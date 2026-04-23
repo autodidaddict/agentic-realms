@@ -27,8 +27,7 @@ defmodule AgenticRealmsWeb.GameLive do
      |> assign(:wizard_user_edited, false)
      |> assign(:wizard_examples, GameData.wizard_examples())
      |> assign(:open_trigger, nil)
-     |> assign(:tweaks, GameData.default_tweaks())
-     |> assign(:tweaks_open, false)}
+     |> assign(:tweaks, build_tweaks(socket.assigns.current_player))}
   end
 
   @impl true
@@ -161,44 +160,19 @@ defmodule AgenticRealmsWeb.GameLive do
     {:noreply, assign(socket, :open_trigger, nil)}
   end
 
-  def handle_event("set_tweak", %{"key" => key, "value" => value}, socket) do
-    tweaks = socket.assigns.tweaks
-
-    {_parsed_value, tweaks} =
-      case key do
-        "show_hud" ->
-          v = value == "true"
-          {v, Map.put(tweaks, :show_hud, v)}
-
-        _ ->
-          {value, Map.put(tweaks, String.to_existing_atom(key), value)}
-      end
-
-    socket = assign(socket, :tweaks, tweaks)
-
-    socket =
-      case key do
-        "theme" ->
-          push_event(socket, "set_theme", %{theme: value})
-
-        "density" ->
-          push_event(socket, "set_density", %{density: value})
-
-        _ ->
-          socket
-      end
-
-    {:noreply, socket}
-  end
-
-  def handle_event("toggle_tweaks", _params, socket) do
-    {:noreply, update(socket, :tweaks_open, &(!&1))}
-  end
-
   def handle_event("stream_done", _params, socket) do
     {:noreply,
      socket
      |> assign(:streaming, false)
      |> update(:log, &(&1 ++ [%{kind: :narrate, text: GameData.streaming_response()}]))}
+  end
+
+  defp build_tweaks(player) do
+    %{
+      theme: player.theme,
+      density: player.density,
+      player_layout: "classic",
+      show_hud: true
+    }
   end
 end

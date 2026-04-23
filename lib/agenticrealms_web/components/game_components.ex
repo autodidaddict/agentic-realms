@@ -8,51 +8,6 @@ defmodule AgenticRealmsWeb.GameComponents do
   alias AgenticRealms.GameData
 
   # ────────────────────────────────────────────────────────────
-  # Topbar
-  # ────────────────────────────────────────────────────────────
-
-  attr :mode, :atom, required: true
-  attr :stats, :map, required: true
-
-  def topbar(assigns) do
-    ~H"""
-    <header class="topbar">
-      <div class="brand">
-        <span class="brand-mark">A</span>
-        <span>Agentic Realms</span>
-        <span class="brand-sep">·</span>
-        <span class="brand-sub">Blackvane server</span>
-      </div>
-      <div class="top-center">
-        <div class="mode-switch" role="tablist">
-          <button
-            class={[@mode == :player && "active"]}
-            data-mode="player"
-            phx-click="switch_mode"
-            phx-value-mode="player"
-          >
-            <span class="dot" /> Player
-          </button>
-          <button
-            class={[@mode == :wizard && "active"]}
-            data-mode="wizard"
-            phx-click="switch_mode"
-            phx-value-mode="wizard"
-          >
-            <span class="dot" /> Wizard
-          </button>
-        </div>
-      </div>
-      <div class="top-right">
-        <span>{String.split(@stats.name, " ") |> hd()}</span>
-        <span class="kbd">⌘K</span>
-        <span>commands</span>
-      </div>
-    </header>
-    """
-  end
-
-  # ────────────────────────────────────────────────────────────
   # HP Bar
   # ────────────────────────────────────────────────────────────
 
@@ -341,7 +296,11 @@ defmodule AgenticRealmsWeb.GameComponents do
   def modal(assigns) do
     ~H"""
     <div class="gm-backdrop" phx-window-keydown="close_modal" phx-key="Escape">
-      <div class="gm-backdrop-click" phx-click="close_modal" style="position: absolute; inset: 0; z-index: 0;" />
+      <div
+        class="gm-backdrop-click"
+        phx-click="close_modal"
+        style="position: absolute; inset: 0; z-index: 0;"
+      />
       <div class="gm-dialog" style="position: relative; z-index: 1;">
         <div class="gm-head">
           <div class="gm-title">
@@ -909,7 +868,11 @@ defmodule AgenticRealmsWeb.GameComponents do
 
     ~H"""
     <div class="gm-backdrop" phx-window-keydown="close_trigger" phx-key="Escape">
-      <div class="gm-backdrop-click" phx-click="close_trigger" style="position: absolute; inset: 0; z-index: 0;" />
+      <div
+        class="gm-backdrop-click"
+        phx-click="close_trigger"
+        style="position: absolute; inset: 0; z-index: 0;"
+      />
       <div class="gm-dialog" style="position: relative; z-index: 1;">
         <div class="trg-modal-head">
           <div style="display: flex; justify-content: space-between; align-items: center;">
@@ -1172,93 +1135,4 @@ defmodule AgenticRealmsWeb.GameComponents do
     """
   end
 
-  # ────────────────────────────────────────────────────────────
-  # Tweaks Panel
-  # ────────────────────────────────────────────────────────────
-
-  attr :tweaks, :map, required: true
-
-  def tweaks_panel(assigns) do
-    ~H"""
-    <div class="tweaks">
-      <h3><span>Design tweaks</span></h3>
-
-      <div class="tweak-field">
-        <label>Theme</label>
-        <div class="seg">
-          <button
-            :for={t <- ~w(phosphor paper dusk)}
-            class={[@tweaks.theme == t && "active"]}
-            phx-click={
-              JS.set_attribute({"data-theme", t}, to: "html")
-              |> JS.dispatch("phx:store-theme", detail: %{theme: t})
-              |> JS.push("set_tweak", value: %{key: "theme", value: t})
-            }
-          >
-            {t}
-          </button>
-        </div>
-      </div>
-
-      <div class="tweak-field">
-        <label>Density</label>
-        <div class="seg">
-          <button
-            :for={d <- ~w(comfortable compact)}
-            class={[@tweaks.density == d && "active"]}
-            phx-click={
-              JS.set_attribute({"data-density", d}, to: "html")
-              |> JS.dispatch("phx:store-density", detail: %{density: d})
-              |> JS.push("set_tweak", value: %{key: "density", value: d})
-            }
-          >
-            {d}
-          </button>
-        </div>
-      </div>
-
-      <div class="tweak-field">
-        <label>Player layout</label>
-        <div class="seg">
-          <button
-            :for={l <- ~w(classic panels minimal)}
-            class={[@tweaks.player_layout == l && "active"]}
-            phx-click="set_tweak"
-            phx-value-key="player_layout"
-            phx-value-value={l}
-          >
-            {l}
-          </button>
-        </div>
-      </div>
-
-      <div class="tweak-field">
-        <label>Wizard preview default</label>
-        <div class="seg">
-          <button
-            :for={p <- ~w(card ingame)}
-            class={[@tweaks.wizard_preview == p && "active"]}
-            phx-click="set_tweak"
-            phx-value-key="wizard_preview"
-            phx-value-value={p}
-          >
-            {p}
-          </button>
-        </div>
-      </div>
-
-      <label class="toggle">
-        <span style="font-size: 11px; color: var(--ink-dim);">Show player HUD</span>
-        <input
-          type="checkbox"
-          checked={@tweaks.show_hud}
-          phx-click="set_tweak"
-          phx-value-key="show_hud"
-          phx-value-value={to_string(!@tweaks.show_hud)}
-        />
-        <span class="switch" />
-      </label>
-    </div>
-    """
-  end
 end
