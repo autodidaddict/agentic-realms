@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="phosphor">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -13,20 +13,33 @@
     <script>
       (() => {
         const setTheme = (theme) => {
-          if (theme === "system") {
-            localStorage.removeItem("phx:theme");
-            document.documentElement.removeAttribute("data-theme");
-          } else {
-            localStorage.setItem("phx:theme", theme);
+          if (theme && ["phosphor", "paper", "dusk"].includes(theme)) {
+            localStorage.setItem("ar:theme", theme);
             document.documentElement.setAttribute("data-theme", theme);
+          } else {
+            document.documentElement.setAttribute("data-theme", "phosphor");
           }
         };
-        if (!document.documentElement.hasAttribute("data-theme")) {
-          setTheme(localStorage.getItem("phx:theme") || "system");
-        }
-        window.addEventListener("storage", (e) => e.key === "phx:theme" && setTheme(e.newValue || "system"));
-        
-        window.addEventListener("phx:set-theme", (e) => setTheme(e.target.dataset.phxTheme));
+        const setDensity = (density) => {
+          if (density) {
+            localStorage.setItem("ar:density", density);
+            document.documentElement.setAttribute("data-density", density);
+          }
+        };
+        setTheme(localStorage.getItem("ar:theme") || "phosphor");
+        setDensity(localStorage.getItem("ar:density") || "comfortable");
+        window.addEventListener("storage", (e) => {
+          if (e.key === "ar:theme") setTheme(e.newValue || "phosphor");
+          if (e.key === "ar:density") setDensity(e.newValue || "comfortable");
+        });
+        window.addEventListener("phx:set-theme", (e) => setTheme(e.detail && e.detail.theme));
+        window.addEventListener("phx:set-density", (e) => setDensity(e.detail && e.detail.density));
+        window.addEventListener("phx:store-theme", (e) => {
+          if (e.detail && e.detail.theme) localStorage.setItem("ar:theme", e.detail.theme);
+        });
+        window.addEventListener("phx:store-density", (e) => {
+          if (e.detail && e.detail.density) localStorage.setItem("ar:density", e.detail.density);
+        });
       })();
     </script>
   </head>

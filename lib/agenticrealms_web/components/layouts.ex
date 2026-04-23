@@ -73,6 +73,24 @@ defmodule AgenticRealmsWeb.Layouts do
   end
 
   @doc """
+  Renders the game layout — a minimal full-viewport shell with no navbar.
+  """
+  attr :flash, :map, required: true, doc: "the map of flash messages"
+
+  attr :current_scope, :map,
+    default: nil,
+    doc: "the current scope"
+
+  slot :inner_block, required: true
+
+  def game(assigns) do
+    ~H"""
+    {render_slot(@inner_block)}
+    <.flash_group flash={@flash} />
+    """
+  end
+
+  @doc """
   Shows the flash group with standard titles and content.
 
   ## Examples
