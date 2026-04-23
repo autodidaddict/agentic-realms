@@ -5,22 +5,17 @@ defmodule AgenticRealmsWeb.Layouts do
   """
   use AgenticRealmsWeb, :html
 
-  # Embed all files in layouts/* within this module.
-  # The default root.html.heex file contains the HTML
-  # skeleton of your application, namely HTML headers
-  # and other static content.
   embed_templates "layouts/*"
 
   @doc """
   Renders your app layout.
 
-  This function is typically invoked from every template,
-  and it often contains your application menu, sidebar,
-  or similar.
+  Shows an authenticated navigation bar when `current_player` is present,
+  or unauthenticated links (Log In / Create Account) when it's nil.
 
   ## Examples
 
-      <Layouts.app flash={@flash}>
+      <Layouts.app flash={@flash} current_player={@current_player}>
         <h1>Content</h1>
       </Layouts.app>
 
@@ -31,41 +26,79 @@ defmodule AgenticRealmsWeb.Layouts do
     default: nil,
     doc: "the current [scope](https://hexdocs.pm/phoenix/scopes.html)"
 
+  attr :current_player, :map, default: nil, doc: "the current authenticated player"
+  attr :game_mode, :atom, default: nil, doc: "current game mode (:player or :wizard) — only set on the game page"
+
   slot :inner_block, required: true
 
   def app(assigns) do
     ~H"""
-    <header class="navbar px-4 sm:px-6 lg:px-8">
-      <div class="flex-1">
-        <a href="/" class="flex-1 flex w-fit items-center gap-2">
-          <img src={~p"/images/logo.svg"} width="36" />
-          <span class="text-sm font-semibold">v{Application.spec(:phoenix, :vsn)}</span>
-        </a>
+    <header class="ar-navbar">
+      <div class="ar-navbar-left">
+        <%= if @current_player do %>
+          <.link navigate={~p"/"} class="ar-nav-home" title="Home">
+            <.icon name="hero-home-solid" class="ar-nav-icon" />
+          </.link>
+          <.link navigate={~p"/play"} class="ar-nav-link">Play</.link>
+        <% else %>
+          <span class="ar-nav-brand">
+            <span class="ar-nav-brand-mark">A</span>
+            <span>Agentic Realms</span>
+          </span>
+        <% end %>
       </div>
-      <div class="flex-none">
-        <ul class="flex flex-column px-1 space-x-4 items-center">
-          <li>
-            <a href="https://phoenixframework.org/" class="btn btn-ghost">Website</a>
-          </li>
-          <li>
-            <a href="https://github.com/phoenixframework/phoenix" class="btn btn-ghost">GitHub</a>
-          </li>
-          <li>
-            <.theme_toggle />
-          </li>
-          <li>
-            <a href="https://hexdocs.pm/phoenix/overview.html" class="btn btn-primary">
-              Get Started <span aria-hidden="true">&rarr;</span>
-            </a>
-          </li>
-        </ul>
+      <div class="ar-navbar-right">
+        <%= if @current_player do %>
+          <%= if @game_mode do %>
+            <div class="mode-switch" role="tablist">
+              <button
+                class={[@game_mode == :player && "active"]}
+                phx-click="switch_mode"
+                phx-value-mode="player"
+              >
+                <span class="dot" /> Player
+              </button>
+              <button
+                class={[@game_mode == :wizard && "active"]}
+                phx-click="switch_mode"
+                phx-value-mode="wizard"
+              >
+                <span class="dot" /> Wizard
+              </button>
+            </div>
+          <% end %>
+          <div class="ar-nav-dropdown" id="user-menu">
+            <button
+              class="ar-nav-username"
+              phx-click={
+                JS.toggle(
+                  to: "#user-menu-items",
+                  in: {"transition-opacity duration-100", "opacity-0", "opacity-100"},
+                  out: {"transition-opacity duration-75", "opacity-100", "opacity-0"}
+                )
+              }
+            >
+              {@current_player.username}
+              <.icon name="hero-chevron-down-mini" class="ar-nav-chevron" />
+            </button>
+            <div id="user-menu-items" class="ar-nav-menu" style="display: none;">
+              <.link navigate={~p"/settings"} class="ar-nav-menu-item">Settings</.link>
+              <.link href={~p"/logout"} method="delete" class="ar-nav-menu-item ar-nav-menu-danger">
+                Log Out
+              </.link>
+            </div>
+          </div>
+        <% else %>
+          <.link navigate={~p"/login"} class="ar-nav-link">Log In</.link>
+          <.link navigate={~p"/register"} class="ar-nav-link ar-nav-link-primary">
+            Create Account
+          </.link>
+        <% end %>
       </div>
     </header>
 
-    <main class="px-4 py-20 sm:px-6 lg:px-8">
-      <div class="mx-auto max-w-2xl space-y-4">
-        {render_slot(@inner_block)}
-      </div>
+    <main class="ar-main">
+      {render_slot(@inner_block)}
     </main>
 
     <.flash_group flash={@flash} />
@@ -129,43 +162,6 @@ defmodule AgenticRealmsWeb.Layouts do
         Attempting to reconnect
         <.icon name="hero-arrow-path" class="ml-1 size-3 motion-safe:animate-spin" />
       </.flash>
-    </div>
-    """
-  end
-
-  @doc """
-  Provides dark vs light theme toggle based on themes defined in app.css.
-
-  See <head> in root.html.heex which applies the theme before page load.
-  """
-  def theme_toggle(assigns) do
-    ~H"""
-    <div class="card relative flex flex-row items-center border-2 border-base-300 bg-base-300 rounded-full">
-      <div class="absolute w-1/3 h-full rounded-full border-1 border-base-200 bg-base-100 brightness-200 left-0 [[data-theme=light]_&]:left-1/3 [[data-theme=dark]_&]:left-2/3 transition-[left]" />
-
-      <button
-        class="flex p-2 cursor-pointer w-1/3"
-        phx-click={JS.dispatch("phx:set-theme")}
-        data-phx-theme="system"
-      >
-        <.icon name="hero-computer-desktop-micro" class="size-4 opacity-75 hover:opacity-100" />
-      </button>
-
-      <button
-        class="flex p-2 cursor-pointer w-1/3"
-        phx-click={JS.dispatch("phx:set-theme")}
-        data-phx-theme="light"
-      >
-        <.icon name="hero-sun-micro" class="size-4 opacity-75 hover:opacity-100" />
-      </button>
-
-      <button
-        class="flex p-2 cursor-pointer w-1/3"
-        phx-click={JS.dispatch("phx:set-theme")}
-        data-phx-theme="dark"
-      >
-        <.icon name="hero-moon-micro" class="size-4 opacity-75 hover:opacity-100" />
-      </button>
     </div>
     """
   end

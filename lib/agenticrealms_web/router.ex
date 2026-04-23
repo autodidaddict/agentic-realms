@@ -1,6 +1,8 @@
 defmodule AgenticRealmsWeb.Router do
   use AgenticRealmsWeb, :router
 
+  import AgenticRealmsWeb.PlayerAuth
+
   pipeline :browser do
     plug :accepts, ["html"]
     plug :fetch_session
@@ -8,30 +10,51 @@ defmodule AgenticRealmsWeb.Router do
     plug :put_root_layout, html: {AgenticRealmsWeb.Layouts, :root}
     plug :protect_from_forgery
     plug :put_secure_browser_headers
+    plug :fetch_current_player
   end
 
   pipeline :api do
     plug :accepts, ["json"]
   end
 
+  # Public routes (redirect if already authenticated)
+  scope "/", AgenticRealmsWeb do
+    pipe_through [:browser, :redirect_if_player_is_authenticated]
+
+    live_session :redirect_if_authenticated,
+      on_mount: [{AgenticRealmsWeb.PlayerAuth, :redirect_if_authenticated}] do
+      live "/login", PlayerLoginLive
+      live "/register", PlayerRegistrationLive
+    end
+
+    post "/login", PlayerSessionController, :create
+  end
+
+  # Public routes (no redirect)
   scope "/", AgenticRealmsWeb do
     pipe_through :browser
 
-    live "/", GameLive
+    live_session :public,
+      on_mount: [{AgenticRealmsWeb.PlayerAuth, :mount_current_player}] do
+      live "/", LandingLive
+    end
   end
 
-  # Other scopes may use custom stacks.
-  # scope "/api", AgenticRealmsWeb do
-  #   pipe_through :api
-  # end
+  # Authenticated routes
+  scope "/", AgenticRealmsWeb do
+    pipe_through [:browser, :require_authenticated_player]
+
+    live_session :authenticated,
+      on_mount: [{AgenticRealmsWeb.PlayerAuth, :ensure_authenticated}] do
+      live "/play", GameLive
+      live "/settings", PlayerSettingsLive
+    end
+
+    delete "/logout", PlayerSessionController, :delete
+  end
 
   # Enable LiveDashboard in development
   if Application.compile_env(:agenticrealms, :dev_routes) do
-    # If you want to use the LiveDashboard in production, you should put
-    # it behind authentication and allow only admins to access it.
-    # If your application does not have an admins-only section yet,
-    # you can use Plug.BasicAuth to set up some basic authentication
-    # as long as you are also using SSL (which you should anyway).
     import Phoenix.LiveDashboard.Router
 
     scope "/dev" do
