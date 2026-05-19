@@ -157,4 +157,153 @@ defmodule AgenticRealms.World.CommandParserTest do
       assert {:unknown, "Dance"} = CommandParser.parse("Dance")
     end
   end
+
+  # ──────────────────────────────────────────────────────────────────────
+  # Feature 004 — Communication verbs
+  # ──────────────────────────────────────────────────────────────────────
+
+  describe "say (US1)" do
+    test "basic say" do
+      assert {:say, "hello"} = CommandParser.parse("say hello")
+    end
+
+    test "preserves internal whitespace in text" do
+      assert {:say, "hi   mom"} = CommandParser.parse("say hi   mom")
+    end
+
+    test "preserves case in text" do
+      assert {:say, "HEY"} = CommandParser.parse("SAY HEY")
+      assert {:say, "Hello World"} = CommandParser.parse("say Hello World")
+    end
+
+    test "apostrophe shortcut without space" do
+      assert {:say, "hello"} = CommandParser.parse("'hello")
+    end
+
+    test "apostrophe shortcut with leading space" do
+      assert {:say, "hello"} = CommandParser.parse("' hello")
+    end
+
+    test "apostrophe shortcut preserves case" do
+      assert {:say, "Hi There"} = CommandParser.parse("'Hi There")
+    end
+
+    test "say alone produces :say_empty" do
+      assert {:say_empty} = CommandParser.parse("say")
+    end
+
+    test "say with whitespace-only text produces :say_empty" do
+      assert {:say_empty} = CommandParser.parse("say     ")
+    end
+
+    test "apostrophe alone produces :say_empty" do
+      assert {:say_empty} = CommandParser.parse("'")
+    end
+
+    test "apostrophe with only whitespace produces :say_empty" do
+      assert {:say_empty} = CommandParser.parse("'    ")
+    end
+  end
+
+  describe "emote (US2)" do
+    test "emote verb form" do
+      assert {:emote, "waves"} = CommandParser.parse("emote waves")
+    end
+
+    test "me alias" do
+      assert {:emote, "waves"} = CommandParser.parse("me waves")
+    end
+
+    test "colon shortcut without space" do
+      assert {:emote, "waves"} = CommandParser.parse(":waves")
+    end
+
+    test "colon shortcut with leading space" do
+      assert {:emote, "waves"} = CommandParser.parse(": waves")
+    end
+
+    test "preserves case in text" do
+      assert {:emote, "Waves"} = CommandParser.parse("EMOTE Waves")
+      assert {:emote, "Bows DEEPLY"} = CommandParser.parse("me Bows DEEPLY")
+    end
+
+    test "emote alone produces :emote_empty" do
+      assert {:emote_empty} = CommandParser.parse("emote")
+    end
+
+    test "me alone produces :emote_empty" do
+      assert {:emote_empty} = CommandParser.parse("me")
+    end
+
+    test "colon alone produces :emote_empty" do
+      assert {:emote_empty} = CommandParser.parse(":")
+    end
+
+    test "mention does NOT parse as me ntion" do
+      # `me` must match the whole first word, not be a prefix
+      assert {:unknown, "mention"} = CommandParser.parse("mention")
+    end
+  end
+
+  describe "tell (US3)" do
+    test "basic tell" do
+      assert {:tell, "alice", "hi"} = CommandParser.parse("tell alice hi")
+    end
+
+    test "t alias" do
+      assert {:tell, "alice", "hi"} = CommandParser.parse("t alice hi")
+    end
+
+    test "preserves recipient case and internal whitespace in text" do
+      assert {:tell, "Bob", "hi there"} = CommandParser.parse("tell Bob   hi there")
+    end
+
+    test "tell alone produces :tell_no_recipient" do
+      assert {:tell_no_recipient} = CommandParser.parse("tell")
+    end
+
+    test "t alone produces :tell_no_recipient" do
+      assert {:tell_no_recipient} = CommandParser.parse("t")
+    end
+
+    test "tell with only recipient produces :tell_no_text" do
+      assert {:tell_no_text, "alice"} = CommandParser.parse("tell alice")
+    end
+
+    test "tell with recipient and whitespace-only text produces :tell_no_text" do
+      assert {:tell_no_text, "alice"} = CommandParser.parse("tell alice    ")
+    end
+
+    test "tell is NOT accepted as whisper alias" do
+      refute match?({:whisper, _, _}, CommandParser.parse("tell alice hi"))
+    end
+  end
+
+  describe "whisper (US4)" do
+    test "basic whisper" do
+      assert {:whisper, "alice", "hi"} = CommandParser.parse("whisper alice hi")
+    end
+
+    test "preserves recipient case and internal whitespace in text" do
+      assert {:whisper, "Bob", "hi there"} = CommandParser.parse("whisper Bob   hi there")
+    end
+
+    test "whisper alone produces :whisper_no_recipient" do
+      assert {:whisper_no_recipient} = CommandParser.parse("whisper")
+    end
+
+    test "whisper with only recipient produces :whisper_no_text" do
+      assert {:whisper_no_text, "alice"} = CommandParser.parse("whisper alice")
+    end
+
+    test "whisper is NOT accepted as tell alias" do
+      refute match?({:tell, _, _}, CommandParser.parse("whisper alice hi"))
+    end
+
+    test "w is reserved for the west movement alias from feature 003" do
+      # The 004 spec originally listed `w` as a whisper alias, but it conflicts
+      # with 003's `w`-for-west. Resolved in favor of the movement alias.
+      assert {:move, :west} = CommandParser.parse("w")
+    end
+  end
 end
