@@ -28,12 +28,21 @@ defmodule AgenticRealmsWeb.GameLivePresenceTest do
       |> Plug.Test.init_test_session(%{})
       |> Plug.Conn.put_session(:player_id, alice.id)
 
-    %{alice: alice, kevin: kevin, alice_conn: alice_conn}
+    kevin_conn =
+      conn
+      |> Plug.Test.init_test_session(%{})
+      |> Plug.Conn.put_session(:player_id, kevin.id)
+
+    %{alice: alice, kevin: kevin, alice_conn: alice_conn, kevin_conn: kevin_conn}
   end
 
   test "alice's Present HUD updates when kevin moves out of and back into the atrium",
-       %{alice_conn: conn, kevin: kevin} do
+       %{alice_conn: conn, kevin_conn: kconn, kevin: kevin} do
     {:ok, view, _html} = live(conn, ~p"/play")
+    # Mount kevin's LiveView too so Phoenix.Presence tracks him as online.
+    # Without this, the Present HUD's online-only filter (Queries.list_other_players)
+    # correctly excludes him — he's spawned in the world but not connected.
+    {:ok, _kevin_view, _} = live(kconn, ~p"/play")
 
     # Give the LiveView a beat to finish post-mount setup (PubSub
     # subscriptions complete inside mount but the test process can race
