@@ -10,7 +10,25 @@ import Config
 config :agenticrealms,
   namespace: AgenticRealms,
   ecto_repos: [AgenticRealms.Repo],
+  event_stores: [AgenticRealms.EventStore],
   generators: [timestamp_type: :utc_datetime]
+
+# Commanded application + EventStore adapter
+config :agenticrealms, AgenticRealms.World.Application,
+  event_store: [
+    adapter: Commanded.EventStore.Adapters.EventStore,
+    event_store: AgenticRealms.EventStore
+  ],
+  pubsub: :local,
+  registry: :local
+
+config :agenticrealms, AgenticRealms.EventStore,
+  serializer: EventStore.JsonSerializer,
+  column_data_type: "jsonb",
+  username: "postgres",
+  password: "postgres",
+  database: "agenticrealms_eventstore",
+  hostname: "localhost"
 
 # Configure the endpoint
 config :agenticrealms, AgenticRealmsWeb.Endpoint,

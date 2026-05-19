@@ -12,8 +12,14 @@ defmodule AgenticRealms.Application do
       AgenticRealms.Repo,
       {DNSCluster, query: Application.get_env(:agenticrealms, :dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: AgenticRealms.PubSub},
-      # Start a worker by calling: AgenticRealms.Worker.start_link(arg)
-      # {AgenticRealms.Worker, arg},
+      AgenticRealmsWeb.Presence,
+      # AgenticRealms.EventStore is started transitively by World.Application
+      # via the commanded_eventstore_adapter — listing it here causes a
+      # double-start (:already_started).
+      AgenticRealms.World.Application,
+      AgenticRealms.World.Projections.WorldProjector,
+      AgenticRealms.World.Projections.PlayerStateProjector,
+      AgenticRealms.World.UIEventBroadcaster,
       # Start to serve requests, typically the last entry
       AgenticRealmsWeb.Endpoint
     ]

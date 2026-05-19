@@ -33,3 +33,13 @@ config :phoenix_live_view,
 # Sort query params output of verified routes for robust url comparisons
 config :phoenix,
   sort_verified_routes_query_params: true
+
+# In tests use the in-memory event store adapter so we don't need a separate
+# Postgres database for event sourcing and tests stay fast/hermetic.
+config :agenticrealms, AgenticRealms.World.Application,
+  event_store: [
+    adapter: Commanded.EventStore.Adapters.InMemory,
+    serializer: Commanded.Serialization.JsonSerializer
+  ],
+  pubsub: :local,
+  registry: :local
