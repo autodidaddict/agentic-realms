@@ -26,10 +26,26 @@ defmodule AgenticRealmsWeb.GameLive do
     player_id = socket.assigns.current_player.id
     username = socket.assigns.current_player.username
 
-    {:ok, _} = Commands.spawn(player_id, Seed.starting_room_id())
+    # `:already_spawned` is success — happens when two mounts race or when
+    # the read model thinks we're not spawned (FR-022) but the aggregate
+    # disagrees. The pre-dispatch check in Commands.spawn/2 returns
+    # :no_current_room in both cases; the aggregate then rejects the
+    # second dispatch.
+    :ok =
+      case Commands.spawn(player_id, Seed.starting_room_id()) do
+        {:ok, _} -> :ok
+        {:error, :already_spawned} -> :ok
+      end
 
-    {:ok, current_room_id} = Queries.current_room_of(player_id)
-    {:ok, room_view} = Queries.look_room(player_id)
+    {current_room_id, room_view} =
+      case Queries.look_room(player_id) do
+        {:ok, view} ->
+          {view.id, view}
+
+        {:error, reason} ->
+          raise "GameLive mount: look_room/1 returned #{inspect(reason)} for player #{player_id} after spawn — read model and aggregate are desynced (likely FR-022)"
+      end
+
     inventory = Queries.list_inventory(player_id)
     presence = Queries.other_occupants_of(current_room_id, player_id)
 
@@ -384,11 +400,14 @@ defmodule AgenticRealmsWeb.GameLive do
     end
   end
 
-  def handle_info(%PlayerInventoryChanged{player_id: pid}, socket) do
-    # Refresh inventory snapshot for this player's other sessions (the
-    # originating tab already updated its assign inline in handle_take/drop).
-    inventory = Queries.list_inventory(pid)
-    {:noreply, assign(socket, :inventory, inventory)}
+  def handle_info(%PlayerInventoryChanged{} = msg, socket) do
+    # Mutate :inventory from the broadcast payload — re-querying would
+    # be subject to the same :strong handler-ordering race we hit for
+    # presence (Commanded doesn't order :strong handlers relative to
+    # each other, so the broadcaster can fire before WorldProjector
+    # commits the world_objects update). The payload carries
+    # everything list_inventory would return.
+    {:noreply, apply_inventory_change(socket, msg)}
   end
 
   def handle_info(%Phoenix.Socket.Broadcast{event: "presence_diff", payload: payload}, socket) do
@@ -479,6 +498,37 @@ defmodule AgenticRealmsWeb.GameLive do
   defp remove_from_presence(socket, actor_id) do
     current = socket.assigns[:presence] || []
     assign(socket, :presence, Enum.reject(current, &(&1.id == actor_id)))
+  end
+
+  # Mutate :inventory from a PlayerInventoryChanged broadcast payload.
+  # Same rationale as add_to_presence/3 — avoids the race against
+  # WorldProjector commit ordering.
+  defp apply_inventory_change(socket, %PlayerInventoryChanged{change: :added} = msg) do
+    current = socket.assigns[:inventory] || []
+
+    if Enum.any?(current, &(&1.id == msg.object_id)) do
+      socket
+    else
+      new =
+        Enum.sort_by(
+          [
+            %{
+              id: msg.object_id,
+              name: msg.object_name,
+              short_description: msg.object_short_description
+            }
+            | current
+          ],
+          & &1.name
+        )
+
+      assign(socket, :inventory, new)
+    end
+  end
+
+  defp apply_inventory_change(socket, %PlayerInventoryChanged{change: :removed} = msg) do
+    current = socket.assigns[:inventory] || []
+    assign(socket, :inventory, Enum.reject(current, &(&1.id == msg.object_id)))
   end
 
   defp presence_entries(key, meta, my_room, self_id, type) do
