@@ -90,7 +90,7 @@ defmodule AgenticRealms.World.UIEventBroadcaster do
         _meta
       ) do
     actor_username = lookup_username(pid)
-    direction_atom = atomize_direction(direction)
+    {:ok, direction_atom} = Direction.parse(direction)
 
     from_topic = AgenticRealms.World.room_topic(from)
 
@@ -188,12 +188,4 @@ defmodule AgenticRealms.World.UIEventBroadcaster do
       %{name: name, short_description: short} -> {name, short}
     end
   end
-
-  defp atomize_direction(d) when is_atom(d), do: d
-  defp atomize_direction("north"), do: :north
-  defp atomize_direction("south"), do: :south
-  defp atomize_direction("east"), do: :east
-  defp atomize_direction("west"), do: :west
-  defp atomize_direction("up"), do: :up
-  defp atomize_direction("down"), do: :down
 end
