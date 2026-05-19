@@ -1,0 +1,200 @@
+defmodule AgenticRealmsWeb.GameLiveIntentParserTest do
+  @moduledoc """
+  End-to-end LiveView test for feature 005 (natural-language intent parser).
+
+  Structured as a single comprehensive test exercising US1 (success path),
+  US2 (refusal), and US3 (resilience) in sequence — one `Seed.run` setup,
+  one mounted LiveView. Multiple per-test setups conflict with the in-memory
+  event store accumulating state across the suite (same constraint that
+  shaped the 004 LiveView tests).
+
+  Tagged `:integration` and excluded from the default `mix test` run. Run with
+  `mix test --include integration test/agenticrealms_web/live/game_live_intent_parser_test.exs`.
+
+  The intent resolver runs in a Task spawned off the LiveView, so the test
+  puts `Req.Test` in shared mode — the Task process can then reach the stub
+  registered here.
+  """
+
+  use AgenticRealmsWeb.ConnCase, async: false
+
+  @moduletag :integration
+
+  import Phoenix.LiveViewTest
+
+  alias AgenticRealms.Accounts
+  alias AgenticRealms.World.{Commands, Queries, Seed}
+
+  setup %{conn: conn} do
+    # Defensive seed (see game_live_communication_test for the rationale).
+    try do
+      Seed.run()
+    rescue
+      MatchError -> :already_seeded
+    end
+
+    # Shared mode so the resolver Task (a separate process) sees our stub.
+    Req.Test.set_req_test_to_shared(%{})
+
+    suffix = System.unique_integer([:positive])
+    {:ok, player} = Accounts.register_player(%{username: "ip_#{suffix}", password: "pw12345678"})
+    {:ok, _} = Commands.spawn(player.id, Seed.starting_room_id())
+
+    player_conn =
+      conn
+      |> Plug.Test.init_test_session(%{})
+      |> Plug.Conn.put_session(:player_id, player.id)
+
+    %{player: player, player_conn: player_conn}
+  end
+
+  test "natural-language input resolves, refuses, and survives API failure",
+       %{player_conn: conn, player: player} do
+    {:ok, view, _html} = live(conn, ~p"/play")
+    flush(view)
+
+    lantern_name = first_object_name(player.id)
+
+    # ── US1: natural-language take resolves to the canonical take action ──
+    stub_tool_use("take", %{"object" => lantern_name})
+
+    submit(view, "grab the #{lantern_name} off the floor")
+    await_unlock(view)
+
+    html = render(view)
+
+    assert html =~ "grab the #{lantern_name} off the floor",
+           "the player's literal input should be echoed as a :cmd entry"
+
+    assert html =~ "You take the #{lantern_name}",
+           "the resolved take action should produce the standard confirmation"
+
+    assert lantern_name in Enum.map(Queries.list_inventory(player.id), & &1.name),
+           "the lantern should now be in the player's inventory"
+
+    # ── US2: a refuse tool call surfaces the model's message, takes no action ──
+    # (Apostrophe-free message so the assertion isn't tripped by HTML escaping.)
+    stub_tool_use("refuse", %{"message" => "Examining specific objects is not supported yet."})
+
+    inventory_before = Queries.list_inventory(player.id)
+    submit(view, "examine the mysterious runes very closely")
+    await_unlock(view)
+
+    html = render(view)
+    assert html =~ "Examining specific objects is not supported yet."
+
+    assert Queries.list_inventory(player.id) == inventory_before,
+           "a refusal must not change game state"
+
+    # ── US3: an API failure degrades to a graceful refusal, session stays usable ──
+    Req.Test.stub(AgenticRealms.Anthropic, fn conn ->
+      Plug.Conn.send_resp(conn, 500, ~s({"error": "overloaded"}))
+    end)
+
+    submit(view, "do something the parser cannot handle either")
+    await_unlock(view)
+
+    html = render(view)
+    # Substring match — the full message has an apostrophe that HTML-escapes.
+    assert html =~ "not sure what you meant just now",
+           "an API failure should produce the graceful refusal"
+
+    # The session is still usable — a canonical fast-path command works after
+    # the failure (and never touches the resolver).
+    submit(view, "look")
+    flush(view)
+    assert render(view) =~ "Stone Atrium"
+
+    # ── 005a: a fast-parsed command that fails object-name resolution falls
+    #    back to the LLM, which resolves the loose noun phrase ──
+    # The player picked up the lantern in US1. "drop the lantern" parses
+    # cleanly as {:drop, "the lantern"}, but "the lantern" does not exact-match
+    # the carried object name — the fast path fails with :not_in_inventory,
+    # and the (stubbed) LLM resolves "the lantern" → the real object name.
+    assert lantern_name in Enum.map(Queries.list_inventory(player.id), & &1.name),
+           "precondition: the lantern is still carried from US1"
+
+    stub_tool_use("drop", %{"object" => lantern_name})
+
+    submit(view, "drop the lantern")
+    await_unlock(view)
+
+    html = render(view)
+
+    assert html =~ "You drop the #{lantern_name}",
+           "a fast-path drop that fails name resolution should fall back to the LLM and succeed"
+
+    refute lantern_name in Enum.map(Queries.list_inventory(player.id), & &1.name),
+           "the lantern should no longer be carried after the resolved drop"
+
+    # Exactly one :cmd echo of the literal input — the fast-path attempt that
+    # fell back must NOT echo; only the LLM-dispatched retry does.
+    assert cmd_echo_count(html, "drop the lantern") == 1,
+           "the literal input must be echoed exactly once, not doubled by the fallback"
+  end
+
+  # --- Helpers ------------------------------------------------------------
+
+  defp stub_tool_use(tool_name, input) do
+    Req.Test.stub(AgenticRealms.Anthropic, fn conn ->
+      Req.Test.json(conn, %{
+        "content" => [
+          %{"type" => "tool_use", "id" => "toolu_test", "name" => tool_name, "input" => input}
+        ],
+        "stop_reason" => "tool_use"
+      })
+    end)
+  end
+
+  defp submit(view, text) do
+    view
+    |> form("form[phx-submit='submit_command']", %{"text" => text})
+    |> render_submit()
+  end
+
+  defp flush(view) do
+    _ = :sys.get_state(view.pid)
+    :ok
+  end
+
+  # Count `:cmd` log entries rendered with exactly `text`.
+  defp cmd_echo_count(html, text) do
+    html
+    |> String.split(~s(class="log-entry cmd">#{text}</div>))
+    |> length()
+    |> Kernel.-(1)
+  end
+
+  # Poll until the resolver task has completed (input_locked back to false).
+  defp await_unlock(view, timeout_ms \\ 5_000) do
+    deadline = System.monotonic_time(:millisecond) + timeout_ms
+    do_await_unlock(view, deadline)
+  end
+
+  defp do_await_unlock(view, deadline) do
+    state = :sys.get_state(view.pid)
+
+    cond do
+      not state.socket.assigns.input_locked ->
+        :ok
+
+      System.monotonic_time(:millisecond) > deadline ->
+        flunk("resolver task did not complete (input still locked) within timeout")
+
+      true ->
+        Process.sleep(25)
+        do_await_unlock(view, deadline)
+    end
+  end
+
+  # First object visible in the player's current room (the seeded starter
+  # room places a single takeable object — the brass lantern — in the atrium).
+  defp first_object_name(player_id) do
+    {:ok, room} = Queries.look_room(player_id)
+
+    case room.objects do
+      [obj | _] -> obj.name
+      [] -> flunk("expected the starting room to contain a takeable object")
+    end
+  end
+end

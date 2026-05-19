@@ -39,3 +39,7 @@ settings.local.json
 CLAUDE.local.md
 .claude/logs/
 
+# Local environment files — may hold ANTHROPIC_API_KEY and other secrets.
+.env
+.env.*
+

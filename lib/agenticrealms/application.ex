@@ -13,6 +13,10 @@ defmodule AgenticRealms.Application do
       {DNSCluster, query: Application.get_env(:agenticrealms, :dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: AgenticRealms.PubSub},
       AgenticRealmsWeb.Presence,
+      # Supervises per-request natural-language intent-resolver tasks
+      # (feature 005) so a slow or crashing Anthropic call cannot take
+      # down the LiveView that spawned it.
+      {Task.Supervisor, name: AgenticRealms.IntentResolverTaskSupervisor},
       # AgenticRealms.EventStore is started transitively by World.Application
       # via the commanded_eventstore_adapter — listing it here causes a
       # double-start (:already_started).

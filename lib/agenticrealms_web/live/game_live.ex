@@ -6,7 +6,16 @@ defmodule AgenticRealmsWeb.GameLive do
   alias AgenticRealms.Accounts
   alias AgenticRealms.GameData
   alias AgenticRealms.World
-  alias AgenticRealms.World.{Commands, CommandParser, Communication, Direction, Queries, Seed}
+
+  alias AgenticRealms.World.{
+    Commands,
+    CommandParser,
+    Communication,
+    Direction,
+    IntentResolver,
+    Queries,
+    Seed
+  }
 
   alias AgenticRealms.World.UIEvents.{
     RoomPlayerArrived,
@@ -71,6 +80,11 @@ defmodule AgenticRealmsWeb.GameLive do
      # (FR-005: speaker's own session does not render the witness broadcast it
      # produced). See specs/004-player-communication/contracts/ui_events.md.
      |> assign(:session_id, make_ref())
+     # Feature 005 — natural-language intent resolution. `resolver_task`
+     # tracks an in-flight async LLM call; `input_locked` disables the
+     # command input while it runs.
+     |> assign(:resolver_task, nil)
+     |> assign(:input_locked, false)
      |> assign(:stats, GameData.player_stats())
      |> assign(:inventory, inventory)
      |> assign(:quests, GameData.quests())
@@ -91,6 +105,12 @@ defmodule AgenticRealmsWeb.GameLive do
     {:noreply, assign(socket, :mode, String.to_existing_atom(mode))}
   end
 
+  # While a natural-language resolver task is in flight the input is locked;
+  # ignore any submit that slips through (e.g. a queued client event).
+  def handle_event("submit_command", _params, %{assigns: %{input_locked: true}} = socket) do
+    {:noreply, socket}
+  end
+
   def handle_event("submit_command", %{"text" => text}, socket) do
     case CommandParser.parse(text) do
       {:empty} ->
@@ -106,10 +126,10 @@ defmodule AgenticRealmsWeb.GameLive do
         handle_move(socket, text, dir)
 
       {:take, name} ->
-        handle_take(socket, text, name)
+        handle_take(socket, text, name, true)
 
       {:drop, name} ->
-        handle_drop(socket, text, name)
+        handle_drop(socket, text, name, true)
 
       {:invalid_take_target} ->
         echo_then_system(socket, text, "Take what?")
@@ -148,11 +168,7 @@ defmodule AgenticRealmsWeb.GameLive do
         echo_then_system(socket, text, "Whisper to #{recipient} what?")
 
       {:unknown, raw} ->
-        {:noreply,
-         socket
-         |> append_log(%{kind: :cmd, text: raw})
-         |> append_log(%{kind: :system, text: "I don't understand \"#{raw}\"."})
-         |> assign(:input, "")}
+        handle_unknown(socket, raw)
     end
   end
 
@@ -221,6 +237,48 @@ defmodule AgenticRealmsWeb.GameLive do
 
   def handle_event("stream_done", _params, socket) do
     {:noreply, assign(socket, :streaming, false)}
+  end
+
+  # --- Natural-language fallback (feature 005) -----------------------------
+
+  # Input the fast parser couldn't resolve. Spawn a supervised async task to
+  # resolve it via the LLM; lock the input and stash the task ref + raw text
+  # so handle_info/2 can finish the job when the task replies.
+  defp handle_unknown(socket, raw) do
+    player_id = socket.assigns.current_player.id
+
+    task =
+      Task.Supervisor.async_nolink(
+        AgenticRealms.IntentResolverTaskSupervisor,
+        IntentResolver,
+        :resolve,
+        [player_id, raw]
+      )
+
+    {:noreply,
+     socket
+     |> assign(:resolver_task, %{ref: task.ref, raw_input: raw})
+     |> assign(:input_locked, true)
+     |> assign(:input, "")}
+  end
+
+  # Dispatch a resolver-produced action tuple through the same handlers the
+  # fast-path parser sentinels use. `raw` is the player's literal input, so
+  # the handlers echo the correct `:cmd` entry.
+  defp dispatch_resolved_action(socket, raw, action) do
+    case action do
+      {:look} -> handle_look(socket, raw)
+      {:inventory} -> handle_inventory(socket, raw)
+      {:move, dir} -> handle_move(socket, raw, dir)
+      # allow_fallback?: false — this IS the LLM-resolved retry; a still-failing
+      # take/drop refuses rather than looping back into the resolver.
+      {:take, name} -> handle_take(socket, raw, name, false)
+      {:drop, name} -> handle_drop(socket, raw, name, false)
+      {:say, said} -> handle_say(socket, raw, said)
+      {:emote, said} -> handle_emote(socket, raw, said)
+      {:tell, recipient, message} -> handle_tell(socket, raw, recipient, message)
+      {:whisper, recipient, message} -> handle_whisper(socket, raw, recipient, message)
+    end
   end
 
   # --- Command handlers ----------------------------------------------------
@@ -308,11 +366,22 @@ defmodule AgenticRealmsWeb.GameLive do
     end
   end
 
-  defp handle_take(socket, raw, name) do
+  # `allow_fallback?` is true on a fast-path attempt: if the object name does
+  # not resolve (`:no_such_object`), the raw input is handed to the LLM, which
+  # can map a loose noun phrase like "the lantern" against actual room
+  # contents (feature 005a). It is false on an LLM-dispatched retry so a
+  # still-failing action simply refuses — no fallback loop.
+  #
+  # The `:cmd` echo is deferred until after the command runs: on the fallback
+  # path nothing is echoed here (the LLM-result handler echoes once when it
+  # dispatches the resolved action), which keeps the log to a single echo.
+  defp handle_take(socket, raw, name, allow_fallback?) do
     player_id = socket.assigns.current_player.id
-    socket = socket |> append_log(%{kind: :cmd, text: String.trim(raw)}) |> assign(:input, "")
 
     case Commands.take(player_id, name) do
+      {:error, :no_such_object} when allow_fallback? ->
+        handle_unknown(socket, raw)
+
       {:ok, %{object_name: object_name}} ->
         # Actor's own confirmation + locally refresh inventory snapshot
         # (PlayerInventoryChanged broadcast also targets us, but it'd race
@@ -322,56 +391,71 @@ defmodule AgenticRealmsWeb.GameLive do
 
         {:noreply,
          socket
+         |> echo(raw)
          |> assign(:inventory, inventory)
          |> append_log(%{kind: :system, text: "You take the #{object_name}."})}
 
-      {:error, :no_such_object} ->
-        {:noreply, append_log(socket, %{kind: :system, text: "You don't see that here."})}
-
-      {:error, :object_not_in_room} ->
-        {:noreply, append_log(socket, %{kind: :system, text: "You don't see that here."})}
+      {:error, err} when err in [:no_such_object, :object_not_in_room] ->
+        {:noreply,
+         socket |> echo(raw) |> append_log(%{kind: :system, text: "You don't see that here."})}
 
       {:error, :object_is_fixed} ->
-        {:noreply, append_log(socket, %{kind: :system, text: "You can't take that."})}
+        {:noreply,
+         socket |> echo(raw) |> append_log(%{kind: :system, text: "You can't take that."})}
 
       {:error, :ambiguous} ->
-        {:noreply, append_log(socket, %{kind: :system, text: "Which one do you mean?"})}
+        {:noreply,
+         socket |> echo(raw) |> append_log(%{kind: :system, text: "Which one do you mean?"})}
 
       {:error, :no_current_room} ->
-        {:noreply, append_log(socket, %{kind: :system, text: "You are nowhere."})}
+        {:noreply, socket |> echo(raw) |> append_log(%{kind: :system, text: "You are nowhere."})}
 
       {:error, reason} ->
         {:noreply,
-         append_log(socket, %{kind: :system, text: "You can't take that (#{inspect(reason)})."})}
+         socket
+         |> echo(raw)
+         |> append_log(%{kind: :system, text: "You can't take that (#{inspect(reason)})."})}
     end
   end
 
-  defp handle_drop(socket, raw, name) do
+  defp handle_drop(socket, raw, name, allow_fallback?) do
     player_id = socket.assigns.current_player.id
-    socket = socket |> append_log(%{kind: :cmd, text: String.trim(raw)}) |> assign(:input, "")
 
     case Commands.drop(player_id, name) do
+      {:error, :not_in_inventory} when allow_fallback? ->
+        handle_unknown(socket, raw)
+
       {:ok, %{object_name: object_name}} ->
         inventory = Queries.list_inventory(player_id)
 
         {:noreply,
          socket
+         |> echo(raw)
          |> assign(:inventory, inventory)
          |> append_log(%{kind: :system, text: "You drop the #{object_name}."})}
 
       {:error, :not_in_inventory} ->
-        {:noreply, append_log(socket, %{kind: :system, text: "You aren't carrying that."})}
+        {:noreply,
+         socket |> echo(raw) |> append_log(%{kind: :system, text: "You aren't carrying that."})}
 
       {:error, :ambiguous} ->
-        {:noreply, append_log(socket, %{kind: :system, text: "Which one do you mean?"})}
+        {:noreply,
+         socket |> echo(raw) |> append_log(%{kind: :system, text: "Which one do you mean?"})}
 
       {:error, :no_current_room} ->
-        {:noreply, append_log(socket, %{kind: :system, text: "You are nowhere."})}
+        {:noreply, socket |> echo(raw) |> append_log(%{kind: :system, text: "You are nowhere."})}
 
       {:error, reason} ->
         {:noreply,
-         append_log(socket, %{kind: :system, text: "You can't drop that (#{inspect(reason)})."})}
+         socket
+         |> echo(raw)
+         |> append_log(%{kind: :system, text: "You can't drop that (#{inspect(reason)})."})}
     end
+  end
+
+  # Append the `:cmd` echo of the player's literal input and clear the input box.
+  defp echo(socket, raw) do
+    socket |> append_log(%{kind: :cmd, text: String.trim(raw)}) |> assign(:input, "")
   end
 
   defp echo_then_system(socket, raw, text) do
@@ -517,9 +601,64 @@ defmodule AgenticRealmsWeb.GameLive do
 
   defp too_long_message, do: "Your message is too long (max 500 characters)."
 
-  # --- UI events from World.UIEventBroadcaster ----------------------------
+  # --- Intent-resolver task replies (feature 005) -------------------------
 
   @impl true
+  # The async LLM resolver finished. Demonitor (flushing the trailing :DOWN),
+  # unlock the input, and either dispatch the resolved action or append the
+  # refusal. `IntentResolver.resolve/2` never raises, so this is the path
+  # taken for every normal completion.
+  def handle_info({ref, result}, %{assigns: %{resolver_task: %{ref: ref}}} = socket) do
+    Process.demonitor(ref, [:flush])
+    raw = socket.assigns.resolver_task.raw_input
+
+    socket =
+      socket
+      |> assign(:resolver_task, nil)
+      |> assign(:input_locked, false)
+
+    case result do
+      {:ok, action} ->
+        dispatch_resolved_action(socket, raw, action)
+
+      {:error, message} ->
+        {:noreply,
+         socket
+         |> append_log(%{kind: :cmd, text: String.trim(raw)})
+         |> append_log(%{kind: :system, text: message})}
+    end
+  end
+
+  # Defensive: the resolver task crashed before replying (should not happen —
+  # `resolve/2` rescues internally — but a task can still be killed). Surface
+  # a graceful refusal rather than leaving the input locked.
+  def handle_info(
+        {:DOWN, ref, :process, _pid, _reason},
+        %{assigns: %{resolver_task: %{ref: ref}}} = socket
+      ) do
+    raw = socket.assigns.resolver_task.raw_input
+
+    {:noreply,
+     socket
+     |> assign(:resolver_task, nil)
+     |> assign(:input_locked, false)
+     |> append_log(%{kind: :cmd, text: String.trim(raw)})
+     |> append_log(%{kind: :system, text: "I'm not sure what you meant just now."})}
+  end
+
+  # Stale task messages (resolver_task already cleared, or a flushed :DOWN
+  # raced this clause) — demonitor defensively and ignore.
+  def handle_info({ref, _result}, socket) when is_reference(ref) do
+    Process.demonitor(ref, [:flush])
+    {:noreply, socket}
+  end
+
+  def handle_info({:DOWN, ref, :process, _pid, _reason}, socket) when is_reference(ref) do
+    {:noreply, socket}
+  end
+
+  # --- UI events from World.UIEventBroadcaster ----------------------------
+
   # First-time spawn: Phoenix.Presence's presence_diff produces the
   # "logged in" message. Discard this arrival event so witnesses don't
   # see a duplicate notification.
