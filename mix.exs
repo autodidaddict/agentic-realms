@@ -66,7 +66,8 @@ defmodule AgenticRealms.MixProject do
       {:bcrypt_elixir, "~> 3.0"},
       {:commanded, "~> 1.4"},
       {:commanded_eventstore_adapter, "~> 1.4"},
-      {:eventstore, "~> 1.4"}
+      {:eventstore, "~> 1.4"},
+      {:req, "~> 0.5"}
     ]
   end
 

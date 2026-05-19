@@ -23,6 +23,23 @@ end
 config :agenticrealms, AgenticRealmsWeb.Endpoint,
   http: [port: String.to_integer(System.get_env("PORT", "4000"))]
 
+# Anthropic API runtime config (feature 005 — intent resolver).
+# The API key is required for the LLM fallback path; if it is absent the
+# resolver degrades gracefully to "I don't understand" refusals rather than
+# crashing. base_url / model / timeout fall back to the compile-time
+# defaults in config/config.exs when the env vars are unset.
+#
+# Skipped in :test — config/test.exs owns the test Anthropic config (a dummy
+# key + a Req.Test plug). Applying this block in test would clobber that
+# `api_key` with `nil` whenever ANTHROPIC_API_KEY is unset.
+if config_env() != :test do
+  config :agenticrealms, AgenticRealms.Anthropic,
+    api_key: System.get_env("ANTHROPIC_API_KEY"),
+    base_url: System.get_env("ANTHROPIC_BASE_URL") || "https://api.anthropic.com",
+    model: System.get_env("ANTHROPIC_MODEL") || "claude-haiku-4-5-20251001",
+    timeout_ms: String.to_integer(System.get_env("ANTHROPIC_TIMEOUT_MS") || "5000")
+end
+
 if config_env() == :prod do
   database_url =
     System.get_env("DATABASE_URL") ||

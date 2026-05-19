@@ -599,6 +599,7 @@ defmodule AgenticRealmsWeb.GameComponents do
   attr :input, :string, required: true
   attr :streaming, :boolean, required: true
   attr :map_open, :boolean, required: true
+  attr :input_locked, :boolean, default: false
   attr :tweaks, :map, required: true
 
   def player_view(assigns) do
@@ -665,9 +666,14 @@ defmodule AgenticRealmsWeb.GameComponents do
                 value={@input}
                 phx-change="update_input"
                 autocomplete="off"
-                placeholder="what do you do?  try 'read letter', 'whisper sable', or 'inventory'"
+                disabled={@input_locked}
+                placeholder={
+                  if @input_locked,
+                    do: "thinking…",
+                    else: "what do you do?  try 'read letter', 'whisper sable', or 'inventory'"
+                }
               />
-              <button type="submit" class="send">send ↵</button>
+              <button type="submit" class="send" disabled={@input_locked}>send ↵</button>
             </form>
           </div>
         </div>

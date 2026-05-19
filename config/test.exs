@@ -43,3 +43,10 @@ config :agenticrealms, AgenticRealms.World.Application,
   ],
   pubsub: :local,
   registry: :local
+
+# Anthropic API in tests: a dummy key (so the resolver does not take the
+# missing-key path) plus a Req.Test plug so no request ever leaves the BEAM.
+# Tests register per-test stubs with `Req.Test.stub(AgenticRealms.Anthropic, fun)`.
+config :agenticrealms, AgenticRealms.Anthropic,
+  api_key: "test-key-not-real",
+  req_options: [plug: {Req.Test, AgenticRealms.Anthropic}]

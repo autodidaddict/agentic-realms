@@ -70,6 +70,14 @@ config :logger, :default_formatter,
 # Use Jason for JSON parsing in Phoenix
 config :phoenix, :json_library, Jason
 
+# Anthropic API — backs the natural-language intent resolver (feature 005).
+# Compile-time defaults; the API key and any overrides are applied in
+# config/runtime.exs from environment variables.
+config :agenticrealms, AgenticRealms.Anthropic,
+  base_url: "https://api.anthropic.com",
+  model: "claude-haiku-4-5-20251001",
+  timeout_ms: 5_000
+
 # Import environment specific config. This must remain at the bottom
 # of this file so it overrides the configuration defined above.
 import_config "#{config_env()}.exs"
