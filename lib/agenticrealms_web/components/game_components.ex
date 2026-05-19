@@ -164,6 +164,66 @@ defmodule AgenticRealmsWeb.GameComponents do
     """
   end
 
+  # Feature 004 — Player Communication
+  # All `text` and `actor` values come from player input and MUST be rendered
+  # via HEEx auto-escaping (default `{ @entry.text }` interpolation). FR-024.
+
+  def log_entry(%{entry: %{kind: :speech}} = assigns) do
+    ~H"""
+    <div class="log-entry speech">
+      <span class="who">{@entry.actor}</span> says, &ldquo;{@entry.text}&rdquo;
+    </div>
+    """
+  end
+
+  def log_entry(%{entry: %{kind: :speech_self}} = assigns) do
+    ~H"""
+    <div class="log-entry speech speech-self">
+      <span class="who">You</span> say, &ldquo;{@entry.text}&rdquo;
+    </div>
+    """
+  end
+
+  def log_entry(%{entry: %{kind: :emote_action}} = assigns) do
+    ~H"""
+    <div class="log-entry emote">
+      <span class="who">{@entry.actor}</span> {@entry.text}
+    </div>
+    """
+  end
+
+  def log_entry(%{entry: %{kind: :private_tell_in}} = assigns) do
+    ~H"""
+    <div class="log-entry private private-tell">
+      <em><span class="who">{@entry.actor}</span> tells you,</em> &ldquo;{@entry.text}&rdquo;
+    </div>
+    """
+  end
+
+  def log_entry(%{entry: %{kind: :private_tell_out}} = assigns) do
+    ~H"""
+    <div class="log-entry private private-tell private-self">
+      <em>You tell <span class="who">{@entry.recipient}</span>,</em> &ldquo;{@entry.text}&rdquo;
+    </div>
+    """
+  end
+
+  def log_entry(%{entry: %{kind: :private_whisper_in}} = assigns) do
+    ~H"""
+    <div class="log-entry private private-whisper">
+      <em><span class="who">{@entry.actor}</span> whispers to you,</em> &ldquo;{@entry.text}&rdquo;
+    </div>
+    """
+  end
+
+  def log_entry(%{entry: %{kind: :private_whisper_out}} = assigns) do
+    ~H"""
+    <div class="log-entry private private-whisper private-self">
+      <em>You whisper to <span class="who">{@entry.recipient}</span>,</em> &ldquo;{@entry.text}&rdquo;
+    </div>
+    """
+  end
+
   def log_entry(%{entry: %{kind: :combat}} = assigns) do
     ~H"""
     <div class="log-entry combat">

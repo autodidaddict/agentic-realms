@@ -38,4 +38,39 @@ defmodule AgenticRealms.World.UIEvents do
     @enforce_keys [:player_id, :change, :object_id, :object_name, :object_short_description]
     defstruct [:player_id, :change, :object_id, :object_name, :object_short_description]
   end
+
+  defmodule RoomUtterance do
+    @moduledoc """
+    Transient room-scoped utterance — `:say`, `:emote`, or `:whisper`.
+
+    Broadcast on `room:<sender_room_id>` directly by `World.Communication` (no
+    Commanded event handler involved — communication is non-event-sourced).
+
+    For `:whisper`, every same-room subscriber receives the struct; non-recipient
+    subscribers MUST drop it based on `recipient_id`. See
+    `specs/004-player-communication/contracts/ui_events.md`.
+    """
+    @enforce_keys [:room_id, :actor_id, :actor_username, :actor_session_id, :kind, :text]
+    defstruct [
+      :room_id,
+      :actor_id,
+      :actor_username,
+      :actor_session_id,
+      :kind,
+      :text,
+      :recipient_id
+    ]
+  end
+
+  defmodule PrivateUtterance do
+    @moduledoc """
+    Transient private utterance — `:tell`. Broadcast on `player:<recipient_id>`.
+
+    Sender's other sessions do NOT subscribe to the recipient's player topic, so
+    no actor-side filter is needed. See
+    `specs/004-player-communication/contracts/ui_events.md`.
+    """
+    @enforce_keys [:actor_id, :actor_username, :recipient_id, :kind, :text]
+    defstruct [:actor_id, :actor_username, :recipient_id, :kind, :text]
+  end
 end

@@ -6,7 +6,7 @@ defmodule AgenticRealmsWeb.GameLive do
   alias AgenticRealms.Accounts
   alias AgenticRealms.GameData
   alias AgenticRealms.World
-  alias AgenticRealms.World.{Commands, CommandParser, Direction, Queries, Seed}
+  alias AgenticRealms.World.{Commands, CommandParser, Communication, Direction, Queries, Seed}
 
   alias AgenticRealms.World.UIEvents.{
     RoomPlayerArrived,
@@ -14,7 +14,9 @@ defmodule AgenticRealmsWeb.GameLive do
     RoomObjectTaken,
     RoomObjectDropped,
     PlayerCurrentRoomChanged,
-    PlayerInventoryChanged
+    PlayerInventoryChanged,
+    RoomUtterance,
+    PrivateUtterance
   }
 
   alias AgenticRealmsWeb.Presence
@@ -65,6 +67,10 @@ defmodule AgenticRealmsWeb.GameLive do
      |> assign(:current_room_id, current_room_id)
      |> assign(:input, "")
      |> assign(:streaming, false)
+     # Per-LiveView opaque id for actor-side self-filtering of own broadcasts
+     # (FR-005: speaker's own session does not render the witness broadcast it
+     # produced). See specs/004-player-communication/contracts/ui_events.md.
+     |> assign(:session_id, make_ref())
      |> assign(:stats, GameData.player_stats())
      |> assign(:inventory, inventory)
      |> assign(:quests, GameData.quests())
@@ -110,6 +116,36 @@ defmodule AgenticRealmsWeb.GameLive do
 
       {:invalid_drop_target} ->
         echo_then_system(socket, text, "Drop what?")
+
+      {:say, said} ->
+        handle_say(socket, text, said)
+
+      {:say_empty} ->
+        echo_then_system(socket, text, "Say what?")
+
+      {:emote, said} ->
+        handle_emote(socket, text, said)
+
+      {:emote_empty} ->
+        echo_then_system(socket, text, "Emote what?")
+
+      {:tell, recipient, message} ->
+        handle_tell(socket, text, recipient, message)
+
+      {:tell_no_recipient} ->
+        echo_then_system(socket, text, "Tell whom what?")
+
+      {:tell_no_text, recipient} ->
+        echo_then_system(socket, text, "Tell #{recipient} what?")
+
+      {:whisper, recipient, message} ->
+        handle_whisper(socket, text, recipient, message)
+
+      {:whisper_no_recipient} ->
+        echo_then_system(socket, text, "Whisper to whom what?")
+
+      {:whisper_no_text, recipient} ->
+        echo_then_system(socket, text, "Whisper to #{recipient} what?")
 
       {:unknown, raw} ->
         {:noreply,
@@ -346,6 +382,141 @@ defmodule AgenticRealmsWeb.GameLive do
      |> assign(:input, "")}
   end
 
+  # --- Communication handlers (feature 004) -------------------------------
+
+  defp handle_say(socket, raw, said) do
+    socket = socket |> append_log(%{kind: :cmd, text: String.trim(raw)}) |> assign(:input, "")
+    sender = sender_context(socket)
+
+    case Communication.say(sender, said) do
+      :ok ->
+        {:noreply, append_log(socket, %{kind: :speech_self, text: said})}
+
+      {:error, :empty} ->
+        {:noreply, append_log(socket, %{kind: :system, text: "Say what?"})}
+
+      {:error, :too_long} ->
+        {:noreply, append_log(socket, %{kind: :system, text: too_long_message()})}
+    end
+  end
+
+  defp handle_whisper(socket, raw, recipient, message) do
+    socket = socket |> append_log(%{kind: :cmd, text: String.trim(raw)}) |> assign(:input, "")
+    sender = sender_context(socket)
+
+    case Communication.whisper(sender, recipient, message) do
+      {:ok, %{recipient_username: rname}} ->
+        {:noreply,
+         append_log(socket, %{
+           kind: :private_whisper_out,
+           recipient: rname,
+           text: message
+         })}
+
+      {:error, :empty} ->
+        {:noreply, append_log(socket, %{kind: :system, text: "Whisper to #{recipient} what?"})}
+
+      {:error, :too_long} ->
+        {:noreply, append_log(socket, %{kind: :system, text: too_long_message()})}
+
+      {:error, :not_found} ->
+        {:noreply,
+         append_log(socket, %{
+           kind: :system,
+           text: "There is no one named '#{recipient}' here or anywhere."
+         })}
+
+      {:error, :ambiguous} ->
+        {:noreply,
+         append_log(socket, %{
+           kind: :system,
+           text: "Multiple players match '#{recipient}'. Use the full unique name."
+         })}
+
+      {:error, :self_target} ->
+        {:noreply, append_log(socket, %{kind: :system, text: "You can't whisper to yourself."})}
+
+      {:error, :recipient_not_in_room} ->
+        {:noreply,
+         append_log(socket, %{
+           kind: :system,
+           text: "#{recipient} is not nearby. Try `tell` instead."
+         })}
+    end
+  end
+
+  defp handle_tell(socket, raw, recipient, message) do
+    socket = socket |> append_log(%{kind: :cmd, text: String.trim(raw)}) |> assign(:input, "")
+    sender = sender_context(socket)
+
+    case Communication.tell(sender, recipient, message) do
+      {:ok, %{recipient_username: rname}} ->
+        {:noreply,
+         append_log(socket, %{
+           kind: :private_tell_out,
+           recipient: rname,
+           text: message
+         })}
+
+      {:error, :empty} ->
+        {:noreply, append_log(socket, %{kind: :system, text: "Tell #{recipient} what?"})}
+
+      {:error, :too_long} ->
+        {:noreply, append_log(socket, %{kind: :system, text: too_long_message()})}
+
+      {:error, :not_found} ->
+        {:noreply,
+         append_log(socket, %{
+           kind: :system,
+           text: "There is no one named '#{recipient}' here or anywhere."
+         })}
+
+      {:error, :ambiguous} ->
+        {:noreply,
+         append_log(socket, %{
+           kind: :system,
+           text: "Multiple players match '#{recipient}'. Use the full unique name."
+         })}
+
+      {:error, :self_target} ->
+        {:noreply, append_log(socket, %{kind: :system, text: "You can't tell yourself."})}
+
+      {:error, :not_deliverable} ->
+        {:noreply,
+         append_log(socket, %{kind: :system, text: "Your message could not be delivered."})}
+    end
+  end
+
+  defp handle_emote(socket, raw, said) do
+    socket = socket |> append_log(%{kind: :cmd, text: String.trim(raw)}) |> assign(:input, "")
+    sender = sender_context(socket)
+
+    case Communication.emote(sender, said) do
+      :ok ->
+        # No separate actor-side confirmation — the actor reads the same
+        # broadcast every other room subscriber gets (FR-008). The :emote_action
+        # log entry is appended in handle_info/2 just like for any witness.
+        {:noreply, socket}
+
+      {:error, :empty} ->
+        {:noreply, append_log(socket, %{kind: :system, text: "Emote what?"})}
+
+      {:error, :too_long} ->
+        {:noreply, append_log(socket, %{kind: :system, text: too_long_message()})}
+    end
+  end
+
+  defp sender_context(socket) do
+    %{
+      id: socket.assigns.current_player.id,
+      username: socket.assigns.current_player.username,
+      session_id: socket.assigns.session_id,
+      room_id: socket.assigns.current_room_id
+    }
+  end
+
+  defp too_long_message, do: "Your message is too long (max 500 characters)."
+
   # --- UI events from World.UIEventBroadcaster ----------------------------
 
   @impl true
@@ -398,6 +569,47 @@ defmodule AgenticRealmsWeb.GameLive do
          text: "#{msg.actor_username} drops the #{msg.object_name}."
        })}
     end
+  end
+
+  def handle_info(%RoomUtterance{kind: :say} = msg, socket) do
+    # Actor-exclusion by session id: the speaker's originating LiveView appends
+    # its own actor-side confirmation inline and discards the broadcast it
+    # receives back. The speaker's OTHER sessions in the same room render the
+    # broadcast as a witness entry (FR-006, multi-session pattern from 003).
+    if msg.actor_session_id == socket.assigns.session_id do
+      {:noreply, socket}
+    else
+      {:noreply, append_log(socket, %{kind: :speech, actor: msg.actor_username, text: msg.text})}
+    end
+  end
+
+  def handle_info(%RoomUtterance{kind: :emote} = msg, socket) do
+    # NO actor exclusion — emote includes the actor (FR-008). Every room
+    # subscriber, sender included, sees the third-person narration.
+    {:noreply,
+     append_log(socket, %{kind: :emote_action, actor: msg.actor_username, text: msg.text})}
+  end
+
+  def handle_info(%RoomUtterance{kind: :whisper} = msg, socket) do
+    # Recipient-id filter: every room subscriber receives the broadcast, but
+    # only the resolved recipient renders it (FR-017). The sender's own
+    # sessions also fall through this filter — their current_player.id is
+    # the sender_id, not recipient_id — which gives us the FR-018 "originating
+    # session only" rule for free.
+    if msg.recipient_id == socket.assigns.current_player.id do
+      {:noreply,
+       append_log(socket, %{kind: :private_whisper_in, actor: msg.actor_username, text: msg.text})}
+    else
+      {:noreply, socket}
+    end
+  end
+
+  def handle_info(%PrivateUtterance{kind: :tell} = msg, socket) do
+    # No filter needed — only the recipient's sessions subscribe to the
+    # `player:<recipient_id>` topic (FR-011, FR-013). The sender's other
+    # sessions are NOT subscribed and never receive this broadcast.
+    {:noreply,
+     append_log(socket, %{kind: :private_tell_in, actor: msg.actor_username, text: msg.text})}
   end
 
   def handle_info(%PlayerInventoryChanged{} = msg, socket) do
