@@ -12,6 +12,7 @@ defmodule AgenticRealms.World.Queries do
   alias AgenticRealms.Accounts.Player, as: AccountPlayer
   alias AgenticRealms.World.RoomView
   alias AgenticRealms.World.Schemas.{Room, Exit, Object, PlayerState}
+  alias AgenticRealmsWeb.Presence
 
   @spec current_room_of(integer()) :: {:ok, String.t()} | {:error, :no_current_room}
   def current_room_of(player_id) when is_integer(player_id) do
@@ -143,14 +144,31 @@ defmodule AgenticRealms.World.Queries do
   end
 
   defp list_other_players(room_id, self_player_id) do
-    from(ps in PlayerState,
-      join: p in AccountPlayer,
-      on: p.id == ps.player_id,
-      where: ps.current_room_id == ^room_id and ps.player_id != ^self_player_id,
-      order_by: p.username,
-      select: %{id: p.id, username: p.username}
-    )
-    |> Repo.all()
+    rows =
+      from(ps in PlayerState,
+        join: p in AccountPlayer,
+        on: p.id == ps.player_id,
+        where: ps.current_room_id == ^room_id and ps.player_id != ^self_player_id,
+        order_by: p.username,
+        select: %{id: p.id, username: p.username}
+      )
+      |> Repo.all()
+
+    # Filter by online presence: a player's persisted current_room_id remains
+    # set after they log out (per the 003 design — disconnect does not unspawn
+    # them), but offline players MUST NOT appear in the Present HUD card, in
+    # `look` output, or as a valid `whisper` target. Authoritative truth for
+    # "online" is `Phoenix.Presence`, which tracks every connected LiveView
+    # session and deduplicates across multi-tab.
+    online = online_player_ids()
+    Enum.filter(rows, fn %{id: id} -> MapSet.member?(online, id) end)
+  end
+
+  defp online_player_ids do
+    Presence.list(Presence.topic())
+    |> Map.keys()
+    |> Enum.map(&String.to_integer/1)
+    |> MapSet.new()
   end
 
   defp normalize_name(s) do
