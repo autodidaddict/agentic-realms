@@ -73,6 +73,40 @@ defmodule AgenticRealmsWeb.GameComponents do
 
   attr :entry, :map, required: true
 
+  def log_entry(%{entry: %{kind: :room, room: %AgenticRealms.World.RoomView{}}} = assigns) do
+    ~H"""
+    <div class="log-entry room">
+      <div class="room-head">
+        <span class="room-name">{@entry.room.name}</span>
+      </div>
+      <div class="room-body">{@entry.room.description}</div>
+      <div :if={@entry.room.exits != []} class="exits">
+        <button
+          :for={exit <- @entry.room.exits}
+          class="exit-chip"
+          phx-click="submit_command"
+          phx-value-text={exit.direction}
+        >
+          <span class="arrow">→</span>
+          <span>{exit.direction} · {exit.target_name}</span>
+        </button>
+      </div>
+      <div :if={@entry.room.objects != [] or @entry.room.other_players != []} class="entities">
+        <span :for={{obj, idx} <- Enum.with_index(@entry.room.objects)}>
+          <span class="entity item">{obj.name}</span>
+          <span :if={idx < length(@entry.room.objects) - 1 or @entry.room.other_players != []}>
+            ·
+          </span>
+        </span>
+        <span :for={{p, idx} <- Enum.with_index(@entry.room.other_players)}>
+          <span class="entity player-other">{p.username}</span>
+          <span :if={idx < length(@entry.room.other_players) - 1}> · </span>
+        </span>
+      </div>
+    </div>
+    """
+  end
+
   def log_entry(%{entry: %{kind: :room}} = assigns) do
     ~H"""
     <div class="log-entry room">
@@ -194,14 +228,13 @@ defmodule AgenticRealmsWeb.GameComponents do
       </div>
 
       <%= if @layout != "minimal" do %>
-        <.hud_card title="Inventory" count={"#{length(@inventory)} / 16"} modal_type="inv">
+        <.hud_card title="Inventory" count={Integer.to_string(length(@inventory))} modal_type="inv">
           <div class="inv-list">
-            <div
-              :for={item <- Enum.take(@inventory, 5)}
-              class={["row", item.equipped && "equipped"]}
-            >
+            <div :if={@inventory == []} style="font-size: 11px; color: var(--ink-faint);">
+              (empty)
+            </div>
+            <div :for={item <- Enum.take(@inventory, 5)} class="row">
               <span>{item.name}</span>
-              <span :if={item.qty > 1} class="qty">×{item.qty}</span>
             </div>
             <div
               :if={length(@inventory) > 5}
@@ -224,12 +257,15 @@ defmodule AgenticRealmsWeb.GameComponents do
         </.hud_card>
 
         <.hud_card title="Present" count={"#{length(@presence)} here"} modal_type="presence">
+          <div
+            :if={@presence == []}
+            style="font-size: 11px; color: var(--ink-faint);"
+          >
+            (no one else)
+          </div>
           <div :for={p <- @presence} class="presence-row">
-            <span class={["presence-dot", p.status == "idle" && "idle"]} />
-            <span>{p.name}{if p.npc, do: " (innkeep)", else: ""}</span>
-            <span style="margin-left: auto; font-size: 10px; color: var(--ink-ghost);">
-              {p.status}
-            </span>
+            <span class="presence-dot" />
+            <span>{p.username}</span>
           </div>
         </.hud_card>
       <% end %>
@@ -394,18 +430,16 @@ defmodule AgenticRealmsWeb.GameComponents do
     <.modal
       title="Inventory"
       glyph="❖"
-      foot_hint="Click an item to examine, use, or drop."
+      foot_hint="Type `drop &lt;name&gt;` in the input to drop an item."
     >
-      <div class="inv-filter">
-        <input placeholder="filter items..." />
-        <span class="cap">{length(@inventory)} / 16 · 12.4 lbs</span>
+      <div :if={@inventory == []} class="inv-empty" style="color: var(--ink-faint); padding: 12px;">
+        You aren't carrying anything.
       </div>
-      <div class="inv-grid">
-        <div :for={item <- @inventory} class={["inv-tile", item.equipped && "equipped"]}>
+      <div :if={@inventory != []} class="inv-grid">
+        <div :for={item <- @inventory} class="inv-tile">
           <div class="nm">{item.name}</div>
           <div class="meta">
-            <span>{if item.equipped, do: "worn", else: "carried"}</span>
-            <span class="qty-badge">×{item.qty}</span>
+            <span>{item.short_description}</span>
           </div>
         </div>
       </div>
@@ -470,30 +504,21 @@ defmodule AgenticRealmsWeb.GameComponents do
   attr :presence, :list, required: true
 
   def presence_modal(assigns) do
-    roles = GameData.presence_roles()
-    assigns = assign(assigns, :roles, roles)
-
     ~H"""
     <.modal
       title="Present in Room"
       glyph="◈"
-      foot_hint="Whisper, trade, party up, or inspect — all from here."
+      foot_hint="Other players currently in this room."
     >
-      <div class="presence-grid">
-        <div
-          :for={p <- @presence}
-          class={"presence-card #{(@roles[p.name] || %{kind: "other"}).kind}"}
-        >
-          <div class="avatar">{String.first(p.name)}</div>
+      <div :if={@presence == []} style="color: var(--ink-faint); padding: 12px;">
+        You are alone here.
+      </div>
+      <div :if={@presence != []} class="presence-grid">
+        <div :for={p <- @presence} class="presence-card other">
+          <div class="avatar">{String.first(p.username) |> String.upcase()}</div>
           <div>
-            <div class="name">{p.name}</div>
-            <div class="role">
-              {(@roles[p.name] || %{role: if(p.npc, do: "NPC", else: "Player")}).role} · {p.status}
-            </div>
-          </div>
-          <div class="actions">
-            <button>whisper</button>
-            <button>inspect</button>
+            <div class="name">{p.username}</div>
+            <div class="role">Player</div>
           </div>
         </div>
       </div>
@@ -1134,5 +1159,4 @@ defmodule AgenticRealmsWeb.GameComponents do
     </div>
     """
   end
-
 end

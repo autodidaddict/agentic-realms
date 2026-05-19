@@ -1,0 +1,194 @@
+defmodule AgenticRealms.World.Commands do
+  @moduledoc """
+  Write-side facade for the world. Wraps Commanded dispatches with
+  pre-dispatch read-model validation so the LiveView only has to deal with
+  one set of `{:ok, ...} | {:error, atom}` shapes.
+
+  Commands implemented so far:
+
+    * `spawn/2` — Phase 4 (US1)
+    * `move/2`  — Phase 5 (US2)
+    * `take/2`  — Phase 6 (US3)
+    * `drop/2`  — Phase 6 (US3)
+  """
+
+  import Ecto.Query
+
+  alias AgenticRealms.Repo
+  alias AgenticRealms.World.Application, as: WorldApp
+
+  alias AgenticRealms.World.Commands.{
+    SpawnPlayer,
+    MovePlayer,
+    TakeObject,
+    DropObject
+  }
+
+  alias AgenticRealms.World.Direction
+  alias AgenticRealms.World.Queries
+  alias AgenticRealms.World.Schemas.Exit
+
+  @doc """
+  Spawn a player into the starting room if (and only if) they have no
+  current room yet. Idempotent for already-spawned players.
+  """
+  @spec spawn(integer(), String.t()) ::
+          {:ok, :spawned | :already_spawned} | {:error, term()}
+  def spawn(player_id, starting_room_id)
+      when is_integer(player_id) and is_binary(starting_room_id) do
+    case Queries.current_room_of(player_id) do
+      {:ok, _room_id} ->
+        {:ok, :already_spawned}
+
+      {:error, :no_current_room} ->
+        case WorldApp.dispatch(
+               %SpawnPlayer{
+                 player_id: player_id,
+                 starting_room_id: starting_room_id
+               },
+               consistency: :strong
+             ) do
+          :ok -> {:ok, :spawned}
+          {:error, _} = err -> err
+        end
+    end
+  end
+
+  @doc """
+  Move the player one step in the given direction.
+
+  Returns `{:ok, to_room_id}` on success; `{:error, :no_exit_in_direction}`
+  when the player's current room has no exit in that direction (FR-007);
+  `{:error, :no_current_room}` if the player has never spawned.
+  """
+  @spec move(integer(), atom()) ::
+          {:ok, String.t()}
+          | {:error, :no_current_room | :no_exit_in_direction | term()}
+  def move(player_id, direction)
+      when is_integer(player_id) and is_atom(direction) do
+    with {:ok, from_room_id} <- Queries.current_room_of(player_id),
+         {:ok, to_room_id} <- resolve_exit(from_room_id, direction) do
+      case WorldApp.dispatch(
+             %MovePlayer{
+               player_id: player_id,
+               from_room_id: from_room_id,
+               to_room_id: to_room_id,
+               direction: direction
+             },
+             consistency: :strong
+           ) do
+        :ok -> {:ok, to_room_id}
+        {:error, _} = err -> err
+      end
+    end
+  end
+
+  @doc """
+  Take an object named `name` from the player's current room.
+
+  Pre-dispatch validation (read-model): the player has a current room,
+  the room contains exactly one object matching `name`, and that object
+  is not fixed (FR-010, FR-011, FR-024).
+
+  Aggregate validation: the object is still in the room when the command
+  is processed (race-loser path for the FR-011 / Q1 clarification).
+
+  Returns `{:ok, %{object_id, object_name}}` on success.
+  """
+  @spec take(integer(), String.t()) ::
+          {:ok, %{object_id: String.t(), object_name: String.t()}}
+          | {:error,
+             :no_current_room
+             | :no_such_object
+             | :ambiguous
+             | :object_is_fixed
+             | :object_not_in_room
+             | term()}
+  def take(player_id, name) when is_integer(player_id) and is_binary(name) do
+    with {:ok, room_id} <- Queries.current_room_of(player_id),
+         {:ok, object_id} <- Queries.resolve_object_in_room(room_id, name),
+         {:ok, false} <- check_not_fixed(object_id),
+         object_name <- name_of(object_id),
+         :ok <-
+           WorldApp.dispatch(
+             %TakeObject{
+               room_id: room_id,
+               player_id: player_id,
+               object_id: object_id
+             },
+             consistency: :strong
+           ) do
+      {:ok, %{object_id: object_id, object_name: object_name}}
+    else
+      {:ok, true} -> {:error, :object_is_fixed}
+      {:error, _} = err -> err
+    end
+  end
+
+  @doc """
+  Drop an object named `name` from the player's inventory into their
+  current room.
+  """
+  @spec drop(integer(), String.t()) ::
+          {:ok, %{object_id: String.t(), object_name: String.t()}}
+          | {:error,
+             :no_current_room
+             | :no_such_object
+             | :ambiguous
+             | :not_in_inventory
+             | term()}
+  def drop(player_id, name) when is_integer(player_id) and is_binary(name) do
+    with {:ok, room_id} <- Queries.current_room_of(player_id),
+         {:ok, object_id} <- resolve_in_inventory(player_id, name),
+         object_name <- name_of(object_id),
+         :ok <-
+           WorldApp.dispatch(
+             %DropObject{
+               room_id: room_id,
+               player_id: player_id,
+               object_id: object_id
+             },
+             consistency: :strong
+           ) do
+      {:ok, %{object_id: object_id, object_name: object_name}}
+    end
+  end
+
+  # --- helpers ------------------------------------------------------------
+
+  defp check_not_fixed(object_id) do
+    case Queries.object_fixed?(object_id) do
+      {:ok, fixed} -> {:ok, fixed}
+      {:error, _} = err -> err
+    end
+  end
+
+  defp resolve_in_inventory(player_id, name) do
+    case Queries.resolve_object_in_inventory(player_id, name) do
+      {:ok, _} = ok -> ok
+      {:error, :no_such_object} -> {:error, :not_in_inventory}
+      other -> other
+    end
+  end
+
+  defp name_of(object_id) do
+    case Repo.get(AgenticRealms.World.Schemas.Object, object_id) do
+      nil -> "something"
+      %{name: name} -> name
+    end
+  end
+
+  defp resolve_exit(from_room_id, direction) do
+    dir_str = Direction.to_string(direction)
+
+    case Repo.one(
+           from(e in Exit,
+             where: e.source_room_id == ^from_room_id and e.direction == ^dir_str,
+             select: e.target_room_id
+           )
+         ) do
+      nil -> {:error, :no_exit_in_direction}
+      target -> {:ok, target}
+    end
+  end
+end

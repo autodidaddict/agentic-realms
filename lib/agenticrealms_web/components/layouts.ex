@@ -27,7 +27,10 @@ defmodule AgenticRealmsWeb.Layouts do
     doc: "the current [scope](https://hexdocs.pm/phoenix/scopes.html)"
 
   attr :current_player, :map, default: nil, doc: "the current authenticated player"
-  attr :game_mode, :atom, default: nil, doc: "current game mode (:player or :wizard) — only set on the game page"
+
+  attr :game_mode, :atom,
+    default: nil,
+    doc: "current game mode (:player or :wizard) — only set on the game page"
 
   slot :inner_block, required: true
 

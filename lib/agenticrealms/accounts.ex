@@ -10,6 +10,8 @@ defmodule AgenticRealms.Accounts do
 
   def get_player!(id), do: Repo.get!(Player, id)
 
+  def get_player(id), do: Repo.get(Player, id)
+
   def get_player_by_username(username) when is_binary(username) do
     Repo.get_by(Player, username: username)
   end
@@ -60,7 +62,46 @@ defmodule AgenticRealms.Accounts do
     |> Repo.update()
   end
 
+  @doc """
+  Delete a player's account.
+
+  Per FR-023, any objects the player is carrying are returned to the room
+  they were in at the time of deletion. If the player has no current room
+  (never played, or their last room is gone), carried objects fall back to
+  the seeded starting room so they remain reachable.
+
+  Each return is dispatched as a real `DropObject` Commanded command so
+  the destination room's aggregate stays in sync with the read model —
+  patching `world_objects` directly here would leave the aggregate
+  unaware that the object is now in its room, breaking subsequent takes.
+  """
   def delete_player(%Player{} = player) do
-    Repo.delete(player)
+    alias AgenticRealms.World.Application, as: WorldApp
+    alias AgenticRealms.World.Commands.DropObject
+    alias AgenticRealms.World.Queries
+    alias AgenticRealms.World.Seed
+
+    target_room_id =
+      case Queries.current_room_of(player.id) do
+        {:ok, room_id} -> room_id
+        _ -> Seed.starting_room_id()
+      end
+
+    Queries.list_inventory(player.id)
+    |> Enum.each(fn item ->
+      WorldApp.dispatch(
+        %DropObject{
+          room_id: target_room_id,
+          player_id: player.id,
+          object_id: item.id
+        },
+        consistency: :strong
+      )
+    end)
+
+    case Repo.delete(player) do
+      {:ok, deleted} -> {:ok, deleted}
+      {:error, _} = err -> err
+    end
   end
 end

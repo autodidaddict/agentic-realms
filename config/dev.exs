@@ -10,6 +10,9 @@ config :agenticrealms, AgenticRealms.Repo,
   show_sensitive_data_on_connection_error: true,
   pool_size: 10
 
+# Event store: separate Postgres database, same instance as the read-model Repo.
+config :agenticrealms, AgenticRealms.EventStore, database: "agenticrealms_eventstore_dev"
+
 # For development, we disable any cache and enable
 # debugging and code reloading.
 #
@@ -58,10 +61,10 @@ config :agenticrealms, AgenticRealmsWeb.Endpoint,
     web_console_logger: true,
     patterns: [
       # Static assets, except user uploads
-      ~r"priv/static/(?!uploads/).*\.(js|css|png|jpeg|jpg|gif|svg)$"E,
+      ~r"priv/static/(?!uploads/).*\.(js|css|png|jpeg|jpg|gif|svg)$",
       # Router, Controllers, LiveViews and LiveComponents
-      ~r"lib/agenticrealms_web/router\.ex$"E,
-      ~r"lib/agenticrealms_web/(controllers|live|components)/.*\.(ex|heex)$"E
+      ~r"lib/agenticrealms_web/router\.ex$",
+      ~r"lib/agenticrealms_web/(controllers|live|components)/.*\.(ex|heex)$"
     ]
   ]
 
