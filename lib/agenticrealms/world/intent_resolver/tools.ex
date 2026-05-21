@@ -77,8 +77,18 @@ defmodule AgenticRealms.World.IntentResolver.Tools do
       ),
       tool(
         "look",
-        "Render the player's current room — its name, description, exits, objects visible, and other players present. Use this ONLY when the player wants to see their surroundings as a whole. DO NOT use this when the player wants to examine, inspect, study, or read a specific object — there is no examine tool yet; use `refuse` with a hint instead.",
-        %{"type" => "object", "properties" => %{}, "required" => []}
+        "Render the player's current room (no target) OR examine a specific object or player (target). Use no target to show the room as a whole — its name, description, exits, objects visible, and other players present. Pass a `target` to show the detail (long description) of a single object or player. Examine, inspect, study, read, look-at, take-a-closer-look-at — all of these map to this tool with a `target`.",
+        %{
+          "type" => "object",
+          "properties" => %{
+            "target" => %{
+              "type" => "string",
+              "description" =>
+                "Optional. The name of a specific object or player to examine, as the player referred to it (e.g. 'brass lantern', 'lantern', 'alice', 'me'). Omit this property entirely to render the whole room. Case-insensitive — the game performs its own resolution against actual room/inventory/player contents. For self-examination ('look at me', 'examine myself'), pass the literal string 'me'."
+            }
+          },
+          "required" => []
+        }
       ),
       tool(
         "inventory",

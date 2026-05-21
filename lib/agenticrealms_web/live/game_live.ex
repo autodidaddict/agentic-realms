@@ -12,10 +12,13 @@ defmodule AgenticRealmsWeb.GameLive do
     CommandParser,
     Communication,
     Direction,
+    Examine,
     IntentResolver,
     Queries,
     Seed
   }
+
+  alias AgenticRealms.World.Examine.Match, as: ExamineMatch
 
   alias AgenticRealms.World.UIEvents.{
     RoomPlayerArrived,
@@ -118,6 +121,9 @@ defmodule AgenticRealmsWeb.GameLive do
 
       {:look} ->
         handle_look(socket, text)
+
+      {:look, target} ->
+        handle_look_target(socket, text, target, true)
 
       {:inventory} ->
         handle_inventory(socket, text)
@@ -268,6 +274,7 @@ defmodule AgenticRealmsWeb.GameLive do
   defp dispatch_resolved_action(socket, raw, action) do
     case action do
       {:look} -> handle_look(socket, raw)
+      {:look, target} -> handle_look_target(socket, raw, target, false)
       {:inventory} -> handle_inventory(socket, raw)
       {:move, dir} -> handle_move(socket, raw, dir)
       # allow_fallback?: false — this IS the LLM-resolved retry; a still-failing
@@ -319,6 +326,55 @@ defmodule AgenticRealmsWeb.GameLive do
          |> assign(:input, "")}
 
       {:error, _} ->
+        echo_then_system(socket, raw, "You are nowhere.")
+    end
+  end
+
+  # `allow_fallback?` is true on a fast-path entry: when the target name does
+  # not resolve (`:no_such_target`), the raw input is handed to the LLM so it
+  # can map a loose noun phrase against actual visible targets (mirror of
+  # FR-001a from 005a). It is false on an LLM-dispatched retry so a
+  # still-failing examine simply refuses — no fallback loop. Ambiguity
+  # refusals (`:ambiguous_*`) never trigger the fallback: those are not name
+  # resolution failures, they are "name resolved to too many things."
+  defp handle_look_target(socket, raw, target, allow_fallback?) do
+    player_id = socket.assigns.current_player.id
+
+    case Examine.examine(player_id, target) do
+      {:ok, %ExamineMatch{target_kind: :object, name: name, long_description: ld}} ->
+        {:noreply,
+         socket
+         |> echo(raw)
+         |> append_log(%{
+           kind: :detail,
+           target_kind: :object,
+           name: name,
+           long_description: ld
+         })}
+
+      {:ok, %ExamineMatch{target_kind: :player, name: name}} ->
+        {:noreply,
+         socket
+         |> echo(raw)
+         |> append_log(%{kind: :detail, target_kind: :player, name: name})}
+
+      {:error, :no_such_target} when allow_fallback? ->
+        handle_unknown(socket, raw)
+
+      {:error, :no_such_target} ->
+        echo_then_system(socket, raw, "You don't see that here.")
+
+      {:error, reason}
+      when reason in [
+             :ambiguous_in_room,
+             :ambiguous_in_inventory,
+             :ambiguous_mixed_kind,
+             :ambiguous_player,
+             :ambiguous_partial
+           ] ->
+        echo_then_system(socket, raw, "Which one do you mean?")
+
+      {:error, :no_current_room} ->
         echo_then_system(socket, raw, "You are nowhere.")
     end
   end

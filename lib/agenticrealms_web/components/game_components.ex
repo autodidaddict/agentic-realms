@@ -132,6 +132,25 @@ defmodule AgenticRealmsWeb.GameComponents do
     """
   end
 
+  def log_entry(%{entry: %{kind: :detail, target_kind: :object}} = assigns) do
+    ~H"""
+    <div class="log-entry detail detail-object">
+      <div class="detail-head">
+        <span class="detail-name">{@entry.name}</span>
+      </div>
+      <div class="detail-body">{@entry.long_description}</div>
+    </div>
+    """
+  end
+
+  def log_entry(%{entry: %{kind: :detail, target_kind: :player}} = assigns) do
+    ~H"""
+    <div class="log-entry detail detail-player">
+      <span class="detail-name">{@entry.name}</span> is a player.
+    </div>
+    """
+  end
+
   def log_entry(%{entry: %{kind: :narrate}} = assigns) do
     ~H"""
     <div class="log-entry narrate">{@entry.text}</div>

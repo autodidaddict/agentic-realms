@@ -28,6 +28,7 @@ defmodule AgenticRealms.World.CommandParser do
           {:empty}
           | {:unknown, String.t()}
           | {:look}
+          | {:look, String.t()}
           | {:inventory}
           | {:move, atom()}
           | {:take, String.t()}
@@ -91,7 +92,13 @@ defmodule AgenticRealms.World.CommandParser do
 
     cond do
       first in ["look", "l"] ->
-        {:look}
+        target = normalize(rest_lc)
+
+        cond do
+          target == "" -> {:look}
+          target in ["me", "self"] -> {:look, "__self__"}
+          true -> {:look, target}
+        end
 
       first in @inventory_aliases ->
         {:inventory}
