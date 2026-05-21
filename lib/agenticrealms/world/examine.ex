@@ -1,0 +1,208 @@
+defmodule AgenticRealms.World.Examine do
+  @moduledoc """
+  Resolve a player-supplied target string to a single visible target — an
+  object in the room, an object in the player's inventory, or a player in
+  the same room (including the acting player themselves) — and return the
+  data the LiveView needs to render a `:detail` log entry.
+
+  Pure read facade. Composes existing reads from `World.Queries`; never
+  dispatches commands, never broadcasts.
+
+  The three-stage decision tree (exact > partial; inventory > room;
+  mixed-kind tie → refuse) is documented in
+  `specs/006-examine-objects/data-model.md` §3.
+
+  Parser-injected sentinel `"__self__"` short-circuits scope gathering: the
+  acting player is always examinable as themselves regardless of room
+  contents. See `contracts/parser.md` for how `look me` / `look self` map.
+  """
+
+  alias AgenticRealms.Accounts
+  alias AgenticRealms.World.Examine.Match
+  alias AgenticRealms.World.Queries
+
+  @type error_reason ::
+          :no_current_room
+          | :no_such_target
+          | :ambiguous_in_room
+          | :ambiguous_in_inventory
+          | :ambiguous_mixed_kind
+          | :ambiguous_player
+          | :ambiguous_partial
+
+  @type result :: {:ok, Match.t()} | {:error, error_reason()}
+
+  @self_aliases ~w(__self__ me self)
+
+  @doc """
+  Resolve `target` for `player_id` to an `Examine.Match` or a refusal reason.
+
+  `target` is expected to have been trimmed and whitespace-collapsed. The
+  values `"__self__"` (parser-injected), `"me"`, and `"self"` (LLM-emitted)
+  all short-circuit to a self-examination match for the acting player.
+  """
+  @spec examine(integer(), String.t()) :: result()
+  def examine(player_id, target) when is_integer(player_id) and is_binary(target) do
+    outcome = do_examine(player_id, target)
+    emit_telemetry(player_id, outcome)
+    outcome
+  end
+
+  defp do_examine(player_id, target) do
+    needle = String.downcase(target)
+
+    cond do
+      needle in @self_aliases ->
+        case acting_username(player_id) do
+          {:ok, username} -> {:ok, %Match{target_kind: :player, name: username}}
+          :error -> {:error, :no_current_room}
+        end
+
+      true ->
+        case gather_scope(player_id) do
+          {:ok, scope} -> resolve(scope, needle)
+          {:error, :no_current_room} = err -> err
+        end
+    end
+  end
+
+  # --- Scope gathering ----------------------------------------------------
+
+  defp gather_scope(player_id) do
+    with {:ok, room_id} <- Queries.current_room_of(player_id),
+         {:ok, room_view} <- Queries.look_room(player_id) do
+      inventory = Queries.list_inventory(player_id)
+
+      players =
+        case acting_username(player_id) do
+          {:ok, name} -> [%{id: player_id, username: name} | room_view.other_players]
+          :error -> room_view.other_players
+        end
+
+      {:ok,
+       %{
+         room_id: room_id,
+         room_objects: room_view.objects,
+         inventory: inventory,
+         players: players
+       }}
+    else
+      {:error, :no_current_room} -> {:error, :no_current_room}
+      {:error, :room_missing} -> {:error, :no_current_room}
+    end
+  end
+
+  defp acting_username(player_id) do
+    case Accounts.get_player(player_id) do
+      %{username: u} when is_binary(u) -> {:ok, u}
+      _ -> :error
+    end
+  end
+
+  # --- Stage 1: exact matching --------------------------------------------
+
+  defp resolve(scope, target) do
+    exact_room = filter_objects_exact(scope.room_objects, target)
+    exact_inv = filter_objects_exact(scope.inventory, target)
+    exact_pl = filter_players_exact(scope.players, target)
+
+    total = length(exact_room) + length(exact_inv) + length(exact_pl)
+
+    cond do
+      total == 0 ->
+        resolve_partial(scope, target)
+
+      total == 1 ->
+        Match
+        |> from_first_match(exact_room, exact_inv, exact_pl)
+
+      exact_pl != [] and (exact_room != [] or exact_inv != []) ->
+        {:error, :ambiguous_mixed_kind}
+
+      length(exact_pl) > 1 ->
+        {:error, :ambiguous_player}
+
+      true ->
+        resolve_object_tiebreak(exact_room, exact_inv)
+    end
+  end
+
+  defp from_first_match(_module, [obj], [], []), do: {:ok, object_match(obj)}
+  defp from_first_match(_module, [], [obj], []), do: {:ok, object_match(obj)}
+  defp from_first_match(_module, [], [], [pl]), do: {:ok, player_match(pl)}
+
+  # --- Stage 2: inventory > room (objects only) ---------------------------
+
+  defp resolve_object_tiebreak([], [_ | _] = inv) when length(inv) > 1,
+    do: {:error, :ambiguous_in_inventory}
+
+  defp resolve_object_tiebreak(_room, [single]), do: {:ok, object_match(single)}
+
+  defp resolve_object_tiebreak(_room, []), do: {:error, :ambiguous_in_room}
+
+  defp resolve_object_tiebreak(_room, [_ | _]), do: {:error, :ambiguous_in_inventory}
+
+  # --- Stage 3: partial / substring matching ------------------------------
+
+  defp resolve_partial(scope, target) do
+    partial_room = filter_objects_partial(scope.room_objects, target)
+    partial_inv = filter_objects_partial(scope.inventory, target)
+    partial_pl = filter_players_partial(scope.players, target)
+
+    case length(partial_room) + length(partial_inv) + length(partial_pl) do
+      0 -> {:error, :no_such_target}
+      1 -> from_first_match(Match, partial_room, partial_inv, partial_pl)
+      _ -> {:error, :ambiguous_partial}
+    end
+  end
+
+  # --- Filters ------------------------------------------------------------
+
+  defp filter_objects_exact(objs, target),
+    do: Enum.filter(objs, fn o -> String.downcase(o.name) == target end)
+
+  defp filter_objects_partial(objs, target),
+    do: Enum.filter(objs, fn o -> String.contains?(String.downcase(o.name), target) end)
+
+  defp filter_players_exact(players, target),
+    do: Enum.filter(players, fn p -> String.downcase(p.username) == target end)
+
+  defp filter_players_partial(players, target),
+    do: Enum.filter(players, fn p -> String.contains?(String.downcase(p.username), target) end)
+
+  # --- Match builders -----------------------------------------------------
+
+  defp object_match(%{name: name} = obj) do
+    %Match{target_kind: :object, name: name, long_description: long_description_of(obj)}
+  end
+
+  defp player_match(%{username: name}) do
+    %Match{target_kind: :player, name: name, long_description: nil}
+  end
+
+  # The :objects list from RoomView and the inventory list don't carry
+  # long_description (they include only id/name/short_description). Look it
+  # up by id from the Object schema directly.
+  defp long_description_of(%{id: id}) do
+    case AgenticRealms.Repo.get(AgenticRealms.World.Schemas.Object, id) do
+      %AgenticRealms.World.Schemas.Object{long_description: ld} -> ld
+      _ -> nil
+    end
+  end
+
+  # --- Telemetry ----------------------------------------------------------
+
+  defp emit_telemetry(player_id, outcome) do
+    {result, target_kind} =
+      case outcome do
+        {:ok, %Match{target_kind: kind}} -> {kind, kind}
+        {:error, reason} -> {reason, nil}
+      end
+
+    :telemetry.execute(
+      [:agenticrealms, :examine, :resolve],
+      %{},
+      %{player_id: player_id, outcome: result, target_kind: target_kind}
+    )
+  end
+end

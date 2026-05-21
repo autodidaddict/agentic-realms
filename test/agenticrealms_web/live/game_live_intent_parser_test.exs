@@ -73,15 +73,18 @@ defmodule AgenticRealmsWeb.GameLiveIntentParserTest do
            "the lantern should now be in the player's inventory"
 
     # ── US2: a refuse tool call surfaces the model's message, takes no action ──
-    # (Apostrophe-free message so the assertion isn't tripped by HTML escaping.)
-    stub_tool_use("refuse", %{"message" => "Examining specific objects is not supported yet."})
+    # (Apostrophe-free message so the assertion isn't tripped by HTML escaping.
+    # Post-006 the LLM is no longer expected to refuse `examine` per se, but
+    # the LiveView's refusal-handling contract still applies for any refuse
+    # tool call — this stub tests that path generically.)
+    stub_tool_use("refuse", %{"message" => "Combat is not supported yet."})
 
     inventory_before = Queries.list_inventory(player.id)
-    submit(view, "examine the mysterious runes very closely")
+    submit(view, "attack the orc with my bare hands")
     await_unlock(view)
 
     html = render(view)
-    assert html =~ "Examining specific objects is not supported yet."
+    assert html =~ "Combat is not supported yet."
 
     assert Queries.list_inventory(player.id) == inventory_before,
            "a refusal must not change game state"
@@ -131,6 +134,41 @@ defmodule AgenticRealmsWeb.GameLiveIntentParserTest do
     # fell back must NOT echo; only the LLM-dispatched retry does.
     assert cmd_echo_count(html, "drop the lantern") == 1,
            "the literal input must be echoed exactly once, not doubled by the fallback"
+
+    # ── 006 (US2 + US3): natural-language examine of an object dispatches
+    #    through the new {:look, target} action tuple ───────────────────
+    # Re-take the lantern so it's back in the room (drop above moved it out
+    # of inventory, into the atrium since Alice never moved during US3-001).
+    stub_tool_use("take", %{"object" => lantern_name})
+    submit(view, "grab the lantern again")
+    await_unlock(view)
+
+    # Now stub a look-target call and submit a natural-language examine.
+    stub_tool_use("look", %{"target" => lantern_name})
+    submit(view, "examine my lantern up close")
+    await_unlock(view)
+
+    html = render(view)
+
+    assert html =~ ~s(class="log-entry detail detail-object"),
+           "a look-target tool call should render a :detail entry via the fallback path"
+
+    assert html =~ ~s(class="log-entry cmd">examine my lantern up close</div>),
+           "the literal natural-language input should be echoed once"
+
+    # Self-examine via the LLM (the model emits 'me'; the Examine module
+    # resolves it to the acting player via the explicit player-name match).
+    stub_tool_use("look", %{"target" => "me"})
+    submit(view, "look at myself")
+    await_unlock(view)
+
+    html = render(view)
+
+    assert html =~ ~s(class="log-entry detail detail-player"),
+           "a self-look tool call should render a :detail player entry"
+
+    assert html =~ "#{player.username}</span> is a player.",
+           "self-examine should render the acting player's name"
   end
 
   # --- Helpers ------------------------------------------------------------

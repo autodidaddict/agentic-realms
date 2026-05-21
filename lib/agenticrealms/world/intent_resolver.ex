@@ -36,6 +36,7 @@ defmodule AgenticRealms.World.IntentResolver do
           | {:drop, String.t()}
           | {:move, atom()}
           | {:look}
+          | {:look, String.t()}
           | {:inventory}
           | {:say, String.t()}
           | {:emote, String.t()}
@@ -136,6 +137,10 @@ defmodule AgenticRealms.World.IntentResolver do
 
   defp to_action("take", %{"object" => o}) when is_binary(o) and o != "", do: {:ok, {:take, o}}
   defp to_action("drop", %{"object" => o}) when is_binary(o) and o != "", do: {:ok, {:drop, o}}
+
+  defp to_action("look", %{"target" => t}) when is_binary(t) and t != "",
+    do: {:ok, {:look, t}}
+
   defp to_action("look", _), do: {:ok, {:look}}
   defp to_action("inventory", _), do: {:ok, {:inventory}}
   defp to_action("say", %{"text" => t}) when is_binary(t) and t != "", do: {:ok, {:say, t}}

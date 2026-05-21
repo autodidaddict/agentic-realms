@@ -452,6 +452,24 @@ button { font: inherit; color: inherit; }
 .entity.npc { color: var(--ink); }
 .entity.player-other { color: var(--mana); }
 
+.log-entry.detail {
+  border-left: 2px solid var(--wizard-dim);
+  padding-left: 14px;
+  margin-top: 14px;
+}
+.detail-head {
+  font-family: var(--mono);
+  font-size: var(--fs-sm);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin-bottom: 6px;
+}
+.detail-name { color: var(--wizard); font-weight: 600; letter-spacing: 0.02em; }
+.detail-body { color: var(--ink); max-width: 68ch; }
+.log-entry.detail-player .detail-name { color: var(--mana); }
+.log-entry.detail-player { color: var(--ink-dim); }
+
 .log-entry.said {
   padding-left: 14px;
   border-left: 2px solid var(--player-dim);

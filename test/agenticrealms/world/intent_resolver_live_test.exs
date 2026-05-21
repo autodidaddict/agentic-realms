@@ -40,7 +40,11 @@ defmodule AgenticRealms.World.IntentResolverLiveTest do
     {"wave cheerfully at the fire", :emote},
     {"tell alice I will be right back", :tell},
     {"lean in and quietly tell bob to watch out", :whisper},
-    {"examine the brass lantern very closely", :refuse},
+    # Examine intent now maps to look-with-target (feature 006) — formerly
+    # refused as near-mapping. The classify/1 helper extracts `:look` for
+    # both `{:look}` and `{:look, target}` action tuples.
+    {"examine the brass lantern very closely", :look},
+    {"study the journal carefully", :look},
     {"take the lantern and then head north", :refuse},
     {"what time is it in the real world", :refuse}
   ]

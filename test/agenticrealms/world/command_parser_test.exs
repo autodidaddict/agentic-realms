@@ -29,9 +29,48 @@ defmodule AgenticRealms.World.CommandParserTest do
     test "l alias" do
       assert {:look} = CommandParser.parse("l")
     end
+  end
 
-    test "look with trailing text is still :look (object-targeted look out of scope)" do
-      assert {:look} = CommandParser.parse("look around")
+  describe "look [target] (feature 006)" do
+    test "look <target> returns {:look, target} with target lowercased" do
+      assert {:look, "brass lantern"} = CommandParser.parse("look brass lantern")
+      assert {:look, "brass lantern"} = CommandParser.parse("look BRASS LANTERN")
+    end
+
+    test "trims and collapses whitespace inside the target" do
+      assert {:look, "the journal"} = CommandParser.parse("look   the   journal  ")
+    end
+
+    test "look around is now a target form" do
+      assert {:look, "around"} = CommandParser.parse("look around")
+    end
+
+    test "look me / look self map to the __self__ sentinel" do
+      assert {:look, "__self__"} = CommandParser.parse("look me")
+      assert {:look, "__self__"} = CommandParser.parse("look self")
+      assert {:look, "__self__"} = CommandParser.parse("look ME")
+      assert {:look, "__self__"} = CommandParser.parse("LOOK SELF")
+    end
+
+    test "l alias also supports me / self" do
+      assert {:look, "__self__"} = CommandParser.parse("l me")
+      assert {:look, "__self__"} = CommandParser.parse("l self")
+    end
+
+    test "self-alias requires exact match, not substring" do
+      # 'mead' contains 'me' but the FULL normalized target is 'mead', so it
+      # is a normal target, not the self-alias.
+      assert {:look, "mead"} = CommandParser.parse("look mead")
+      # 'someone' is not 'me' or 'self'.
+      assert {:look, "someone"} = CommandParser.parse("look someone")
+      # An extra word past 'me' makes the target 'me someone' — not the alias.
+      assert {:look, "me someone"} = CommandParser.parse("look me someone")
+    end
+
+    test "look / l with no target still returns {:look} (regression guard)" do
+      assert {:look} = CommandParser.parse("look")
+      assert {:look} = CommandParser.parse("l")
+      assert {:look} = CommandParser.parse("  LOOK  ")
     end
   end
 

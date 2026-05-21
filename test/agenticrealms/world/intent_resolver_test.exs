@@ -47,6 +47,18 @@ defmodule AgenticRealms.World.IntentResolverTest do
       assert {:ok, {:look}} = IntentResolver.parse_response(tool_response("look", %{}))
     end
 
+    test "look with a target maps to {:look, target} (feature 006)" do
+      assert {:ok, {:look, "brass lantern"}} =
+               IntentResolver.parse_response(
+                 tool_response("look", %{"target" => "brass lantern"})
+               )
+    end
+
+    test "look with an empty-string target falls back to {:look}" do
+      assert {:ok, {:look}} =
+               IntentResolver.parse_response(tool_response("look", %{"target" => ""}))
+    end
+
     test "inventory maps to {:inventory}" do
       assert {:ok, {:inventory}} = IntentResolver.parse_response(tool_response("inventory", %{}))
     end
@@ -101,19 +113,24 @@ defmodule AgenticRealms.World.IntentResolverTest do
                )
     end
 
-    test "near-mapping intent: a refuse response does NOT produce a look action" do
-      # The model correctly chose `refuse` for an examine-style intent. The
-      # resolver must surface the refusal — never substitute {:look}.
+    test "a refuse response never produces a look action (resolver contract)" do
+      # Resolver-level contract: when the model picks `refuse`, the resolver
+      # surfaces the refusal and never substitutes {:look}, regardless of why
+      # the model chose to refuse. (Pre-006 this test guarded the
+      # near-mapping refusal rule; post-006 examine is supported, but the
+      # resolver-level contract — refuse → error, never substitute — is
+      # unchanged.)
       result =
         IntentResolver.parse_response(
           tool_response("refuse", %{
-            "message" => "You can look to see the room, but examining objects isn't supported."
+            "message" => "Combat is not supported yet."
           })
         )
 
       assert {:error, message} = result
-      assert message =~ "examining objects"
+      assert message =~ "Combat"
       refute match?({:ok, {:look}}, result)
+      refute match?({:ok, {:look, _}}, result)
     end
 
     test "multiple tool_use blocks refuse with the one-action-at-a-time message" do
