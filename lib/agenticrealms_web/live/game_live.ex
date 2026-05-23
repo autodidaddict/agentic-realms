@@ -25,6 +25,7 @@ defmodule AgenticRealmsWeb.GameLive do
     RoomPlayerLeft,
     RoomObjectTaken,
     RoomObjectDropped,
+    RoomNPCArrived,
     PlayerCurrentRoomChanged,
     PlayerInventoryChanged,
     RoomUtterance,
@@ -358,6 +359,17 @@ defmodule AgenticRealmsWeb.GameLive do
          |> echo(raw)
          |> append_log(%{kind: :detail, target_kind: :player, name: name})}
 
+      {:ok, %ExamineMatch{target_kind: :npc, name: name, long_description: ld}} ->
+        {:noreply,
+         socket
+         |> echo(raw)
+         |> append_log(%{
+           kind: :detail,
+           target_kind: :npc,
+           name: name,
+           long_description: ld
+         })}
+
       {:error, :no_such_target} when allow_fallback? ->
         handle_unknown(socket, raw)
 
@@ -370,6 +382,7 @@ defmodule AgenticRealmsWeb.GameLive do
              :ambiguous_in_inventory,
              :ambiguous_mixed_kind,
              :ambiguous_player,
+             :ambiguous_npc,
              :ambiguous_partial
            ] ->
         echo_then_system(socket, raw, "Which one do you mean?")
@@ -740,6 +753,16 @@ defmodule AgenticRealmsWeb.GameLive do
        |> append_log(%{kind: :system, text: departure_text(msg)})
        |> remove_from_presence(actor_id)}
     end
+  end
+
+  # NPC arrival witness (feature 007 FR-011 / FR-012 / FR-014). No actor
+  # exclusion — NPCs have no acting player. Every subscriber of the room
+  # topic, including every concurrent session of every player in the room,
+  # receives the entry. The subsequent room view (next look or arrival)
+  # re-queries Queries.look_room/1 and reflects the new NPC in the
+  # "Also here" section.
+  def handle_info(%RoomNPCArrived{npc_name: name}, socket) do
+    {:noreply, append_log(socket, %{kind: :system, text: "#{name} arrives."})}
   end
 
   def handle_info(%RoomObjectTaken{actor_id: actor_id} = msg, socket) do

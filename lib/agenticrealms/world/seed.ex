@@ -20,7 +20,7 @@ defmodule AgenticRealms.World.Seed do
 
   alias AgenticRealms.Repo
   alias AgenticRealms.World.Application, as: WorldApp
-  alias AgenticRealms.World.Commands.{CreateRoom, AddExit, PlaceObject}
+  alias AgenticRealms.World.Commands.{CreateRoom, AddExit, PlaceObject, SpawnNPC}
   alias AgenticRealms.World.Schemas.Room
 
   @starting_room_id "00000000-0000-4000-8000-000000000001"
@@ -30,6 +30,8 @@ defmodule AgenticRealms.World.Seed do
   @brass_lantern_id "00000000-0000-4000-8000-100000000001"
   @leather_journal_id "00000000-0000-4000-8000-100000000002"
   @reading_lectern_id "00000000-0000-4000-8000-100000000003"
+
+  @innkeeper_garrick_id "00000000-0000-4000-8000-200000000001"
 
   @doc """
   Returns the UUID of the designated starting room. Stable across runs
@@ -141,6 +143,17 @@ defmodule AgenticRealms.World.Seed do
         long_description:
           "A heavy oak lectern, scratched and ink-stained from generations of use. It is bolted to the floor — there is no moving it.",
         fixed: true
+      })
+
+    # NPCs (feature 007)
+    :ok =
+      WorldApp.dispatch(%SpawnNPC{
+        room_id: @starting_room_id,
+        npc_id: @innkeeper_garrick_id,
+        name: "Garrick the Innkeeper",
+        short_description: "a wiry innkeeper in a stained apron",
+        long_description:
+          "A wiry man in a stained apron, his hands callused and his eyes patient. He polishes a tankard that already looks clean and watches the door without quite seeming to."
       })
   end
 end

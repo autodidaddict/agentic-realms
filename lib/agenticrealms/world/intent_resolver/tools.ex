@@ -77,14 +77,14 @@ defmodule AgenticRealms.World.IntentResolver.Tools do
       ),
       tool(
         "look",
-        "Render the player's current room (no target) OR examine a specific object or player (target). Use no target to show the room as a whole — its name, description, exits, objects visible, and other players present. Pass a `target` to show the detail (long description) of a single object or player. Examine, inspect, study, read, look-at, take-a-closer-look-at — all of these map to this tool with a `target`.",
+        "Render the player's current room (no target) OR examine a specific object, player, or NPC currently in the room (target). Use no target to show the room as a whole — its name, description, exits, objects visible, other players present, and any NPCs in the 'Also here' section. Pass a `target` to show the detail (long description) of a single object, player, or NPC. Examine, inspect, study, read, look-at, take-a-closer-look-at — all of these map to this tool with a `target`.",
         %{
           "type" => "object",
           "properties" => %{
             "target" => %{
               "type" => "string",
               "description" =>
-                "Optional. The name of a specific object or player to examine, as the player referred to it (e.g. 'brass lantern', 'lantern', 'alice', 'me'). Omit this property entirely to render the whole room. Case-insensitive — the game performs its own resolution against actual room/inventory/player contents. For self-examination ('look at me', 'examine myself'), pass the literal string 'me'."
+                "Optional. The name of a specific object, player, or NPC to examine, as the player referred to it (e.g. 'brass lantern', 'lantern', 'alice', 'me', 'garrick', 'the innkeeper', 'the old man'). Omit this property entirely to render the whole room. Case-insensitive — the game performs its own resolution against actual room/inventory/player/NPC contents. For self-examination ('look at me', 'examine myself'), pass the literal string 'me'."
             }
           },
           "required" => []

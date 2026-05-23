@@ -1,20 +1,24 @@
 defmodule AgenticRealms.World.Examine do
   @moduledoc """
   Resolve a player-supplied target string to a single visible target — an
-  object in the room, an object in the player's inventory, or a player in
-  the same room (including the acting player themselves) — and return the
-  data the LiveView needs to render a `:detail` log entry.
+  object in the room, an object in the player's inventory, a player in
+  the same room (including the acting player themselves), or an NPC in
+  the same room — and return the data the LiveView needs to render a
+  `:detail` log entry.
 
   Pure read facade. Composes existing reads from `World.Queries`; never
   dispatches commands, never broadcasts.
 
   The three-stage decision tree (exact > partial; inventory > room;
   mixed-kind tie → refuse) is documented in
-  `specs/006-examine-objects/data-model.md` §3.
+  `specs/006-examine-objects/data-model.md` §3 and extended for NPCs in
+  `specs/007-static-npcs/data-model.md` §8.
 
   Parser-injected sentinel `"__self__"` short-circuits scope gathering: the
   acting player is always examinable as themselves regardless of room
   contents. See `contracts/parser.md` for how `look me` / `look self` map.
+  NPCs do NOT participate in self-examination grammar — the self-aliases
+  resolve only to the acting player.
   """
 
   alias AgenticRealms.Accounts
@@ -28,6 +32,7 @@ defmodule AgenticRealms.World.Examine do
           | :ambiguous_in_inventory
           | :ambiguous_mixed_kind
           | :ambiguous_player
+          | :ambiguous_npc
           | :ambiguous_partial
 
   @type result :: {:ok, Match.t()} | {:error, error_reason()}
@@ -84,7 +89,8 @@ defmodule AgenticRealms.World.Examine do
          room_id: room_id,
          room_objects: room_view.objects,
          inventory: inventory,
-         players: players
+         players: players,
+         npcs: room_view.npcs
        }}
     else
       {:error, :no_current_room} -> {:error, :no_current_room}
@@ -105,31 +111,42 @@ defmodule AgenticRealms.World.Examine do
     exact_room = filter_objects_exact(scope.room_objects, target)
     exact_inv = filter_objects_exact(scope.inventory, target)
     exact_pl = filter_players_exact(scope.players, target)
+    exact_npc = filter_npcs_exact(scope.npcs, target)
 
-    total = length(exact_room) + length(exact_inv) + length(exact_pl)
+    total = length(exact_room) + length(exact_inv) + length(exact_pl) + length(exact_npc)
 
     cond do
       total == 0 ->
         resolve_partial(scope, target)
 
       total == 1 ->
-        Match
-        |> from_first_match(exact_room, exact_inv, exact_pl)
+        from_first_match(exact_room, exact_inv, exact_pl, exact_npc)
 
-      exact_pl != [] and (exact_room != [] or exact_inv != []) ->
+      cross_kind_tie?(exact_room, exact_inv, exact_pl, exact_npc) ->
         {:error, :ambiguous_mixed_kind}
 
       length(exact_pl) > 1 ->
         {:error, :ambiguous_player}
+
+      length(exact_npc) > 1 ->
+        {:error, :ambiguous_npc}
 
       true ->
         resolve_object_tiebreak(exact_room, exact_inv)
     end
   end
 
-  defp from_first_match(_module, [obj], [], []), do: {:ok, object_match(obj)}
-  defp from_first_match(_module, [], [obj], []), do: {:ok, object_match(obj)}
-  defp from_first_match(_module, [], [], [pl]), do: {:ok, player_match(pl)}
+  defp cross_kind_tie?(room, inv, pl, npc) do
+    has_obj = room != [] or inv != []
+    has_pl = pl != []
+    has_npc = npc != []
+    Enum.count([has_obj, has_pl, has_npc], & &1) > 1
+  end
+
+  defp from_first_match([obj], [], [], []), do: {:ok, object_match(obj)}
+  defp from_first_match([], [obj], [], []), do: {:ok, object_match(obj)}
+  defp from_first_match([], [], [pl], []), do: {:ok, player_match(pl)}
+  defp from_first_match([], [], [], [npc]), do: {:ok, npc_match(npc)}
 
   # --- Stage 2: inventory > room (objects only) ---------------------------
 
@@ -148,10 +165,14 @@ defmodule AgenticRealms.World.Examine do
     partial_room = filter_objects_partial(scope.room_objects, target)
     partial_inv = filter_objects_partial(scope.inventory, target)
     partial_pl = filter_players_partial(scope.players, target)
+    partial_npc = filter_npcs_partial(scope.npcs, target)
 
-    case length(partial_room) + length(partial_inv) + length(partial_pl) do
+    total =
+      length(partial_room) + length(partial_inv) + length(partial_pl) + length(partial_npc)
+
+    case total do
       0 -> {:error, :no_such_target}
-      1 -> from_first_match(Match, partial_room, partial_inv, partial_pl)
+      1 -> from_first_match(partial_room, partial_inv, partial_pl, partial_npc)
       _ -> {:error, :ambiguous_partial}
     end
   end
@@ -170,6 +191,12 @@ defmodule AgenticRealms.World.Examine do
   defp filter_players_partial(players, target),
     do: Enum.filter(players, fn p -> String.contains?(String.downcase(p.username), target) end)
 
+  defp filter_npcs_exact(npcs, target),
+    do: Enum.filter(npcs, fn n -> String.downcase(n.name) == target end)
+
+  defp filter_npcs_partial(npcs, target),
+    do: Enum.filter(npcs, fn n -> String.contains?(String.downcase(n.name), target) end)
+
   # --- Match builders -----------------------------------------------------
 
   defp object_match(%{name: name} = obj) do
@@ -180,12 +207,25 @@ defmodule AgenticRealms.World.Examine do
     %Match{target_kind: :player, name: name, long_description: nil}
   end
 
+  defp npc_match(%{name: name} = npc) do
+    %Match{target_kind: :npc, name: name, long_description: long_description_of_npc(npc)}
+  end
+
   # The :objects list from RoomView and the inventory list don't carry
   # long_description (they include only id/name/short_description). Look it
   # up by id from the Object schema directly.
   defp long_description_of(%{id: id}) do
     case AgenticRealms.Repo.get(AgenticRealms.World.Schemas.Object, id) do
       %AgenticRealms.World.Schemas.Object{long_description: ld} -> ld
+      _ -> nil
+    end
+  end
+
+  # NPCs follow the same pattern — RoomView.npcs omits long_description; look
+  # it up by id when needed for the detail-entry body.
+  defp long_description_of_npc(%{id: id}) do
+    case AgenticRealms.Repo.get(AgenticRealms.World.Schemas.NPC, id) do
+      %AgenticRealms.World.Schemas.NPC{long_description: ld} -> ld
       _ -> nil
     end
   end

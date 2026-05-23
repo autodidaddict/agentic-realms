@@ -11,7 +11,7 @@ defmodule AgenticRealms.World.Queries do
   alias AgenticRealms.Repo
   alias AgenticRealms.Accounts.Player, as: AccountPlayer
   alias AgenticRealms.World.RoomView
-  alias AgenticRealms.World.Schemas.{Room, Exit, Object, PlayerState}
+  alias AgenticRealms.World.Schemas.{Room, Exit, Object, PlayerState, NPC}
   alias AgenticRealmsWeb.Presence
 
   @spec current_room_of(integer()) :: {:ok, String.t()} | {:error, :no_current_room}
@@ -34,12 +34,29 @@ defmodule AgenticRealms.World.Queries do
          description: room.description,
          exits: list_exits(room_id),
          objects: list_objects_in_room(room_id),
-         other_players: list_other_players(room_id, player_id)
+         other_players: list_other_players(room_id, player_id),
+         npcs: list_npcs_in_room(room_id)
        }}
     else
       {:error, :no_current_room} = err -> err
       nil -> {:error, :room_missing}
     end
+  end
+
+  @doc """
+  All NPCs currently located in `room_id`, ordered alphabetically by display
+  name. Returns each NPC's id, name, and short description — the room view
+  does NOT need long descriptions (FR-005 in feature 007).
+  """
+  @spec list_npcs_in_room(String.t()) ::
+          [%{id: String.t(), name: String.t(), short_description: String.t()}]
+  def list_npcs_in_room(room_id) when is_binary(room_id) do
+    from(n in NPC,
+      where: n.room_id == ^room_id,
+      order_by: n.name,
+      select: %{id: n.id, name: n.name, short_description: n.short_description}
+    )
+    |> Repo.all()
   end
 
   @spec list_inventory(integer()) :: [
@@ -96,6 +113,31 @@ defmodule AgenticRealms.World.Queries do
 
     case Enum.filter(rows, fn r -> normalize_name(r.name) == needle end) do
       [] -> {:error, :no_such_object}
+      [%{id: id}] -> {:ok, id}
+      _multiple -> {:error, :ambiguous}
+    end
+  end
+
+  @doc """
+  Resolve an NPC display name within a room's current contents to its npc_id.
+  Mirrors `resolve_object_in_room/2`. Used by `World.Commands.take/2` to
+  refuse takes against NPCs via the existing fixed-object refusal path
+  (feature 007 FR-015).
+  """
+  @spec resolve_npc_in_room(String.t(), String.t()) ::
+          {:ok, String.t()} | {:error, :no_such_npc | :ambiguous}
+  def resolve_npc_in_room(room_id, name) when is_binary(room_id) and is_binary(name) do
+    needle = normalize_name(name)
+
+    rows =
+      from(n in NPC,
+        where: n.room_id == ^room_id,
+        select: %{id: n.id, name: n.name}
+      )
+      |> Repo.all()
+
+    case Enum.filter(rows, fn r -> normalize_name(r.name) == needle end) do
+      [] -> {:error, :no_such_npc}
       [%{id: id}] -> {:ok, id}
       _multiple -> {:error, :ambiguous}
     end

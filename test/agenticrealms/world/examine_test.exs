@@ -11,7 +11,7 @@ defmodule AgenticRealms.World.ExamineTest do
   alias AgenticRealms.Accounts
   alias AgenticRealms.World.Examine
   alias AgenticRealms.World.Examine.Match
-  alias AgenticRealms.World.Schemas.{Object, PlayerState, Room}
+  alias AgenticRealms.World.Schemas.{Object, PlayerState, Room, NPC}
   alias AgenticRealmsWeb.Presence
 
   defp register_player(name) do
@@ -273,5 +273,114 @@ defmodule AgenticRealms.World.ExamineTest do
   # Helper for the offline test — fetches the bob_room_id from his PlayerState
   defp bob_room_id(bob) do
     Repo.get!(PlayerState, bob.id).current_room_id
+  end
+
+  # ──────────────────────────────────────────────────────────────────────
+  # Feature 007 — Static NPCs
+  # ──────────────────────────────────────────────────────────────────────
+
+  defp insert_npc(room_id, name, long_description) do
+    Repo.insert!(%NPC{
+      id: Ecto.UUID.generate(),
+      name: name,
+      short_description: "a #{name}",
+      long_description: long_description,
+      room_id: room_id
+    })
+  end
+
+  describe "examine/2 — NPCs (feature 007)" do
+    setup do
+      alice = register_player("alice")
+      room = insert_room()
+      place_in_room(alice, room)
+      track_online(alice)
+
+      garrick =
+        insert_npc(
+          room.id,
+          "Garrick the Innkeeper",
+          "A wiry man in a stained apron, his hands callused and his eyes patient."
+        )
+
+      %{alice: alice, room: room, garrick: garrick}
+    end
+
+    test "exact-name match returns an NPC Match", %{alice: alice} do
+      assert {:ok,
+              %Match{
+                target_kind: :npc,
+                name: "Garrick the Innkeeper",
+                long_description: ld
+              }} = Examine.examine(alice.id, "garrick the innkeeper")
+
+      assert ld =~ "wiry man in a stained apron"
+    end
+
+    test "partial substring match returns the NPC", %{alice: alice} do
+      assert {:ok, %Match{target_kind: :npc, name: "Garrick the Innkeeper"}} =
+               Examine.examine(alice.id, "garrick")
+    end
+
+    test "NPC name is case-insensitive", %{alice: alice} do
+      assert {:ok, %Match{target_kind: :npc, name: "Garrick the Innkeeper"}} =
+               Examine.examine(alice.id, "GARRICK")
+    end
+
+    test "NPC in another room is not findable", %{alice: alice} do
+      other_room = insert_room("Other Room")
+      insert_npc(other_room.id, "Maelyn", "A bard.")
+
+      assert {:error, :no_such_target} = Examine.examine(alice.id, "maelyn")
+    end
+
+    test "NPC + same-named room object → :ambiguous_mixed_kind", %{alice: alice, room: room} do
+      insert_object(room.id, "garrick the innkeeper", "An object that happens to share the name.")
+
+      assert {:error, :ambiguous_mixed_kind} =
+               Examine.examine(alice.id, "garrick the innkeeper")
+    end
+
+    test "NPC + same-named player in the same room → :ambiguous_mixed_kind",
+         %{room: room} do
+      # Player usernames are constrained to letters/numbers/hyphens/underscores,
+      # AND register_player suffixes the username for uniqueness. Set up the
+      # collision by inserting an NPC whose name equals the twin's actual
+      # registered username.
+      alice = register_player("alice_obs")
+      place_in_room(alice, room)
+      track_online(alice)
+
+      twin = register_player("warden")
+      place_in_room(twin, room)
+      track_online(twin)
+
+      insert_npc(room.id, twin.username, "A grim warden in dented mail.")
+
+      assert {:error, :ambiguous_mixed_kind} = Examine.examine(alice.id, twin.username)
+    end
+
+    test "self-aliases never resolve to an NPC", %{alice: alice, room: room} do
+      insert_npc(room.id, "me", "An NPC literally named 'me'.")
+
+      # `me` short-circuits to the acting player, NOT the NPC.
+      assert {:ok, %Match{target_kind: :player, name: name}} =
+               Examine.examine(alice.id, "me")
+
+      refute name == "me"
+      assert name == Accounts.get_player(alice.id).username
+    end
+
+    test "exact-matching inventory object wins over partially-matching NPC", %{alice: alice} do
+      # The NPC's full name "Garrick the Innkeeper" only PARTIALLY matches
+      # the input "garrick". The inventory object's name exact-matches.
+      # Stage-1 exact resolution returns the inventory object — no NPC tie.
+      insert_inventory_object(alice.id, "garrick", "An inventory item named garrick.")
+
+      assert {:ok, %Match{target_kind: :object, name: "garrick", long_description: ld}} =
+               Examine.examine(alice.id, "garrick")
+
+      assert ld =~ "inventory item"
+    end
   end
 end

@@ -17,14 +17,15 @@ defmodule AgenticRealms.World.Router do
     SpawnPlayer,
     MovePlayer,
     TakeObject,
-    DropObject
+    DropObject,
+    SpawnNPC
   }
 
   identify(Room, by: :room_id, prefix: "room-")
   identify(Player, by: :player_id, prefix: "player-")
 
-  # Phase 3 (US5) + Phase 6 (US3): room commands routed to Room
-  dispatch([CreateRoom, AddExit, PlaceObject, TakeObject, DropObject], to: Room)
+  # Phase 3 (US5) + Phase 6 (US3) + Feature 007: room commands routed to Room
+  dispatch([CreateRoom, AddExit, PlaceObject, TakeObject, DropObject, SpawnNPC], to: Room)
 
   # Phase 4 (US1) + Phase 5 (US2): player lifecycle + movement routed to Player
   dispatch([SpawnPlayer, MovePlayer], to: Player)

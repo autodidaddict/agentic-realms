@@ -29,6 +29,19 @@ defmodule AgenticRealms.World.UIEvents do
     defstruct [:room_id, :actor_id, :actor_username, :to_direction]
   end
 
+  defmodule RoomNPCArrived do
+    @moduledoc """
+    Transient NPC-arrival event. Broadcast on `room:<destination>` when an
+    `NPCSpawnedInRoom` domain event fires while live sessions are present
+    in the destination room. Feature 007 FR-011 / FR-012.
+
+    Always directionless — NPCs in feature 007 do not move and have no
+    source room (FR-012).
+    """
+    @enforce_keys [:room_id, :npc_id, :npc_name]
+    defstruct [:room_id, :npc_id, :npc_name]
+  end
+
   defmodule PlayerCurrentRoomChanged do
     @enforce_keys [:player_id, :to_room_id]
     defstruct [:player_id, :from_room_id, :to_room_id]

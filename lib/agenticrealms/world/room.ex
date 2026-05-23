@@ -1,9 +1,11 @@
 defmodule AgenticRealms.World.Room do
   @moduledoc """
   Room aggregate. Owns a room's display info (name + description), its exit
-  set, and the set of objects currently in the room. Per-room commands
-  (`TakeObject`, `DropObject`) are serialized by Commanded on this aggregate,
-  which is what gives us the FR-011 concurrent-take race resolution for free.
+  set, the set of objects currently in the room, and the set of NPCs currently
+  in the room. Per-room commands (`TakeObject`, `DropObject`, `SpawnNPC`) are
+  serialized by Commanded on this aggregate, which is what gives us the
+  FR-011 concurrent-take race resolution for free and what enforces per-room
+  NPC name uniqueness in-flight (feature 007 FR-001a).
 
   Occupancy is NOT tracked on this aggregate — `PlayerStateProjector` owns
   that question via the `player_state` read model. This keeps movement
@@ -15,21 +17,25 @@ defmodule AgenticRealms.World.Room do
   needs serialization. Fixed-ness is a static property; reading it from the
   read model is always definitive.
 
-  See `specs/003-persisted-world/data-model.md` §1.1.
+  See `specs/003-persisted-world/data-model.md` §1.1 and
+  `specs/007-static-npcs/data-model.md` §2.
   """
 
   defstruct id: nil,
             name: nil,
             description: nil,
             exits: %{},
-            object_ids: MapSet.new()
+            object_ids: MapSet.new(),
+            npc_ids: MapSet.new(),
+            npc_names_lower: MapSet.new()
 
   alias AgenticRealms.World.Commands.{
     CreateRoom,
     AddExit,
     PlaceObject,
     TakeObject,
-    DropObject
+    DropObject,
+    SpawnNPC
   }
 
   alias AgenticRealms.World.Events.{
@@ -37,7 +43,8 @@ defmodule AgenticRealms.World.Room do
     ExitAdded,
     ObjectPlacedInRoom,
     ObjectTakenFromRoom,
-    ObjectDroppedInRoom
+    ObjectDroppedInRoom,
+    NPCSpawnedInRoom
   }
 
   # --- CreateRoom ---------------------------------------------------------
@@ -135,6 +142,46 @@ defmodule AgenticRealms.World.Room do
     end
   end
 
+  # --- SpawnNPC -----------------------------------------------------------
+  # Enforces per-room NPC name uniqueness (FR-001a) in-flight. The DB unique
+  # index on (room_id, LOWER(name)) is defense in depth.
+
+  def execute(%__MODULE__{id: nil}, %SpawnNPC{}), do: {:error, :room_not_found}
+
+  def execute(
+        %__MODULE__{id: rid, npc_ids: nids, npc_names_lower: names},
+        %SpawnNPC{
+          room_id: rid,
+          npc_id: nid,
+          name: name,
+          short_description: short,
+          long_description: long
+        }
+      ) do
+    cond do
+      short in [nil, ""] ->
+        {:error, :short_description_required}
+
+      long in [nil, ""] ->
+        {:error, :long_description_required}
+
+      MapSet.member?(nids, nid) ->
+        {:error, :npc_already_in_room}
+
+      MapSet.member?(names, String.downcase(name)) ->
+        {:error, :npc_name_taken_in_room}
+
+      true ->
+        %NPCSpawnedInRoom{
+          room_id: rid,
+          npc_id: nid,
+          name: name,
+          short_description: short,
+          long_description: long
+        }
+    end
+  end
+
   # --- apply/2 ------------------------------------------------------------
 
   def apply(%__MODULE__{} = state, %RoomCreated{
@@ -162,5 +209,16 @@ defmodule AgenticRealms.World.Room do
 
   def apply(%__MODULE__{object_ids: ids} = state, %ObjectDroppedInRoom{object_id: oid}) do
     %__MODULE__{state | object_ids: MapSet.put(ids, oid)}
+  end
+
+  def apply(
+        %__MODULE__{npc_ids: nids, npc_names_lower: names} = state,
+        %NPCSpawnedInRoom{npc_id: nid, name: name}
+      ) do
+    %__MODULE__{
+      state
+      | npc_ids: MapSet.put(nids, nid),
+        npc_names_lower: MapSet.put(names, String.downcase(name))
+    }
   end
 end

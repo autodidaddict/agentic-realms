@@ -105,9 +105,29 @@ defmodule AgenticRealms.World.Commands do
              | :object_not_in_room
              | term()}
   def take(player_id, name) when is_integer(player_id) and is_binary(name) do
-    with {:ok, room_id} <- Queries.current_room_of(player_id),
-         {:ok, object_id} <- Queries.resolve_object_in_room(room_id, name),
-         {:ok, false} <- check_not_fixed(object_id),
+    with {:ok, room_id} <- Queries.current_room_of(player_id) do
+      case Queries.resolve_object_in_room(room_id, name) do
+        {:ok, object_id} ->
+          do_take(room_id, player_id, object_id)
+
+        {:error, :no_such_object} ->
+          # Feature 007 FR-015: fall through to NPC scope. If an NPC matches,
+          # refuse via the existing :object_is_fixed path (the LiveView
+          # renders "You can't take that.").
+          case Queries.resolve_npc_in_room(room_id, name) do
+            {:ok, _npc_id} -> {:error, :object_is_fixed}
+            {:error, :no_such_npc} -> {:error, :no_such_object}
+            {:error, :ambiguous} -> {:error, :ambiguous}
+          end
+
+        {:error, _} = err ->
+          err
+      end
+    end
+  end
+
+  defp do_take(room_id, player_id, object_id) do
+    with {:ok, false} <- check_not_fixed(object_id),
          object_name <- name_of(object_id),
          :ok <-
            WorldApp.dispatch(
