@@ -4,6 +4,6 @@ defmodule AgenticRealms.World.RoomView do
   Produced by `AgenticRealms.World.Queries.look_room/1`.
   """
 
-  @enforce_keys [:id, :name, :description, :exits, :objects, :other_players]
-  defstruct [:id, :name, :description, :exits, :objects, :other_players]
+  @enforce_keys [:id, :name, :description, :exits, :objects, :other_players, :npcs]
+  defstruct [:id, :name, :description, :exits, :objects, :other_players, :npcs]
 end

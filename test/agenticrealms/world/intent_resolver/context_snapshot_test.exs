@@ -17,13 +17,14 @@ defmodule AgenticRealms.World.IntentResolver.ContextSnapshotTest do
           %{direction: "east", target_name: "Corridor"}
         ],
         objects: [%{name: "brass lantern"}, %{name: "leather-bound journal"}],
-        other_players: [%{username: "bob"}]
+        other_players: [%{username: "bob"}],
+        npcs: []
       },
       overrides
     )
   end
 
-  test "renders room name, description, exits, objects, occupants, inventory, and input" do
+  test "renders room name, description, exits, objects, NPCs, occupants, inventory, and input" do
     text = ContextSnapshot.render(room(), [%{name: "iron key"}], "grab the lantern")
 
     assert text =~ "Current room: Stone Atrium"
@@ -31,6 +32,7 @@ defmodule AgenticRealms.World.IntentResolver.ContextSnapshotTest do
     assert text =~ "north (Forest Path)"
     assert text =~ "east (Corridor)"
     assert text =~ "Objects here: brass lantern, leather-bound journal"
+    assert text =~ "NPCs here: (none)"
     assert text =~ "Other players present: bob"
     assert text =~ "Your inventory: iron key"
     assert text =~ "Player typed: grab the lantern"
@@ -42,13 +44,44 @@ defmodule AgenticRealms.World.IntentResolver.ContextSnapshotTest do
   end
 
   test "empty collections render as explicit placeholders" do
-    bare = room(%{exits: [], objects: [], other_players: []})
+    bare = room(%{exits: [], objects: [], other_players: [], npcs: []})
     text = ContextSnapshot.render(bare, [], "look")
 
     assert text =~ "Exits: (none)"
     assert text =~ "Objects here: (none)"
+    assert text =~ "NPCs here: (none)"
     assert text =~ "Other players present: (none)"
     assert text =~ "Your inventory: (empty)"
+  end
+
+  test "populated NPC list renders each NPC with its short description in parentheses" do
+    populated =
+      room(%{
+        npcs: [
+          %{
+            name: "Garrick the Innkeeper",
+            short_description: "a wiry innkeeper in a stained apron"
+          },
+          %{name: "Maelyn the Bard", short_description: "a slender bard tuning a lute"}
+        ]
+      })
+
+    text = ContextSnapshot.render(populated, [], "look")
+
+    assert text =~
+             "NPCs here: Garrick the Innkeeper (a wiry innkeeper in a stained apron), Maelyn the Bard (a slender bard tuning a lute)"
+  end
+
+  test "NPC with missing short_description falls back to just the name" do
+    populated =
+      room(%{
+        npcs: [%{name: "Mystery NPC", short_description: ""}]
+      })
+
+    text = ContextSnapshot.render(populated, [], "look")
+
+    assert text =~ "NPCs here: Mystery NPC"
+    refute text =~ "Mystery NPC ()"
   end
 
   test "truncates a long room description to 300 characters with an ellipsis" do

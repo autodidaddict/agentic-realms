@@ -103,6 +103,15 @@ defmodule AgenticRealmsWeb.GameComponents do
           <span :if={idx < length(@entry.room.other_players) - 1}> · </span>
         </span>
       </div>
+      <div :if={@entry.room.npcs != []} class="room-section also-here">
+        <span class="room-section-label">Also here:</span>
+        <span :for={{npc, idx} <- Enum.with_index(@entry.room.npcs)} class="also-here-entry">
+          <span class="entity npc">{npc.name}</span><span
+            :if={npc.short_description not in [nil, ""]}
+            class="also-here-short"
+          > — {npc.short_description}</span><span :if={idx < length(@entry.room.npcs) - 1}> · </span>
+        </span>
+      </div>
     </div>
     """
   end
@@ -147,6 +156,17 @@ defmodule AgenticRealmsWeb.GameComponents do
     ~H"""
     <div class="log-entry detail detail-player">
       <span class="detail-name">{@entry.name}</span> is a player.
+    </div>
+    """
+  end
+
+  def log_entry(%{entry: %{kind: :detail, target_kind: :npc}} = assigns) do
+    ~H"""
+    <div class="log-entry detail detail-npc">
+      <div class="detail-head">
+        <span class="detail-name">{@entry.name}</span>
+      </div>
+      <div class="detail-body">{@entry.long_description}</div>
     </div>
     """
   end

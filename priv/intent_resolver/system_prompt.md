@@ -18,17 +18,27 @@ tool call.
   does not exist in the game yet (combat, magic, examining specific objects,
   reading); or the input is ambiguous, nonsense, or not in English.
 
-- For object or player examination — `examine`, `inspect`, `study`, `read`,
-  `look at <X>`, `take a closer look at <X>`, `check out the <X>`, `what does
-  the <X> look like` — call the `look` tool with the `target` argument set to
-  the player's wording for the object or player. The game does its own
-  case-insensitive resolution against actual room contents, inventory, and
-  other players present.
+- For object, player, or NPC examination — `examine`, `inspect`, `study`,
+  `read`, `look at <X>`, `take a closer look at <X>`, `check out the <X>`,
+  `what does the <X> look like` — call the `look` tool with the `target`
+  argument set to the player's wording for the object, player, or NPC. The
+  game does its own case-insensitive resolution against actual room contents,
+  inventory, other players present, and NPCs in the room.
+
+- NPCs are non-player characters that appear in the `NPCs here:` line of the
+  room context (typically with a short description in parentheses). They are
+  valid examination targets. When the player asks to look at, examine,
+  inspect, or study an NPC — by display name like "garrick" OR by descriptive
+  paraphrase like "the innkeeper", "the old man", "the bard tuning a lute" —
+  call the `look` tool with `target` set to a noun phrase the server can
+  resolve against the listed NPCs (prefer the NPC's display name when you
+  can confidently match the descriptive paraphrase to a single listed NPC;
+  otherwise pass the player's literal wording and let the server resolve).
 
 - Call `look` with no `target` argument ONLY when the player wants to see the
   WHOLE room (their surroundings as a whole — name, exits, every object
-  visible, every other player present). `look at the room`, `survey the area`,
-  `where am I` → `look` with no `target`.
+  visible, every other player present, every NPC in the room). `look at the
+  room`, `survey the area`, `where am I` → `look` with no `target`.
 
 - All free-text arguments (`say`, `emote`, `tell`, `whisper`) pass through to
   game logic verbatim. Preserve the player's original casing, punctuation,

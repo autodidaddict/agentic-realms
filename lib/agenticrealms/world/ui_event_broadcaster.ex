@@ -41,7 +41,8 @@ defmodule AgenticRealms.World.UIEventBroadcaster do
     PlayerSpawned,
     PlayerMoved,
     ObjectTakenFromRoom,
-    ObjectDroppedInRoom
+    ObjectDroppedInRoom,
+    NPCSpawnedInRoom
   }
 
   alias AgenticRealms.World.Schemas.Object
@@ -51,6 +52,7 @@ defmodule AgenticRealms.World.UIEventBroadcaster do
     RoomPlayerLeft,
     RoomObjectTaken,
     RoomObjectDropped,
+    RoomNPCArrived,
     PlayerCurrentRoomChanged,
     PlayerInventoryChanged
   }
@@ -170,6 +172,16 @@ defmodule AgenticRealms.World.UIEventBroadcaster do
         object_name: name,
         object_short_description: short
       }
+    )
+
+    :ok
+  end
+
+  def handle(%NPCSpawnedInRoom{room_id: rid, npc_id: nid, name: name}, _meta) do
+    Phoenix.PubSub.broadcast(
+      @pubsub,
+      AgenticRealms.World.room_topic(rid),
+      %RoomNPCArrived{room_id: rid, npc_id: nid, npc_name: name}
     )
 
     :ok

@@ -43,7 +43,8 @@ defmodule AgenticRealms.World.IntentResolver.ContextSnapshot do
             description: String.t(),
             exits: list(),
             objects: list(),
-            other_players: list()
+            other_players: list(),
+            npcs: list()
           },
           list(),
           String.t()
@@ -54,6 +55,7 @@ defmodule AgenticRealms.World.IntentResolver.ContextSnapshot do
     Description: #{truncate(room.description)}
     Exits: #{format_exits(room.exits)}
     Objects here: #{format_names(room.objects)}
+    NPCs here: #{format_npcs(room.npcs)}
     Other players present: #{format_usernames(room.other_players)}
     Your inventory: #{format_inventory(inventory)}
 
@@ -83,6 +85,17 @@ defmodule AgenticRealms.World.IntentResolver.ContextSnapshot do
 
   defp format_usernames([]), do: "(none)"
   defp format_usernames(players), do: Enum.map_join(players, ", ", & &1.username)
+
+  defp format_npcs([]), do: "(none)"
+
+  defp format_npcs(npcs) do
+    Enum.map_join(npcs, ", ", fn n ->
+      case n[:short_description] do
+        s when is_binary(s) and s != "" -> "#{n.name} (#{s})"
+        _ -> n.name
+      end
+    end)
+  end
 
   defp format_inventory([]), do: "(empty)"
   defp format_inventory(items), do: Enum.map_join(items, ", ", & &1.name)

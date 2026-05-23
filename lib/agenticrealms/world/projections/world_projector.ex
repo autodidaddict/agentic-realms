@@ -6,6 +6,7 @@ defmodule AgenticRealms.World.Projections.WorldProjector do
   Event handler clauses added so far:
     * Phase 3 (US5): RoomCreated, ExitAdded, ObjectPlacedInRoom
     * Phase 6 (US3): ObjectTakenFromRoom, ObjectDroppedInRoom
+    * Feature 007: NPCSpawnedInRoom
 
   Every insert uses `on_conflict: :nothing` so the projector is safe to
   replay against a partially-populated read model (which happens on a fresh
@@ -31,10 +32,11 @@ defmodule AgenticRealms.World.Projections.WorldProjector do
     ExitAdded,
     ObjectPlacedInRoom,
     ObjectTakenFromRoom,
-    ObjectDroppedInRoom
+    ObjectDroppedInRoom,
+    NPCSpawnedInRoom
   }
 
-  alias AgenticRealms.World.Schemas.{Room, Exit, Object}
+  alias AgenticRealms.World.Schemas.{Room, Exit, Object, NPC}
 
   def handle(%RoomCreated{room_id: id, name: name, description: description}, _meta) do
     Repo.insert!(
@@ -107,6 +109,31 @@ defmodule AgenticRealms.World.Projections.WorldProjector do
         from(o in Object, where: o.id == ^oid),
         set: [room_id: rid, player_id: nil, updated_at: utc_now()]
       )
+
+    :ok
+  end
+
+  def handle(
+        %NPCSpawnedInRoom{
+          room_id: room_id,
+          npc_id: nid,
+          name: name,
+          short_description: short,
+          long_description: long
+        },
+        _meta
+      ) do
+    Repo.insert!(
+      %NPC{
+        id: nid,
+        name: name,
+        short_description: short,
+        long_description: long,
+        room_id: room_id
+      },
+      on_conflict: :nothing,
+      conflict_target: :id
+    )
 
     :ok
   end
