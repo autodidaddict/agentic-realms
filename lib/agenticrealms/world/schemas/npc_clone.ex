@@ -20,6 +20,7 @@ defmodule AgenticRealms.World.Schemas.NPCClone do
     field :name, :string
     field :short_description, :string
     field :long_description, :string
+    field :behaviors, {:array, :map}, default: []
 
     belongs_to :blueprint, AgenticRealms.World.Schemas.NPCBlueprint,
       foreign_key: :blueprint_id,

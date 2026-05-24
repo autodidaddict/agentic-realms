@@ -42,6 +42,21 @@ defmodule AgenticRealms.World.UIEvents do
     defstruct [:room_id, :npc_id, :npc_name]
   end
 
+  defmodule BehaviorUtterance do
+    @moduledoc """
+    Transient utterance produced by a behavior's :say action (feature 009).
+    Broadcast on `player:<player_id>` topic, NEVER persisted, NEVER on the
+    room topic — see `specs/009-npc-behaviors/research.md` R2 for the
+    delivery-topic rationale.
+
+    `kind` is `:npc_speech` (NPC clone speaker, attributed) or `:room_speech`
+    (room source, unattributed ambient narration). `actor_name` is the
+    clone's display name for `:npc_speech` and `nil` for `:room_speech`.
+    """
+    @enforce_keys [:kind, :text, :room_id, :triggering_player_id]
+    defstruct [:kind, :actor_name, :text, :room_id, :triggering_player_id]
+  end
+
   defmodule PlayerCurrentRoomChanged do
     @enforce_keys [:player_id, :to_room_id]
     defstruct [:player_id, :from_room_id, :to_room_id]

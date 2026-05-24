@@ -267,4 +267,44 @@ defmodule AgenticRealms.World.RoomTest do
       assert after_apply == before
     end
   end
+
+  describe "behaviors (feature 009)" do
+    @behaviors_payload [
+      %{
+        "trigger" => "player_entered",
+        "actions" => [%{"type" => "say", "text" => "Hello."}]
+      }
+    ]
+
+    test "CreateRoom carries :behaviors through to the emitted event" do
+      assert %RoomCreated{behaviors: @behaviors_payload} =
+               Room.execute(%Room{}, %CreateRoom{
+                 room_id: @room_id,
+                 name: "Test Room",
+                 description: "A room.",
+                 behaviors: @behaviors_payload
+               })
+    end
+
+    test "apply/2 of RoomCreated with behaviors sets state.behaviors" do
+      state =
+        Room.apply(%Room{}, %RoomCreated{
+          room_id: @room_id,
+          name: "Test Room",
+          description: "A room.",
+          behaviors: @behaviors_payload
+        })
+
+      assert state.behaviors == @behaviors_payload
+    end
+
+    test "CreateRoom without :behaviors defaults to []" do
+      assert %RoomCreated{behaviors: []} =
+               Room.execute(%Room{}, %CreateRoom{
+                 room_id: @room_id,
+                 name: "Test Room",
+                 description: "A room."
+               })
+    end
+  end
 end

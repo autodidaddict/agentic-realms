@@ -177,6 +177,23 @@ defmodule AgenticRealmsWeb.GameComponents do
     """
   end
 
+  # Feature 009 — behavior-sourced NPC speech. Attributed: <name> says, "text".
+  def log_entry(%{entry: %{kind: :npc_speech}} = assigns) do
+    ~H"""
+    <div class="log-entry speech speech-npc">
+      <span class="who">{@entry.actor_name}</span> says, &ldquo;{@entry.text}&rdquo;
+    </div>
+    """
+  end
+
+  # Feature 009 — behavior-sourced room narration. NO attribution — just the
+  # line, rendered as ambient narration. No "X says" framing, no quotes.
+  def log_entry(%{entry: %{kind: :room_speech}} = assigns) do
+    ~H"""
+    <div class="log-entry narrate narrate-room">{@entry.text}</div>
+    """
+  end
+
   def log_entry(%{entry: %{kind: :cmd}} = assigns) do
     ~H"""
     <div class="log-entry cmd">{@entry.text}</div>

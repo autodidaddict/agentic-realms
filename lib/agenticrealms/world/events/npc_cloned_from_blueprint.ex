@@ -17,6 +17,7 @@ defmodule AgenticRealms.World.Events.NPCClonedFromBlueprint do
     :name,
     :short_description,
     :long_description,
+    behaviors: [],
     version: 1
   ]
 end

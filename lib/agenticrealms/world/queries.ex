@@ -61,6 +61,48 @@ defmodule AgenticRealms.World.Queries do
   end
 
   @doc """
+  Fetch the behaviors list attached to a room (feature 009).
+
+  Returns `{:ok, behaviors_list}` (which may be `[]`) or
+  `{:error, :no_such_room}` if the room id is unknown.
+  """
+  @spec get_room_behaviors(String.t()) ::
+          {:ok, [map()]} | {:error, :no_such_room}
+  def get_room_behaviors(room_id) when is_binary(room_id) do
+    case Repo.get(Room, room_id) do
+      nil -> {:error, :no_such_room}
+      %Room{behaviors: behaviors} -> {:ok, behaviors || []}
+    end
+  end
+
+  @doc """
+  List NPC clones in a room together with their behaviors list, ordered by
+  the per-blueprint serial counter (feature 009). Returns an empty list
+  when the room contains no NPCs.
+  """
+  @spec list_npc_clones_in_room_with_behaviors(String.t()) :: [
+          %{
+            id: String.t(),
+            name: String.t(),
+            serial: integer(),
+            behaviors: [map()]
+          }
+        ]
+  def list_npc_clones_in_room_with_behaviors(room_id) when is_binary(room_id) do
+    from(c in NPCClone,
+      where: c.room_id == ^room_id,
+      order_by: c.serial,
+      select: %{
+        id: c.id,
+        name: c.name,
+        serial: c.serial,
+        behaviors: c.behaviors
+      }
+    )
+    |> Repo.all()
+  end
+
+  @doc """
   Fetch a single NPC blueprint by its stable identifier. Used by the
   pre-dispatch wrapper `Commands.spawn_npc_clone/3` to validate blueprint
   existence before dispatching the spawn command.
