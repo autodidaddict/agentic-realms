@@ -67,6 +67,7 @@ defmodule AgenticRealms.MixProject do
       {:commanded, "~> 1.4"},
       {:commanded_eventstore_adapter, "~> 1.4"},
       {:eventstore, "~> 1.4"},
+      {:horde, "~> 0.9"},
       {:req, "~> 0.5"}
     ]
   end

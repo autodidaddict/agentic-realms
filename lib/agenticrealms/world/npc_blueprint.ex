@@ -21,6 +21,7 @@ defmodule AgenticRealms.World.NPCBlueprint do
             short_description: nil,
             long_description: nil,
             behaviors: [],
+            lore: "",
             next_serial: 1,
             clone_ids: MapSet.new()
 
@@ -34,7 +35,8 @@ defmodule AgenticRealms.World.NPCBlueprint do
         name: name,
         short_description: short,
         long_description: long,
-        behaviors: behaviors
+        behaviors: behaviors,
+        lore: lore
       }) do
     cond do
       name in [nil, ""] ->
@@ -52,7 +54,8 @@ defmodule AgenticRealms.World.NPCBlueprint do
           name: name,
           short_description: short,
           long_description: long,
-          behaviors: behaviors
+          behaviors: behaviors,
+          lore: lore || ""
         }
     end
   end
@@ -74,6 +77,7 @@ defmodule AgenticRealms.World.NPCBlueprint do
           short_description: short,
           long_description: long,
           behaviors: behaviors,
+          lore: lore,
           next_serial: serial,
           clone_ids: clones
         },
@@ -90,7 +94,8 @@ defmodule AgenticRealms.World.NPCBlueprint do
         name: name,
         short_description: short,
         long_description: long,
-        behaviors: behaviors
+        behaviors: behaviors,
+        lore: lore
       }
     end
   end
@@ -102,7 +107,8 @@ defmodule AgenticRealms.World.NPCBlueprint do
         name: name,
         short_description: short,
         long_description: long,
-        behaviors: behaviors
+        behaviors: behaviors,
+        lore: lore
       }) do
     %__MODULE__{
       state
@@ -110,7 +116,8 @@ defmodule AgenticRealms.World.NPCBlueprint do
         name: name,
         short_description: short,
         long_description: long,
-        behaviors: behaviors
+        behaviors: behaviors,
+        lore: lore || ""
     }
   end
 

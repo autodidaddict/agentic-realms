@@ -29,6 +29,12 @@ defmodule AgenticRealms.Application do
       # (feature 005) so a slow or crashing Anthropic call cannot take
       # down the LiveView that spawned it.
       {Task.Supervisor, name: AgenticRealms.IntentResolverTaskSupervisor},
+      # Feature 010 — cluster-wide registry + dynamic supervisor for the
+      # per-(player, NPC) chat Conversation GenServers, plus a dedicated
+      # Task.Supervisor for the LLM round-trips those Conversations spawn.
+      AgenticRealms.World.NPCChat.Registry,
+      AgenticRealms.World.NPCChat.Supervisor,
+      AgenticRealms.World.NPCChat.TaskSupervisor,
       # AgenticRealms.EventStore is started transitively by World.Application
       # via the commanded_eventstore_adapter — listing it here causes a
       # double-start (:already_started).

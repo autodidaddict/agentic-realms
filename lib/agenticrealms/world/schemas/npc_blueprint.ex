@@ -20,6 +20,7 @@ defmodule AgenticRealms.World.Schemas.NPCBlueprint do
     field :long_description, :string
     field :is_synthetic, :boolean, default: false
     field :behaviors, {:array, :map}, default: []
+    field :lore, :string, default: ""
 
     has_many :clones, AgenticRealms.World.Schemas.NPCClone, foreign_key: :blueprint_id
 

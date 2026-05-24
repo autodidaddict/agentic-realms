@@ -95,6 +95,24 @@ defmodule AgenticRealms.World.Seed do
 
     :ok = validate_behaviors!(garrick_behaviors, "garrick_behaviors")
 
+    # Feature 010 — Garrick's lore. The LLM-only voice/backstory; never
+    # shown on `look <npc>` (that's `long_description`), never recited on
+    # demand to the player (FR-008e — the system prompt forbids dumping).
+    garrick_lore =
+      """
+      You are Garrick, a former bridge-guard from the Riverford garrison. \
+      You came south to the Stone Atrium twelve winters ago after the \
+      Riverford collapse — a flood that swept your watchhouse into the \
+      water and ended a dozen lives, including your captain's. You don't \
+      speak of it directly unless the conversation earns it. You're \
+      soft-spoken, patient, observant. You miss your old comrades but \
+      have made an uneasy peace with innkeeping. You take pride in a \
+      clean tankard and an honest welcome. You distrust nobles and like \
+      travelers who pay for their second pint without being asked.\
+      """
+      |> String.replace("\n", " ")
+      |> String.trim()
+
     # Rooms. Feature 008 — use consistency: :strong so the read-model
     # `world_rooms` rows exist by the time later seed dispatches (or any
     # post-seed pre-dispatch checks that consult the read model — e.g.
@@ -208,7 +226,8 @@ defmodule AgenticRealms.World.Seed do
           short_description: "a wiry innkeeper in a stained apron",
           long_description:
             "A wiry man in a stained apron, his hands callused and his eyes patient. He polishes a tankard that already looks clean and watches the door without quite seeming to.",
-          behaviors: garrick_behaviors
+          behaviors: garrick_behaviors,
+          lore: garrick_lore
         },
         consistency: :strong
       )

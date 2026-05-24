@@ -50,3 +50,7 @@ config :agenticrealms, AgenticRealms.World.Application,
 config :agenticrealms, AgenticRealms.Anthropic,
   api_key: "test-key-not-real",
   req_options: [plug: {Req.Test, AgenticRealms.Anthropic}]
+
+# Feature 010 — idle-timeout override for NPC chat Conversation GenServers.
+# Keeps idle-reap tests fast (200ms instead of 60_000ms).
+config :agenticrealms, AgenticRealms.World.NPCChat, idle_timeout_ms: 200

@@ -7,6 +7,7 @@ defmodule AgenticRealms.World.Events.NPCBlueprintCreated do
     :short_description,
     :long_description,
     behaviors: [],
+    lore: "",
     version: 1
   ]
 end

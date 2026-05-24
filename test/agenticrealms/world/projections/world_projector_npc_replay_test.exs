@@ -322,4 +322,67 @@ defmodule AgenticRealms.World.Projections.WorldProjectorNpcReplayTest do
       assert %NPCClone{behaviors: []} = Repo.get(NPCClone, npc_id)
     end
   end
+
+  # Feature 010 — backward compat for `lore`. Old events serialized before
+  # the `lore` field was added must still project cleanly: the projector
+  # must default `lore` to "" rather than crashing on a missing key.
+  describe "lore backward-compat (feature 010)" do
+    setup do
+      %{room: insert_room()}
+    end
+
+    test "NPCBlueprintCreated without lore projects with lore = \"\"" do
+      alias AgenticRealms.World.Events.NPCBlueprintCreated
+
+      bp_id = "lore_compat_bp_#{System.unique_integer([:positive])}"
+
+      # Build the struct WITHOUT a `:lore` key by funneling through the
+      # struct's defstruct default (the field exists in the source but
+      # the default of "" simulates an old payload).
+      event = %NPCBlueprintCreated{
+        blueprint_id: bp_id,
+        name: "Old Blueprint",
+        short_description: "short",
+        long_description: "long"
+      }
+
+      :ok = WorldProjector.handle(event, %{})
+
+      assert %NPCBlueprint{lore: ""} = Repo.get(NPCBlueprint, bp_id)
+    end
+
+    test "NPCClonedFromBlueprint without lore projects with lore = \"\"", %{room: room} do
+      alias AgenticRealms.World.Events.{NPCBlueprintCreated, NPCClonedFromBlueprint}
+
+      bp_id = "lore_compat_clone_bp_#{System.unique_integer([:positive])}"
+      clone_id = Ecto.UUID.generate()
+
+      :ok =
+        WorldProjector.handle(
+          %NPCBlueprintCreated{
+            blueprint_id: bp_id,
+            name: "BP",
+            short_description: "s",
+            long_description: "l"
+          },
+          %{}
+        )
+
+      :ok =
+        WorldProjector.handle(
+          %NPCClonedFromBlueprint{
+            blueprint_id: bp_id,
+            clone_id: clone_id,
+            room_id: room.id,
+            serial: 1,
+            name: "Clone",
+            short_description: "s",
+            long_description: "l"
+          },
+          %{}
+        )
+
+      assert %NPCClone{lore: ""} = Repo.get(NPCClone, clone_id)
+    end
+  end
 end

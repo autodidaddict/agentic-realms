@@ -194,6 +194,47 @@ defmodule AgenticRealmsWeb.GameComponents do
     """
   end
 
+  # Feature 010 — private chat reply (speech mode). Visually mirrors :npc_speech
+  # but on the private surface. The `speech-chat` class lets CSS distinguish
+  # public NPC speech from a chat-private utterance if desired.
+  def log_entry(%{entry: %{kind: :chat_speech}} = assigns) do
+    ~H"""
+    <div class="log-entry speech speech-npc speech-chat">
+      <span class="who">{@entry.actor_name}</span> says, &ldquo;{@entry.text}&rdquo;
+    </div>
+    """
+  end
+
+  # Feature 010 — private chat reply (emote mode). Third-person narration
+  # attributed to the NPC by name. Mirrors the existing :emote_action shape.
+  def log_entry(%{entry: %{kind: :chat_emote}} = assigns) do
+    ~H"""
+    <div class="log-entry emote emote-chat">
+      <span class="who">{@entry.actor_name}</span> {@entry.text}
+    </div>
+    """
+  end
+
+  # Feature 010 — chat-frame system message. `kind_variant` discriminates
+  # CSS class for styling (`chat-new`, `chat-continuing`, `chat-fallback`,
+  # `chat-in-flight`).
+  def log_entry(%{entry: %{kind: :chat_system}} = assigns) do
+    variant_class =
+      case assigns.entry[:kind_variant] do
+        :chat_new -> "chat-new"
+        :chat_continuing -> "chat-continuing"
+        :chat_fallback -> "chat-fallback"
+        :chat_in_flight_rejection -> "chat-in-flight"
+        _ -> "chat-other"
+      end
+
+    assigns = Phoenix.Component.assign(assigns, :variant_class, variant_class)
+
+    ~H"""
+    <div class={"log-entry chat-system " <> @variant_class}>{@entry.text}</div>
+    """
+  end
+
   def log_entry(%{entry: %{kind: :cmd}} = assigns) do
     ~H"""
     <div class="log-entry cmd">{@entry.text}</div>
