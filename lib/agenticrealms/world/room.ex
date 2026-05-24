@@ -1,41 +1,40 @@
 defmodule AgenticRealms.World.Room do
   @moduledoc """
   Room aggregate. Owns a room's display info (name + description), its exit
-  set, the set of objects currently in the room, and the set of NPCs currently
-  in the room. Per-room commands (`TakeObject`, `DropObject`, `SpawnNPC`) are
-  serialized by Commanded on this aggregate, which is what gives us the
-  FR-011 concurrent-take race resolution for free and what enforces per-room
-  NPC name uniqueness in-flight (feature 007 FR-001a).
+  set, and the set of objects currently in the room. Per-room commands
+  (`TakeObject`, `DropObject`) are serialized by Commanded on this aggregate.
 
   Occupancy is NOT tracked on this aggregate — `PlayerStateProjector` owns
-  that question via the `player_state` read model. This keeps movement
-  non-transactional across rooms (per Q2 clarification + research D2).
+  that question via the `player_state` read model.
 
-  Object FIXED-ness is checked at the pre-dispatch layer (`World.Commands.take`)
-  via the read model, NOT in the aggregate. The aggregate only owns the
-  contested resource — "is this object currently here?" — which is what
-  needs serialization. Fixed-ness is a static property; reading it from the
-  read model is always definitive.
+  Object FIXED-ness is checked at the pre-dispatch layer via the read
+  model, NOT in the aggregate.
+
+  **Feature 008 note**: NPC state (`npc_ids`, `npc_names_lower`) was
+  removed from this aggregate when the blueprint/clone split moved NPC
+  spawning to `World.NPCBlueprint`. Per-room display name uniqueness for
+  clones is enforced at the read-model layer (DB unique index + pre-dispatch
+  check in `World.Commands.spawn_npc_clone/3`). The `apply/2` clause for
+  `NPCSpawnedInRoom` is preserved as a vestigial no-op for aggregate
+  rehydration compatibility — feature 007 emitted those events from this
+  aggregate, and they remain in the event store.
 
   See `specs/003-persisted-world/data-model.md` §1.1 and
-  `specs/007-static-npcs/data-model.md` §2.
+  `specs/008-npc-blueprints/data-model.md` §3.
   """
 
   defstruct id: nil,
             name: nil,
             description: nil,
             exits: %{},
-            object_ids: MapSet.new(),
-            npc_ids: MapSet.new(),
-            npc_names_lower: MapSet.new()
+            object_ids: MapSet.new()
 
   alias AgenticRealms.World.Commands.{
     CreateRoom,
     AddExit,
     PlaceObject,
     TakeObject,
-    DropObject,
-    SpawnNPC
+    DropObject
   }
 
   alias AgenticRealms.World.Events.{
@@ -103,11 +102,6 @@ defmodule AgenticRealms.World.Room do
   end
 
   # --- TakeObject ---------------------------------------------------------
-  # Race-resolution point: when two players concurrently dispatch TakeObject
-  # for the same room+object, Commanded serializes them on this aggregate.
-  # The first removes the object_id from object_ids; the second arrives,
-  # finds it gone, and returns {:error, :object_not_in_room} — which the
-  # LiveView renders as the FR-011 message (Q1 clarification).
 
   def execute(%__MODULE__{id: nil}, %TakeObject{}), do: {:error, :room_not_found}
 
@@ -124,9 +118,6 @@ defmodule AgenticRealms.World.Room do
   end
 
   # --- DropObject ---------------------------------------------------------
-  # The aggregate only checks that this object isn't already in the room
-  # (which would indicate a serious read-model/aggregate divergence — the
-  # pre-dispatch layer already verified the player carries this object).
 
   def execute(%__MODULE__{id: nil}, %DropObject{}), do: {:error, :room_not_found}
 
@@ -139,46 +130,6 @@ defmodule AgenticRealms.World.Room do
       {:error, :object_already_in_room}
     else
       %ObjectDroppedInRoom{room_id: rid, player_id: pid, object_id: oid}
-    end
-  end
-
-  # --- SpawnNPC -----------------------------------------------------------
-  # Enforces per-room NPC name uniqueness (FR-001a) in-flight. The DB unique
-  # index on (room_id, LOWER(name)) is defense in depth.
-
-  def execute(%__MODULE__{id: nil}, %SpawnNPC{}), do: {:error, :room_not_found}
-
-  def execute(
-        %__MODULE__{id: rid, npc_ids: nids, npc_names_lower: names},
-        %SpawnNPC{
-          room_id: rid,
-          npc_id: nid,
-          name: name,
-          short_description: short,
-          long_description: long
-        }
-      ) do
-    cond do
-      short in [nil, ""] ->
-        {:error, :short_description_required}
-
-      long in [nil, ""] ->
-        {:error, :long_description_required}
-
-      MapSet.member?(nids, nid) ->
-        {:error, :npc_already_in_room}
-
-      MapSet.member?(names, String.downcase(name)) ->
-        {:error, :npc_name_taken_in_room}
-
-      true ->
-        %NPCSpawnedInRoom{
-          room_id: rid,
-          npc_id: nid,
-          name: name,
-          short_description: short,
-          long_description: long
-        }
     end
   end
 
@@ -211,14 +162,10 @@ defmodule AgenticRealms.World.Room do
     %__MODULE__{state | object_ids: MapSet.put(ids, oid)}
   end
 
-  def apply(
-        %__MODULE__{npc_ids: nids, npc_names_lower: names} = state,
-        %NPCSpawnedInRoom{npc_id: nid, name: name}
-      ) do
-    %__MODULE__{
-      state
-      | npc_ids: MapSet.put(nids, nid),
-        npc_names_lower: MapSet.put(names, String.downcase(name))
-    }
-  end
+  # Feature 008: vestigial no-op for legacy `NPCSpawnedInRoom` events. The
+  # Room aggregate no longer tracks NPC state; per-room name uniqueness is
+  # enforced at the read-model layer (DB unique index + pre-dispatch check).
+  # This clause exists only so rehydrating a Room aggregate from its event
+  # stream doesn't crash on historical events emitted by feature 007.
+  def apply(%__MODULE__{} = state, %NPCSpawnedInRoom{}), do: state
 end

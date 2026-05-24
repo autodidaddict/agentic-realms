@@ -42,7 +42,8 @@ defmodule AgenticRealms.World.UIEventBroadcaster do
     PlayerMoved,
     ObjectTakenFromRoom,
     ObjectDroppedInRoom,
-    NPCSpawnedInRoom
+    NPCSpawnedInRoom,
+    NPCClonedFromBlueprint
   }
 
   alias AgenticRealms.World.Schemas.Object
@@ -182,6 +183,22 @@ defmodule AgenticRealms.World.UIEventBroadcaster do
       @pubsub,
       AgenticRealms.World.room_topic(rid),
       %RoomNPCArrived{room_id: rid, npc_id: nid, npc_name: name}
+    )
+
+    :ok
+  end
+
+  # Feature 008: new event type emitted by the NPCBlueprint aggregate. Same
+  # downstream UI event as the legacy NPCSpawnedInRoom path so GameLive's
+  # handler is one clause covering both.
+  def handle(
+        %NPCClonedFromBlueprint{room_id: rid, clone_id: cid, name: name},
+        _meta
+      ) do
+    Phoenix.PubSub.broadcast(
+      @pubsub,
+      AgenticRealms.World.room_topic(rid),
+      %RoomNPCArrived{room_id: rid, npc_id: cid, npc_name: name}
     )
 
     :ok

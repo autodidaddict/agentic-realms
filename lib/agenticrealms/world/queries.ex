@@ -11,7 +11,7 @@ defmodule AgenticRealms.World.Queries do
   alias AgenticRealms.Repo
   alias AgenticRealms.Accounts.Player, as: AccountPlayer
   alias AgenticRealms.World.RoomView
-  alias AgenticRealms.World.Schemas.{Room, Exit, Object, PlayerState, NPC}
+  alias AgenticRealms.World.Schemas.{Room, Exit, Object, PlayerState, NPCBlueprint, NPCClone}
   alias AgenticRealmsWeb.Presence
 
   @spec current_room_of(integer()) :: {:ok, String.t()} | {:error, :no_current_room}
@@ -44,19 +44,107 @@ defmodule AgenticRealms.World.Queries do
   end
 
   @doc """
-  All NPCs currently located in `room_id`, ordered alphabetically by display
-  name. Returns each NPC's id, name, and short description — the room view
-  does NOT need long descriptions (FR-005 in feature 007).
+  All NPC clones currently located in `room_id`, ordered alphabetically by
+  display name. Returns each clone's id, name, and short description — the
+  room view does NOT need long descriptions (FR-005 in feature 007). Clone
+  data is fully denormalized, so no join to the blueprint is needed.
   """
   @spec list_npcs_in_room(String.t()) ::
           [%{id: String.t(), name: String.t(), short_description: String.t()}]
   def list_npcs_in_room(room_id) when is_binary(room_id) do
-    from(n in NPC,
-      where: n.room_id == ^room_id,
-      order_by: n.name,
-      select: %{id: n.id, name: n.name, short_description: n.short_description}
+    from(c in NPCClone,
+      where: c.room_id == ^room_id,
+      order_by: c.name,
+      select: %{id: c.id, name: c.name, short_description: c.short_description}
     )
     |> Repo.all()
+  end
+
+  @doc """
+  Fetch a single NPC blueprint by its stable identifier. Used by the
+  pre-dispatch wrapper `Commands.spawn_npc_clone/3` to validate blueprint
+  existence before dispatching the spawn command.
+  """
+  @spec get_npc_blueprint(String.t()) ::
+          {:ok,
+           %{
+             id: String.t(),
+             name: String.t(),
+             short_description: String.t(),
+             long_description: String.t()
+           }}
+          | {:error, :no_such_blueprint}
+  def get_npc_blueprint(blueprint_id) when is_binary(blueprint_id) do
+    case Repo.get(NPCBlueprint, blueprint_id) do
+      nil ->
+        {:error, :no_such_blueprint}
+
+      %NPCBlueprint{} = bp ->
+        {:ok,
+         %{
+           id: bp.id,
+           name: bp.name,
+           short_description: bp.short_description,
+           long_description: bp.long_description
+         }}
+    end
+  end
+
+  @doc """
+  Fetch a single NPC clone by its stable identifier. Used by the
+  pre-dispatch wrapper to re-query the freshly-projected clone and return
+  the assigned serial to the caller.
+  """
+  @spec get_npc_clone(String.t()) ::
+          {:ok,
+           %{
+             id: String.t(),
+             blueprint_id: String.t(),
+             serial: integer(),
+             name: String.t(),
+             room_id: String.t()
+           }}
+          | {:error, :no_such_clone}
+  def get_npc_clone(clone_id) when is_binary(clone_id) do
+    case Repo.get(NPCClone, clone_id) do
+      nil ->
+        {:error, :no_such_clone}
+
+      %NPCClone{} = c ->
+        {:ok,
+         %{
+           id: c.id,
+           blueprint_id: c.blueprint_id,
+           serial: c.serial,
+           name: c.name,
+           room_id: c.room_id
+         }}
+    end
+  end
+
+  @doc """
+  Find a clone in a given room by its display name (case-insensitive,
+  whitespace-normalized). Used by the pre-dispatch per-room name-collision
+  check (preserves feature 007 FR-001a at the clone level).
+  """
+  @spec find_clone_in_room_by_name(String.t(), String.t()) ::
+          {:ok, %{id: String.t(), name: String.t()}}
+          | {:error, :no_such_clone}
+  def find_clone_in_room_by_name(room_id, name)
+      when is_binary(room_id) and is_binary(name) do
+    needle = normalize_name(name)
+
+    rows =
+      from(c in NPCClone,
+        where: c.room_id == ^room_id,
+        select: %{id: c.id, name: c.name}
+      )
+      |> Repo.all()
+
+    case Enum.find(rows, fn r -> normalize_name(r.name) == needle end) do
+      nil -> {:error, :no_such_clone}
+      found -> {:ok, found}
+    end
   end
 
   @spec list_inventory(integer()) :: [
@@ -130,9 +218,9 @@ defmodule AgenticRealms.World.Queries do
     needle = normalize_name(name)
 
     rows =
-      from(n in NPC,
-        where: n.room_id == ^room_id,
-        select: %{id: n.id, name: n.name}
+      from(c in NPCClone,
+        where: c.room_id == ^room_id,
+        select: %{id: c.id, name: c.name}
       )
       |> Repo.all()
 

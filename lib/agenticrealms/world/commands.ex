@@ -21,12 +21,13 @@ defmodule AgenticRealms.World.Commands do
     SpawnPlayer,
     MovePlayer,
     TakeObject,
-    DropObject
+    DropObject,
+    SpawnNPCClone
   }
 
   alias AgenticRealms.World.Direction
   alias AgenticRealms.World.Queries
-  alias AgenticRealms.World.Schemas.Exit
+  alias AgenticRealms.World.Schemas.{Exit, Room}
 
   @doc """
   Spawn a player into the starting room if (and only if) they have no
@@ -209,6 +210,69 @@ defmodule AgenticRealms.World.Commands do
          ) do
       nil -> {:error, :no_exit_in_direction}
       target -> {:ok, target}
+    end
+  end
+
+  # --- NPC blueprint cloning (feature 008) --------------------------------
+
+  @doc """
+  Spawn a clone of `blueprint_id` into `room_id` with the given `clone_id`.
+
+  Pre-dispatch validation:
+    * blueprint exists (`:blueprint_not_found`)
+    * room exists (`:room_not_found`)
+    * no other clone in this room shares the blueprint's display name
+      (`:clone_name_taken_in_room` — preserves feature 007 FR-001a)
+
+  On success, dispatches `SpawnNPCClone` to the blueprint aggregate which
+  emits `NPCClonedFromBlueprint` with the aggregate's current data
+  materialized into the event (full-copy at dispatch time). Returns
+  `{:ok, %{clone_id, serial}}` after re-querying the freshly-projected
+  clone.
+
+  See `specs/008-npc-blueprints/contracts/commands.md`.
+  """
+  @spec spawn_npc_clone(String.t(), String.t(), String.t()) ::
+          {:ok, %{clone_id: String.t(), serial: integer()}}
+          | {:error,
+             :blueprint_not_found
+             | :room_not_found
+             | :clone_name_taken_in_room
+             | :clone_id_already_used
+             | term()}
+  def spawn_npc_clone(blueprint_id, room_id, clone_id)
+      when is_binary(blueprint_id) and is_binary(room_id) and is_binary(clone_id) do
+    with {:ok, blueprint} <- Queries.get_npc_blueprint(blueprint_id) |> remap_blueprint_error(),
+         :ok <- check_room_exists(room_id),
+         :ok <- check_no_clone_name_collision(room_id, blueprint.name),
+         :ok <-
+           WorldApp.dispatch(
+             %SpawnNPCClone{
+               blueprint_id: blueprint_id,
+               clone_id: clone_id,
+               room_id: room_id
+             },
+             consistency: :strong
+           ),
+         {:ok, clone} <- Queries.get_npc_clone(clone_id) do
+      {:ok, %{clone_id: clone_id, serial: clone.serial}}
+    end
+  end
+
+  defp remap_blueprint_error({:ok, _} = ok), do: ok
+  defp remap_blueprint_error({:error, :no_such_blueprint}), do: {:error, :blueprint_not_found}
+
+  defp check_room_exists(room_id) do
+    case Repo.get(Room, room_id) do
+      %Room{} -> :ok
+      nil -> {:error, :room_not_found}
+    end
+  end
+
+  defp check_no_clone_name_collision(room_id, name) do
+    case Queries.find_clone_in_room_by_name(room_id, name) do
+      {:ok, _clone} -> {:error, :clone_name_taken_in_room}
+      {:error, :no_such_clone} -> :ok
     end
   end
 end

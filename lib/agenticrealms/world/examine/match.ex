@@ -18,11 +18,12 @@ defmodule AgenticRealms.World.Examine.Match do
   """
 
   @enforce_keys [:target_kind, :name]
-  defstruct [:target_kind, :name, :long_description]
+  defstruct [:target_kind, :name, :long_description, :serial]
 
   @type t :: %__MODULE__{
           target_kind: :object | :player | :npc,
           name: String.t(),
-          long_description: String.t() | nil
+          long_description: String.t() | nil,
+          serial: integer() | nil
         }
 end

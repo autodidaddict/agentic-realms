@@ -8,8 +8,7 @@ defmodule AgenticRealms.World.RoomTest do
     AddExit,
     PlaceObject,
     TakeObject,
-    DropObject,
-    SpawnNPC
+    DropObject
   }
 
   alias AgenticRealms.World.Events.{
@@ -24,8 +23,7 @@ defmodule AgenticRealms.World.RoomTest do
   @room_id "00000000-0000-0000-0000-000000000001"
   @target_id "00000000-0000-0000-0000-000000000002"
   @object_id "00000000-0000-0000-0000-000000000100"
-  @npc_id "00000000-0000-0000-0000-000000000200"
-  @other_npc_id "00000000-0000-0000-0000-000000000201"
+  @legacy_npc_id "00000000-0000-0000-0000-000000000200"
 
   defp created_room do
     Room.apply(%Room{}, %RoomCreated{
@@ -249,112 +247,24 @@ defmodule AgenticRealms.World.RoomTest do
     end
   end
 
-  describe "SpawnNPC" do
-    test "spawns an NPC into an existing room" do
-      assert %NPCSpawnedInRoom{
-               room_id: @room_id,
-               npc_id: @npc_id,
-               name: "Garrick",
-               short_description: "a wiry innkeeper",
-               long_description: "A wiry man in a stained apron."
-             } =
-               Room.execute(created_room(), %SpawnNPC{
-                 room_id: @room_id,
-                 npc_id: @npc_id,
-                 name: "Garrick",
-                 short_description: "a wiry innkeeper",
-                 long_description: "A wiry man in a stained apron."
-               })
-    end
+  # Feature 008 — legacy NPCSpawnedInRoom apply/2 must remain a no-op so
+  # Room aggregates with historical NPC events can rehydrate without
+  # crashing. NPC state is no longer tracked on the Room aggregate; per-
+  # room display name uniqueness moved to the read-model layer.
+  describe "apply/2 — legacy NPCSpawnedInRoom replay compatibility (feature 008)" do
+    test "applying NPCSpawnedInRoom leaves Room aggregate state unchanged" do
+      before = created_room()
 
-    test "rejects on uninitialized room" do
-      assert {:error, :room_not_found} =
-               Room.execute(%Room{}, %SpawnNPC{
-                 room_id: @room_id,
-                 npc_id: @npc_id,
-                 name: "Garrick",
-                 short_description: "a wiry innkeeper",
-                 long_description: "A wiry man in a stained apron."
-               })
-    end
-
-    test "rejects duplicate npc_id" do
-      state =
-        created_room()
-        |> Room.apply(%NPCSpawnedInRoom{
+      after_apply =
+        Room.apply(before, %NPCSpawnedInRoom{
           room_id: @room_id,
-          npc_id: @npc_id,
-          name: "Garrick",
-          short_description: "a wiry innkeeper",
-          long_description: "A wiry man in a stained apron."
-        })
-
-      assert {:error, :npc_already_in_room} =
-               Room.execute(state, %SpawnNPC{
-                 room_id: @room_id,
-                 npc_id: @npc_id,
-                 name: "Garrick",
-                 short_description: "a wiry innkeeper",
-                 long_description: "A wiry man in a stained apron."
-               })
-    end
-
-    test "rejects duplicate display name (case-insensitive) within the same room" do
-      state =
-        created_room()
-        |> Room.apply(%NPCSpawnedInRoom{
-          room_id: @room_id,
-          npc_id: @npc_id,
-          name: "Garrick",
-          short_description: "a wiry innkeeper",
-          long_description: "A wiry man in a stained apron."
-        })
-
-      assert {:error, :npc_name_taken_in_room} =
-               Room.execute(state, %SpawnNPC{
-                 room_id: @room_id,
-                 npc_id: @other_npc_id,
-                 name: "GARRICK",
-                 short_description: "a different innkeeper",
-                 long_description: "Another man."
-               })
-    end
-
-    test "rejects empty long_description" do
-      assert {:error, :long_description_required} =
-               Room.execute(created_room(), %SpawnNPC{
-                 room_id: @room_id,
-                 npc_id: @npc_id,
-                 name: "Garrick",
-                 short_description: "a wiry innkeeper",
-                 long_description: ""
-               })
-    end
-
-    test "rejects empty short_description" do
-      assert {:error, :short_description_required} =
-               Room.execute(created_room(), %SpawnNPC{
-                 room_id: @room_id,
-                 npc_id: @npc_id,
-                 name: "Garrick",
-                 short_description: "",
-                 long_description: "A wiry man in a stained apron."
-               })
-    end
-
-    test "apply/2 round-trip: NPCSpawnedInRoom adds id and lowercased name to aggregate state" do
-      state =
-        created_room()
-        |> Room.apply(%NPCSpawnedInRoom{
-          room_id: @room_id,
-          npc_id: @npc_id,
+          npc_id: @legacy_npc_id,
           name: "Garrick the Innkeeper",
           short_description: "a wiry innkeeper",
           long_description: "A wiry man in a stained apron."
         })
 
-      assert MapSet.member?(state.npc_ids, @npc_id)
-      assert MapSet.member?(state.npc_names_lower, "garrick the innkeeper")
+      assert after_apply == before
     end
   end
 end

@@ -11,7 +11,7 @@ defmodule AgenticRealms.World.ExamineTest do
   alias AgenticRealms.Accounts
   alias AgenticRealms.World.Examine
   alias AgenticRealms.World.Examine.Match
-  alias AgenticRealms.World.Schemas.{Object, PlayerState, Room, NPC}
+  alias AgenticRealms.World.Schemas.{Object, PlayerState, Room, NPCBlueprint, NPCClone}
   alias AgenticRealmsWeb.Presence
 
   defp register_player(name) do
@@ -280,8 +280,20 @@ defmodule AgenticRealms.World.ExamineTest do
   # ──────────────────────────────────────────────────────────────────────
 
   defp insert_npc(room_id, name, long_description) do
-    Repo.insert!(%NPC{
+    blueprint_id = "test_blueprint_#{System.unique_integer([:positive])}"
+
+    Repo.insert!(%NPCBlueprint{
+      id: blueprint_id,
+      name: name,
+      short_description: "a #{name}",
+      long_description: long_description,
+      is_synthetic: false
+    })
+
+    Repo.insert!(%NPCClone{
       id: Ecto.UUID.generate(),
+      blueprint_id: blueprint_id,
+      serial: 1,
       name: name,
       short_description: "a #{name}",
       long_description: long_description,
@@ -381,6 +393,35 @@ defmodule AgenticRealms.World.ExamineTest do
                Examine.examine(alice.id, "garrick")
 
       assert ld =~ "inventory item"
+    end
+
+    test "telemetry emits clone_debug_id on successful NPC match (FR-011)",
+         %{alice: alice, garrick: garrick} do
+      handler_id = "examine-debug-id-watcher-#{System.unique_integer([:positive])}"
+      ref = make_ref()
+      test_pid = self()
+
+      :telemetry.attach(
+        handler_id,
+        [:agenticrealms, :examine, :resolve],
+        fn _event, _measurements, metadata, _config ->
+          send(test_pid, {ref, metadata})
+        end,
+        nil
+      )
+
+      try do
+        assert {:ok, %Match{target_kind: :npc}} =
+                 Examine.examine(alice.id, "garrick the innkeeper")
+
+        assert_receive {^ref, metadata}, 200
+
+        expected_debug = "#{garrick.name}##{garrick.serial}"
+        assert metadata.clone_debug_id == expected_debug
+        assert metadata.target_kind == :npc
+      after
+        :telemetry.detach(handler_id)
+      end
     end
   end
 end
