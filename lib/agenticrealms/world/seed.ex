@@ -20,6 +20,7 @@ defmodule AgenticRealms.World.Seed do
 
   alias AgenticRealms.Repo
   alias AgenticRealms.World.Application, as: WorldApp
+  alias AgenticRealms.World.Behaviors.Validator, as: BehaviorsValidator
   alias AgenticRealms.World.Commands, as: WorldCommands
   alias AgenticRealms.World.Commands.{CreateRoom, AddExit, PlaceObject, CreateNPCBlueprint}
   alias AgenticRealms.World.Schemas.Room
@@ -62,6 +63,38 @@ defmodule AgenticRealms.World.Seed do
   end
 
   defp do_seed do
+    # Feature 009 — behavior payloads for the seeded entities. The
+    # validator catches authoring errors at seed time (mis-typed trigger,
+    # missing/empty/over-cap text, etc.) so they surface during
+    # `mix ecto.reset` rather than at runtime.
+    atrium_behaviors = [
+      %{
+        "trigger" => "player_entered",
+        "actions" => [
+          %{"type" => "say", "text" => "The cool air carries the scent of rain."}
+        ]
+      }
+    ]
+
+    :ok = validate_behaviors!(atrium_behaviors, "atrium_behaviors")
+
+    garrick_behaviors = [
+      %{
+        "trigger" => "player_entered",
+        "actions" => [
+          %{"type" => "say", "text" => "Welcome to the Stone Atrium."}
+        ]
+      },
+      %{
+        "trigger" => "player_left",
+        "actions" => [
+          %{"type" => "say", "text" => "Farewell, traveler."}
+        ]
+      }
+    ]
+
+    :ok = validate_behaviors!(garrick_behaviors, "garrick_behaviors")
+
     # Rooms. Feature 008 — use consistency: :strong so the read-model
     # `world_rooms` rows exist by the time later seed dispatches (or any
     # post-seed pre-dispatch checks that consult the read model — e.g.
@@ -72,7 +105,8 @@ defmodule AgenticRealms.World.Seed do
           room_id: @starting_room_id,
           name: "Stone Atrium",
           description:
-            "A wide, pillared hall of mossy granite. The air is cool and tastes faintly of rain. A single shaft of daylight falls from a slot high above, lighting motes of dust drifting in slow spirals."
+            "A wide, pillared hall of mossy granite. The air is cool and tastes faintly of rain. A single shaft of daylight falls from a slot high above, lighting motes of dust drifting in slow spirals.",
+          behaviors: atrium_behaviors
         },
         consistency: :strong
       )
@@ -162,9 +196,10 @@ defmodule AgenticRealms.World.Seed do
         fixed: true
       })
 
-    # NPCs (feature 007 + feature 008 blueprint/clone split). Use
-    # consistency: :strong so the blueprint is in the read model before
-    # the subsequent spawn-clone wrapper consults it.
+    # NPCs (feature 007 + feature 008 blueprint/clone split + feature 009
+    # greeter/farewell behaviors). Use consistency: :strong so the
+    # blueprint is in the read model before the subsequent spawn-clone
+    # wrapper consults it.
     :ok =
       WorldApp.dispatch(
         %CreateNPCBlueprint{
@@ -172,7 +207,8 @@ defmodule AgenticRealms.World.Seed do
           name: "Garrick the Innkeeper",
           short_description: "a wiry innkeeper in a stained apron",
           long_description:
-            "A wiry man in a stained apron, his hands callused and his eyes patient. He polishes a tankard that already looks clean and watches the door without quite seeming to."
+            "A wiry man in a stained apron, his hands callused and his eyes patient. He polishes a tankard that already looks clean and watches the door without quite seeming to.",
+          behaviors: garrick_behaviors
         },
         consistency: :strong
       )
@@ -183,5 +219,15 @@ defmodule AgenticRealms.World.Seed do
         @starting_room_id,
         @innkeeper_garrick_clone_id
       )
+  end
+
+  defp validate_behaviors!(behaviors, label) do
+    case BehaviorsValidator.validate(behaviors) do
+      :ok ->
+        :ok
+
+      {:error, reason} ->
+        raise "Seed authoring error in #{label}: #{inspect(reason)}"
+    end
   end
 end

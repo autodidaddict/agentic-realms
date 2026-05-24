@@ -1,4 +1,16 @@
 defmodule AgenticRealms.Application do
+  # Feature 009 — pre-declare the atoms used as keys inside the
+  # `behaviors` JSONB field of RoomCreated / NPCBlueprintCreated /
+  # NPCClonedFromBlueprint events. The eventstore's JsonSerializer
+  # deserializes event payloads with `Jason.decode!(..., keys: :atoms!)`,
+  # which recursively atomizes ALL keys in the JSON — including the
+  # nested behavior maps' keys. If these atoms aren't already known to
+  # the BEAM at deserialize time, `binary_to_existing_atom/1` crashes
+  # the notification publisher. Referencing them in a compile-time
+  # module attribute guarantees they exist in the atom table.
+  @_behavior_atoms [:trigger, :actions, :type, :text]
+  def __behavior_atoms__, do: @_behavior_atoms
+
   # See https://hexdocs.pm/elixir/Application.html
   # for more information on OTP Applications
   @moduledoc false
@@ -24,6 +36,7 @@ defmodule AgenticRealms.Application do
       AgenticRealms.World.Projections.WorldProjector,
       AgenticRealms.World.Projections.PlayerStateProjector,
       AgenticRealms.World.UIEventBroadcaster,
+      AgenticRealms.World.Behaviors.Interpreter,
       # Start to serve requests, typically the last entry
       AgenticRealmsWeb.Endpoint
     ]

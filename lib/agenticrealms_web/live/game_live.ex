@@ -26,6 +26,7 @@ defmodule AgenticRealmsWeb.GameLive do
     RoomObjectTaken,
     RoomObjectDropped,
     RoomNPCArrived,
+    BehaviorUtterance,
     PlayerCurrentRoomChanged,
     PlayerInventoryChanged,
     RoomUtterance,
@@ -41,11 +42,6 @@ defmodule AgenticRealmsWeb.GameLive do
     player_id = socket.assigns.current_player.id
     username = socket.assigns.current_player.username
 
-    # `:already_spawned` is success — happens when two mounts race or when
-    # the read model thinks we're not spawned (FR-022) but the aggregate
-    # disagrees. The pre-dispatch check in Commands.spawn/2 returns
-    # :no_current_room in both cases; the aggregate then rejects the
-    # second dispatch.
     :ok =
       case Commands.spawn(player_id, Seed.starting_room_id()) do
         {:ok, _} -> :ok
@@ -69,6 +65,17 @@ defmodule AgenticRealmsWeb.GameLive do
       Phoenix.PubSub.subscribe(@pubsub, World.room_topic(current_room_id))
       Phoenix.PubSub.subscribe(@pubsub, Presence.topic())
       {:ok, _} = Presence.track_player(self(), player_id, username)
+
+      # Feature 009 — fire `player_entered` behaviors for this session's
+      # arrival in the player's current room. Behaviors fire on EVERY
+      # connected mount, not just first-time spawn (a re-mounting session
+      # is "arriving" again from the room/NPC's perspective). PlayerMoved
+      # events drive subsequent in-session arrivals via the interpreter's
+      # event-handler clause.
+      AgenticRealms.World.Behaviors.Interpreter.fire_for_arrival(
+        player_id,
+        current_room_id
+      )
     end
 
     {:ok,
@@ -394,14 +401,28 @@ defmodule AgenticRealmsWeb.GameLive do
 
   defp handle_move(socket, raw, dir) do
     player_id = socket.assigns.current_player.id
+    from_room_id = socket.assigns.current_room_id
     socket = socket |> append_log(%{kind: :cmd, text: String.trim(raw)}) |> assign(:input, "")
 
     case Commands.move(player_id, dir) do
       {:ok, to_room_id} ->
+        # Feature 009 — fire `player_left` behaviors INLINE before
+        # rendering the destination room view. Otherwise the farewell
+        # entries would arrive in the mailbox after handle_move returns
+        # and appear visually AFTER the new room, making it feel like the
+        # NPC followed the player.
+        departure_entries =
+          AgenticRealms.World.Behaviors.Interpreter.fire_departure_inline(
+            player_id,
+            from_room_id
+          )
+
+        socket = Enum.reduce(departure_entries, socket, &append_log(&2, &1))
+
         if connected?(socket) do
           Phoenix.PubSub.unsubscribe(
             @pubsub,
-            World.room_topic(socket.assigns.current_room_id)
+            World.room_topic(from_room_id)
           )
 
           Phoenix.PubSub.subscribe(@pubsub, World.room_topic(to_room_id))
@@ -763,6 +784,23 @@ defmodule AgenticRealmsWeb.GameLive do
   # "Also here" section.
   def handle_info(%RoomNPCArrived{npc_name: name}, socket) do
     {:noreply, append_log(socket, %{kind: :system, text: "#{name} arrives."})}
+  end
+
+  # Feature 009 — behavior-sourced speech. The interpreter has already
+  # filtered recipients at broadcast time (`:room_speech` to triggering
+  # player only; `:npc_speech` to triggering player + other room
+  # occupants), so we accept every message that lands on our player-topic.
+  def handle_info(%BehaviorUtterance{kind: :npc_speech} = msg, socket) do
+    {:noreply,
+     append_log(socket, %{
+       kind: :npc_speech,
+       actor_name: msg.actor_name,
+       text: msg.text
+     })}
+  end
+
+  def handle_info(%BehaviorUtterance{kind: :room_speech} = msg, socket) do
+    {:noreply, append_log(socket, %{kind: :room_speech, text: msg.text})}
   end
 
   def handle_info(%RoomObjectTaken{actor_id: actor_id} = msg, socket) do

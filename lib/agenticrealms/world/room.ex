@@ -27,7 +27,8 @@ defmodule AgenticRealms.World.Room do
             name: nil,
             description: nil,
             exits: %{},
-            object_ids: MapSet.new()
+            object_ids: MapSet.new(),
+            behaviors: []
 
   alias AgenticRealms.World.Commands.{
     CreateRoom,
@@ -51,9 +52,15 @@ defmodule AgenticRealms.World.Room do
   def execute(%__MODULE__{id: nil}, %CreateRoom{
         room_id: id,
         name: name,
-        description: description
+        description: description,
+        behaviors: behaviors
       }) do
-    %RoomCreated{room_id: id, name: name, description: description}
+    %RoomCreated{
+      room_id: id,
+      name: name,
+      description: description,
+      behaviors: behaviors
+    }
   end
 
   def execute(%__MODULE__{}, %CreateRoom{}), do: {:error, :room_already_exists}
@@ -138,9 +145,16 @@ defmodule AgenticRealms.World.Room do
   def apply(%__MODULE__{} = state, %RoomCreated{
         room_id: id,
         name: name,
-        description: description
+        description: description,
+        behaviors: behaviors
       }) do
-    %__MODULE__{state | id: id, name: name, description: description}
+    %__MODULE__{
+      state
+      | id: id,
+        name: name,
+        description: description,
+        behaviors: behaviors
+    }
   end
 
   def apply(%__MODULE__{exits: exits} = state, %ExitAdded{

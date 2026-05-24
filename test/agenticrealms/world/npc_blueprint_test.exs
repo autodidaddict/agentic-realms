@@ -231,4 +231,69 @@ defmodule AgenticRealms.World.NPCBlueprintTest do
       assert MapSet.member?(state.clone_ids, @other_clone_id)
     end
   end
+
+  describe "behaviors (feature 009)" do
+    @behaviors_payload [
+      %{
+        "trigger" => "player_entered",
+        "actions" => [%{"type" => "say", "text" => "Welcome."}]
+      },
+      %{
+        "trigger" => "player_left",
+        "actions" => [%{"type" => "say", "text" => "Goodbye."}]
+      }
+    ]
+
+    test "CreateNPCBlueprint carries :behaviors through to the emitted event" do
+      assert %NPCBlueprintCreated{behaviors: @behaviors_payload} =
+               NPCBlueprint.execute(%NPCBlueprint{}, %CreateNPCBlueprint{
+                 blueprint_id: @bp_id,
+                 name: "Garrick the Innkeeper",
+                 short_description: "a wiry innkeeper",
+                 long_description: "A wiry man in a stained apron.",
+                 behaviors: @behaviors_payload
+               })
+    end
+
+    test "apply/2 of NPCBlueprintCreated with behaviors sets state.behaviors" do
+      state =
+        NPCBlueprint.apply(%NPCBlueprint{}, %NPCBlueprintCreated{
+          blueprint_id: @bp_id,
+          name: "Garrick the Innkeeper",
+          short_description: "a wiry innkeeper",
+          long_description: "A wiry man in a stained apron.",
+          behaviors: @behaviors_payload
+        })
+
+      assert state.behaviors == @behaviors_payload
+    end
+
+    test "SpawnNPCClone stamps blueprint behaviors into the emitted event (full-copy)" do
+      state =
+        NPCBlueprint.apply(%NPCBlueprint{}, %NPCBlueprintCreated{
+          blueprint_id: @bp_id,
+          name: "Garrick the Innkeeper",
+          short_description: "a wiry innkeeper",
+          long_description: "A wiry man in a stained apron.",
+          behaviors: @behaviors_payload
+        })
+
+      assert %NPCClonedFromBlueprint{behaviors: @behaviors_payload} =
+               NPCBlueprint.execute(state, %SpawnNPCClone{
+                 blueprint_id: @bp_id,
+                 clone_id: @clone_id,
+                 room_id: @room_id
+               })
+    end
+
+    test "CreateNPCBlueprint without :behaviors defaults to []" do
+      assert %NPCBlueprintCreated{behaviors: []} =
+               NPCBlueprint.execute(%NPCBlueprint{}, %CreateNPCBlueprint{
+                 blueprint_id: @bp_id,
+                 name: "Garrick the Innkeeper",
+                 short_description: "a wiry innkeeper",
+                 long_description: "A wiry man in a stained apron."
+               })
+    end
+  end
 end

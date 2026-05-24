@@ -198,4 +198,128 @@ defmodule AgenticRealms.World.Projections.WorldProjectorNpcReplayTest do
       assert length(Repo.all(NPCClone)) == 1
     end
   end
+
+  describe "behaviors projection (feature 009)" do
+    setup do
+      room = insert_room("Behaviors Test Room")
+      %{room: room}
+    end
+
+    @behaviors_payload [
+      %{
+        "trigger" => "player_entered",
+        "actions" => [%{"type" => "say", "text" => "Hi."}]
+      }
+    ]
+
+    test "RoomCreated projection carries behaviors onto the world_rooms row" do
+      alias AgenticRealms.World.Events.RoomCreated
+      alias AgenticRealms.World.Schemas.Room
+
+      room_id = Ecto.UUID.generate()
+
+      :ok =
+        WorldProjector.handle(
+          %RoomCreated{
+            room_id: room_id,
+            name: "Test",
+            description: "Desc",
+            behaviors: @behaviors_payload
+          },
+          %{}
+        )
+
+      assert %Room{behaviors: behaviors} = Repo.get(Room, room_id)
+      assert behaviors == @behaviors_payload
+    end
+
+    test "RoomCreated with default empty behaviors projects as []" do
+      alias AgenticRealms.World.Events.RoomCreated
+      alias AgenticRealms.World.Schemas.Room
+
+      room_id = Ecto.UUID.generate()
+
+      :ok =
+        WorldProjector.handle(
+          %RoomCreated{room_id: room_id, name: "Test", description: "Desc"},
+          %{}
+        )
+
+      assert %Room{behaviors: []} = Repo.get(Room, room_id)
+    end
+
+    test "NPCBlueprintCreated carries behaviors onto the npc_blueprints row" do
+      alias AgenticRealms.World.Events.NPCBlueprintCreated
+
+      bp_id = "test_behaviors_bp_#{System.unique_integer([:positive])}"
+
+      :ok =
+        WorldProjector.handle(
+          %NPCBlueprintCreated{
+            blueprint_id: bp_id,
+            name: "Test NPC",
+            short_description: "short",
+            long_description: "long",
+            behaviors: @behaviors_payload
+          },
+          %{}
+        )
+
+      assert %NPCBlueprint{behaviors: behaviors, is_synthetic: false} =
+               Repo.get(NPCBlueprint, bp_id)
+
+      assert behaviors == @behaviors_payload
+    end
+
+    test "NPCClonedFromBlueprint carries behaviors onto the npc_clones row", %{room: room} do
+      bp_id = "test_clone_behaviors_bp_#{System.unique_integer([:positive])}"
+
+      Repo.insert!(%NPCBlueprint{
+        id: bp_id,
+        name: "Test NPC",
+        short_description: "short",
+        long_description: "long"
+      })
+
+      clone_id = Ecto.UUID.generate()
+
+      :ok =
+        WorldProjector.handle(
+          %NPCClonedFromBlueprint{
+            blueprint_id: bp_id,
+            clone_id: clone_id,
+            room_id: room.id,
+            serial: 1,
+            name: "Test NPC",
+            short_description: "short",
+            long_description: "long",
+            behaviors: @behaviors_payload
+          },
+          %{}
+        )
+
+      assert %NPCClone{behaviors: behaviors} = Repo.get(NPCClone, clone_id)
+      assert behaviors == @behaviors_payload
+    end
+
+    test "legacy NPCSpawnedInRoom defaults clone behaviors to []", %{room: room} do
+      alias AgenticRealms.World.Events.NPCSpawnedInRoom
+
+      npc_id = Ecto.UUID.generate()
+
+      :ok =
+        WorldProjector.handle(
+          %NPCSpawnedInRoom{
+            room_id: room.id,
+            npc_id: npc_id,
+            name: "Legacy NPC",
+            short_description: "short",
+            long_description: "long"
+          },
+          %{}
+        )
+
+      assert %NPCClone{behaviors: []} = Repo.get(NPCClone, npc_id)
+    end
+  end
 end

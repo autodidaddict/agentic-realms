@@ -45,9 +45,17 @@ defmodule AgenticRealms.World.Projections.WorldProjector do
 
   alias AgenticRealms.World.Schemas.{Room, Exit, Object, NPCBlueprint, NPCClone}
 
-  def handle(%RoomCreated{room_id: id, name: name, description: description}, _meta) do
+  def handle(
+        %RoomCreated{
+          room_id: id,
+          name: name,
+          description: description,
+          behaviors: behaviors
+        },
+        _meta
+      ) do
     Repo.insert!(
-      %Room{id: id, name: name, description: description},
+      %Room{id: id, name: name, description: description, behaviors: behaviors},
       on_conflict: :nothing,
       conflict_target: :id
     )
@@ -121,12 +129,15 @@ defmodule AgenticRealms.World.Projections.WorldProjector do
   end
 
   # Feature 008: authored blueprints (from CreateNPCBlueprint command).
+  # Feature 009: extended with :behaviors field (defaults to [] for pre-009
+  # events via the event struct's default).
   def handle(
         %NPCBlueprintCreated{
           blueprint_id: bp_id,
           name: name,
           short_description: short,
-          long_description: long
+          long_description: long,
+          behaviors: behaviors
         },
         _meta
       ) do
@@ -136,7 +147,8 @@ defmodule AgenticRealms.World.Projections.WorldProjector do
         name: name,
         short_description: short,
         long_description: long,
-        is_synthetic: false
+        is_synthetic: false,
+        behaviors: behaviors
       },
       on_conflict: :nothing,
       conflict_target: :id
@@ -156,7 +168,8 @@ defmodule AgenticRealms.World.Projections.WorldProjector do
           serial: serial,
           name: name,
           short_description: short,
-          long_description: long
+          long_description: long,
+          behaviors: behaviors
         },
         _meta
       ) do
@@ -168,7 +181,8 @@ defmodule AgenticRealms.World.Projections.WorldProjector do
         name: name,
         short_description: short,
         long_description: long,
-        room_id: rid
+        room_id: rid,
+        behaviors: behaviors
       },
       on_conflict: :nothing,
       conflict_target: :id
