@@ -207,8 +207,9 @@ defmodule AgenticRealms.World.Examine do
     %Match{target_kind: :player, name: name, long_description: nil}
   end
 
-  defp npc_match(%{name: name} = npc) do
-    %Match{target_kind: :npc, name: name, long_description: long_description_of_npc(npc)}
+  defp npc_match(%{id: id, name: name}) do
+    {long_description, serial} = npc_clone_extras(id)
+    %Match{target_kind: :npc, name: name, long_description: long_description, serial: serial}
   end
 
   # The :objects list from RoomView and the inventory list don't carry
@@ -221,28 +222,43 @@ defmodule AgenticRealms.World.Examine do
     end
   end
 
-  # NPCs follow the same pattern — RoomView.npcs omits long_description; look
-  # it up by id when needed for the detail-entry body.
-  defp long_description_of_npc(%{id: id}) do
-    case AgenticRealms.Repo.get(AgenticRealms.World.Schemas.NPC, id) do
-      %AgenticRealms.World.Schemas.NPC{long_description: ld} -> ld
-      _ -> nil
+  # NPC clones follow the same pattern — RoomView.npcs omits long_description
+  # AND serial; look them up together when we materialize the Match.
+  defp npc_clone_extras(id) do
+    case AgenticRealms.Repo.get(AgenticRealms.World.Schemas.NPCClone, id) do
+      %AgenticRealms.World.Schemas.NPCClone{long_description: ld, serial: serial} ->
+        {ld, serial}
+
+      _ ->
+        {nil, nil}
     end
   end
 
   # --- Telemetry ----------------------------------------------------------
 
   defp emit_telemetry(player_id, outcome) do
-    {result, target_kind} =
+    {result, target_kind, clone_debug_id} =
       case outcome do
-        {:ok, %Match{target_kind: kind}} -> {kind, kind}
-        {:error, reason} -> {reason, nil}
+        {:ok, %Match{target_kind: :npc, name: name, serial: serial}}
+        when not is_nil(serial) ->
+          {:npc, :npc, "#{name}##{serial}"}
+
+        {:ok, %Match{target_kind: kind}} ->
+          {kind, kind, nil}
+
+        {:error, reason} ->
+          {reason, nil, nil}
       end
 
     :telemetry.execute(
       [:agenticrealms, :examine, :resolve],
       %{},
-      %{player_id: player_id, outcome: result, target_kind: target_kind}
+      %{
+        player_id: player_id,
+        outcome: result,
+        target_kind: target_kind,
+        clone_debug_id: clone_debug_id
+      }
     )
   end
 end

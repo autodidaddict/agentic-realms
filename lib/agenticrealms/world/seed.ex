@@ -20,7 +20,8 @@ defmodule AgenticRealms.World.Seed do
 
   alias AgenticRealms.Repo
   alias AgenticRealms.World.Application, as: WorldApp
-  alias AgenticRealms.World.Commands.{CreateRoom, AddExit, PlaceObject, SpawnNPC}
+  alias AgenticRealms.World.Commands, as: WorldCommands
+  alias AgenticRealms.World.Commands.{CreateRoom, AddExit, PlaceObject, CreateNPCBlueprint}
   alias AgenticRealms.World.Schemas.Room
 
   @starting_room_id "00000000-0000-4000-8000-000000000001"
@@ -31,7 +32,11 @@ defmodule AgenticRealms.World.Seed do
   @leather_journal_id "00000000-0000-4000-8000-100000000002"
   @reading_lectern_id "00000000-0000-4000-8000-100000000003"
 
-  @innkeeper_garrick_id "00000000-0000-4000-8000-200000000001"
+  # Feature 008 — clone id preserved verbatim from feature 007's
+  # @innkeeper_garrick_id so any test referencing the literal UUID continues
+  # to work.
+  @innkeeper_garrick_clone_id "00000000-0000-4000-8000-200000000001"
+  @innkeeper_garrick_blueprint_id "garrick_the_innkeeper"
 
   @doc """
   Returns the UUID of the designated starting room. Stable across runs
@@ -57,30 +62,42 @@ defmodule AgenticRealms.World.Seed do
   end
 
   defp do_seed do
-    # Rooms
+    # Rooms. Feature 008 — use consistency: :strong so the read-model
+    # `world_rooms` rows exist by the time later seed dispatches (or any
+    # post-seed pre-dispatch checks that consult the read model — e.g.
+    # `Commands.spawn_npc_clone/3`'s `check_room_exists/1`) run.
     :ok =
-      WorldApp.dispatch(%CreateRoom{
-        room_id: @starting_room_id,
-        name: "Stone Atrium",
-        description:
-          "A wide, pillared hall of mossy granite. The air is cool and tastes faintly of rain. A single shaft of daylight falls from a slot high above, lighting motes of dust drifting in slow spirals."
-      })
+      WorldApp.dispatch(
+        %CreateRoom{
+          room_id: @starting_room_id,
+          name: "Stone Atrium",
+          description:
+            "A wide, pillared hall of mossy granite. The air is cool and tastes faintly of rain. A single shaft of daylight falls from a slot high above, lighting motes of dust drifting in slow spirals."
+        },
+        consistency: :strong
+      )
 
     :ok =
-      WorldApp.dispatch(%CreateRoom{
-        room_id: @corridor_room_id,
-        name: "North Corridor",
-        description:
-          "A narrow stone passage worn smooth by centuries of footsteps. The walls are bare. Your own breath sounds loud in the quiet."
-      })
+      WorldApp.dispatch(
+        %CreateRoom{
+          room_id: @corridor_room_id,
+          name: "North Corridor",
+          description:
+            "A narrow stone passage worn smooth by centuries of footsteps. The walls are bare. Your own breath sounds loud in the quiet."
+        },
+        consistency: :strong
+      )
 
     :ok =
-      WorldApp.dispatch(%CreateRoom{
-        room_id: @library_room_id,
-        name: "Dusty Library",
-        description:
-          "Shelves of crumbling tomes line three walls, their spines cracked and silver-leafed. A heavy reading lectern stands beneath the only window, its surface scratched with the marks of generations of scribes."
-      })
+      WorldApp.dispatch(
+        %CreateRoom{
+          room_id: @library_room_id,
+          name: "Dusty Library",
+          description:
+            "Shelves of crumbling tomes line three walls, their spines cracked and silver-leafed. A heavy reading lectern stands beneath the only window, its surface scratched with the marks of generations of scribes."
+        },
+        consistency: :strong
+      )
 
     # Exits (paired both directions)
     :ok =
@@ -145,15 +162,26 @@ defmodule AgenticRealms.World.Seed do
         fixed: true
       })
 
-    # NPCs (feature 007)
+    # NPCs (feature 007 + feature 008 blueprint/clone split). Use
+    # consistency: :strong so the blueprint is in the read model before
+    # the subsequent spawn-clone wrapper consults it.
     :ok =
-      WorldApp.dispatch(%SpawnNPC{
-        room_id: @starting_room_id,
-        npc_id: @innkeeper_garrick_id,
-        name: "Garrick the Innkeeper",
-        short_description: "a wiry innkeeper in a stained apron",
-        long_description:
-          "A wiry man in a stained apron, his hands callused and his eyes patient. He polishes a tankard that already looks clean and watches the door without quite seeming to."
-      })
+      WorldApp.dispatch(
+        %CreateNPCBlueprint{
+          blueprint_id: @innkeeper_garrick_blueprint_id,
+          name: "Garrick the Innkeeper",
+          short_description: "a wiry innkeeper in a stained apron",
+          long_description:
+            "A wiry man in a stained apron, his hands callused and his eyes patient. He polishes a tankard that already looks clean and watches the door without quite seeming to."
+        },
+        consistency: :strong
+      )
+
+    {:ok, _} =
+      WorldCommands.spawn_npc_clone(
+        @innkeeper_garrick_blueprint_id,
+        @starting_room_id,
+        @innkeeper_garrick_clone_id
+      )
   end
 end

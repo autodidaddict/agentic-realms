@@ -8,7 +8,7 @@ defmodule AgenticRealms.World.Router do
 
   use Commanded.Commands.Router
 
-  alias AgenticRealms.World.{Room, Player}
+  alias AgenticRealms.World.{Room, Player, NPCBlueprint}
 
   alias AgenticRealms.World.Commands.{
     CreateRoom,
@@ -18,15 +18,20 @@ defmodule AgenticRealms.World.Router do
     MovePlayer,
     TakeObject,
     DropObject,
-    SpawnNPC
+    CreateNPCBlueprint,
+    SpawnNPCClone
   }
 
   identify(Room, by: :room_id, prefix: "room-")
   identify(Player, by: :player_id, prefix: "player-")
+  identify(NPCBlueprint, by: :blueprint_id, prefix: "npc-blueprint-")
 
-  # Phase 3 (US5) + Phase 6 (US3) + Feature 007: room commands routed to Room
-  dispatch([CreateRoom, AddExit, PlaceObject, TakeObject, DropObject, SpawnNPC], to: Room)
+  # Phase 3 (US5) + Phase 6 (US3): room commands routed to Room
+  dispatch([CreateRoom, AddExit, PlaceObject, TakeObject, DropObject], to: Room)
 
   # Phase 4 (US1) + Phase 5 (US2): player lifecycle + movement routed to Player
   dispatch([SpawnPlayer, MovePlayer], to: Player)
+
+  # Feature 008: NPC blueprint authoring + cloning
+  dispatch([CreateNPCBlueprint, SpawnNPCClone], to: NPCBlueprint)
 end

@@ -1,22 +1,26 @@
 defmodule AgenticRealms.World.Projections.WorldProjector do
   @moduledoc """
-  Projects every room / exit / object domain event into the `world_rooms`,
-  `world_exits`, and `world_objects` Ecto-backed read models.
+  Projects every room / exit / object / NPC domain event into the
+  `world_rooms`, `world_exits`, `world_objects`, `npc_blueprints`, and
+  `npc_clones` Ecto-backed read models.
 
   Event handler clauses added so far:
     * Phase 3 (US5): RoomCreated, ExitAdded, ObjectPlacedInRoom
     * Phase 6 (US3): ObjectTakenFromRoom, ObjectDroppedInRoom
-    * Feature 007: NPCSpawnedInRoom
+    * Feature 007: NPCSpawnedInRoom (REWRITTEN in 008 — see below)
+    * Feature 008: NPCBlueprintCreated, NPCClonedFromBlueprint
 
   Every insert uses `on_conflict: :nothing` so the projector is safe to
-  replay against a partially-populated read model (which happens on a fresh
-  subscription after an `event_store.reset`).
+  replay against a partially-populated read model.
+
+  **Feature 008 — legacy NPCSpawnedInRoom handling**: the feature 007 event
+  type is preserved in the event store; this projector handles it by
+  deriving a deterministic synthetic blueprint id, upserting a blueprint
+  row with `is_synthetic: true`, then inserting the clone with a serial
+  computed via a MAX query against the existing clones for that blueprint.
+  See `specs/008-npc-blueprints/contracts/projector.md`.
   """
 
-  # `:strong` so callers (Commands.take, Commands.drop) can dispatch with
-  # `consistency: :strong` and be guaranteed the read model reflects the
-  # event by the time the dispatch returns. Without this, `list_inventory`
-  # called immediately after `take/2` would see stale state.
   use Commanded.Event.Handler,
     application: AgenticRealms.World.Application,
     name: __MODULE__,
@@ -26,6 +30,7 @@ defmodule AgenticRealms.World.Projections.WorldProjector do
 
   alias AgenticRealms.Repo
   alias AgenticRealms.World.Direction
+  alias AgenticRealms.World.Projections.SyntheticBlueprintId
 
   alias AgenticRealms.World.Events.{
     RoomCreated,
@@ -33,10 +38,12 @@ defmodule AgenticRealms.World.Projections.WorldProjector do
     ObjectPlacedInRoom,
     ObjectTakenFromRoom,
     ObjectDroppedInRoom,
-    NPCSpawnedInRoom
+    NPCSpawnedInRoom,
+    NPCBlueprintCreated,
+    NPCClonedFromBlueprint
   }
 
-  alias AgenticRealms.World.Schemas.{Room, Exit, Object, NPC}
+  alias AgenticRealms.World.Schemas.{Room, Exit, Object, NPCBlueprint, NPCClone}
 
   def handle(%RoomCreated{room_id: id, name: name, description: description}, _meta) do
     Repo.insert!(
@@ -113,10 +120,10 @@ defmodule AgenticRealms.World.Projections.WorldProjector do
     :ok
   end
 
+  # Feature 008: authored blueprints (from CreateNPCBlueprint command).
   def handle(
-        %NPCSpawnedInRoom{
-          room_id: room_id,
-          npc_id: nid,
+        %NPCBlueprintCreated{
+          blueprint_id: bp_id,
           name: name,
           short_description: short,
           long_description: long
@@ -124,18 +131,105 @@ defmodule AgenticRealms.World.Projections.WorldProjector do
         _meta
       ) do
     Repo.insert!(
-      %NPC{
-        id: nid,
+      %NPCBlueprint{
+        id: bp_id,
         name: name,
         short_description: short,
         long_description: long,
-        room_id: room_id
+        is_synthetic: false
       },
       on_conflict: :nothing,
       conflict_target: :id
     )
 
     :ok
+  end
+
+  # Feature 008: clone insertion from the event's denormalized payload.
+  # The blueprint table is NOT consulted here — the event already contains
+  # the full-copy snapshot of the blueprint's data as of clone time.
+  def handle(
+        %NPCClonedFromBlueprint{
+          blueprint_id: bp_id,
+          clone_id: cid,
+          room_id: rid,
+          serial: serial,
+          name: name,
+          short_description: short,
+          long_description: long
+        },
+        _meta
+      ) do
+    Repo.insert!(
+      %NPCClone{
+        id: cid,
+        blueprint_id: bp_id,
+        serial: serial,
+        name: name,
+        short_description: short,
+        long_description: long,
+        room_id: rid
+      },
+      on_conflict: :nothing,
+      conflict_target: :id
+    )
+
+    :ok
+  end
+
+  # Feature 008 — legacy event from feature 007. Synthesizes a blueprint
+  # id from the payload, upserts it, computes the next serial via MAX,
+  # then inserts the clone. Deterministic + idempotent under replay.
+  def handle(
+        %NPCSpawnedInRoom{
+          room_id: rid,
+          npc_id: nid,
+          name: name,
+          short_description: short,
+          long_description: long
+        },
+        _meta
+      ) do
+    bp_id = SyntheticBlueprintId.derive(name, short, long)
+
+    Repo.insert!(
+      %NPCBlueprint{
+        id: bp_id,
+        name: name,
+        short_description: short,
+        long_description: long,
+        is_synthetic: true
+      },
+      on_conflict: :nothing,
+      conflict_target: :id
+    )
+
+    serial = next_serial_for_blueprint(bp_id)
+
+    Repo.insert!(
+      %NPCClone{
+        id: nid,
+        blueprint_id: bp_id,
+        serial: serial,
+        name: name,
+        short_description: short,
+        long_description: long,
+        room_id: rid
+      },
+      on_conflict: :nothing,
+      conflict_target: :id
+    )
+
+    :ok
+  end
+
+  defp next_serial_for_blueprint(bp_id) do
+    from(c in NPCClone, where: c.blueprint_id == ^bp_id, select: max(c.serial))
+    |> Repo.one()
+    |> case do
+      nil -> 1
+      n -> n + 1
+    end
   end
 
   defp utc_now, do: DateTime.utc_now() |> DateTime.truncate(:second)
