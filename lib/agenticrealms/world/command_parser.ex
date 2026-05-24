@@ -45,6 +45,9 @@ defmodule AgenticRealms.World.CommandParser do
           | {:whisper, String.t(), String.t()}
           | {:whisper_no_recipient}
           | {:whisper_no_text, String.t()}
+          | {:chat, String.t(), String.t()}
+          | {:chat_no_npc}
+          | {:chat_no_message, String.t()}
 
   @take_aliases ~w(take get pick)
   @drop_aliases ~w(drop put)
@@ -58,6 +61,7 @@ defmodule AgenticRealms.World.CommandParser do
   # shortcuts are deeply muscle-memory for MUD players). Use the full word
   # `whisper` instead. See FR-004 and contracts/parser.md.
   @whisper_aliases ~w(whisper)
+  @chat_aliases ~w(chat)
 
   @spec parse(String.t()) :: result()
   def parse(raw) when is_binary(raw) do
@@ -121,6 +125,9 @@ defmodule AgenticRealms.World.CommandParser do
       first in @whisper_aliases ->
         recipient_text_sentinel(rest_original, :whisper)
 
+      first in @chat_aliases ->
+        chat_sentinel(rest_original)
+
       true ->
         case Direction.parse(String.downcase(trimmed)) do
           {:ok, dir} -> {:move, dir}
@@ -165,6 +172,24 @@ defmodule AgenticRealms.World.CommandParser do
   defp no_recipient(:whisper), do: {:whisper_no_recipient}
   defp no_text(:tell, recipient), do: {:tell_no_text, recipient}
   defp no_text(:whisper, recipient), do: {:whisper_no_text, recipient}
+
+  # Feature 010 — `chat <npc> <message>` parsing. Same recipient/message split
+  # as `tell`, but produces chat-specific sentinels.
+  defp chat_sentinel(rest) do
+    case String.split(rest, ~r/\s+/, parts: 2) do
+      [""] ->
+        {:chat_no_npc}
+
+      [npc_token] ->
+        {:chat_no_message, npc_token}
+
+      [npc_token, message] ->
+        case String.trim(message) do
+          "" -> {:chat_no_message, npc_token}
+          m -> {:chat, npc_token, m}
+        end
+    end
+  end
 
   # --- Prefix shortcut handling ------------------------------------------
 

@@ -181,6 +181,15 @@ defmodule AgenticRealmsWeb.GameLive do
       {:whisper_no_text, recipient} ->
         echo_then_system(socket, text, "Whisper to #{recipient} what?")
 
+      {:chat, npc_token, message} ->
+        handle_chat(socket, text, npc_token, message)
+
+      {:chat_no_npc} ->
+        echo_then_system(socket, text, "Chat with whom?")
+
+      {:chat_no_message, npc_token} ->
+        echo_then_system(socket, text, "Chat with #{npc_token} about what?")
+
       {:unknown, raw} ->
         handle_unknown(socket, raw)
     end
@@ -293,6 +302,7 @@ defmodule AgenticRealmsWeb.GameLive do
       {:emote, said} -> handle_emote(socket, raw, said)
       {:tell, recipient, message} -> handle_tell(socket, raw, recipient, message)
       {:whisper, recipient, message} -> handle_whisper(socket, raw, recipient, message)
+      {:chat, npc_token, message} -> handle_chat(socket, raw, npc_token, message)
     end
   end
 
@@ -691,6 +701,60 @@ defmodule AgenticRealmsWeb.GameLive do
 
   defp too_long_message, do: "Your message is too long (max 500 characters)."
 
+  # --- NPC chat handler (feature 010) -------------------------------------
+  # The chat verb routes to NPCChat.send/3 which (a) validates input,
+  # (b) resolves the NPC token, (c) finds-or-starts the Conversation
+  # GenServer (cluster-aware via Horde.Registry), (d) returns the
+  # new-vs-continuing indicator synchronously. The reply itself arrives
+  # asynchronously as a %ChatUtterance{} on the player_topic.
+
+  defp handle_chat(socket, raw, npc_token, message) do
+    socket = socket |> append_log(%{kind: :cmd, text: String.trim(raw)}) |> assign(:input, "")
+    player_id = socket.assigns.current_player.id
+
+    case AgenticRealms.World.NPCChat.send(player_id, npc_token, message) do
+      {:ok, :new} ->
+        # The :chat_new system message is broadcast by the Conversation
+        # itself; we just leave the input cleared and wait for it on
+        # player_topic. (The reply will follow when the LLM call lands.)
+        {:noreply, socket}
+
+      {:ok, :continuing} ->
+        {:noreply, socket}
+
+      {:error, :empty_message} ->
+        {:noreply, append_log(socket, %{kind: :system, text: "Chat about what?"})}
+
+      {:error, :too_long} ->
+        {:noreply, append_log(socket, %{kind: :system, text: too_long_message()})}
+
+      {:error, :no_current_room} ->
+        {:noreply, append_log(socket, %{kind: :system, text: "You are nowhere."})}
+
+      {:error, {:no_such_npc, token}} ->
+        {:noreply,
+         append_log(socket, %{
+           kind: :system,
+           text: "You don't see #{token} here."
+         })}
+
+      {:error, {:ambiguous_npc, candidates}} ->
+        names = Enum.join(candidates, ", ")
+
+        {:noreply,
+         append_log(socket, %{
+           kind: :system,
+           text: "There are several here. Which one — #{names}?"
+         })}
+
+      {:error, :still_thinking} ->
+        # Defensive — the Conversation should broadcast its own
+        # :chat_in_flight_rejection message; this is a fallback in case
+        # the GenServer call path produced the error directly.
+        {:noreply, socket}
+    end
+  end
+
   # --- Intent-resolver task replies (feature 005) -------------------------
 
   @impl true
@@ -801,6 +865,27 @@ defmodule AgenticRealmsWeb.GameLive do
 
   def handle_info(%BehaviorUtterance{kind: :room_speech} = msg, socket) do
     {:noreply, append_log(socket, %{kind: :room_speech, text: msg.text})}
+  end
+
+  # Feature 010 — NPC chat reply (private to the chatting player). The
+  # Conversation GenServer has already filtered by player_topic so we
+  # accept every message here unconditionally.
+  def handle_info(%AgenticRealms.World.UIEvents.ChatUtterance{} = msg, socket) do
+    {:noreply,
+     append_log(socket, %{
+       kind: msg.kind,
+       actor_name: msg.npc_name,
+       text: msg.text
+     })}
+  end
+
+  def handle_info(%AgenticRealms.World.UIEvents.ChatSystemMessage{} = msg, socket) do
+    {:noreply,
+     append_log(socket, %{
+       kind: :chat_system,
+       kind_variant: msg.kind,
+       text: msg.text
+     })}
   end
 
   def handle_info(%RoomObjectTaken{actor_id: actor_id} = msg, socket) do

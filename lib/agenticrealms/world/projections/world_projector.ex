@@ -137,7 +137,8 @@ defmodule AgenticRealms.World.Projections.WorldProjector do
           name: name,
           short_description: short,
           long_description: long,
-          behaviors: behaviors
+          behaviors: behaviors,
+          lore: lore
         },
         _meta
       ) do
@@ -148,7 +149,8 @@ defmodule AgenticRealms.World.Projections.WorldProjector do
         short_description: short,
         long_description: long,
         is_synthetic: false,
-        behaviors: behaviors
+        behaviors: behaviors,
+        lore: lore || ""
       },
       on_conflict: :nothing,
       conflict_target: :id
@@ -169,7 +171,8 @@ defmodule AgenticRealms.World.Projections.WorldProjector do
           name: name,
           short_description: short,
           long_description: long,
-          behaviors: behaviors
+          behaviors: behaviors,
+          lore: lore
         },
         _meta
       ) do
@@ -182,7 +185,8 @@ defmodule AgenticRealms.World.Projections.WorldProjector do
         short_description: short,
         long_description: long,
         room_id: rid,
-        behaviors: behaviors
+        behaviors: behaviors,
+        lore: lore || ""
       },
       on_conflict: :nothing,
       conflict_target: :id

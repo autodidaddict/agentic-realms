@@ -7,10 +7,10 @@ defmodule AgenticRealms.World.IntentResolver.ToolsTest do
 
   alias AgenticRealms.World.IntentResolver.Tools
 
-  @canonical ~w(take drop move look inventory say emote tell whisper)
+  @canonical ~w(take drop move look inventory say emote tell whisper chat)
 
-  test "exposes exactly 10 tools — 9 canonical actions plus refuse" do
-    assert length(Tools.list()) == 10
+  test "exposes exactly 11 tools — 10 canonical actions plus refuse" do
+    assert length(Tools.list()) == 11
   end
 
   test "every canonical action is present exactly once" do

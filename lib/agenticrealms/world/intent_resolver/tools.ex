@@ -23,7 +23,7 @@ defmodule AgenticRealms.World.IntentResolver.Tools do
   @doc "Set of recognized tool names (the 9 canonical actions + `refuse`)."
   @spec names() :: MapSet.t(String.t())
   def names do
-    MapSet.new(~w(take drop move look inventory say emote tell whisper refuse))
+    MapSet.new(~w(take drop move look inventory say emote tell whisper chat refuse))
   end
 
   @doc "The tool definitions, in wire order, for the Anthropic `tools` field."
@@ -153,6 +153,26 @@ defmodule AgenticRealms.World.IntentResolver.Tools do
             "text" => %{"type" => "string", "description" => "The whispered message text."}
           },
           "required" => ["recipient", "text"]
+        }
+      ),
+      tool(
+        "chat",
+        "Initiate or continue a conversation with an NPC in the player's current room. Use this when the player wants to talk to, ask, address, converse with, speak with, or otherwise chat with a named NPC. The NPC's name MUST match an NPC visible in the current room. The message is what the player is saying or asking. Examples: 'talk to garrick', 'ask the innkeeper about the rumors', 'say hello to the guard', 'tell garrick I'm new here' all map to chat. (Note: a plain `say <text>` without a target stays as the `say` tool — only chooses chat when the player is clearly addressing a specific NPC.)",
+        %{
+          "type" => "object",
+          "properties" => %{
+            "npc" => %{
+              "type" => "string",
+              "description" =>
+                "The NPC's name as the player referred to them (e.g., 'garrick', 'the innkeeper'). Case-insensitive substring match against the NPCs visible in the room."
+            },
+            "message" => %{
+              "type" => "string",
+              "description" =>
+                "What the player is saying to the NPC. Preserve casing and punctuation."
+            }
+          },
+          "required" => ["npc", "message"]
         }
       ),
       tool(

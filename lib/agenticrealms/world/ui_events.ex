@@ -101,4 +101,41 @@ defmodule AgenticRealms.World.UIEvents do
     @enforce_keys [:actor_id, :actor_username, :recipient_id, :kind, :text]
     defstruct [:actor_id, :actor_username, :recipient_id, :kind, :text]
   end
+
+  defmodule ChatUtterance do
+    @moduledoc """
+    Transient NPC chat reply (feature 010). Broadcast on
+    `player:<triggering_player_id>` ONLY — NEVER on `room:<...>` or any
+    other player's topic. Distinct from `BehaviorUtterance` (which is
+    public) by virtue of being on the private player surface and having
+    its own struct + kind atoms.
+
+    `kind` is `:chat_speech` (rendered with quoted attribution like a
+    `says`) or `:chat_emote` (rendered as freeform third-person narration
+    attributed to the NPC by name).
+
+    See `specs/010-npc-conversations/contracts/ui_events.md`.
+    """
+    @enforce_keys [:kind, :npc_clone_id, :npc_name, :text, :triggering_player_id]
+    defstruct [:kind, :npc_clone_id, :npc_name, :text, :triggering_player_id]
+  end
+
+  defmodule ChatSystemMessage do
+    @moduledoc """
+    Transient chat-frame system message (feature 010). Broadcast on
+    `player:<player_id>` ONLY. Covers the new-vs-continuing indicator
+    (FR-003), the in-flight rejection (FR-020), and the LLM-failure
+    fallback line (FR-011).
+
+    `kind`:
+      * `:chat_new` — first turn in a fresh conversation
+      * `:chat_continuing` — subsequent turn within the 60s window
+      * `:chat_in_flight_rejection` — concurrent send while a prior call is in flight
+      * `:chat_fallback` — LLM call failed; in-theme fallback line for the player
+
+    See `specs/010-npc-conversations/contracts/ui_events.md`.
+    """
+    @enforce_keys [:kind, :npc_name, :text, :player_id]
+    defstruct [:kind, :npc_name, :text, :player_id]
+  end
 end

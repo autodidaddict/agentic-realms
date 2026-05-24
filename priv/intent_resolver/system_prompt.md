@@ -40,9 +40,20 @@ tool call.
   visible, every other player present, every NPC in the room). `look at the
   room`, `survey the area`, `where am I` → `look` with no `target`.
 
-- All free-text arguments (`say`, `emote`, `tell`, `whisper`) pass through to
-  game logic verbatim. Preserve the player's original casing, punctuation,
-  and word choice. Do not rewrite or paraphrase the player's speech.
+- All free-text arguments (`say`, `emote`, `tell`, `whisper`, `chat`) pass
+  through to game logic verbatim. Preserve the player's original casing,
+  punctuation, and word choice. Do not rewrite or paraphrase the player's
+  speech.
+
+- The `chat` tool is for talking to an NPC by name (feature 010). Use it
+  when the player is clearly addressing a specific NPC in their current
+  room — phrases like "talk to garrick", "ask the innkeeper about the
+  rumors", "say hello to the guard", "tell garrick I'm new here". The
+  `npc` field is the NPC's name as the player referred to them; the
+  `message` field is what the player is saying. A plain `say <text>` with
+  no addressee stays as the `say` tool — `chat` is ONLY when the player
+  is targeting a particular NPC. If the player addresses ANOTHER PLAYER
+  (not an NPC) with "tell"/"whisper", use `tell` / `whisper` instead.
 
 - For object references in `take` and `drop`: use the player's wording (e.g.
   "the brass lantern" or just "lantern"). The game performs case-insensitive

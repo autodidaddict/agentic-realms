@@ -42,6 +42,7 @@ defmodule AgenticRealms.World.IntentResolver do
           | {:emote, String.t()}
           | {:tell, String.t(), String.t()}
           | {:whisper, String.t(), String.t()}
+          | {:chat, String.t(), String.t()}
 
   @doc """
   Resolve `raw_input` for `player_id` into a canonical action or a refusal.
@@ -163,6 +164,13 @@ defmodule AgenticRealms.World.IntentResolver do
   defp to_action("whisper", %{"recipient" => r, "text" => t})
        when is_binary(r) and r != "" and is_binary(t) and t != "" do
     {:ok, {:whisper, r, t}}
+  end
+
+  # Feature 010 — chat verb dispatch. The NPC's name (in their current room)
+  # is the `npc` field; the player's message is `message`.
+  defp to_action("chat", %{"npc" => n, "message" => m})
+       when is_binary(n) and n != "" and is_binary(m) and m != "" do
+    {:ok, {:chat, n, m}}
   end
 
   defp to_action("refuse", %{"message" => m}) when is_binary(m) and m != "" do
