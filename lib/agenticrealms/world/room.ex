@@ -92,7 +92,8 @@ defmodule AgenticRealms.World.Room do
         name: name,
         short_description: short,
         long_description: long,
-        fixed: fixed
+        fixed: fixed,
+        behaviors: behaviors
       }) do
     if MapSet.member?(ids, oid) do
       {:error, :object_already_in_room}
@@ -103,7 +104,8 @@ defmodule AgenticRealms.World.Room do
         name: name,
         short_description: short,
         long_description: long,
-        fixed: fixed
+        fixed: fixed,
+        behaviors: behaviors || []
       }
     end
   end

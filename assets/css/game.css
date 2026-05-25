@@ -542,6 +542,26 @@ button { font: inherit; color: inherit; }
   font-weight: 600;
 }
 
+/* Feature 011 — ambient tick lines. Subtler than `.narrate` (no
+   drop-cap, smaller, muted) since they fire repeatedly. Italic
+   serif keeps a narrative feel without dominating the log. */
+.log-entry.ambient {
+  font-family: var(--serif);
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ink-faint);
+  font-style: italic;
+  max-width: 58ch;
+  padding: 2px 0;
+  opacity: 0.85;
+}
+.log-entry.ambient .who {
+  color: var(--ink-dim);
+  font-style: normal;
+  font-weight: 500;
+}
+.log-entry.ambient::before { content: "· "; color: var(--ink-ghost); }
+
 .cursor {
   display: inline-block;
   width: 8px;

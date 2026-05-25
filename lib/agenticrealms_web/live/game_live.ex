@@ -867,6 +867,29 @@ defmodule AgenticRealmsWeb.GameLive do
     {:noreply, append_log(socket, %{kind: :room_speech, text: msg.text})}
   end
 
+  # Feature 011 — emote utterances (third-person narration).
+  def handle_info(%BehaviorUtterance{kind: :room_emote} = msg, socket) do
+    {:noreply, append_log(socket, %{kind: :room_emote, text: msg.text})}
+  end
+
+  def handle_info(%BehaviorUtterance{kind: :npc_emote} = msg, socket) do
+    {:noreply,
+     append_log(socket, %{
+       kind: :npc_emote,
+       actor_name: msg.actor_name,
+       text: msg.text
+     })}
+  end
+
+  def handle_info(%BehaviorUtterance{kind: :object_emote} = msg, socket) do
+    {:noreply,
+     append_log(socket, %{
+       kind: :object_emote,
+       actor_name: msg.actor_name,
+       text: msg.text
+     })}
+  end
+
   # Feature 010 — NPC chat reply (private to the chatting player). The
   # Conversation GenServer has already filtered by player_topic so we
   # accept every message here unconditionally.

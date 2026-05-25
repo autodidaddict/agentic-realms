@@ -73,6 +73,19 @@ defmodule AgenticRealms.World.Seed do
         "actions" => [
           %{"type" => "say", "text" => "The cool air carries the scent of rain."}
         ]
+      },
+      # Feature 011 — periodic ambient narration. Fires every ~30s while
+      # the room has at least one live occupant. Uses the `emote` action
+      # so it renders as plain ambient text (no "says" wrapper).
+      %{
+        "trigger" => "tick",
+        "interval_ms" => 30_000,
+        "actions" => [
+          %{
+            "type" => "emote",
+            "text" => "Dust motes drift in the slanted afternoon light."
+          }
+        ]
       }
     ]
 
@@ -89,6 +102,18 @@ defmodule AgenticRealms.World.Seed do
         "trigger" => "player_left",
         "actions" => [
           %{"type" => "say", "text" => "Farewell, traveler."}
+        ]
+      },
+      # Feature 011 — periodic idle gesture. Fires every ~20s. Uses the
+      # `emote` action so it renders as third-person narration prefixed
+      # with the NPC's name, not as quoted speech. The text starts mid-
+      # sentence (no actor name); the renderer prepends "Garrick the
+      # Innkeeper" at render time.
+      %{
+        "trigger" => "tick",
+        "interval_ms" => 20_000,
+        "actions" => [
+          %{"type" => "emote", "text" => "polishes a tankard absentmindedly."}
         ]
       }
     ]
@@ -181,6 +206,25 @@ defmodule AgenticRealms.World.Seed do
       })
 
     # Objects
+    lantern_behaviors = [
+      # Feature 011 — flickering tick. Fires every ~10s, broadcasting an
+      # ambient line whenever the lantern is in a room with live
+      # occupants (whether on the floor or in a player's inventory).
+      # Uses the `emote` action so it renders as third-person narration
+      # prefixed with the object's name — NOT as "the brass lantern
+      # says, '...'". The text starts mid-sentence; the renderer
+      # prepends "brass lantern" at render time.
+      %{
+        "trigger" => "tick",
+        "interval_ms" => 10_000,
+        "actions" => [
+          %{"type" => "emote", "text" => "flickers softly."}
+        ]
+      }
+    ]
+
+    :ok = validate_behaviors!(lantern_behaviors, "lantern_behaviors")
+
     :ok =
       WorldApp.dispatch(%PlaceObject{
         room_id: @starting_room_id,
@@ -189,7 +233,8 @@ defmodule AgenticRealms.World.Seed do
         short_description: "a dented brass lantern",
         long_description:
           "An old hand-lantern of dented brass. Its glass is smoked but unbroken, and a stub of candle still rests within.",
-        fixed: false
+        fixed: false,
+        behaviors: lantern_behaviors
       })
 
     :ok =

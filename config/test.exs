@@ -54,3 +54,10 @@ config :agenticrealms, AgenticRealms.Anthropic,
 # Feature 010 — idle-timeout override for NPC chat Conversation GenServers.
 # Keeps idle-reap tests fast (200ms instead of 60_000ms).
 config :agenticrealms, AgenticRealms.World.NPCChat, idle_timeout_ms: 200
+
+# Feature 011 — Room-Scoped Tick Timers. Test overrides keep cadence
+# fast so per-beat assertions don't sleep for the production defaults.
+config :agenticrealms, AgenticRealms.World.Ticks,
+  base_tick_rate_ms: 50,
+  join_grace_ms: 10,
+  leave_grace_ms: 50

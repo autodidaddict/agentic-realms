@@ -13,6 +13,7 @@ defmodule AgenticRealms.World.Commands.PlaceObject do
     :name,
     :short_description,
     :long_description,
-    :fixed
+    :fixed,
+    behaviors: []
   ]
 end
