@@ -87,7 +87,8 @@ defmodule AgenticRealms.World.Projections.WorldProjector do
           name: name,
           short_description: short,
           long_description: long,
-          fixed: fixed
+          fixed: fixed,
+          behaviors: behaviors
         },
         _meta
       ) do
@@ -99,7 +100,8 @@ defmodule AgenticRealms.World.Projections.WorldProjector do
         long_description: long,
         fixed: fixed,
         room_id: room_id,
-        player_id: nil
+        player_id: nil,
+        behaviors: behaviors || []
       },
       on_conflict: :nothing,
       conflict_target: :id

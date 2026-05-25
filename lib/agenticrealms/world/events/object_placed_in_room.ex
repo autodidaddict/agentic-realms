@@ -15,6 +15,7 @@ defmodule AgenticRealms.World.Events.ObjectPlacedInRoom do
     :short_description,
     :long_description,
     :fixed,
+    behaviors: [],
     version: 1
   ]
 end

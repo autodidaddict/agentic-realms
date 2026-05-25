@@ -21,12 +21,27 @@ defmodule AgenticRealms.World.UIEvents do
 
   defmodule RoomPlayerArrived do
     @enforce_keys [:room_id, :actor_id, :actor_username]
-    defstruct [:room_id, :actor_id, :actor_username, :from_direction]
+    defstruct [:room_id, :actor_id, :actor_username, :from_direction, carried_object_ids: []]
   end
 
   defmodule RoomPlayerLeft do
     @enforce_keys [:room_id, :actor_id, :actor_username, :to_direction]
-    defstruct [:room_id, :actor_id, :actor_username, :to_direction]
+    defstruct [:room_id, :actor_id, :actor_username, :to_direction, carried_object_ids: []]
+  end
+
+  defmodule RoomNPCLeft do
+    @moduledoc """
+    Transient NPC-departure event (feature 011). Mirror of `RoomNPCArrived`
+    from feature 007. Broadcast on `room:<source>` when an NPC clone is
+    despawned or removed.
+
+    Consumed by `AgenticRealms.World.Ticks.Scheduler` to drop the NPC's
+    tick behaviors from its in-scope set. Production emission path is
+    forward-compatible: the event is defined here; production emission
+    lands whenever NPC despawn ships as a feature.
+    """
+    @enforce_keys [:room_id, :npc_id, :npc_name]
+    defstruct [:room_id, :npc_id, :npc_name]
   end
 
   defmodule RoomNPCArrived do

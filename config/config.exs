@@ -30,6 +30,20 @@ config :agenticrealms, AgenticRealms.EventStore,
   database: "agenticrealms_eventstore",
   hostname: "localhost"
 
+# Feature 011 — Room-Scoped Tick Timers.
+# `base_tick_rate_ms`: scheduler beat granularity; the minimum interval
+#   for any tick behavior (FR-004). Authored intervals must be positive
+#   integer multiples of this value.
+# `join_grace_ms`: short delay before a 0→1 occupancy transition starts
+#   the room scheduler (FR-002). Absorbs reconnect bursts.
+# `leave_grace_ms`: delay before a 1→0 occupancy transition tears down
+#   the room scheduler (FR-003). Re-entry within this window preserves
+#   the schedule.
+config :agenticrealms, AgenticRealms.World.Ticks,
+  base_tick_rate_ms: 1_000,
+  join_grace_ms: 250,
+  leave_grace_ms: 5_000
+
 # Configure the endpoint
 config :agenticrealms, AgenticRealmsWeb.Endpoint,
   url: [host: "localhost"],

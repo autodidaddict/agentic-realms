@@ -296,7 +296,15 @@ defmodule AgenticRealms.World.Queries do
     |> Repo.all()
   end
 
-  defp list_objects_in_room(room_id) do
+  @doc """
+  All objects currently in `room_id`, ordered alphabetically. Used by
+  `look_room/1` (privately) and by `RoomTicks.Scope` (feature 011) to
+  build the tick-behavior scope set.
+  """
+  @spec list_objects_in_room(String.t()) :: [
+          %{id: String.t(), name: String.t(), short_description: String.t()}
+        ]
+  def list_objects_in_room(room_id) when is_binary(room_id) do
     from(o in Object,
       where: o.room_id == ^room_id,
       order_by: o.name,
@@ -313,6 +321,50 @@ defmodule AgenticRealms.World.Queries do
   def other_occupants_of(room_id, self_player_id)
       when is_binary(room_id) and is_integer(self_player_id) do
     list_other_players(room_id, self_player_id)
+  end
+
+  @doc """
+  Returns the list of player ids whose `current_room_id == room_id` AND
+  who appear in `Phoenix.Presence`'s online set (feature 011). Used by
+  `RoomTicks.Scheduler` to compute fan-out recipients for tick-driven
+  room/object speech, and by `RoomTicks.Lifecycle` to seed live-occupant
+  state on Scheduler init.
+
+  Returns ids only — no usernames — to keep this hot path cheap.
+  """
+  @spec live_occupants_of(String.t()) :: [integer()]
+  def live_occupants_of(room_id) when is_binary(room_id) do
+    online = online_player_ids()
+
+    from(ps in PlayerState,
+      where: ps.current_room_id == ^room_id,
+      select: ps.player_id
+    )
+    |> Repo.all()
+    |> Enum.filter(&MapSet.member?(online, &1))
+  end
+
+  @doc """
+  Returns all objects currently held by any player whose `current_room_id
+  == room_id` (feature 011). Used by `RoomTicks.Scope` to include carried
+  objects in the tick-behavior scope set for the carrier's current room.
+
+  The caller is responsible for filtering by online presence if needed
+  (the scheduler does this via the carrier's appearance in
+  `live_occupants_of/1`).
+
+  Returns the full Ecto `%Object{}` struct rows so callers can read the
+  `behaviors` field directly.
+  """
+  @spec list_carried_objects_in_room(String.t()) :: [AgenticRealms.World.Schemas.Object.t()]
+  def list_carried_objects_in_room(room_id) when is_binary(room_id) do
+    from(o in Object,
+      join: ps in PlayerState,
+      on: ps.player_id == o.player_id,
+      where: ps.current_room_id == ^room_id and not is_nil(o.player_id),
+      select: o
+    )
+    |> Repo.all()
   end
 
   defp list_other_players(room_id, self_player_id) do

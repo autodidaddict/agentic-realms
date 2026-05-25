@@ -62,12 +62,14 @@ defmodule AgenticRealms.World.UIEventBroadcaster do
 
   def handle(%PlayerSpawned{player_id: pid, room_id: room_id}, _meta) do
     actor_username = lookup_username(pid)
+    carried_ids = lookup_carried_object_ids(pid)
 
     Phoenix.PubSub.broadcast(@pubsub, AgenticRealms.World.room_topic(room_id), %RoomPlayerArrived{
       room_id: room_id,
       actor_id: pid,
       actor_username: actor_username,
-      from_direction: nil
+      from_direction: nil,
+      carried_object_ids: carried_ids
     })
 
     Phoenix.PubSub.broadcast(
@@ -94,6 +96,7 @@ defmodule AgenticRealms.World.UIEventBroadcaster do
       ) do
     actor_username = lookup_username(pid)
     {:ok, direction_atom} = Direction.parse(direction)
+    carried_ids = lookup_carried_object_ids(pid)
 
     from_topic = AgenticRealms.World.room_topic(from)
 
@@ -101,14 +104,16 @@ defmodule AgenticRealms.World.UIEventBroadcaster do
       room_id: from,
       actor_id: pid,
       actor_username: actor_username,
-      to_direction: direction_atom
+      to_direction: direction_atom,
+      carried_object_ids: carried_ids
     })
 
     Phoenix.PubSub.broadcast(@pubsub, AgenticRealms.World.room_topic(to), %RoomPlayerArrived{
       room_id: to,
       actor_id: pid,
       actor_username: actor_username,
-      from_direction: Direction.opposite(direction_atom)
+      from_direction: Direction.opposite(direction_atom),
+      carried_object_ids: carried_ids
     })
 
     Phoenix.PubSub.broadcast(
@@ -216,5 +221,15 @@ defmodule AgenticRealms.World.UIEventBroadcaster do
       nil -> {"something", ""}
       %{name: name, short_description: short} -> {name, short}
     end
+  end
+
+  # Feature 011 — population helper for the new `carried_object_ids` field
+  # on RoomPlayerArrived / RoomPlayerLeft. Returns the ids of every object
+  # currently in the player's inventory. Bounded by inventory size.
+  defp lookup_carried_object_ids(player_id) do
+    import Ecto.Query
+
+    from(o in Object, where: o.player_id == ^player_id, select: o.id)
+    |> Repo.all()
   end
 end

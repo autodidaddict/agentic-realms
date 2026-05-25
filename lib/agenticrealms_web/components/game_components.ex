@@ -194,6 +194,35 @@ defmodule AgenticRealmsWeb.GameComponents do
     """
   end
 
+  # Feature 011 — emote actions (third-person narration). Three flavors:
+  # room (ambient, no attribution), NPC (name prepended), object (name
+  # prepended). No "says" wrapper, no quotes — just narrative text. Uses
+  # the `ambient` base class (NOT `narrate`) so ticking emotes don't
+  # carry feature 009's drop-cap styling — that styling was designed
+  # for one-shot arrival narration and is too heavy for repeating ticks.
+
+  def log_entry(%{entry: %{kind: :room_emote}} = assigns) do
+    ~H"""
+    <div class="log-entry ambient ambient-room">{@entry.text}</div>
+    """
+  end
+
+  def log_entry(%{entry: %{kind: :npc_emote}} = assigns) do
+    ~H"""
+    <div class="log-entry ambient ambient-npc">
+      <span class="who">{@entry.actor_name}</span> {@entry.text}
+    </div>
+    """
+  end
+
+  def log_entry(%{entry: %{kind: :object_emote}} = assigns) do
+    ~H"""
+    <div class="log-entry ambient ambient-object">
+      <span class="who">{@entry.actor_name}</span> {@entry.text}
+    </div>
+    """
+  end
+
   # Feature 010 — private chat reply (speech mode). Visually mirrors :npc_speech
   # but on the private surface. The `speech-chat` class lets CSS distinguish
   # public NPC speech from a chat-private utterance if desired.

@@ -81,11 +81,13 @@ defmodule AgenticRealms.World.Behaviors.ValidatorTest do
     end
 
     test "unknown action type is rejected" do
-      assert {:error, {:unknown_action_type, "emote"}} =
+      # Feature 011 added `emote` to the action vocabulary, so use a
+      # type that is still unrecognized.
+      assert {:error, {:unknown_action_type, "teleport"}} =
                Validator.validate([
                  %{
                    "trigger" => "player_entered",
-                   "actions" => [%{"type" => "emote", "text" => "smiles"}]
+                   "actions" => [%{"type" => "teleport", "text" => "x"}]
                  }
                ])
     end
@@ -153,6 +155,248 @@ defmodule AgenticRealms.World.Behaviors.ValidatorTest do
                  %{
                    "trigger" => "bogus",
                    "actions" => [%{"type" => "say", "text" => "x"}]
+                 }
+               ])
+    end
+  end
+
+  # Feature 011 — tick trigger + interval_ms validation.
+  describe "tick trigger validation (feature 011)" do
+    defp say_action, do: %{"type" => "say", "text" => "tick"}
+
+    setup do
+      original = Application.get_env(:agenticrealms, AgenticRealms.World.Ticks, [])
+
+      on_exit(fn ->
+        Application.put_env(:agenticrealms, AgenticRealms.World.Ticks, original)
+      end)
+
+      :ok
+    end
+
+    defp put_base_rate(ms) do
+      original = Application.get_env(:agenticrealms, AgenticRealms.World.Ticks, [])
+
+      Application.put_env(
+        :agenticrealms,
+        AgenticRealms.World.Ticks,
+        Keyword.put(original, :base_tick_rate_ms, ms)
+      )
+    end
+
+    test "accepts a tick behavior with a valid interval_ms (multiple of base)" do
+      put_base_rate(1_000)
+
+      assert :ok =
+               Validator.validate([
+                 %{
+                   "trigger" => "tick",
+                   "interval_ms" => 1_000,
+                   "actions" => [say_action()]
+                 }
+               ])
+
+      assert :ok =
+               Validator.validate([
+                 %{
+                   "trigger" => "tick",
+                   "interval_ms" => 5_000,
+                   "actions" => [say_action()]
+                 }
+               ])
+    end
+
+    test "rejects a tick behavior with missing interval_ms" do
+      put_base_rate(1_000)
+
+      assert {:error, {:invalid_tick_interval, %{reason: :missing}}} =
+               Validator.validate([
+                 %{
+                   "trigger" => "tick",
+                   "actions" => [say_action()]
+                 }
+               ])
+    end
+
+    test "rejects a tick behavior with nil interval_ms" do
+      put_base_rate(1_000)
+
+      assert {:error, {:invalid_tick_interval, %{reason: :missing}}} =
+               Validator.validate([
+                 %{
+                   "trigger" => "tick",
+                   "interval_ms" => nil,
+                   "actions" => [say_action()]
+                 }
+               ])
+    end
+
+    test "rejects a tick behavior with string interval_ms" do
+      put_base_rate(1_000)
+
+      assert {:error, {:invalid_tick_interval, %{reason: :non_integer, value: "1000"}}} =
+               Validator.validate([
+                 %{
+                   "trigger" => "tick",
+                   "interval_ms" => "1000",
+                   "actions" => [say_action()]
+                 }
+               ])
+    end
+
+    test "rejects a tick behavior with float interval_ms" do
+      put_base_rate(1_000)
+
+      assert {:error, {:invalid_tick_interval, %{reason: :non_integer, value: 1000.0}}} =
+               Validator.validate([
+                 %{
+                   "trigger" => "tick",
+                   "interval_ms" => 1000.0,
+                   "actions" => [say_action()]
+                 }
+               ])
+    end
+
+    test "rejects a tick behavior with zero interval_ms" do
+      put_base_rate(1_000)
+
+      assert {:error, {:invalid_tick_interval, %{reason: :non_positive, value: 0}}} =
+               Validator.validate([
+                 %{
+                   "trigger" => "tick",
+                   "interval_ms" => 0,
+                   "actions" => [say_action()]
+                 }
+               ])
+    end
+
+    test "rejects a tick behavior with negative interval_ms" do
+      put_base_rate(1_000)
+
+      assert {:error, {:invalid_tick_interval, %{reason: :non_positive, value: -500}}} =
+               Validator.validate([
+                 %{
+                   "trigger" => "tick",
+                   "interval_ms" => -500,
+                   "actions" => [say_action()]
+                 }
+               ])
+    end
+
+    test "rejects a tick behavior whose interval is not a multiple of the base rate" do
+      put_base_rate(1_000)
+
+      assert {:error,
+              {:invalid_tick_interval, %{reason: :non_multiple, value: 750, base_rate: 1000}}} =
+               Validator.validate([
+                 %{
+                   "trigger" => "tick",
+                   "interval_ms" => 750,
+                   "actions" => [say_action()]
+                 }
+               ])
+    end
+
+    test "base-rate sensitivity: 1000ms is rejected when base is 100ms, accepted when base is 250ms" do
+      put_base_rate(250)
+
+      assert :ok =
+               Validator.validate([
+                 %{
+                   "trigger" => "tick",
+                   "interval_ms" => 1_000,
+                   "actions" => [say_action()]
+                 }
+               ])
+
+      put_base_rate(100)
+
+      assert :ok =
+               Validator.validate([
+                 %{
+                   "trigger" => "tick",
+                   "interval_ms" => 1_000,
+                   "actions" => [say_action()]
+                 }
+               ])
+
+      # 100 is not a multiple of 250
+      put_base_rate(250)
+
+      assert {:error, {:invalid_tick_interval, %{reason: :non_multiple, value: 100}}} =
+               Validator.validate([
+                 %{
+                   "trigger" => "tick",
+                   "interval_ms" => 100,
+                   "actions" => [say_action()]
+                 }
+               ])
+    end
+
+    test "accepts an emote action in a tick behavior" do
+      put_base_rate(1_000)
+
+      assert :ok =
+               Validator.validate([
+                 %{
+                   "trigger" => "tick",
+                   "interval_ms" => 1_000,
+                   "actions" => [%{"type" => "emote", "text" => "flickers softly."}]
+                 }
+               ])
+    end
+
+    test "rejects an emote action with missing text" do
+      put_base_rate(1_000)
+
+      assert {:error, :missing_emote_text} =
+               Validator.validate([
+                 %{
+                   "trigger" => "tick",
+                   "interval_ms" => 1_000,
+                   "actions" => [%{"type" => "emote"}]
+                 }
+               ])
+    end
+
+    test "rejects an emote action with empty text" do
+      put_base_rate(1_000)
+
+      assert {:error, :empty_emote_text} =
+               Validator.validate([
+                 %{
+                   "trigger" => "tick",
+                   "interval_ms" => 1_000,
+                   "actions" => [%{"type" => "emote", "text" => ""}]
+                 }
+               ])
+    end
+
+    test "rejects an emote action with text > 500 chars" do
+      put_base_rate(1_000)
+      long = String.duplicate("x", 501)
+
+      assert {:error, :emote_text_too_long} =
+               Validator.validate([
+                 %{
+                   "trigger" => "tick",
+                   "interval_ms" => 1_000,
+                   "actions" => [%{"type" => "emote", "text" => long}]
+                 }
+               ])
+    end
+
+    test "interval_ms validation does NOT apply to non-tick triggers" do
+      put_base_rate(1_000)
+
+      # A player_entered behavior with a (meaningless here) interval_ms field
+      # should still validate — the field is just ignored.
+      assert :ok =
+               Validator.validate([
+                 %{
+                   "trigger" => "player_entered",
+                   "interval_ms" => "not-an-integer",
+                   "actions" => [say_action()]
                  }
                ])
     end

@@ -8,7 +8,8 @@ defmodule AgenticRealms.Application do
   # the BEAM at deserialize time, `binary_to_existing_atom/1` crashes
   # the notification publisher. Referencing them in a compile-time
   # module attribute guarantees they exist in the atom table.
-  @_behavior_atoms [:trigger, :actions, :type, :text]
+  # Feature 011 adds :interval_ms (used by tick behaviors).
+  @_behavior_atoms [:trigger, :actions, :type, :text, :interval_ms]
   def __behavior_atoms__, do: @_behavior_atoms
 
   # See https://hexdocs.pm/elixir/Application.html
@@ -35,6 +36,14 @@ defmodule AgenticRealms.Application do
       AgenticRealms.World.NPCChat.Registry,
       AgenticRealms.World.NPCChat.Supervisor,
       AgenticRealms.World.NPCChat.TaskSupervisor,
+      # Feature 011 — cluster-wide registry + dynamic supervisor for the
+      # per-room tick Scheduler GenServers, plus a singleton Lifecycle
+      # process that watches Phoenix.Presence + room events to detect
+      # 0↔1 live-occupancy transitions and start/stop schedulers with
+      # configurable grace periods.
+      AgenticRealms.World.Ticks.Registry,
+      AgenticRealms.World.Ticks.Supervisor,
+      AgenticRealms.World.Ticks.Lifecycle,
       # AgenticRealms.EventStore is started transitively by World.Application
       # via the commanded_eventstore_adapter — listing it here causes a
       # double-start (:already_started).
