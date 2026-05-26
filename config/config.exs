@@ -45,15 +45,11 @@ config :agenticrealms, AgenticRealms.World.Ticks,
   leave_grace_ms: 5_000
 
 # Feature 012 — Maps.
-# `cell_size_px`: side length in pixels of one grid cell in the SVG renderer.
-# `viewport_cells`: width and height of the rendered window, in cells.
-#   MUST be odd so the player's current room sits exactly in the center.
-# `node_padding_px`: gap between a room glyph and its cell edge, so the
-#   connecting lines have visible run-up before reaching the room rect.
-config :agenticrealms, AgenticRealms.MapRenderer,
-  cell_size_px: 56,
-  viewport_cells: 11,
-  node_padding_px: 4
+# `default_zoom_cells`: side length of the initial SVG viewBox in CELL
+#   units. Defaults to 3 (3×3 cells visible at first open, centered on the
+#   player's current room). The browser-side `.MapInteract` hook owns
+#   mouse-wheel zoom and click-drag pan from there.
+config :agenticrealms, AgenticRealms.MapRenderer, default_zoom_cells: 3
 
 # Configure the endpoint
 config :agenticrealms, AgenticRealmsWeb.Endpoint,

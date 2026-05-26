@@ -555,11 +555,11 @@ defmodule AgenticRealmsWeb.GameComponents.MiniMapTest do
       assert names == ["Border"]
     end
 
-    test "SVG carries the phx-hook directive for the tooltip hook" do
+    test "SVG carries the phx-hook directive for the map-interact hook" do
       html = render_map(linear_three_view())
-      # Phoenix resolves `.MapTooltip` (defined in this module's
+      # Phoenix resolves `.MapInteract` (defined in this module's
       # ColocatedHook script) to the fully-qualified module path.
-      assert html =~ "MapTooltip"
+      assert html =~ "MapInteract"
       assert html =~ "phx-hook"
       assert html =~ ~s|id="map-canvas-svg"|
     end

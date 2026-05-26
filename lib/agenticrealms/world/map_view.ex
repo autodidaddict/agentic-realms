@@ -81,13 +81,15 @@ defmodule AgenticRealms.World.MapView do
   end
 
   @doc """
-  Returns `viewport_cells` from app config (default 11 — odd so the player
-  sits in the center cell of the rendered window).
+  Default initial zoom level in cells (the SVG viewBox is `default_zoom_cells`
+  cells wide and tall, centered on the player's current room). Mouse-wheel
+  zoom and click-drag pan are owned by the client-side `.MapInteract` hook
+  — the server never re-renders for pan/zoom interactions.
   """
-  @spec viewport_cells() :: pos_integer()
-  def viewport_cells do
+  @spec default_zoom_cells() :: pos_integer()
+  def default_zoom_cells do
     Application.get_env(:agenticrealms, AgenticRealms.MapRenderer, [])
-    |> Keyword.get(:viewport_cells, 11)
+    |> Keyword.get(:default_zoom_cells, 3)
   end
 
   # ------------------------------------------------------------------------
@@ -141,31 +143,23 @@ defmodule AgenticRealms.World.MapView do
     }
   end
 
-  # Hot path. Five indexed queries, all bounded by the viewport size or by
-  # short-circuit EXISTS. Avoid adding work here without measuring.
+  # Hot path. Four indexed queries (discovery + rooms + exits + two
+  # short-circuit EXISTS for above/below). The server emits ALL discovered
+  # rooms in the current region+elevation — the client owns viewport
+  # decisions via SVG viewBox pan/zoom.
   defp normal_view(player_id, %Room{} = current, %Region{} = region) do
     # The current room is trivially "discovered" — the player is standing
-    # in it. We add it to the set unconditionally so the renderer can draw
-    # the "you are here" highlight immediately on first spawn, even before
-    # the eventually-consistent PlayerDiscoveredRoom row lands in the read
-    # model (the projector dispatches the discovery from inside its own
-    # event handler, so the row arrives asynchronously).
+    # in it. Add it unconditionally so the renderer can draw the "you are
+    # here" highlight immediately on first spawn, even before the
+    # eventually-consistent PlayerDiscoveredRoom row lands in the read
+    # model.
     discovered =
       player_id
       |> Queries.discovered_room_ids_for()
       |> MapSet.put(current.id)
 
-    viewport = viewport_cells()
-    center = {current.map_x, current.map_y}
-
     rendered_rooms =
-      Queries.rooms_in_region_at_elevation_within_viewport(
-        region.id,
-        current.elevation,
-        center,
-        viewport,
-        discovered
-      )
+      Queries.rooms_in_region_at_elevation(region.id, current.elevation, discovered)
 
     rendered_by_id = Map.new(rendered_rooms, &{&1.id, &1})
     rendered_id_set = MapSet.new(Map.keys(rendered_by_id))
@@ -200,7 +194,7 @@ defmodule AgenticRealms.World.MapView do
       region_name: region.name,
       current_room_id: current.id,
       off_map?: false,
-      viewport_center: center,
+      viewport_center: {current.map_x, current.map_y},
       rooms: glyphs,
       exits: exit_lines,
       has_above_rooms?:

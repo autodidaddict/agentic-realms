@@ -446,36 +446,15 @@ defmodule AgenticRealms.World.Queries do
   end
 
   @doc """
-  Rooms in the given region at the given elevation, filtered to a square
-  viewport window centered on `(cx, cy)` of side length `viewport_cells`.
-  Also filters to map_visible AND coord-non-null AND in the player's
-  discovered set.
-
-  Preloads `:exits` for the room — used by MapView to compute `has_up?` /
-  `has_down?` and to classify outgoing edges without a second round-trip.
+  All discovered, map-visible, coord-bearing rooms in the given region at
+  the given elevation. The client-side pan/zoom logic owns the viewport
+  decision — the server emits the full set and the SVG `viewBox` handles
+  what's visible. Typical regions are ≤200 rooms so the over-fetch cost
+  is negligible.
   """
-  @spec rooms_in_region_at_elevation_within_viewport(
-          String.t(),
-          integer(),
-          {integer(), integer()},
-          pos_integer(),
-          MapSet.t()
-        ) :: [%Room{}]
-  def rooms_in_region_at_elevation_within_viewport(
-        region_id,
-        elevation,
-        {cx, cy},
-        viewport_cells,
-        discovered_ids
-      )
-      when is_binary(region_id) and is_integer(elevation) and is_integer(cx) and
-             is_integer(cy) and is_integer(viewport_cells) and viewport_cells > 0 do
-    half = div(viewport_cells, 2)
-    min_x = cx - half
-    max_x = cx + half
-    min_y = cy - half
-    max_y = cy + half
-
+  @spec rooms_in_region_at_elevation(String.t(), integer(), MapSet.t()) :: [%Room{}]
+  def rooms_in_region_at_elevation(region_id, elevation, discovered_ids)
+      when is_binary(region_id) and is_integer(elevation) do
     discovered_list = MapSet.to_list(discovered_ids)
 
     from(r in Room,
@@ -485,8 +464,6 @@ defmodule AgenticRealms.World.Queries do
           r.map_visible == true and
           not is_nil(r.map_x) and
           not is_nil(r.map_y) and
-          r.map_x >= ^min_x and r.map_x <= ^max_x and
-          r.map_y >= ^min_y and r.map_y <= ^max_y and
           r.id in ^discovered_list
     )
     |> Repo.all()

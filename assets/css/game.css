@@ -310,32 +310,13 @@ button { font: inherit; color: inherit; }
 .player[data-layout="classic"] .p-stats { grid-area: stats; }
 .player[data-layout="classic"] .p-input { grid-area: input; }
 
-.player[data-layout="classic"][data-map="open"] {
-  grid-template-columns: 220px 1fr 280px;
-  grid-template-areas:
-    "map log stats"
-    "input input input";
-}
-.player[data-layout="classic"][data-map="open"] .p-side-left { grid-area: map; }
-
-.player[data-layout="minimal"][data-map="open"] {
-  grid-template-columns: 220px 1fr;
-  grid-template-rows: auto 1fr auto;
-  grid-template-areas:
-    "map status"
-    "map log"
-    "input input";
-}
-.player[data-layout="minimal"][data-map="open"] .p-side-left { grid-area: map; display: flex; }
-
 .player[data-layout="panels"] {
-  grid-template-columns: 220px 1fr 260px;
+  grid-template-columns: 1fr 260px;
   grid-template-rows: 1fr auto;
   grid-template-areas:
-    "map log stats"
-    "input input input";
+    "log stats"
+    "input input";
 }
-.player[data-layout="panels"] .p-side-left { grid-area: map; }
 .player[data-layout="panels"] .p-log { grid-area: log; }
 .player[data-layout="panels"] .p-stats { grid-area: stats; }
 .player[data-layout="panels"] .p-input { grid-area: input; }
@@ -351,12 +332,10 @@ button { font: inherit; color: inherit; }
 .player[data-layout="minimal"] .p-stats { grid-area: status; }
 .player[data-layout="minimal"] .p-log { grid-area: log; }
 .player[data-layout="minimal"] .p-input { grid-area: input; }
-.player[data-layout="minimal"] .p-side-left { display: none; }
 .player[data-layout="minimal"] .p-log-inner { max-width: 720px; margin: 0 auto; }
 
 /* When HUD hidden */
-.player[data-hud="hidden"] .p-stats,
-.player[data-hud="hidden"] .p-side-left { display: none; }
+.player[data-hud="hidden"] .p-stats { display: none; }
 .player[data-hud="hidden"][data-layout="classic"],
 .player[data-hud="hidden"][data-layout="panels"] {
   grid-template-columns: 1fr;
@@ -1440,24 +1419,32 @@ button { font: inherit; color: inherit; }
 }
 .presence-dot.idle { background: var(--ink-faint); box-shadow: none; }
 
-/* --------- Left side panel (mini-map) --------- */
-
-.p-side-left {
-  padding: 20px;
-  border-right: 1px solid var(--line);
-  background: var(--bg-sunken);
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-/* Feature 012 — Maps. SVG-primary renderer. */
+/* Feature 012 — Maps. Floating overlay anchored above the chat input,
+   sized to roughly 1/3 of the content area in each dimension. The map
+   does NOT take a grid column anymore. The SVG itself owns mouse-wheel
+   zoom and click-drag pan via the .MapInteract ColocatedHook. */
 
 .map-panel {
+  position: absolute;
+  /* `bottom` clears the chat input bar (its height is content-driven, so
+     leave a generous floor and let flex absorb the rest). */
+  bottom: 88px;
+  right: 24px;
+  width: 33%;
+  height: 33%;
+  min-width: 220px;
+  min-height: 180px;
+  max-width: 480px;
+  max-height: 420px;
+  z-index: 50;
+  padding: 12px;
+  background: var(--bg-sunken);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
 }
 
 .map-region {
@@ -1479,10 +1466,15 @@ button { font: inherit; color: inherit; }
   border-radius: 4px;
   display: block;
   width: 100%;
-  aspect-ratio: 1;
-  /* The SVG's viewBox carries the internal cell grid; the element scales
-     to fill the panel width while preserving its square aspect. */
+  flex: 1;
+  min-height: 0;
+  /* The SVG's viewBox lives in cell units; the .MapInteract hook
+     rewrites the viewBox attribute on wheel/drag. Element fills the
+     panel below the header. */
+  cursor: grab;
+  user-select: none;
 }
+.map-canvas:active { cursor: grabbing; }
 .map-canvas--off-map {
   /* Same dimensions; intentionally empty content per FR-003a */
 }
