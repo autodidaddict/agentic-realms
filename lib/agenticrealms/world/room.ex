@@ -28,7 +28,13 @@ defmodule AgenticRealms.World.Room do
             description: nil,
             exits: %{},
             object_ids: MapSet.new(),
-            behaviors: []
+            behaviors: [],
+            # Feature 012 — Maps
+            region_id: nil,
+            map_visible: true,
+            elevation: 0,
+            map_x: nil,
+            map_y: nil
 
   alias AgenticRealms.World.Commands.{
     CreateRoom,
@@ -53,13 +59,23 @@ defmodule AgenticRealms.World.Room do
         room_id: id,
         name: name,
         description: description,
-        behaviors: behaviors
+        behaviors: behaviors,
+        region_id: region_id,
+        map_visible: map_visible,
+        elevation: elevation,
+        map_x: map_x,
+        map_y: map_y
       }) do
     %RoomCreated{
       room_id: id,
       name: name,
       description: description,
-      behaviors: behaviors
+      behaviors: behaviors,
+      region_id: region_id,
+      map_visible: map_visible,
+      elevation: elevation,
+      map_x: map_x,
+      map_y: map_y
     }
   end
 
@@ -149,13 +165,18 @@ defmodule AgenticRealms.World.Room do
         name: name,
         description: description,
         behaviors: behaviors
-      }) do
+      } = event) do
     %__MODULE__{
       state
       | id: id,
         name: name,
         description: description,
-        behaviors: behaviors
+        behaviors: behaviors,
+        region_id: Map.get(event, :region_id),
+        map_visible: Map.get(event, :map_visible, true),
+        elevation: Map.get(event, :elevation, 0),
+        map_x: Map.get(event, :map_x),
+        map_y: Map.get(event, :map_y)
     }
   end
 

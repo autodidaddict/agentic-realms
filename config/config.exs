@@ -44,6 +44,17 @@ config :agenticrealms, AgenticRealms.World.Ticks,
   join_grace_ms: 250,
   leave_grace_ms: 5_000
 
+# Feature 012 — Maps.
+# `cell_size_px`: side length in pixels of one grid cell in the SVG renderer.
+# `viewport_cells`: width and height of the rendered window, in cells.
+#   MUST be odd so the player's current room sits exactly in the center.
+# `node_padding_px`: gap between a room glyph and its cell edge, so the
+#   connecting lines have visible run-up before reaching the room rect.
+config :agenticrealms, AgenticRealms.MapRenderer,
+  cell_size_px: 56,
+  viewport_cells: 11,
+  node_padding_px: 4
+
 # Configure the endpoint
 config :agenticrealms, AgenticRealmsWeb.Endpoint,
   url: [host: "localhost"],

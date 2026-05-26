@@ -24,12 +24,14 @@ defmodule AgenticRealms.World.RoomTest do
   @target_id "00000000-0000-0000-0000-000000000002"
   @object_id "00000000-0000-0000-0000-000000000100"
   @legacy_npc_id "00000000-0000-0000-0000-000000000200"
+  @region_id "00000000-0000-0000-0000-000000000900"
 
   defp created_room do
     Room.apply(%Room{}, %RoomCreated{
       room_id: @room_id,
       name: "Test Room",
-      description: "A room."
+      description: "A room.",
+      region_id: @region_id
     })
   end
 
@@ -39,7 +41,8 @@ defmodule AgenticRealms.World.RoomTest do
                Room.execute(%Room{}, %CreateRoom{
                  room_id: @room_id,
                  name: "Test Room",
-                 description: "A room."
+                 description: "A room.",
+                 region_id: @region_id
                })
     end
 
@@ -48,7 +51,8 @@ defmodule AgenticRealms.World.RoomTest do
                Room.execute(created_room(), %CreateRoom{
                  room_id: @room_id,
                  name: "Test Room",
-                 description: "A room."
+                 description: "A room.",
+                 region_id: @region_id
                })
     end
   end
@@ -282,6 +286,7 @@ defmodule AgenticRealms.World.RoomTest do
                  room_id: @room_id,
                  name: "Test Room",
                  description: "A room.",
+                 region_id: @region_id,
                  behaviors: @behaviors_payload
                })
     end
@@ -292,6 +297,7 @@ defmodule AgenticRealms.World.RoomTest do
           room_id: @room_id,
           name: "Test Room",
           description: "A room.",
+          region_id: @region_id,
           behaviors: @behaviors_payload
         })
 
@@ -303,7 +309,8 @@ defmodule AgenticRealms.World.RoomTest do
                Room.execute(%Room{}, %CreateRoom{
                  room_id: @room_id,
                  name: "Test Room",
-                 description: "A room."
+                 description: "A room.",
+                 region_id: @region_id
                })
     end
   end

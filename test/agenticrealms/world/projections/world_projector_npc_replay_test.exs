@@ -11,13 +11,23 @@ defmodule AgenticRealms.World.Projections.WorldProjectorNpcReplayTest do
 
   alias AgenticRealms.World.Events.{NPCSpawnedInRoom, NPCClonedFromBlueprint}
   alias AgenticRealms.World.Projections.{WorldProjector, SyntheticBlueprintId}
-  alias AgenticRealms.World.Schemas.{Room, NPCBlueprint, NPCClone}
+  alias AgenticRealms.World.Schemas.{Room, NPCBlueprint, NPCClone, Region}
+
+  defp insert_region(name \\ "TestRegion") do
+    Repo.insert!(%Region{
+      id: Ecto.UUID.generate(),
+      name: "#{name}-#{System.unique_integer([:positive])}"
+    })
+  end
 
   defp insert_room(name \\ "Test Room") do
+    region = insert_region()
+
     Repo.insert!(%Room{
       id: Ecto.UUID.generate(),
       name: name,
-      description: "A room."
+      description: "A room.",
+      region_id: region.id
     })
   end
 
@@ -216,6 +226,7 @@ defmodule AgenticRealms.World.Projections.WorldProjectorNpcReplayTest do
       alias AgenticRealms.World.Events.RoomCreated
       alias AgenticRealms.World.Schemas.Room
 
+      region = insert_region()
       room_id = Ecto.UUID.generate()
 
       :ok =
@@ -224,6 +235,7 @@ defmodule AgenticRealms.World.Projections.WorldProjectorNpcReplayTest do
             room_id: room_id,
             name: "Test",
             description: "Desc",
+            region_id: region.id,
             behaviors: @behaviors_payload
           },
           %{}
@@ -237,11 +249,17 @@ defmodule AgenticRealms.World.Projections.WorldProjectorNpcReplayTest do
       alias AgenticRealms.World.Events.RoomCreated
       alias AgenticRealms.World.Schemas.Room
 
+      region = insert_region()
       room_id = Ecto.UUID.generate()
 
       :ok =
         WorldProjector.handle(
-          %RoomCreated{room_id: room_id, name: "Test", description: "Desc"},
+          %RoomCreated{
+            room_id: room_id,
+            name: "Test",
+            description: "Desc",
+            region_id: region.id
+          },
           %{}
         )
 

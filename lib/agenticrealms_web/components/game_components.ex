@@ -463,38 +463,71 @@ defmodule AgenticRealmsWeb.GameComponents do
   # Mini Map
   # ────────────────────────────────────────────────────────────
 
+  attr :map_view, :map, required: true
+
   def mini_map(assigns) do
-    nodes = GameData.map_nodes()
-    edges = GameData.map_edges()
-    by_id = Map.new(nodes, fn n -> {n.id, n} end)
-    assigns = assign(assigns, nodes: nodes, edges: edges, by_id: by_id)
+    cell_size = map_cell_size_px()
+    viewport = map_viewport_cells()
+    canvas_px = cell_size * viewport
+
+    {cx, cy} = assigns.map_view.viewport_center
+    half = div(viewport, 2)
+    # SVG coords are in cells centered on the player. Translate so cells
+    # (cx - half) .. (cx + half) map to [0, viewport_cells].
+    min_x = cx - half
+    min_y = cy - half
+
+    assigns =
+      assigns
+      |> assign(:cell_size, cell_size)
+      |> assign(:viewport, viewport)
+      |> assign(:canvas_px, canvas_px)
+      |> assign(:min_x, min_x)
+      |> assign(:min_y, min_y)
 
     ~H"""
-    <div class="stat-block">
-      <h4>Region · Blackvane</h4>
-      <div class="map">
-        <div class="map-grid"></div>
-        <%= for {a_id, b_id} <- @edges do %>
-          <% a = @by_id[a_id] %>
-          <% b = @by_id[b_id] %>
-          <% dx = b.x - a.x %>
-          <% dy = b.y - a.y %>
-          <% len = :math.sqrt(dx * dx + dy * dy) %>
-          <% ang = :math.atan2(dy, dx) * 180 / :math.pi() %>
-          <div
-            class="map-edge"
-            style={"left: #{a.x}%; top: #{a.y}%; width: #{len}%; transform: rotate(#{ang}deg)"}
-          >
-          </div>
-        <% end %>
+    <div class="stat-block map-panel">
+      <h4 class="map-region">
+        <span class="map-region-label">Region</span>
+        <span class="map-region-sep">·</span>
+        <span class="map-region-name">{@map_view.region_name || "—"}</span>
+      </h4>
+
+      <%= if @map_view.off_map? do %>
         <div
-          :for={node <- @nodes}
-          class={"map-node #{node.state}"}
-          style={"left: #{node.x}%; top: #{node.y}%"}
-          title={node.label}
+          class="map-canvas map-canvas--off-map"
+          style={"width: #{@canvas_px}px; height: #{@canvas_px}px;"}
         >
         </div>
-      </div>
+      <% else %>
+        <svg
+          class="map-canvas"
+          width={@canvas_px}
+          height={@canvas_px}
+          viewBox={"0 0 #{@canvas_px} #{@canvas_px}"}
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <%!-- Exit lines (drawn first so room rects sit on top) --%>
+          <line
+            :for={e <- @map_view.exits}
+            class={"map-line map-line--#{e.kind}"}
+            x1={cell_center_px(e.from_x, @min_x, @cell_size)}
+            y1={cell_center_px(e.from_y, @min_y, @cell_size)}
+            x2={cell_center_px(e.to_x, @min_x, @cell_size)}
+            y2={cell_center_px(e.to_y, @min_y, @cell_size)}
+          />
+
+          <%!-- Room glyphs --%>
+          <.map_cell
+            :for={r <- @map_view.rooms}
+            room={r}
+            cell_size={@cell_size}
+            min_x={@min_x}
+            min_y={@min_y}
+          />
+        </svg>
+      <% end %>
+
       <div style="margin-top: 12px;">
         <div class="dir-pad">
           <span /><button>N</button> <span />
@@ -504,6 +537,71 @@ defmodule AgenticRealmsWeb.GameComponents do
       </div>
     </div>
     """
+  end
+
+  attr :room, :map, required: true
+  attr :cell_size, :integer, required: true
+  attr :min_x, :integer, required: true
+  attr :min_y, :integer, required: true
+
+  defp map_cell(assigns) do
+    pad = 6
+    inner = assigns.cell_size - pad * 2
+
+    assigns =
+      assigns
+      |> assign(:pad, pad)
+      |> assign(:inner, inner)
+      |> assign(:translate_x, cell_origin_px(assigns.room.x, assigns.min_x, assigns.cell_size))
+      |> assign(:translate_y, cell_origin_px(assigns.room.y, assigns.min_y, assigns.cell_size))
+
+    ~H"""
+    <g
+      class={["map-cell", @room.is_current? && "map-cell--current"]}
+      data-room-name={@room.name}
+      transform={"translate(#{@translate_x}, #{@translate_y})"}
+    >
+      <title>{@room.name}</title>
+      <rect class="map-rect" x={@pad} y={@pad} width={@inner} height={@inner} rx="4" />
+
+      <svg
+        :if={@room.has_up?}
+        class="map-icon-up"
+        x={@cell_size - @pad - 10}
+        y={@pad}
+        width="8"
+        height="8"
+        viewBox="0 0 8 8"
+      >
+        <path d="M0 6 L4 1 L8 6" stroke="currentColor" stroke-width="1.5" fill="none" />
+      </svg>
+
+      <svg
+        :if={@room.has_down?}
+        class="map-icon-down"
+        x={@cell_size - @pad - 10}
+        y={@cell_size - @pad - 10}
+        width="8"
+        height="8"
+        viewBox="0 0 8 8"
+      >
+        <path d="M0 1 L4 6 L8 1" stroke="currentColor" stroke-width="1.5" fill="none" />
+      </svg>
+    </g>
+    """
+  end
+
+  defp cell_origin_px(coord, min_coord, cell_size), do: (coord - min_coord) * cell_size
+  defp cell_center_px(coord, min_coord, cell_size), do: cell_origin_px(coord, min_coord, cell_size) + div(cell_size, 2)
+
+  defp map_cell_size_px do
+    Application.get_env(:agenticrealms, AgenticRealms.MapRenderer, [])
+    |> Keyword.get(:cell_size_px, 56)
+  end
+
+  defp map_viewport_cells do
+    Application.get_env(:agenticrealms, AgenticRealms.MapRenderer, [])
+    |> Keyword.get(:viewport_cells, 11)
   end
 
   # ────────────────────────────────────────────────────────────
@@ -725,6 +823,7 @@ defmodule AgenticRealmsWeb.GameComponents do
   attr :input, :string, required: true
   attr :streaming, :boolean, required: true
   attr :map_open, :boolean, required: true
+  attr :map_view, :map, required: true
   attr :input_locked, :boolean, default: false
   attr :tweaks, :map, required: true
 
@@ -737,7 +836,7 @@ defmodule AgenticRealmsWeb.GameComponents do
       data-map={if @map_open, do: "open", else: "closed"}
     >
       <aside :if={@map_open} class="p-side-left">
-        <.mini_map />
+        <.mini_map map_view={@map_view} />
       </aside>
 
       <main class="p-log" id="game-log" phx-hook=".ScrollBottom">

@@ -1452,43 +1452,60 @@ button { font: inherit; color: inherit; }
   gap: 20px;
 }
 
-.map {
-  position: relative;
-  aspect-ratio: 1;
+/* Feature 012 — Maps. SVG-primary renderer. */
+
+.map-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.map-region {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin: 0;
+  font-family: var(--serif);
+  font-size: var(--fs-sm);
+  color: var(--ink);
+}
+.map-region-label { color: var(--ink-faint); text-transform: uppercase; letter-spacing: 0.14em; font-size: var(--fs-xs); }
+.map-region-sep   { color: var(--ink-faint); }
+.map-region-name  { color: var(--ink); }
+
+.map-canvas {
   border: 1px solid var(--line);
   background: var(--bg-inset);
   border-radius: 4px;
-  padding: 10px;
+  display: block;
+  /* width/height set inline by the renderer from cell_size_px × viewport_cells */
 }
-.map-grid {
-  position: absolute;
-  inset: 0;
-  background-image:
-    linear-gradient(to right, var(--line-soft) 1px, transparent 1px),
-    linear-gradient(to bottom, var(--line-soft) 1px, transparent 1px);
-  background-size: 25% 25%;
-  opacity: 0.4;
+.map-canvas--off-map {
+  /* Same dimensions; intentionally empty content per FR-003a */
 }
-.map-node {
-  position: absolute;
-  width: 10px;
-  height: 10px;
-  border: 1px solid var(--ink-faint);
-  background: var(--bg-inset);
-  transform: translate(-50%, -50%);
+
+/* Room glyphs */
+.map-cell { color: var(--ink-dim); cursor: default; }
+.map-cell:hover .map-rect { stroke: var(--player); }
+.map-rect {
+  fill: var(--bg-inset);
+  stroke: var(--ink-dim);
+  stroke-width: 1.5;
 }
-.map-node.current {
-  background: var(--player);
-  border-color: var(--player);
-  box-shadow: 0 0 12px var(--player);
+.map-cell--current .map-rect {
+  fill: var(--player);
+  stroke: var(--player);
+  filter: drop-shadow(0 0 6px var(--player));
 }
-.map-node.visited { border-color: var(--ink-dim); background: var(--ink-ghost); }
-.map-edge {
-  position: absolute;
-  background: var(--ink-ghost);
-  height: 1px;
-  transform-origin: left center;
+.map-icon-up, .map-icon-down { pointer-events: none; }
+
+/* Exit lines */
+.map-line {
+  stroke: var(--ink-dim);
+  stroke-width: 2;
+  stroke-linecap: round;
 }
+.map-line--normal { /* defaults */ }
 
 .dir-pad {
   display: grid;
