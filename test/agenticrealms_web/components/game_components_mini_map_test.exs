@@ -99,6 +99,35 @@ defmodule AgenticRealmsWeb.GameComponents.MiniMapTest do
     }
   end
 
+  defp multi_floor_view(opts \\ []) do
+    has_up = Keyword.get(opts, :has_up?, true)
+    has_down = Keyword.get(opts, :has_down?, false)
+    above = Keyword.get(opts, :has_above_rooms?, false)
+    below = Keyword.get(opts, :has_below_rooms?, false)
+
+    %MapView{
+      region_id: "r-1",
+      region_name: "Blackmire",
+      current_room_id: "current",
+      off_map?: false,
+      viewport_center: {0, 0},
+      rooms: [
+        %RoomGlyph{
+          id: "current",
+          name: "Stone Atrium",
+          x: 0,
+          y: 0,
+          is_current?: true,
+          has_up?: has_up,
+          has_down?: has_down
+        }
+      ],
+      exits: [],
+      has_above_rooms?: above,
+      has_below_rooms?: below
+    }
+  end
+
   defp off_map_view do
     %MapView{
       region_id: "r-1",
@@ -264,6 +293,83 @@ defmodule AgenticRealmsWeb.GameComponents.MiniMapTest do
       # somewhere we didn't render.
       data_names = Regex.scan(~r/data-room-name="([^"]+)"/, html)
       assert data_names == [["data-room-name=\"A\"", "A"]]
+    end
+  end
+
+  # ----------------------------------------------------------------
+  # US4 — vertical exits + elevation filtering UI
+  # ----------------------------------------------------------------
+
+  describe "US4 — Up/Down icons inside the room glyph" do
+    test "has_up?: true renders a .map-icon-up SVG inside the cell" do
+      html = render_map(multi_floor_view(has_up?: true, has_down?: false))
+      assert html =~ "map-icon-up"
+      refute html =~ "map-icon-down"
+    end
+
+    test "has_down?: true renders .map-icon-down" do
+      html = render_map(multi_floor_view(has_up?: false, has_down?: true))
+      assert html =~ "map-icon-down"
+      refute html =~ "map-icon-up"
+    end
+
+    test "has_up? + has_down? both true renders BOTH icons in the same cell" do
+      html = render_map(multi_floor_view(has_up?: true, has_down?: true))
+      assert html =~ "map-icon-up"
+      assert html =~ "map-icon-down"
+    end
+
+    test "has_up?: false, has_down?: false → no icons in the cell" do
+      html = render_map(multi_floor_view(has_up?: false, has_down?: false))
+      refute html =~ "map-icon-up"
+      refute html =~ "map-icon-down"
+    end
+  end
+
+  describe "US4 — above/below header affordances (FR-011 / FR-012)" do
+    test "has_above_rooms?: true renders the above affordance pip with aria-label" do
+      html = render_map(multi_floor_view(has_above_rooms?: true))
+      assert html =~ "map-affordance--above"
+      assert html =~ ~s|aria-label="Discovered rooms above"|
+    end
+
+    test "has_below_rooms?: true renders the below affordance pip with aria-label" do
+      html = render_map(multi_floor_view(has_below_rooms?: true))
+      assert html =~ "map-affordance--below"
+      assert html =~ ~s|aria-label="Discovered rooms below"|
+    end
+
+    test "neither flag set → no affordance pips" do
+      html = render_map(multi_floor_view(has_above_rooms?: false, has_below_rooms?: false))
+      refute html =~ "map-affordance--above"
+      refute html =~ "map-affordance--below"
+    end
+
+    test "NO raw integer elevation appears anywhere in the rendered HTML (SC-008)" do
+      html = render_map(multi_floor_view(has_above_rooms?: true, has_below_rooms?: true))
+
+      # FR-012: the integer elevation must not leak. The header must not
+      # contain a digit-bearing tag adjacent to the affordances.
+      refute html =~ ~r/elevation[\s:="]*\d/i
+      refute html =~ ~r/floor\s*\d/i
+      refute html =~ ~r/level\s*\d/i
+    end
+
+    test "above affordance pip contains chevron-up path, NOT a digit" do
+      html = render_map(multi_floor_view(has_above_rooms?: true))
+
+      assert [pip] =
+               Regex.run(
+                 ~r/<span[^>]*map-affordance--above[^>]*>.*?<\/span>/s,
+                 html
+               )
+
+      assert pip =~ "<path"
+      # The path's `d` attribute may contain numerics (coordinates), but
+      # no integer-looking elevation marker should appear as visible text
+      # inside the span.
+      visible_text = Regex.replace(~r/<[^>]+>/, pip, "")
+      refute visible_text =~ ~r/\d/
     end
   end
 

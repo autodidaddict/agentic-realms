@@ -403,8 +403,150 @@ defmodule AgenticRealms.World.MapViewTest do
   end
 
   # ----------------------------------------------------------------
-  # Off-map render (FR-003a) — also exercised by US5
+  # US4 — vertical exits + elevation filtering
   # ----------------------------------------------------------------
+
+  describe "US4 — Up/Down icon flags" do
+    test "a room with an :up exit to a visible coord-bearing target gets has_up?: true" do
+      region = insert_region()
+      ground = insert_room(region, elevation: 0, map_x: 0, map_y: 0)
+      _loft = insert_room(region, elevation: 1, map_x: 0, map_y: 0)
+      insert_exit(ground, :up, _loft)
+
+      player_id = insert_account_player()
+      insert_player_state(player_id, ground.id)
+      discover(player_id, ground)
+
+      view = MapView.for_player(player_id)
+      [g] = view.rooms
+      assert g.has_up?
+      refute g.has_down?
+    end
+
+    test "a room with a :down exit gets has_down?: true" do
+      region = insert_region()
+      loft = insert_room(region, elevation: 1, map_x: 0, map_y: 0)
+      _ground = insert_room(region, elevation: 0, map_x: 0, map_y: 0)
+      insert_exit(loft, :down, _ground)
+
+      player_id = insert_account_player()
+      insert_player_state(player_id, loft.id)
+      discover(player_id, loft)
+
+      view = MapView.for_player(player_id)
+      [g] = view.rooms
+      assert g.has_down?
+      refute g.has_up?
+    end
+
+    test "a middle-landing room with both :up and :down exits gets both flags" do
+      region = insert_region()
+      ground = insert_room(region, elevation: 0, map_x: 0, map_y: 0)
+      middle = insert_room(region, elevation: 1, map_x: 0, map_y: 0)
+      top = insert_room(region, elevation: 2, map_x: 0, map_y: 0)
+      insert_exit(middle, :up, top)
+      insert_exit(middle, :down, ground)
+
+      player_id = insert_account_player()
+      insert_player_state(player_id, middle.id)
+      discover(player_id, middle)
+
+      view = MapView.for_player(player_id)
+      [g] = view.rooms
+      assert g.has_up?
+      assert g.has_down?
+    end
+
+    test "vertical exit to a map-hidden target does NOT set the icon flag (FR-006)" do
+      region = insert_region()
+      ground = insert_room(region, elevation: 0, map_x: 0, map_y: 0)
+      hidden_loft = insert_room(region, map_visible: false, elevation: 1, map_x: 0, map_y: 0)
+      insert_exit(ground, :up, hidden_loft)
+
+      player_id = insert_account_player()
+      insert_player_state(player_id, ground.id)
+      discover(player_id, ground)
+
+      view = MapView.for_player(player_id)
+      [g] = view.rooms
+      refute g.has_up?
+    end
+  end
+
+  describe "US4 — elevation filtering and above/below affordances" do
+    test "from elev 0 with a discovered room above: has_above_rooms? is true; loft does not render" do
+      region = insert_region()
+      ground = insert_room(region, elevation: 0, map_x: 0, map_y: 0)
+      loft = insert_room(region, elevation: 1, map_x: 0, map_y: 0)
+      insert_exit(ground, :up, loft)
+
+      player_id = insert_account_player()
+      insert_player_state(player_id, ground.id)
+      discover(player_id, ground)
+      discover(player_id, loft)
+
+      view = MapView.for_player(player_id)
+
+      assert length(view.rooms) == 1
+      [g] = view.rooms
+      assert g.id == ground.id
+      assert view.has_above_rooms?
+      refute view.has_below_rooms?
+    end
+
+    test "from elev 1 with a discovered room below: has_below_rooms? is true; ground does not render" do
+      region = insert_region()
+      ground = insert_room(region, elevation: 0, map_x: 0, map_y: 0)
+      loft = insert_room(region, elevation: 1, map_x: 0, map_y: 0)
+      insert_exit(loft, :down, ground)
+
+      player_id = insert_account_player()
+      insert_player_state(player_id, loft.id)
+      discover(player_id, loft)
+      discover(player_id, ground)
+
+      view = MapView.for_player(player_id)
+
+      assert length(view.rooms) == 1
+      [g] = view.rooms
+      assert g.id == loft.id
+      refute view.has_above_rooms?
+      assert view.has_below_rooms?
+    end
+
+    test "two-wing-house — both wings on elev 1 render but with no line between them" do
+      region = insert_region()
+      # Elev 0: wing A and wing B connected via a hub.
+      hub = insert_room(region, elevation: 0, map_x: 0, map_y: 0)
+      wing_a_ground = insert_room(region, elevation: 0, map_x: -1, map_y: 0)
+      wing_b_ground = insert_room(region, elevation: 0, map_x: 1, map_y: 0)
+      insert_exit(hub, :west, wing_a_ground)
+      insert_exit(hub, :east, wing_b_ground)
+      # Elev 1: wing A and wing B upstairs rooms NOT connected to each other.
+      wing_a_loft = insert_room(region, elevation: 1, map_x: -1, map_y: 0)
+      wing_b_loft = insert_room(region, elevation: 1, map_x: 1, map_y: 0)
+      insert_exit(wing_a_ground, :up, wing_a_loft)
+      insert_exit(wing_b_ground, :up, wing_b_loft)
+
+      player_id = insert_account_player()
+      insert_player_state(player_id, wing_a_loft.id)
+      # Player has discovered everything.
+      for r <- [hub, wing_a_ground, wing_b_ground, wing_a_loft, wing_b_loft],
+          do: discover(player_id, r)
+
+      view = MapView.for_player(player_id)
+
+      # Only the two loft rooms render (elev 1 filter).
+      assert length(view.rooms) == 2
+      ids = MapSet.new(Enum.map(view.rooms, & &1.id))
+      assert MapSet.equal?(ids, MapSet.new([wing_a_loft.id, wing_b_loft.id]))
+      # No line connects them (no exit between them at this elevation).
+      assert view.exits == []
+      # Below affordance present (elev 0 has discovered rooms).
+      assert view.has_below_rooms?
+      refute view.has_above_rooms?
+    end
+  end
 
   describe "off-map render (FR-003a)" do
     test "player in a room with map_x = nil → blank map, region header only" do

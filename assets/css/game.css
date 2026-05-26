@@ -1497,7 +1497,22 @@ button { font: inherit; color: inherit; }
   stroke: var(--player);
   filter: drop-shadow(0 0 6px var(--player));
 }
-.map-icon-up, .map-icon-down { pointer-events: none; }
+.map-icon-up, .map-icon-down { pointer-events: none; color: var(--ink-dim); }
+.map-cell--current .map-icon-up,
+.map-cell--current .map-icon-down { color: var(--bg-inset); }
+
+/* Above/Below header pips — visible only when the player has discovered
+   rooms on the corresponding adjacent elevation. NO numeric content
+   (FR-012). The aria-label carries the semantic meaning for screen
+   readers. */
+.map-affordance {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 4px;
+  color: var(--player-dim);
+}
+.map-affordance--above,
+.map-affordance--below { /* same styling for now */ }
 
 /* Exit lines */
 .map-line {

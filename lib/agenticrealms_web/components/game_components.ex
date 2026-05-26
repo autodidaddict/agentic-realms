@@ -491,6 +491,27 @@ defmodule AgenticRealmsWeb.GameComponents do
         <span class="map-region-label">Region</span>
         <span class="map-region-sep">·</span>
         <span class="map-region-name">{@map_view.region_name || "—"}</span>
+
+        <span
+          :if={@map_view.has_above_rooms?}
+          class="map-affordance map-affordance--above"
+          aria-label="Discovered rooms above"
+          title="Rooms above"
+        >
+          <svg width="10" height="10" viewBox="0 0 10 10" xmlns="http://www.w3.org/2000/svg">
+            <path d="M1 7 L5 2 L9 7" stroke="currentColor" stroke-width="1.5" fill="none" />
+          </svg>
+        </span>
+        <span
+          :if={@map_view.has_below_rooms?}
+          class="map-affordance map-affordance--below"
+          aria-label="Discovered rooms below"
+          title="Rooms below"
+        >
+          <svg width="10" height="10" viewBox="0 0 10 10" xmlns="http://www.w3.org/2000/svg">
+            <path d="M1 3 L5 8 L9 3" stroke="currentColor" stroke-width="1.5" fill="none" />
+          </svg>
+        </span>
       </h4>
 
       <%= if @map_view.off_map? do %>

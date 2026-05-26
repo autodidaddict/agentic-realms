@@ -248,40 +248,40 @@ Phoenix LiveView single project. All paths under repo root. Implementation under
 
 ### Up/Down icon support in MapView
 
-- [ ] T067 [US4] In `lib/agenticrealms/world/map_view.ex`, extend the per-room build step to populate `has_up?` and `has_down?` on `MapView.Room`. For each rendered room, check its exits: if any `:up` exit exists whose target is `map_visible: true` and has coords set, `has_up?: true`. Same for `:down`. Hidden-target exits do NOT trigger the icon (FR-006). This requires preloading exits when fetching rooms; extend `Queries.rooms_in_region_at_elevation_within_viewport/4` to preload `:exits` (and the exit's target room enough to check `map_visible` and coord-set), or do a follow-up query.
+- [X] T067 [US4] In `lib/agenticrealms/world/map_view.ex`, extend the per-room build step to populate `has_up?` and `has_down?` on `MapView.Room`. For each rendered room, check its exits: if any `:up` exit exists whose target is `map_visible: true` and has coords set, `has_up?: true`. Same for `:down`. Hidden-target exits do NOT trigger the icon (FR-006). This requires preloading exits when fetching rooms; extend `Queries.rooms_in_region_at_elevation_within_viewport/4` to preload `:exits` (and the exit's target room enough to check `map_visible` and coord-set), or do a follow-up query.
 
 ### Elevation filtering + above/below affordances in MapView
 
-- [ ] T068 [US4] Add `has_discovered_rooms_at_elevations?/3` to `lib/agenticrealms/world/queries.ex` per `contracts/map-view.md`: given a region_id, a list of comparison-elevations (e.g., `[elev_above_1, elev_above_2, …]` if querying "above"; or simpler — accept a comparison operator and a reference elevation), and the player_id, returns a boolean. Implementation: a single `EXISTS` query joining `world_rooms` and `player_discovered_rooms`, filtered to the region and the elevation comparison.
+- [X] T068 [US4] Add `has_discovered_rooms_at_elevations?/3` to `lib/agenticrealms/world/queries.ex` per `contracts/map-view.md`: given a region_id, a list of comparison-elevations (e.g., `[elev_above_1, elev_above_2, …]` if querying "above"; or simpler — accept a comparison operator and a reference elevation), and the player_id, returns a boolean. Implementation: a single `EXISTS` query joining `world_rooms` and `player_discovered_rooms`, filtered to the region and the elevation comparison.
   Simpler API: `has_discovered_rooms_above?(region_id, current_elevation, player_id)` and `has_discovered_rooms_below?(region_id, current_elevation, player_id)`. Two separate functions.
-- [ ] T069 [US4] In `lib/agenticrealms/world/map_view.ex` `build_normal_view/2`, populate `has_above_rooms?` and `has_below_rooms?` by calling the new Queries helpers. Confirm these are NOT populated in `build_off_map_view/1` (those return `false`).
+- [X] T069 [US4] In `lib/agenticrealms/world/map_view.ex` `build_normal_view/2`, populate `has_above_rooms?` and `has_below_rooms?` by calling the new Queries helpers. Confirm these are NOT populated in `build_off_map_view/1` (those return `false`).
 
 ### Renderer: Up/Down icons + above/below affordances
 
-- [ ] T070 [US4] In `lib/agenticrealms_web/components/game_components.ex` `mini_map/1`, inside each `g.map-cell`, render:
+- [X] T070 [US4] In `lib/agenticrealms_web/components/game_components.ex` `mini_map/1`, inside each `g.map-cell`, render:
   - `<svg :if={r.has_up?} class="map-icon-up" ...>` with a chevron-up `<path d="M0 5 L4 1 L8 5" stroke="currentColor" stroke-width="1.5" fill="none" />` positioned at the top-right corner of the room rect (8 px wide; padded 3 px from the room's top and right).
   - `<svg :if={r.has_down?} class="map-icon-down" ...>` with a chevron-down `<path d="M0 1 L4 5 L8 1" .../>` at the bottom-right corner.
   Both can render simultaneously without overlap.
-- [ ] T071 [US4] In `lib/agenticrealms_web/components/game_components.ex` `mini_map/1`'s `.map-header`, add:
+- [X] T071 [US4] In `lib/agenticrealms_web/components/game_components.ex` `mini_map/1`'s `.map-header`, add:
   - `<span :if={@map_view.has_above_rooms?} class="map-affordance-above" aria-label="Discovered rooms above"></span>` (a small chevron-up SVG inside).
   - `<span :if={@map_view.has_below_rooms?} class="map-affordance-below" aria-label="Discovered rooms below"></span>`.
   Both render side-by-side next to the region name. NO numeric content, NO integer.
 
 ### CSS for icons and affordances
 
-- [ ] T072 [US4] In `assets/css/game.css`, add:
+- [X] T072 [US4] In `assets/css/game.css`, add:
   - `.map-icon-up`, `.map-icon-down` — color inherited from parent `.map-cell`; subtle stroke; `pointer-events: none` so they don't intercept hover.
   - `.map-affordance-above`, `.map-affordance-below` — small inline-flex items in the header; color `var(--ink-dim)` normally, `var(--player-dim)` when present.
 
 ### Tests for US4
 
-- [ ] T073 [P] [US4] Extend `test/agenticrealms/world/map_view_test.exs` with `multi_floor/0` fixture cases (per `research.md R10`):
+- [X] T073 [P] [US4] Extend `test/agenticrealms/world/map_view_test.exs` with `multi_floor/0` fixture cases (per `research.md R10`):
   - From an elev-0 room with an Up exit, MapView returns the room with `has_up?: true`, `has_down?: false`; `has_above_rooms?: true`; `has_below_rooms?: false`.
   - From an elev-1 room with a Down exit, MapView returns `has_down?: true`, `has_up?: false`; `has_below_rooms?: true`; `has_above_rooms?: false`.
   - From a middle-landing room (elev=1) with both Up and Down exits, MapView returns `has_up?: true` AND `has_down?: true`.
   - From an elev-1 room, elev-0 rooms do NOT appear in `rooms` (elevation filter).
   - The `two_wing_house/0` fixture: at elev-1, both wings' discovered rooms appear, with NO line between them (disconnected components).
-- [ ] T074 [P] [US4] Extend `test/agenticrealms_web/components/game_components_mini_map_test.exs` with US4 assertions:
+- [X] T074 [P] [US4] Extend `test/agenticrealms_web/components/game_components_mini_map_test.exs` with US4 assertions:
   - Multi-floor fixture renders the Up icon as `.map-icon-up` inside the correct room's group; ditto Down.
   - When both `has_up?` and `has_down?` are true on the same room, both icons render and don't visually overlap (assert by counting `.map-icon-up` and `.map-icon-down` elements).
   - The `.map-affordance-above` element appears in the header when `has_above_rooms?: true`, otherwise absent.
