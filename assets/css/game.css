@@ -1478,7 +1478,10 @@ button { font: inherit; color: inherit; }
   background: var(--bg-inset);
   border-radius: 4px;
   display: block;
-  /* width/height set inline by the renderer from cell_size_px × viewport_cells */
+  width: 100%;
+  aspect-ratio: 1;
+  /* The SVG's viewBox carries the internal cell grid; the element scales
+     to fill the panel width while preserving its square aspect. */
 }
 .map-canvas--off-map {
   /* Same dimensions; intentionally empty content per FR-003a */
@@ -1575,43 +1578,6 @@ button { font: inherit; color: inherit; }
   stroke-width: 0.5;
 }
 
-/* Feature 012 — dir-pad-wrap pairs the 3×3 compass with the Up/Down
-   vertical column. Buttons issue text commands via submit_command. */
-.dir-pad-wrap {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  margin-top: 12px;
-}
-.dir-pad {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 4px;
-  font-size: var(--fs-xs);
-  flex: 1;
-}
-.dir-pad-vert {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  width: 48px;
-}
-.dir-btn {
-  padding: 6px 0;
-  background: var(--bg);
-  border: 1px solid var(--line);
-  color: var(--ink-dim);
-  font-family: var(--mono);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  cursor: pointer;
-  border-radius: 3px;
-  text-align: center;
-}
-.dir-btn:hover:not(:disabled) { border-color: var(--player); color: var(--player); }
-.dir-btn:disabled { color: var(--ink-ghost); cursor: not-allowed; opacity: 0.4; }
-.dir-btn--look { color: var(--ink-faint); }
-.dir-btn--look:hover { border-color: var(--ink-dim); color: var(--ink); }
 
 /* --------- Map toggle button --------- */
 .p-input-line {
