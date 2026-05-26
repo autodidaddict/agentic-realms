@@ -548,6 +548,113 @@ defmodule AgenticRealms.World.MapViewTest do
     end
   end
 
+  # ----------------------------------------------------------------
+  # US5 — hidden rooms (FR-006): map_visible: false leaves NO map trace
+  # ----------------------------------------------------------------
+
+  describe "US5 — hidden room invisibility" do
+    test "a discovered map-hidden room does NOT appear in rendered rooms" do
+      region = insert_region()
+      atrium = insert_room(region, name: "Atrium", map_x: 0, map_y: 0)
+      vault = insert_room(region, name: "Vault", map_visible: false, map_x: 1, map_y: 0)
+
+      player_id = insert_account_player()
+      insert_player_state(player_id, atrium.id)
+      discover(player_id, atrium)
+      # Player has discovered the Vault via the cardinal command, but
+      # map_visible is false so it never renders.
+      discover(player_id, vault)
+
+      view = MapView.for_player(player_id)
+      ids = Enum.map(view.rooms, & &1.id)
+
+      refute vault.id in ids
+      assert atrium.id in ids
+    end
+
+    test "exit FROM a discovered visible room TO a hidden room produces no entry of any kind" do
+      region = insert_region()
+      atrium = insert_room(region, name: "Atrium", map_x: 0, map_y: 0)
+      vault = insert_room(region, name: "Vault", map_visible: false, map_x: 1, map_y: 0)
+      insert_exit(atrium, :east, vault)
+
+      player_id = insert_account_player()
+      insert_player_state(player_id, atrium.id)
+      discover(player_id, atrium)
+      discover(player_id, vault)
+
+      view = MapView.for_player(player_id)
+
+      # No normal line, no fog stub, no cross-region affordance. The east
+      # side of Atrium looks identical to a room with no east exit.
+      assert view.exits == []
+    end
+
+    test "exit FROM a hidden source room produces nothing — the source isn't in the rendered set" do
+      region = insert_region()
+      hidden = insert_room(region, name: "Hidden", map_visible: false, map_x: 0, map_y: 0)
+      visible = insert_room(region, name: "Visible", map_x: 1, map_y: 0)
+      insert_exit(hidden, :east, visible)
+
+      player_id = insert_account_player()
+      insert_player_state(player_id, visible.id)
+      discover(player_id, visible)
+      discover(player_id, hidden)
+
+      view = MapView.for_player(player_id)
+
+      # Only the visible room renders. The hidden source can't appear in
+      # rendered_rooms (filtered by map_visible in the query layer), and
+      # build_exit_lines never sees its outgoing exits since they aren't
+      # included in exits_for_rooms(rendered_ids).
+      assert length(view.rooms) == 1
+      [g] = view.rooms
+      assert g.id == visible.id
+      assert view.exits == []
+    end
+
+    test "wizard toggles a previously-hidden room to visible → next render includes it" do
+      region = insert_region()
+      atrium = insert_room(region, name: "Atrium", map_x: 0, map_y: 0)
+      vault = insert_room(region, name: "Vault", map_visible: false, map_x: 1, map_y: 0)
+      insert_exit(atrium, :east, vault)
+
+      player_id = insert_account_player()
+      insert_player_state(player_id, atrium.id)
+      discover(player_id, atrium)
+      discover(player_id, vault)
+
+      view_before = MapView.for_player(player_id)
+      assert view_before.exits == [],
+             "before unhide: no east-going line or fog stub"
+
+      Repo.update_all(
+        from(r in Room, where: r.id == ^vault.id),
+        set: [map_visible: true]
+      )
+
+      view_after = MapView.for_player(player_id)
+      ids = Enum.map(view_after.rooms, & &1.id)
+      assert vault.id in ids, "after unhide: Vault appears in rendered rooms"
+      assert length(view_after.exits) == 1, "after unhide: Atrium↔Vault line drawn"
+    end
+
+    test "hidden up/down target also suppresses the icon flag (cross-check with US4)" do
+      region = insert_region()
+      ground = insert_room(region, elevation: 0, map_x: 0, map_y: 0)
+      hidden_loft = insert_room(region, map_visible: false, elevation: 1, map_x: 0, map_y: 0)
+      insert_exit(ground, :up, hidden_loft)
+
+      player_id = insert_account_player()
+      insert_player_state(player_id, ground.id)
+      discover(player_id, ground)
+
+      view = MapView.for_player(player_id)
+      [g] = view.rooms
+      refute g.has_up?, "FR-006 suppresses the Up icon when the target is hidden"
+    end
+  end
+
   describe "off-map render (FR-003a)" do
     test "player in a room with map_x = nil → blank map, region header only" do
       region = insert_region()

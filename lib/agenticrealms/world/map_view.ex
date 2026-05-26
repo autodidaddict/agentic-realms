@@ -243,7 +243,11 @@ defmodule AgenticRealms.World.MapView do
           direction in [:up, :down] ->
             {normal_acc, fog_acc}
 
-          # Hidden or unmapped target → suppress entirely (FR-006).
+          # FR-006: a map-hidden room (or one without coords) leaves NO
+          # visible trace on the map. The source-side line is suppressed
+          # entirely — no :normal, no :fog_stub, no :cross_region affordance.
+          # The source room looks identical to one with no exit in that
+          # direction. This is the wizard's primary tool for secret areas.
           is_nil(e.target_room) or e.target_room.map_visible != true or
             is_nil(e.target_room.map_x) or is_nil(e.target_room.map_y) ->
             {normal_acc, fog_acc}

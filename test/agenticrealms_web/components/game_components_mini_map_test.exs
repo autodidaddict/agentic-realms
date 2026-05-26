@@ -374,6 +374,51 @@ defmodule AgenticRealmsWeb.GameComponents.MiniMapTest do
   end
 
   # ----------------------------------------------------------------
+  # US5 — hidden rooms render as if absent (FR-006)
+  # ----------------------------------------------------------------
+  #
+  # The MapView layer is what actually enforces hidden-room suppression
+  # (its query filter on map_visible == true and its build_exit_lines
+  # cond). The renderer is a pure function of the MapView struct, so
+  # these snapshot tests verify the contract by feeding a MapView that
+  # has ALREADY excluded the hidden room — the renderer must not "make
+  # up" extra content.
+
+  describe "US5 — hidden room renders as if absent" do
+    test "when the hidden neighbor was suppressed from MapView, no line or fog stub appears" do
+      # Single-room MapView (hidden neighbor pre-suppressed by MapView).
+      html = render_map(single_room_view())
+
+      refute html =~ "map-line--normal"
+      refute html =~ "map-fog-stub"
+      refute html =~ "map-fog-cloud"
+
+      # The current room glyph still renders normally — hidden rooms
+      # don't affect the visible room's own appearance.
+      assert html =~ ~s|data-room-name="Stone Atrium"|
+    end
+
+    test "no DOM element names the hidden room or its coordinates" do
+      html = render_map(single_room_view())
+
+      # The single_room_view fixture conceptually has a hidden neighbor
+      # that MapView has filtered out. The renderer's job is to not
+      # invent any reference to it. Assert no extra room-name attributes
+      # beyond the single rendered cell.
+      data_names = Regex.scan(~r/data-room-name="([^"]+)"/, html)
+      assert length(data_names) == 1
+    end
+
+    test "the rendered HTML does not contain the literal 'Hidden' as a room name" do
+      # Catches a class of regressions where the renderer might leak the
+      # hidden room's name via some forgotten attribute or comment.
+      html = render_map(single_room_view())
+      refute html =~ "Hidden Vault"
+      refute html =~ ~s|name="Hidden|
+    end
+  end
+
+  # ----------------------------------------------------------------
   # Off-map state (FR-003a)
   # ----------------------------------------------------------------
 

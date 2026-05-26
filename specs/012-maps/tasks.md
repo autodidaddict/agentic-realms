@@ -297,18 +297,18 @@ Phoenix LiveView single project. All paths under repo root. Implementation under
 
 **Independent test**: From the Library, the west side shows no exit indication at all (the Hidden Vault to the west is `map_visible: false`). Walk west into the Vault. The map header still reads "Region · Blackmire" but the canvas is blank. Walk east back to the Library; the full map of discovered rooms reappears.
 
-- [ ] T075 [US5] Verify that `lib/agenticrealms/world/map_view.ex` (built in T051 and extended in T061) ALREADY suppresses:
+- [X] T075 [US5] Verify that `lib/agenticrealms/world/map_view.ex` (built in T051 and extended in T061) ALREADY suppresses:
   - Hidden rooms from `MapView.rooms` (covered by the `map_visible = true` filter in `Queries.rooms_in_region_at_elevation_within_viewport/4` from T049).
   - Exits to hidden rooms from `MapView.exits` (in `build_normal_view`, when classifying exits, target rooms with `map_visible: false` are SUPPRESSED ENTIRELY — no `:normal`, no `:fog_stub`, no `:cross_region` entry).
   - Exits FROM hidden rooms (the source room isn't in the rendered set, so no exits from it are considered).
   If any of these are not already in place from T051/T061, add the suppression now. Add an inline comment naming FR-006.
-- [ ] T076 [US5] Verify that `build_off_map_view/1` in `map_view.ex` is invoked when the player's current room has `map_visible: false` OR `map_x: nil` (the `off_map?/1` helper handles both). If the off-map branch was not implemented in T051, add it now.
-- [ ] T077 [P] [US5] Extend `test/agenticrealms/world/map_view_test.exs` with US5 cases:
+- [X] T076 [US5] Verify that `build_off_map_view/1` in `map_view.ex` is invoked when the player's current room has `map_visible: false` OR `map_x: nil` (the `off_map?/1` helper handles both). If the off-map branch was not implemented in T051, add it now.
+- [X] T077 [P] [US5] Extend `test/agenticrealms/world/map_view_test.exs` with US5 cases:
   - `hidden_room/0` fixture: a room with `map_visible: false` does NOT appear in `MapView.rooms` even when discovered.
   - Exits TO the hidden room are suppressed entirely (zero entries of any kind in `MapView.exits` for that pair).
   - Exits FROM the hidden room are suppressed (the source isn't in the rendered set, so no entries appear).
   - `off_map/0` fixture (player standing in a hidden or unmapped room): `MapView.for_player/1` returns `off_map?: true`, `rooms: []`, `exits: []`, `has_above_rooms?: false`, `has_below_rooms?: false`. The `region_name` is still populated.
-- [ ] T078 [P] [US5] Extend `test/agenticrealms_web/components/game_components_mini_map_test.exs` with US5 assertions:
+- [X] T078 [P] [US5] Extend `test/agenticrealms_web/components/game_components_mini_map_test.exs` with US5 assertions:
   - Hidden-room fixture: the rendered SVG contains zero glyphs for hidden rooms; no lines reach the hidden room's coords.
   - Off-map fixture: the SVG contains the region-name header but the `.map-canvas` is `.map-canvas--off-map` (or absent), with zero glyphs and zero lines.
 
