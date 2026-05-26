@@ -521,7 +521,47 @@ defmodule AgenticRealmsWeb.GameComponents do
         >
         </div>
       <% else %>
+        <script :type={Phoenix.LiveView.ColocatedHook} name=".MapTooltip">
+          // Feature 012 — hover tooltip for the map. Listens for mouseover /
+          // mouseout on any descendant carrying a data-room-name attribute
+          // (the .map-cell groups). Fog stubs and cross-region portals do NOT
+          // carry data-room-name, so they never trigger the tooltip — that
+          // is the FR-017 information-hiding guarantee at the renderer
+          // layer; this hook just trusts whatever attribute lives in the DOM.
+          export default {
+            mounted() {
+              this._onOver = (ev) => {
+                const cell = ev.target.closest("[data-room-name]");
+                if (!cell) return;
+                const name = cell.getAttribute("data-room-name");
+                this.pushEvent("tooltip:show", { name, x: ev.clientX, y: ev.clientY });
+              };
+              this._onMove = (ev) => {
+                const cell = ev.target.closest("[data-room-name]");
+                if (!cell) return;
+                this.pushEvent("tooltip:move", { x: ev.clientX, y: ev.clientY });
+              };
+              this._onOut = (ev) => {
+                // Only hide when leaving the SVG entirely (not just moving
+                // between cells within it).
+                if (this.el.contains(ev.relatedTarget)) return;
+                this.pushEvent("tooltip:hide", {});
+              };
+              this.el.addEventListener("mouseover", this._onOver);
+              this.el.addEventListener("mousemove", this._onMove);
+              this.el.addEventListener("mouseout", this._onOut);
+            },
+            destroyed() {
+              this.el.removeEventListener("mouseover", this._onOver);
+              this.el.removeEventListener("mousemove", this._onMove);
+              this.el.removeEventListener("mouseout", this._onOut);
+            }
+          }
+        </script>
+
         <svg
+          id="map-canvas-svg"
+          phx-hook=".MapTooltip"
           class="map-canvas"
           width={@canvas_px}
           height={@canvas_px}
@@ -922,6 +962,7 @@ defmodule AgenticRealmsWeb.GameComponents do
   attr :streaming, :boolean, required: true
   attr :map_open, :boolean, required: true
   attr :map_view, :map, required: true
+  attr :map_tooltip, :any, default: nil
   attr :input_locked, :boolean, default: false
   attr :tweaks, :map, required: true
 
@@ -936,6 +977,14 @@ defmodule AgenticRealmsWeb.GameComponents do
       <aside :if={@map_open} class="p-side-left">
         <.mini_map map_view={@map_view} />
       </aside>
+
+      <div
+        :if={@map_tooltip}
+        class="map-tooltip"
+        style={"left: #{@map_tooltip.x + 12}px; top: #{@map_tooltip.y + 12}px;"}
+      >
+        {@map_tooltip.name}
+      </div>
 
       <main class="p-log" id="game-log" phx-hook=".ScrollBottom">
         <div class="p-log-inner">

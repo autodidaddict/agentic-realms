@@ -511,6 +511,63 @@ defmodule AgenticRealmsWeb.GameComponents.MiniMapTest do
   end
 
   # ----------------------------------------------------------------
+  # US7 — hover tooltip plumbing (data-room-name placement)
+  # ----------------------------------------------------------------
+  #
+  # The ColocatedHook (.MapTooltip) drives tooltip:show/hide via the
+  # data-room-name attribute. The renderer's job is to put that attribute
+  # on .map-cell groups ONLY — never on fog stubs or cross-region
+  # portals, where it would leak destination identity per FR-017.
+
+  describe "US7 — data-room-name placement" do
+    test "every .map-cell carries data-room-name matching the room's display name" do
+      html = render_map(linear_three_view())
+
+      data_names = Regex.scan(~r/data-room-name="([^"]+)"/, html)
+      names = Enum.map(data_names, fn [_, name] -> name end)
+
+      assert "A" in names
+      assert "B" in names
+      assert "C" in names
+      assert length(names) == 3
+    end
+
+    test "fog-stub render places NO data-room-name on the line or cloud" do
+      html = render_map(fog_stub_view())
+
+      data_names = Regex.scan(~r/data-room-name="([^"]+)"/, html)
+      # Only the source room ("A") should carry the attribute.
+      names = Enum.map(data_names, fn [_, name] -> name end)
+      assert names == ["A"]
+    end
+
+    test "cross-region render places NO data-room-name on the line or portal" do
+      html = render_map(cross_region_view())
+
+      data_names = Regex.scan(~r/data-room-name="([^"]+)"/, html)
+      # Only "Border" — the rendered source — should carry the attribute.
+      names = Enum.map(data_names, fn [_, name] -> name end)
+      assert names == ["Border"]
+    end
+
+    test "SVG carries the phx-hook directive for the tooltip hook" do
+      html = render_map(linear_three_view())
+      # Phoenix resolves `.MapTooltip` (defined in this module's
+      # ColocatedHook script) to the fully-qualified module path.
+      assert html =~ "MapTooltip"
+      assert html =~ "phx-hook"
+      assert html =~ ~s|id="map-canvas-svg"|
+    end
+
+    test "off-map render has NO data-room-name (no rooms to hover)" do
+      html = render_map(off_map_view())
+
+      data_names = Regex.scan(~r/data-room-name="([^"]+)"/, html)
+      assert data_names == []
+    end
+  end
+
+  # ----------------------------------------------------------------
   # Off-map state (FR-003a)
   # ----------------------------------------------------------------
 

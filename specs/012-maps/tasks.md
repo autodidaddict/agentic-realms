@@ -361,14 +361,14 @@ Phoenix LiveView single project. All paths under repo root. Implementation under
 
 ### Styled tooltip (server-rendered + minimal JS hook for positioning)
 
-- [ ] T085 [US7] In `lib/agenticrealms_web/components/game_components.ex` `mini_map/1`, ensure each `.map-cell` group has its room name baked in via the existing `<title>` (already added in T054) AND a `data-room-name={r.name}` attribute on the `.map-cell` group itself. The data-attribute is for the JS hook (T086) to read on `mouseover`. Fog stubs and cross-region portals MUST NOT receive `data-room-name`.
-- [ ] T086 [US7] In `lib/agenticrealms_web/live/game_live.html.heex`, add a ColocatedHook named `.MapTooltip` attached to the `<svg class="map-canvas">` element. The hook listens for `mouseover` and `mouseleave` on child elements with `data-room-name`. On `mouseover`, it pushes `tooltip:show` with `{name, x, y}` (computed from `event.clientX/Y`). On `mouseleave` it pushes `tooltip:hide`. The hook is ~15 lines of JS — modeled on the existing `.ScrollBottom` and `.StreamingText` colocated hooks.
-- [ ] T087 [US7] In `lib/agenticrealms_web/live/game_live.ex`, handle the `tooltip:show` event by assigning `{room_name, x, y}` to the socket; `tooltip:hide` clears it. Render a `<div :if={@map_tooltip} class="map-tooltip" style={"left: #{@map_tooltip.x}px; top: #{@map_tooltip.y}px"}>{@map_tooltip.name}</div>` in `game_live.html.heex` (or in `player_view/1`).
-- [ ] T088 [US7] In `assets/css/game.css`, add a `.map-tooltip` rule: absolutely positioned (overflows the SVG cleanly), small padding, `background: var(--bg-sunken)`, `border: 1px solid var(--line)`, `color: var(--ink)`, font from `var(--mono)`, `pointer-events: none`, fades in via a short CSS transition.
+- [X] T085 [US7] In `lib/agenticrealms_web/components/game_components.ex` `mini_map/1`, ensure each `.map-cell` group has its room name baked in via the existing `<title>` (already added in T054) AND a `data-room-name={r.name}` attribute on the `.map-cell` group itself. The data-attribute is for the JS hook (T086) to read on `mouseover`. Fog stubs and cross-region portals MUST NOT receive `data-room-name`.
+- [X] T086 [US7] In `lib/agenticrealms_web/live/game_live.html.heex`, add a ColocatedHook named `.MapTooltip` attached to the `<svg class="map-canvas">` element. The hook listens for `mouseover` and `mouseleave` on child elements with `data-room-name`. On `mouseover`, it pushes `tooltip:show` with `{name, x, y}` (computed from `event.clientX/Y`). On `mouseleave` it pushes `tooltip:hide`. The hook is ~15 lines of JS — modeled on the existing `.ScrollBottom` and `.StreamingText` colocated hooks.
+- [X] T087 [US7] In `lib/agenticrealms_web/live/game_live.ex`, handle the `tooltip:show` event by assigning `{room_name, x, y}` to the socket; `tooltip:hide` clears it. Render a `<div :if={@map_tooltip} class="map-tooltip" style={"left: #{@map_tooltip.x}px; top: #{@map_tooltip.y}px"}>{@map_tooltip.name}</div>` in `game_live.html.heex` (or in `player_view/1`).
+- [X] T088 [US7] In `assets/css/game.css`, add a `.map-tooltip` rule: absolutely positioned (overflows the SVG cleanly), small padding, `background: var(--bg-sunken)`, `border: 1px solid var(--line)`, `color: var(--ink)`, font from `var(--mono)`, `pointer-events: none`, fades in via a short CSS transition.
 
 ### Tests for US7
 
-- [ ] T089 [P] [US7] Extend `test/agenticrealms_web/components/game_components_mini_map_test.exs` with US7 assertions:
+- [X] T089 [P] [US7] Extend `test/agenticrealms_web/components/game_components_mini_map_test.exs` with US7 assertions:
   - Every `.map-cell` group has BOTH a `<title>` child (accessibility baseline) AND a `data-room-name` attribute.
   - The `data-room-name` attribute value matches the corresponding `MapView.Room.name`.
   - Fog stubs (`.map-fog-stub`, `.map-fog-cloud`) have NO `data-room-name`.

@@ -1538,6 +1538,27 @@ button { font: inherit; color: inherit; }
   opacity: 0.7;
 }
 
+/* Hover tooltip — driven by the .MapTooltip ColocatedHook + GameLive
+   handle_event clauses for tooltip:show / tooltip:move / tooltip:hide.
+   Position is set inline via mouse client coords; pointer-events: none
+   so the tooltip never intercepts clicks (we want the user to be able to
+   click through to the room glyph behind it, even though click-to-move
+   is out of scope per FR-018). */
+.map-tooltip {
+  position: fixed;
+  z-index: 100;
+  padding: 4px 8px;
+  background: var(--bg-sunken);
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: var(--fs-xs);
+  letter-spacing: 0.02em;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
 /* Cross-region affordance: dashed line + portal glyph at the endpoint.
    Dashed stroke distinguishes it from intra-region lines without leaking
    any directionality (FR-005 still holds: both ends of a one-way cross-
