@@ -25,6 +25,7 @@ defmodule AgenticRealms.World.MapView do
   """
 
   alias AgenticRealms.Repo
+  alias AgenticRealms.World.Direction.Geometry
   alias AgenticRealms.World.Queries
   alias AgenticRealms.World.Schemas.{Region, Room, Exit, PlayerState}
 
@@ -186,7 +187,13 @@ defmodule AgenticRealms.World.MapView do
         }
       end)
 
-    exit_lines = build_normal_exit_lines(exits, rendered_by_id, rendered_id_set)
+    exit_lines =
+      build_exit_lines(
+        exits,
+        rendered_by_id,
+        rendered_id_set,
+        discovered
+      )
 
     %__MODULE__{
       region_id: region.id,
@@ -207,41 +214,95 @@ defmodule AgenticRealms.World.MapView do
   # Exit classification
   # ------------------------------------------------------------------------
 
-  # For US1 we emit only `:normal` lines — between two rendered rooms.
-  # `:fog_stub` (US3) and `:cross_region` (US6) extend this in later phases.
+  # Classifies each outgoing exit into one of:
+  #   * `:normal`   — between two rendered rooms, deduped by unordered pair
+  #   * `:fog_stub` — destination is map-visible + coord-set + UNDISCOVERED;
+  #     a half-step line extends from the source toward the direction with
+  #     NO destination identity carried through (FR-007 / FR-017)
   #
-  # Dedup invariant (FR-004): exactly one line per unordered pair of rooms.
-  # Reciprocal exits (A→B + B→A) MUST NOT produce two overlapping lines.
-  defp build_normal_exit_lines(exits, rendered_by_id, rendered_id_set) do
-    exits
-    |> Enum.filter(fn %Exit{target_room: t} ->
-      not is_nil(t) and t.map_visible == true and not is_nil(t.map_x) and
-        MapSet.member?(rendered_id_set, t.id)
-    end)
-    |> Enum.reduce({MapSet.new(), []}, fn %Exit{} = e, {seen, acc} ->
-      a = e.source_room_id
-      b = e.target_room.id
-      key = canonical_pair(a, b)
+  # Suppressed entirely (no entry):
+  #   * destination is map-hidden or has no coords (FR-006)
+  #   * destination is in a different region (deferred to US6 :cross_region)
+  #   * vertical exits (Up/Down) — those produce icons on the source room,
+  #     not lines
+  #   * destination is discovered + map-visible but OUTSIDE the rendered
+  #     viewport window (off-screen — keep the renderer simple for v1)
+  #
+  # Dedup invariant (FR-004): exactly one line per unordered pair of
+  # rendered rooms. Reciprocal exits (A→B + B→A) collapse to one line.
+  # Fog stubs DO NOT dedupe — each undiscovered direction from the same
+  # source room produces its own stub (they emerge in different
+  # directions; the player needs to see each).
+  defp build_exit_lines(exits, rendered_by_id, rendered_id_set, discovered) do
+    {normal, fog} =
+      Enum.reduce(exits, {%{}, []}, fn %Exit{} = e, {normal_acc, fog_acc} ->
+        direction = direction_atom(e.direction)
 
-      if MapSet.member?(seen, key) do
-        {seen, acc}
-      else
-        source = Map.fetch!(rendered_by_id, a)
+        cond do
+          # Vertical exits produce icons, not lines.
+          direction in [:up, :down] ->
+            {normal_acc, fog_acc}
 
-        line = %ExitLine{
-          kind: :normal,
-          from_x: source.map_x,
-          from_y: source.map_y,
-          to_x: e.target_room.map_x,
-          to_y: e.target_room.map_y,
-          direction: direction_atom(e.direction)
-        }
+          # Hidden or unmapped target → suppress entirely (FR-006).
+          is_nil(e.target_room) or e.target_room.map_visible != true or
+            is_nil(e.target_room.map_x) or is_nil(e.target_room.map_y) ->
+            {normal_acc, fog_acc}
 
-        {MapSet.put(seen, key), [line | acc]}
-      end
-    end)
-    |> elem(1)
-    |> Enum.reverse()
+          # Cross-region target → deferred to US6.
+          e.target_room.region_id != Map.fetch!(rendered_by_id, e.source_room_id).region_id ->
+            {normal_acc, fog_acc}
+
+          # Both endpoints rendered → :normal (dedup by unordered pair).
+          MapSet.member?(rendered_id_set, e.target_room.id) ->
+            a = e.source_room_id
+            b = e.target_room.id
+            key = canonical_pair(a, b)
+
+            if Map.has_key?(normal_acc, key) do
+              {normal_acc, fog_acc}
+            else
+              source = Map.fetch!(rendered_by_id, a)
+
+              line = %ExitLine{
+                kind: :normal,
+                from_x: source.map_x,
+                from_y: source.map_y,
+                to_x: e.target_room.map_x,
+                to_y: e.target_room.map_y,
+                direction: direction
+              }
+
+              {Map.put(normal_acc, key, line), fog_acc}
+            end
+
+          # Target undiscovered but map-visible + coord-set → :fog_stub.
+          not MapSet.member?(discovered, e.target_room.id) ->
+            source = Map.fetch!(rendered_by_id, e.source_room_id)
+            {dx, dy} = Geometry.unit_vector(direction)
+            # Stub extends half a cell beyond the source room's center —
+            # short enough to feel like a teaser, long enough to read.
+            stub = %ExitLine{
+              kind: :fog_stub,
+              from_x: source.map_x,
+              from_y: source.map_y,
+              # Float endpoints render fine in SVG; the cell-to-pixel
+              # transform in the renderer multiplies by cell_size_px.
+              to_x: source.map_x + dx * 0.6,
+              to_y: source.map_y + dy * 0.6,
+              direction: direction
+            }
+
+            {normal_acc, [stub | fog_acc]}
+
+          # Discovered + map-visible + coord-set but outside the rendered
+          # viewport (room exists but the player has wandered past the
+          # window) → suppress (off-screen affordance is out of scope).
+          true ->
+            {normal_acc, fog_acc}
+        end
+      end)
+
+    Map.values(normal) ++ Enum.reverse(fog)
   end
 
   defp canonical_pair(a, b) when a <= b, do: {a, b}

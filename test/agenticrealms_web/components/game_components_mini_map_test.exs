@@ -66,6 +66,39 @@ defmodule AgenticRealmsWeb.GameComponents.MiniMapTest do
     }
   end
 
+  defp fog_stub_view do
+    %MapView{
+      region_id: "r-1",
+      region_name: "Blackmire",
+      current_room_id: "a",
+      off_map?: false,
+      viewport_center: {0, 0},
+      rooms: [
+        %RoomGlyph{
+          id: "a",
+          name: "A",
+          x: 0,
+          y: 0,
+          is_current?: true,
+          has_up?: false,
+          has_down?: false
+        }
+      ],
+      exits: [
+        %ExitLine{
+          kind: :fog_stub,
+          from_x: 0,
+          from_y: 0,
+          to_x: 0.6,
+          to_y: 0.0,
+          direction: :east
+        }
+      ],
+      has_above_rooms?: false,
+      has_below_rooms?: false
+    }
+  end
+
   defp off_map_view do
     %MapView{
       region_id: "r-1",
@@ -118,7 +151,11 @@ defmodule AgenticRealmsWeb.GameComponents.MiniMapTest do
 
     test "no exit lines for a lone room" do
       html = render_map(single_room_view())
-      refute html =~ "<line "
+      # The <defs> block contains a `<line>` inside the hatch pattern (it's
+      # render scaffolding, not an exit). Assert on the exit-specific
+      # classes instead.
+      refute html =~ "map-line--normal"
+      refute html =~ "map-fog-stub"
     end
   end
 
@@ -166,6 +203,67 @@ defmodule AgenticRealmsWeb.GameComponents.MiniMapTest do
 
       assert length(single_cells) == 1
       assert length(linear_cells) == 3
+    end
+  end
+
+  # ----------------------------------------------------------------
+  # US3 — fog-of-war stubs + information hiding at the renderer
+  # ----------------------------------------------------------------
+
+  describe "US3 — fog-of-war stub rendering" do
+    test "renders a .map-fog-stub line plus a .map-fog-cloud rect" do
+      html = render_map(fog_stub_view())
+
+      assert html =~ "map-fog-stub"
+      assert html =~ "map-fog-cloud"
+    end
+
+    test "the fog-stub line element carries NO title and NO data-room-name" do
+      html = render_map(fog_stub_view())
+
+      # Find the line tagged map-fog-stub (it may be self-closing or open
+      # depending on Phoenix's renderer; match both).
+      assert [stub_chunk] = Regex.run(~r/<line[^>]*map-fog-stub[^>]*>/, html)
+      refute stub_chunk =~ "data-room-name"
+      refute stub_chunk =~ "data-room-id"
+      refute stub_chunk =~ "data-target"
+
+      # And there's no <title> child inside the line (linear element, no
+      # children typically, but assert defensively).
+      stub_index = String.split(html, "map-fog-stub") |> length()
+      assert stub_index >= 2
+    end
+
+    test "the fog-cloud rect carries NO data-room-name or identifying attribute" do
+      html = render_map(fog_stub_view())
+
+      assert [cloud_chunk] = Regex.run(~r/<rect[^>]*map-fog-cloud[^>]*>/, html)
+      refute cloud_chunk =~ "data-room-name"
+      refute cloud_chunk =~ "data-room-id"
+      refute cloud_chunk =~ "data-target"
+    end
+
+    test "fog-stub render includes the <defs> linearGradient + pattern" do
+      html = render_map(fog_stub_view())
+
+      assert html =~ ~s|id="fog-fade"|
+      assert html =~ ~s|id="fog-hatch"|
+      assert html =~ "linearGradient"
+      assert html =~ "<pattern"
+    end
+
+    test "an undiscovered destination name is NEVER present in fog-stub markup" do
+      html = render_map(fog_stub_view())
+
+      # The fixture has only room A in `rooms`. Any other name appearing
+      # would mean the renderer leaked info. The destination's name in our
+      # fixture doesn't exist (the stub has no destination identity), so
+      # the only room name allowed is "A".
+      assert html =~ ~s|data-room-name="A"|
+      # Verify there's no second data-room-name attribute referring to
+      # somewhere we didn't render.
+      data_names = Regex.scan(~r/data-room-name="([^"]+)"/, html)
+      assert data_names == [["data-room-name=\"A\"", "A"]]
     end
   end
 

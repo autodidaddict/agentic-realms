@@ -1507,6 +1507,22 @@ button { font: inherit; color: inherit; }
 }
 .map-line--normal { /* defaults */ }
 
+/* Fog-of-war stub: exit toward an undiscovered map-visible room.
+   Stroke fades along its length (the linearGradient is defined in the
+   SVG's <defs>). The hatched cloud sits at the endpoint as a visual
+   "something is over there" marker. Neither element carries a title or
+   data-room-name — FR-007 / FR-017. */
+.map-fog-stub {
+  stroke: url(#fog-fade);
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+.map-fog-cloud {
+  /* Pattern fill comes from the SVG <defs>. Slight transparency softens
+     the edge of the hatched square so it reads as a cloud, not a tile. */
+  opacity: 0.7;
+}
+
 .dir-pad {
   display: grid;
   grid-template-columns: repeat(3, 1fr);

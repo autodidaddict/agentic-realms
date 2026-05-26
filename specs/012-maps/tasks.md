@@ -206,7 +206,7 @@ Phoenix LiveView single project. All paths under repo root. Implementation under
 
 ### Fog stubs in MapView
 
-- [ ] T061 [US3] In `lib/agenticrealms/world/map_view.ex`, extend `build_normal_view/2` to emit `MapView.Exit{kind: :fog_stub, ...}` entries per `contracts/map-view.md`:
+- [X] T061 [US3] In `lib/agenticrealms/world/map_view.ex`, extend `build_normal_view/2` to emit `MapView.Exit{kind: :fog_stub, ...}` entries per `contracts/map-view.md`:
   - For each exit whose source room is in the rendered set AND whose target room is map_visible + has coordinates set BUT NOT in the player's discovered set, emit a `:fog_stub` entry.
   - `from_x`/`from_y` = source coords; `to_x`/`to_y` = source coords plus the direction's unit-vector step (one cell into the direction), computed via `Direction.Geometry.unit_vector/1` for planar exits. For vertical exits (Up/Down), a fog stub is NOT emitted — vertical exits to undiscovered rooms produce an Up/Down icon on the source room (see T067) but no fog line.
   - `direction` field is populated so the renderer can angle the stub correctly.
@@ -214,23 +214,23 @@ Phoenix LiveView single project. All paths under repo root. Implementation under
 
 ### Fog-stub renderer
 
-- [ ] T062 [US3] In `lib/agenticrealms_web/components/game_components.ex` `mini_map/1`, add an `:if/case` branch in the per-exit render path for `kind == :fog_stub`. Render:
+- [X] T062 [US3] In `lib/agenticrealms_web/components/game_components.ex` `mini_map/1`, add an `:if/case` branch in the per-exit render path for `kind == :fog_stub`. Render:
   - A `<line class="map-fog-stub" stroke="url(#fog-fade)">` from `(from_x, from_y)` to `(to_x, to_y)` in screen coords.
   - A `<rect class="map-fog-cloud" fill="url(#fog-hatch)">` centered on `(to_x, to_y)`, 20×20 px.
   - NO `<title>` element. NO `data-room-name`. NO `data-room-id`.
-- [ ] T063 [US3] In `lib/agenticrealms_web/components/game_components.ex` `mini_map/1`, add an `<defs>` block at the top of the `<svg>` containing:
+- [X] T063 [US3] In `lib/agenticrealms_web/components/game_components.ex` `mini_map/1`, add an `<defs>` block at the top of the `<svg>` containing:
   - `<linearGradient id="fog-fade">` from full-opacity `var(--ink-dim)` at offset 0% to ~10% opacity at offset 100%.
   - `<pattern id="fog-hatch">` — a diagonal-hatch pattern using `var(--ink-faint)` strokes at 45°.
-- [ ] T064 [US3] In `assets/css/game.css`, add `.map-fog-stub` (stroke-width 2; `stroke-linecap: round`) and `.map-fog-cloud` rules. Style the fog cloud's hatch fill so it looks like a soft cloud at typical browser zoom levels.
+- [X] T064 [US3] In `assets/css/game.css`, add `.map-fog-stub` (stroke-width 2; `stroke-linecap: round`) and `.map-fog-cloud` rules. Style the fog cloud's hatch fill so it looks like a soft cloud at typical browser zoom levels.
 
 ### Information-hiding verification
 
-- [ ] T065 [P] [US3] Extend `test/agenticrealms/world/map_view_test.exs` with US3 cases using the `fog_stub` fixture from `research.md R10`:
+- [X] T065 [P] [US3] Extend `test/agenticrealms/world/map_view_test.exs` with US3 cases using the `fog_stub` fixture from `research.md R10`:
   - A player who has discovered the source room but not the target produces one `MapView.Exit{kind: :fog_stub}` entry.
   - The `:fog_stub` entry's `to_x`/`to_y` differ from any rendered room's coords (it's a midway point, not a room).
   - The struct's fields do NOT include the target room's id (assert by checking the struct has no field named anything like `:target_id`, `:to_room_id`, etc. — the struct only has `kind`, `from_x`, `from_y`, `to_x`, `to_y`, `direction`).
   - One-way exit fixture: from A→B (one-way), with both rooms discovered, MapView emits ONE `:normal` exit (not two). Render dedup confirms.
-- [ ] T066 [P] [US3] Extend `test/agenticrealms_web/components/game_components_mini_map_test.exs` with US3 assertions:
+- [X] T066 [P] [US3] Extend `test/agenticrealms_web/components/game_components_mini_map_test.exs` with US3 assertions:
   - The fog-stub fixture renders exactly one `line.map-fog-stub` and exactly one `rect.map-fog-cloud`.
   - The `.map-fog-stub` element has NO `title` child element.
   - The `.map-fog-cloud` element has NO `data-room-name`, `data-room-id`, or any other identifying attribute.

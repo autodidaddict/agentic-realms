@@ -224,13 +224,20 @@ defmodule AgenticRealms.World.MapViewTest do
       %{atrium: atrium, corridor: corridor, player_id: player_id}
     end
 
-    test "before move: only the Atrium renders, no exits drawn (Corridor undiscovered)",
+    test "before move: only the Atrium renders, but exit toward Corridor emits a fog stub",
          %{atrium: atrium, player_id: player_id} do
       view = MapView.for_player(player_id)
       assert [glyph] = view.rooms
       assert glyph.id == atrium.id
-      assert view.exits == [],
-             "US1 emits no fog stubs; the undiscovered Corridor produces no line yet"
+
+      assert [stub] = view.exits
+      assert stub.kind == :fog_stub
+      assert stub.from_x == atrium.map_x
+      assert stub.from_y == atrium.map_y
+      assert stub.direction == :north
+      # Fog stub endpoint is fractional (~half a cell into the direction),
+      # NOT the actual destination's coords.
+      refute stub.to_y == -1
     end
 
     test "after the player moves into the Corridor: both rooms render, line connects them",
@@ -265,6 +272,133 @@ defmodule AgenticRealms.World.MapViewTest do
       assert length(view.rooms) == 2
       current = Enum.find(view.rooms, & &1.is_current?)
       assert current.id == atrium.id
+    end
+  end
+
+  # ----------------------------------------------------------------
+  # US3 — fog-of-war stubs + one-way exit info-hiding
+  # ----------------------------------------------------------------
+
+  describe "US3 — fog-of-war stubs" do
+    test "undiscovered map-visible target produces a :fog_stub entry" do
+      region = insert_region()
+      a = insert_room(region, name: "A", map_x: 0, map_y: 0)
+      b = insert_room(region, name: "B", map_x: 1, map_y: 0)
+      insert_exit(a, :east, b)
+      insert_exit(b, :west, a)
+
+      player_id = insert_account_player()
+      insert_player_state(player_id, a.id)
+      discover(player_id, a)
+      # B is NOT discovered.
+
+      view = MapView.for_player(player_id)
+
+      assert length(view.exits) == 1
+      [stub] = view.exits
+      assert stub.kind == :fog_stub
+      assert stub.from_x == 0
+      assert stub.from_y == 0
+      assert stub.direction == :east
+    end
+
+    test "fog stub endpoint is NOT the destination's actual coords (info hiding)" do
+      region = insert_region()
+      a = insert_room(region, map_x: 0, map_y: 0)
+      b = insert_room(region, map_x: 5, map_y: 0)
+      insert_exit(a, :east, b)
+
+      player_id = insert_account_player()
+      insert_player_state(player_id, a.id)
+      discover(player_id, a)
+
+      view = MapView.for_player(player_id)
+      [stub] = view.exits
+      # Stub points east but lands ~0.6 cells out — definitely not at x=5.
+      assert stub.kind == :fog_stub
+      assert stub.to_x < 1
+      assert stub.to_x > 0
+    end
+
+    test "exit to a map-hidden target produces NO stub (FR-006 trumps fog)" do
+      region = insert_region()
+      a = insert_room(region, map_x: 0, map_y: 0)
+      hidden = insert_room(region, map_visible: false, map_x: 1, map_y: 0)
+      insert_exit(a, :east, hidden)
+
+      player_id = insert_account_player()
+      insert_player_state(player_id, a.id)
+      discover(player_id, a)
+
+      view = MapView.for_player(player_id)
+      assert view.exits == []
+    end
+
+    test "exit to an off-map (coord-nil) target produces NO stub" do
+      region = insert_region()
+      a = insert_room(region, map_x: 0, map_y: 0)
+      off = insert_room(region, map_x: nil, map_y: nil)
+      insert_exit(a, :east, off)
+
+      player_id = insert_account_player()
+      insert_player_state(player_id, a.id)
+      discover(player_id, a)
+
+      view = MapView.for_player(player_id)
+      assert view.exits == []
+    end
+
+    test "discovered + map-visible target collapses fog stub into a normal line" do
+      region = insert_region()
+      a = insert_room(region, map_x: 0, map_y: 0)
+      b = insert_room(region, map_x: 1, map_y: 0)
+      insert_exit(a, :east, b)
+
+      player_id = insert_account_player()
+      insert_player_state(player_id, a.id)
+      discover(player_id, a)
+      discover(player_id, b)
+
+      view = MapView.for_player(player_id)
+      [line] = view.exits
+      assert line.kind == :normal
+    end
+
+    test "vertical exit (:up) to an undiscovered room does NOT produce a fog stub" do
+      region = insert_region()
+      ground = insert_room(region, name: "Ground", elevation: 0, map_x: 0, map_y: 0)
+      _loft = insert_room(region, name: "Loft", elevation: 1, map_x: 0, map_y: 0)
+      insert_exit(ground, :up, _loft)
+
+      player_id = insert_account_player()
+      insert_player_state(player_id, ground.id)
+      discover(player_id, ground)
+
+      view = MapView.for_player(player_id)
+      # No line at all — :up turns into an icon (covered in US4).
+      assert view.exits == []
+    end
+  end
+
+  describe "US3 — one-way exit info-hiding" do
+    test "a one-way A→B exit between discovered rooms still produces ONE undirected line" do
+      region = insert_region()
+      a = insert_room(region, map_x: 0, map_y: 0)
+      b = insert_room(region, map_x: 1, map_y: 0)
+      # ONLY one direction (no B→A return)
+      insert_exit(a, :east, b)
+
+      player_id = insert_account_player()
+      insert_player_state(player_id, a.id)
+      discover(player_id, a)
+      discover(player_id, b)
+
+      view = MapView.for_player(player_id)
+      assert length(view.exits) == 1
+      [line] = view.exits
+      assert line.kind == :normal
+      # The line is visually identical to a reciprocal pair's render — no
+      # direction marker, no asymmetric styling at this layer.
     end
   end
 

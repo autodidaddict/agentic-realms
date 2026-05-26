@@ -507,14 +507,36 @@ defmodule AgenticRealmsWeb.GameComponents do
           viewBox={"0 0 #{@canvas_px} #{@canvas_px}"}
           xmlns="http://www.w3.org/2000/svg"
         >
-          <%!-- Exit lines (drawn first so room rects sit on top) --%>
-          <line
+          <defs>
+            <linearGradient
+              id="fog-fade"
+              x1="0%"
+              y1="0%"
+              x2="100%"
+              y2="0%"
+              gradientUnits="objectBoundingBox"
+            >
+              <stop offset="0%" stop-color="var(--ink-dim)" stop-opacity="1" />
+              <stop offset="100%" stop-color="var(--ink-dim)" stop-opacity="0.1" />
+            </linearGradient>
+            <pattern
+              id="fog-hatch"
+              patternUnits="userSpaceOnUse"
+              width="6"
+              height="6"
+              patternTransform="rotate(45)"
+            >
+              <line x1="0" y1="0" x2="0" y2="6" stroke="var(--ink-faint)" stroke-width="1" />
+            </pattern>
+          </defs>
+
+          <%!-- Exit lines + fog stubs (drawn first so room rects sit on top) --%>
+          <.map_exit
             :for={e <- @map_view.exits}
-            class={"map-line map-line--#{e.kind}"}
-            x1={cell_center_px(e.from_x, @min_x, @cell_size)}
-            y1={cell_center_px(e.from_y, @min_y, @cell_size)}
-            x2={cell_center_px(e.to_x, @min_x, @cell_size)}
-            y2={cell_center_px(e.to_y, @min_y, @cell_size)}
+            exit={e}
+            cell_size={@cell_size}
+            min_x={@min_x}
+            min_y={@min_y}
           />
 
           <%!-- Room glyphs --%>
@@ -536,6 +558,46 @@ defmodule AgenticRealmsWeb.GameComponents do
         </div>
       </div>
     </div>
+    """
+  end
+
+  attr :exit, :map, required: true
+  attr :cell_size, :integer, required: true
+  attr :min_x, :integer, required: true
+  attr :min_y, :integer, required: true
+
+  defp map_exit(assigns) do
+    x1 = cell_center_px(assigns.exit.from_x, assigns.min_x, assigns.cell_size)
+    y1 = cell_center_px(assigns.exit.from_y, assigns.min_y, assigns.cell_size)
+    x2 = cell_center_px(assigns.exit.to_x, assigns.min_x, assigns.cell_size)
+    y2 = cell_center_px(assigns.exit.to_y, assigns.min_y, assigns.cell_size)
+
+    assigns =
+      assigns
+      |> assign(:x1, x1)
+      |> assign(:y1, y1)
+      |> assign(:x2, x2)
+      |> assign(:y2, y2)
+
+    ~H"""
+    <%= case @exit.kind do %>
+      <% :normal -> %>
+        <line class="map-line map-line--normal" x1={@x1} y1={@y1} x2={@x2} y2={@y2} />
+      <% :fog_stub -> %>
+        <%!-- Fog-of-war stub: a short line fading out toward a hatched
+              cloud at the endpoint. NO <title>, NO data-room-name,
+              NO data-room-id (FR-007 / FR-017). The destination's identity
+              is not in the DOM. --%>
+        <line class="map-line map-fog-stub" x1={@x1} y1={@y1} x2={@x2} y2={@y2} />
+        <rect
+          class="map-fog-cloud"
+          x={@x2 - 10}
+          y={@y2 - 10}
+          width="20"
+          height="20"
+          fill="url(#fog-hatch)"
+        />
+    <% end %>
     """
   end
 
