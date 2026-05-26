@@ -201,9 +201,13 @@ defmodule AgenticRealmsWeb.GameComponents.MiniMapTest do
       assert html =~ "map-cell--current"
     end
 
-    test "the rendered cell has a <title> with the room name (a11y)" do
+    test "the rendered cell carries an aria-label with the room name (a11y)" do
+      # No SVG <title> — the browser would render that as a native
+      # tooltip alongside our styled one (double-tooltip). aria-label on
+      # the <g> is the FR-016-compliant accessibility primitive.
       html = render_map(single_room_view())
-      assert html =~ "<title>Stone Atrium</title>"
+      assert html =~ ~s|aria-label="Stone Atrium"|
+      refute html =~ "<title>"
     end
 
     test "the rendered cell carries the data-room-name attribute" do
@@ -514,8 +518,9 @@ defmodule AgenticRealmsWeb.GameComponents.MiniMapTest do
   # US7 — hover tooltip plumbing (data-room-name placement)
   # ----------------------------------------------------------------
   #
-  # The ColocatedHook (.MapTooltip) drives tooltip:show/hide via the
-  # data-room-name attribute. The renderer's job is to put that attribute
+  # The ColocatedHook (.MapTooltip) reads the data-room-name attribute
+  # and renders the styled tooltip DIRECTLY on the client — no LiveView
+  # round-trip per mousemove. The renderer's job is to put the attribute
   # on .map-cell groups ONLY — never on fog stubs or cross-region
   # portals, where it would leak destination identity per FR-017.
 

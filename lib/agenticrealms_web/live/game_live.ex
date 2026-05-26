@@ -85,7 +85,6 @@ defmodule AgenticRealmsWeb.GameLive do
      |> assign(:modal, nil)
      |> assign(:map_open, false)
      |> assign(:map_view, MapView.for_player(player_id))
-     |> assign(:map_tooltip, nil)
      |> assign(:log, [%{kind: :room, room: room_view}])
      |> assign(:current_room_id, current_room_id)
      |> assign(:input, "")
@@ -216,28 +215,6 @@ defmodule AgenticRealmsWeb.GameLive do
 
   def handle_event("toggle_map", _params, socket) do
     {:noreply, update(socket, :map_open, &(!&1))}
-  end
-
-  # Feature 012 — hover tooltip on the map. The .MapTooltip ColocatedHook
-  # fires these only for elements carrying data-room-name (i.e., .map-cell
-  # groups). Fog stubs and cross-region portals do NOT carry that
-  # attribute — FR-017 information-hiding is enforced at the renderer
-  # layer; this handler just trusts whatever the hook sends.
-  def handle_event("tooltip:show", %{"name" => name, "x" => x, "y" => y}, socket)
-      when is_binary(name) and is_number(x) and is_number(y) do
-    {:noreply, assign(socket, :map_tooltip, %{name: name, x: x, y: y})}
-  end
-
-  def handle_event("tooltip:move", %{"x" => x, "y" => y}, socket)
-      when is_number(x) and is_number(y) do
-    case socket.assigns[:map_tooltip] do
-      nil -> {:noreply, socket}
-      tip -> {:noreply, assign(socket, :map_tooltip, %{tip | x: x, y: y})}
-    end
-  end
-
-  def handle_event("tooltip:hide", _params, socket) do
-    {:noreply, assign(socket, :map_tooltip, nil)}
   end
 
   def handle_event("select_quest", %{"index" => index}, socket) do

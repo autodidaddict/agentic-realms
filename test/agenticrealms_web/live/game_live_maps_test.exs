@@ -115,15 +115,13 @@ defmodule AgenticRealmsWeb.GameLiveMapsTest do
     assert html_in_hollowvale =~ "Hollowvale", "US6: header swaps to Hollowvale"
     assert html_in_hollowvale =~ ~s|data-room-name="Hollowvale Outskirts"|
 
-    # ----- US7 — hover tooltip plumbing -------------------------------
-    html_tooltip =
-      render_hook(view, "tooltip:show", %{"name" => "Hollowvale Outskirts", "x" => 50, "y" => 60})
-
-    assert html_tooltip =~ ~s|class="map-tooltip"|, "US7: tooltip div rendered"
-    assert html_tooltip =~ "Hollowvale Outskirts"
-
-    html_hidden_tip = render_hook(view, "tooltip:hide", %{})
-    refute html_hidden_tip =~ ~s|class="map-tooltip"|, "US7: tooltip cleared"
+    # ----- US7 — hover tooltip plumbing (client-side) ------------------
+    # The tooltip is rendered entirely by the .MapTooltip ColocatedHook
+    # in the browser; the LiveView is not involved per-hover. Verify the
+    # data-room-name + aria-label primitives that the hook reads are
+    # present on the rendered cells.
+    assert html_in_hollowvale =~ ~s|data-room-name="Hollowvale Outskirts"|
+    assert html_in_hollowvale =~ ~s|aria-label="Hollowvale Outskirts"|
 
     # ----- Cross-cutting audits ---------------------------------------
     refute html_in_hollowvale =~ "marker-end", "SC-003: no arrowheads"
