@@ -1067,6 +1067,10 @@ defmodule AgenticRealmsWeb.GameLive do
   # time the player's current room changes (own move, other-tab swap, or
   # any future region/elevation transition). The MapView query is bounded
   # by the configured viewport (default 11×11 cells) so this stays cheap.
+  #
+  # FR-015 / SC-005: a region transition is just a current-room change
+  # whose destination has a different `region_id`. `MapView.for_player/1`
+  # reads the region from the destination room — no special-casing here.
   defp refresh_map_view(socket) do
     assign(socket, :map_view, MapView.for_player(socket.assigns.current_player.id))
   end

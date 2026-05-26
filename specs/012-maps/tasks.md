@@ -324,27 +324,27 @@ Phoenix LiveView single project. All paths under repo root. Implementation under
 
 ### MapView: cross-region exits
 
-- [ ] T079 [US6] In `lib/agenticrealms/world/map_view.ex` `build_normal_view/2`, extend the exit classification step to emit `MapView.Exit{kind: :cross_region, ...}` entries when the source room is in the rendered set AND the target room is map_visible + has coords + is in a DIFFERENT region. The terminator endpoint `(to_x, to_y)` is positioned one cell into the direction from the source (same convention as fog stubs — uses `Direction.Geometry.unit_vector/1`). The struct contains NO target room id, NO target region id, NO target region name (verified by tests).
+- [X] T079 [US6] In `lib/agenticrealms/world/map_view.ex` `build_normal_view/2`, extend the exit classification step to emit `MapView.Exit{kind: :cross_region, ...}` entries when the source room is in the rendered set AND the target room is map_visible + has coords + is in a DIFFERENT region. The terminator endpoint `(to_x, to_y)` is positioned one cell into the direction from the source (same convention as fog stubs — uses `Direction.Geometry.unit_vector/1`). The struct contains NO target room id, NO target region id, NO target region name (verified by tests).
 
 ### Renderer: dashed line + portal glyph
 
-- [ ] T080 [US6] In `lib/agenticrealms_web/components/game_components.ex` `mini_map/1`, add a render branch for `kind == :cross_region`:
+- [X] T080 [US6] In `lib/agenticrealms_web/components/game_components.ex` `mini_map/1`, add a render branch for `kind == :cross_region`:
   - `<line class="map-line map-line--cross-region">` from source center to terminator endpoint.
   - `<circle class="map-portal" cx={to_x} cy={to_y} r="3">`.
   - NO `<title>` element. NO `data-*` attribute that names the destination.
-- [ ] T081 [US6] In `assets/css/game.css`, add `.map-line--cross-region` (stroke `var(--player-dim)`, stroke-width 2, `stroke-dasharray: 4 3`) and `.map-portal` (fill `var(--player-dim)`).
+- [X] T081 [US6] In `assets/css/game.css`, add `.map-line--cross-region` (stroke `var(--player-dim)`, stroke-width 2, `stroke-dasharray: 4 3`) and `.map-portal` (fill `var(--player-dim)`).
 
 ### Region swap on movement
 
-- [ ] T082 [US6] Verify the `handle_info/2` clause for `%PlayerCurrentRoomChanged{}` added in T055 correctly recomputes the `MapView` when the destination room is in a different region — the `MapView.for_player/1` query naturally picks up the new region via `current_room.region_id`. No new code is required; this task adds a comment to the handler explicitly naming FR-015 / SC-005 and confirming that region transitions flow through the same handler. Also confirm `GameLive` subscribes to the destination room's topic on region swap (existing pattern — already handled).
+- [X] T082 [US6] Verify the `handle_info/2` clause for `%PlayerCurrentRoomChanged{}` added in T055 correctly recomputes the `MapView` when the destination room is in a different region — the `MapView.for_player/1` query naturally picks up the new region via `current_room.region_id`. No new code is required; this task adds a comment to the handler explicitly naming FR-015 / SC-005 and confirming that region transitions flow through the same handler. Also confirm `GameLive` subscribes to the destination room's topic on region swap (existing pattern — already handled).
 
 ### Tests for US6
 
-- [ ] T083 [P] [US6] Extend `test/agenticrealms/world/map_view_test.exs` with US6 cases using the `cross_region/0` fixture:
+- [X] T083 [P] [US6] Extend `test/agenticrealms/world/map_view_test.exs` with US6 cases using the `cross_region/0` fixture:
   - From a Blackmire room with an exit to a Hollowvale room, MapView emits one `MapView.Exit{kind: :cross_region}` entry; the Hollowvale room is NOT in `MapView.rooms`.
   - The `:cross_region` struct contains no field naming the target region.
   - When the player moves into Hollowvale, MapView returns `region_name: "Hollowvale"`, only Hollowvale rooms in `MapView.rooms`, and one `:cross_region` entry pointing back west to Blackmire.
-- [ ] T084 [P] [US6] Extend `test/agenticrealms_web/components/game_components_mini_map_test.exs` with US6 assertions:
+- [X] T084 [P] [US6] Extend `test/agenticrealms_web/components/game_components_mini_map_test.exs` with US6 assertions:
   - Cross-region fixture: exactly one `line.map-line--cross-region` element with `stroke-dasharray` set; exactly one `circle.map-portal` at its terminator end.
   - NO `title` child of the cross-region line or portal.
   - NO `data-region-name` or `data-room-name` attribute on the portal.

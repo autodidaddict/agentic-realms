@@ -655,6 +655,129 @@ defmodule AgenticRealms.World.MapViewTest do
     end
   end
 
+  # ----------------------------------------------------------------
+  # US6 — cross-region exits + region swap
+  # ----------------------------------------------------------------
+
+  describe "US6 — cross-region affordance" do
+    test "exit from a Blackmire room to a Hollowvale room emits :cross_region; destination not rendered" do
+      blackmire = insert_region("Blackmire")
+      hollowvale = insert_region("Hollowvale")
+
+      border = insert_room(blackmire, name: "Border", map_x: 0, map_y: 0)
+      outskirts = insert_room(hollowvale, name: "Outskirts", map_x: 0, map_y: 0)
+      insert_exit(border, :east, outskirts)
+
+      player_id = insert_account_player()
+      insert_player_state(player_id, border.id)
+      discover(player_id, border)
+      discover(player_id, outskirts)
+
+      view = MapView.for_player(player_id)
+
+      assert view.region_name == blackmire.name
+      assert length(view.rooms) == 1
+      [g] = view.rooms
+      assert g.id == border.id
+
+      refute Enum.any?(view.rooms, &(&1.id == outskirts.id))
+
+      assert [%{kind: :cross_region, direction: :east} = cr] = view.exits
+      assert cr.from_x == 0
+      assert cr.from_y == 0
+      assert cr.to_x > 0
+      assert cr.to_x < 1
+    end
+
+    test "cross-region MapView.Exit struct carries NO destination identity" do
+      blackmire = insert_region("Blackmire")
+      hollowvale = insert_region("Hollowvale")
+
+      border = insert_room(blackmire, map_x: 0, map_y: 0)
+      outskirts = insert_room(hollowvale, map_x: 0, map_y: 0)
+      insert_exit(border, :east, outskirts)
+
+      player_id = insert_account_player()
+      insert_player_state(player_id, border.id)
+      discover(player_id, border)
+
+      view = MapView.for_player(player_id)
+      [cr] = view.exits
+
+      refute Map.has_key?(cr, :target_id)
+      refute Map.has_key?(cr, :to_room_id)
+      refute Map.has_key?(cr, :destination_id)
+      refute Map.has_key?(cr, :target_region_id)
+      refute Map.has_key?(cr, :target_region_name)
+    end
+
+    test "crossing into the other region swaps the rendered set" do
+      blackmire = insert_region("Blackmire")
+      hollowvale = insert_region("Hollowvale")
+
+      border = insert_room(blackmire, name: "Border", map_x: 0, map_y: 0)
+      outskirts = insert_room(hollowvale, name: "Outskirts", map_x: 0, map_y: 0)
+      insert_exit(border, :east, outskirts)
+      insert_exit(outskirts, :west, border)
+
+      player_id = insert_account_player()
+      insert_player_state(player_id, border.id)
+      discover(player_id, border)
+
+      view_before = MapView.for_player(player_id)
+      assert view_before.region_name == blackmire.name
+      assert [g] = view_before.rooms
+      assert g.id == border.id
+
+      insert_player_state(player_id, outskirts.id)
+      discover(player_id, outskirts)
+
+      view_after = MapView.for_player(player_id)
+      assert view_after.region_name == hollowvale.name
+      assert [g] = view_after.rooms
+      assert g.id == outskirts.id
+
+      refute Enum.any?(view_after.rooms, &(&1.id == border.id))
+      assert [%{kind: :cross_region, direction: :west}] = view_after.exits
+    end
+
+    test "one-way cross-region exit looks the same from the discovered side" do
+      blackmire = insert_region("Blackmire")
+      hollowvale = insert_region("Hollowvale")
+
+      border = insert_room(blackmire, map_x: 0, map_y: 0)
+      outskirts = insert_room(hollowvale, map_x: 0, map_y: 0)
+      # Only Border → Outskirts (no return). One-way trap.
+      insert_exit(border, :east, outskirts)
+
+      player_id = insert_account_player()
+      insert_player_state(player_id, border.id)
+      discover(player_id, border)
+
+      view = MapView.for_player(player_id)
+      [cr] = view.exits
+      assert cr.kind == :cross_region
+    end
+
+    test "hidden cross-region target gets suppressed (FR-006 trumps FR-008)" do
+      blackmire = insert_region("Blackmire")
+      hollowvale = insert_region("Hollowvale")
+
+      border = insert_room(blackmire, map_x: 0, map_y: 0)
+      hidden_outskirts =
+        insert_room(hollowvale, map_visible: false, map_x: 0, map_y: 0)
+
+      insert_exit(border, :east, hidden_outskirts)
+
+      player_id = insert_account_player()
+      insert_player_state(player_id, border.id)
+      discover(player_id, border)
+
+      view = MapView.for_player(player_id)
+      assert view.exits == []
+    end
+  end
+
   describe "off-map render (FR-003a)" do
     test "player in a room with map_x = nil → blank map, region header only" do
       region = insert_region()

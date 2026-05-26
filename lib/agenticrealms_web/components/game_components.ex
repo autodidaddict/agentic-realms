@@ -618,6 +618,21 @@ defmodule AgenticRealmsWeb.GameComponents do
           height="20"
           fill="url(#fog-hatch)"
         />
+      <% :cross_region -> %>
+        <%!-- Cross-region affordance: a dashed line into another region,
+              terminating in a small portal glyph (a tilted square). The
+              destination region's name and the destination room's
+              identity are NOT in the DOM — only the player crossing the
+              exit learns where it leads (FR-008). --%>
+        <line class="map-line map-line--cross-region" x1={@x1} y1={@y1} x2={@x2} y2={@y2} />
+        <rect
+          class="map-portal"
+          x={@x2 - 4}
+          y={@y2 - 4}
+          width="8"
+          height="8"
+          transform={"rotate(45 #{@x2} #{@y2})"}
+        />
     <% end %>
     """
   end

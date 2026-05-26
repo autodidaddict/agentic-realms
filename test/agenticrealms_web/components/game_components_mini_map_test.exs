@@ -128,6 +128,39 @@ defmodule AgenticRealmsWeb.GameComponents.MiniMapTest do
     }
   end
 
+  defp cross_region_view do
+    %MapView{
+      region_id: "blackmire",
+      region_name: "Blackmire",
+      current_room_id: "border",
+      off_map?: false,
+      viewport_center: {0, 0},
+      rooms: [
+        %RoomGlyph{
+          id: "border",
+          name: "Border",
+          x: 0,
+          y: 0,
+          is_current?: true,
+          has_up?: false,
+          has_down?: false
+        }
+      ],
+      exits: [
+        %ExitLine{
+          kind: :cross_region,
+          from_x: 0,
+          from_y: 0,
+          to_x: 0.6,
+          to_y: 0.0,
+          direction: :east
+        }
+      ],
+      has_above_rooms?: false,
+      has_below_rooms?: false
+    }
+  end
+
   defp off_map_view do
     %MapView{
       region_id: "r-1",
@@ -415,6 +448,65 @@ defmodule AgenticRealmsWeb.GameComponents.MiniMapTest do
       html = render_map(single_room_view())
       refute html =~ "Hidden Vault"
       refute html =~ ~s|name="Hidden|
+    end
+  end
+
+  # ----------------------------------------------------------------
+  # US6 — cross-region affordance rendering
+  # ----------------------------------------------------------------
+
+  describe "US6 — cross-region rendering" do
+    test "renders a .map-line--cross-region (dashed) plus a .map-portal" do
+      html = render_map(cross_region_view())
+      assert html =~ "map-line--cross-region"
+      assert html =~ "map-portal"
+    end
+
+    test "the cross-region line carries NO data-room-name and NO data-target-id" do
+      html = render_map(cross_region_view())
+
+      assert [chunk] = Regex.run(~r/<line[^>]*map-line--cross-region[^>]*>/, html)
+      refute chunk =~ "data-room-name"
+      refute chunk =~ "data-room-id"
+      refute chunk =~ "data-target"
+      refute chunk =~ "data-region-name"
+    end
+
+    test "the portal glyph carries NO identifying attribute" do
+      html = render_map(cross_region_view())
+
+      assert [chunk] = Regex.run(~r/<rect[^>]*map-portal[^>]*>/, html)
+      refute chunk =~ "data-room-name"
+      refute chunk =~ "data-room-id"
+      refute chunk =~ "data-target"
+      refute chunk =~ "data-region-name"
+    end
+
+    test "destination region name never appears in cross-region markup" do
+      # cross_region_view source region is Blackmire; the destination
+      # would be Hollowvale or similar. The fixture deliberately does
+      # NOT include the destination's name anywhere. Verify the renderer
+      # doesn't accidentally insert it via title, aria, etc.
+      html = render_map(cross_region_view())
+
+      refute html =~ "Hollowvale"
+      refute html =~ "Outskirts"
+    end
+
+    test "no <title> elements on cross-region line or portal" do
+      html = render_map(cross_region_view())
+
+      # Extract just the cross-region SVG section by finding the line + portal.
+      cross_section =
+        case Regex.run(
+               ~r/(<line[^>]*map-line--cross-region.*?<rect[^>]*map-portal[^>]*>)/s,
+               html
+             ) do
+          [_, section] -> section
+          _ -> ""
+        end
+
+      refute cross_section =~ "<title>"
     end
   end
 

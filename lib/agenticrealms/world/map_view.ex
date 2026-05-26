@@ -234,14 +234,18 @@ defmodule AgenticRealms.World.MapView do
   # source room produces its own stub (they emerge in different
   # directions; the player needs to see each).
   defp build_exit_lines(exits, rendered_by_id, rendered_id_set, discovered) do
-    {normal, fog} =
-      Enum.reduce(exits, {%{}, []}, fn %Exit{} = e, {normal_acc, fog_acc} ->
+    # `normal_lines` is a map keyed on the unordered pair {a, b} so
+    # reciprocal exits collapse to one entry (FR-004). `other_lines`
+    # holds fog stubs and cross-region affordances — both are non-
+    # dedupable (each direction-from-source carries its own meaning).
+    {normal_lines, other_lines} =
+      Enum.reduce(exits, {%{}, []}, fn %Exit{} = e, {normal_acc, other_acc} ->
         direction = direction_atom(e.direction)
 
         cond do
           # Vertical exits produce icons, not lines.
           direction in [:up, :down] ->
-            {normal_acc, fog_acc}
+            {normal_acc, other_acc}
 
           # FR-006: a map-hidden room (or one without coords) leaves NO
           # visible trace on the map. The source-side line is suppressed
@@ -250,11 +254,29 @@ defmodule AgenticRealms.World.MapView do
           # direction. This is the wizard's primary tool for secret areas.
           is_nil(e.target_room) or e.target_room.map_visible != true or
             is_nil(e.target_room.map_x) or is_nil(e.target_room.map_y) ->
-            {normal_acc, fog_acc}
+            {normal_acc, other_acc}
 
-          # Cross-region target → deferred to US6.
+          # FR-008 — cross-region exit. Source is rendered; target is in
+          # a DIFFERENT region. The destination room is NOT drawn on this
+          # view (regions are independent map planes); we emit a
+          # :cross_region affordance whose endpoint sits ~0.6 cells into
+          # the direction from the source — visually similar to a fog
+          # stub but with its own renderer treatment (dashed line +
+          # portal glyph). NO destination identity carried.
           e.target_room.region_id != Map.fetch!(rendered_by_id, e.source_room_id).region_id ->
-            {normal_acc, fog_acc}
+            source = Map.fetch!(rendered_by_id, e.source_room_id)
+            {dx, dy} = Geometry.unit_vector(direction)
+
+            cross = %ExitLine{
+              kind: :cross_region,
+              from_x: source.map_x,
+              from_y: source.map_y,
+              to_x: source.map_x + dx * 0.6,
+              to_y: source.map_y + dy * 0.6,
+              direction: direction
+            }
+
+            {normal_acc, [cross | other_acc]}
 
           # Both endpoints rendered → :normal (dedup by unordered pair).
           MapSet.member?(rendered_id_set, e.target_room.id) ->
@@ -263,7 +285,7 @@ defmodule AgenticRealms.World.MapView do
             key = canonical_pair(a, b)
 
             if Map.has_key?(normal_acc, key) do
-              {normal_acc, fog_acc}
+              {normal_acc, other_acc}
             else
               source = Map.fetch!(rendered_by_id, a)
 
@@ -276,14 +298,14 @@ defmodule AgenticRealms.World.MapView do
                 direction: direction
               }
 
-              {Map.put(normal_acc, key, line), fog_acc}
+              {Map.put(normal_acc, key, line), other_acc}
             end
 
           # Target undiscovered but map-visible + coord-set → :fog_stub.
           not MapSet.member?(discovered, e.target_room.id) ->
             source = Map.fetch!(rendered_by_id, e.source_room_id)
             {dx, dy} = Geometry.unit_vector(direction)
-            # Stub extends half a cell beyond the source room's center —
+            # Stub extends ~0.6 cells beyond the source room's center —
             # short enough to feel like a teaser, long enough to read.
             stub = %ExitLine{
               kind: :fog_stub,
@@ -296,17 +318,17 @@ defmodule AgenticRealms.World.MapView do
               direction: direction
             }
 
-            {normal_acc, [stub | fog_acc]}
+            {normal_acc, [stub | other_acc]}
 
           # Discovered + map-visible + coord-set but outside the rendered
           # viewport (room exists but the player has wandered past the
           # window) → suppress (off-screen affordance is out of scope).
           true ->
-            {normal_acc, fog_acc}
+            {normal_acc, other_acc}
         end
       end)
 
-    Map.values(normal) ++ Enum.reverse(fog)
+    Map.values(normal_lines) ++ Enum.reverse(other_lines)
   end
 
   defp canonical_pair(a, b) when a <= b, do: {a, b}

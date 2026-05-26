@@ -1538,6 +1538,22 @@ button { font: inherit; color: inherit; }
   opacity: 0.7;
 }
 
+/* Cross-region affordance: dashed line + portal glyph at the endpoint.
+   Dashed stroke distinguishes it from intra-region lines without leaking
+   any directionality (FR-005 still holds: both ends of a one-way cross-
+   region exit look identical). FR-008. */
+.map-line--cross-region {
+  stroke: var(--player-dim);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-dasharray: 4 3;
+}
+.map-portal {
+  fill: var(--player-dim);
+  stroke: var(--player-dim);
+  stroke-width: 0.5;
+}
+
 .dir-pad {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
