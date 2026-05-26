@@ -1426,10 +1426,11 @@ button { font: inherit; color: inherit; }
 
 .map-panel {
   position: absolute;
-  /* `bottom` clears the chat input bar (its height is content-driven, so
-     leave a generous floor and let flex absorb the rest). */
+  /* Anchored above the map-toggle button (left side of the input row).
+     `bottom` clears the chat input bar; `left` aligns with the toggle's
+     left edge. */
   bottom: 88px;
-  right: 24px;
+  left: 24px;
   width: 33%;
   height: 33%;
   min-width: 220px;

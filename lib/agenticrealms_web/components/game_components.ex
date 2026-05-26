@@ -685,11 +685,17 @@ defmodule AgenticRealmsWeb.GameComponents do
             </pattern>
           </defs>
 
-          <%!-- Exit lines + fog stubs (drawn first so room rects sit on top) --%>
-          <.map_exit :for={e <- @map_view.exits} exit={e} />
+          <%!-- Pass 1: connector lines — drawn under everything. --%>
+          <.map_exit_line :for={e <- @map_view.exits} exit={e} />
 
-          <%!-- Room glyphs --%>
+          <%!-- Pass 2: room glyphs — sit on top of the lines. --%>
           <.map_cell :for={r <- @map_view.rooms} room={r} />
+
+          <%!-- Pass 3: endpoint decorations (fog clouds, cross-region
+                portal glyphs) — drawn LAST so they sit above the player's
+                current-room glyph and its glow, otherwise they get buried
+                when the portal coincides with the player's room. --%>
+          <.map_exit_decoration :for={e <- @map_view.exits} exit={e} />
         </svg>
       <% end %>
 
@@ -709,7 +715,48 @@ defmodule AgenticRealmsWeb.GameComponents do
 
   attr :exit, :map, required: true
 
-  defp map_exit(assigns) do
+  # Pass 1: just the line. Sits under room glyphs.
+  defp map_exit_line(assigns) do
+    ~H"""
+    <%= case @exit.kind do %>
+      <% :normal -> %>
+        <line
+          class="map-line map-line--normal"
+          x1={@exit.from_x}
+          y1={@exit.from_y}
+          x2={@exit.to_x}
+          y2={@exit.to_y}
+          vector-effect="non-scaling-stroke"
+        />
+      <% :fog_stub -> %>
+        <line
+          class="map-line map-fog-stub"
+          x1={@exit.from_x}
+          y1={@exit.from_y}
+          x2={@exit.to_x}
+          y2={@exit.to_y}
+          vector-effect="non-scaling-stroke"
+        />
+      <% :cross_region -> %>
+        <line
+          class="map-line map-line--cross-region"
+          x1={@exit.from_x}
+          y1={@exit.from_y}
+          x2={@exit.to_x}
+          y2={@exit.to_y}
+          vector-effect="non-scaling-stroke"
+        />
+    <% end %>
+    """
+  end
+
+  attr :exit, :map, required: true
+
+  # Pass 3: fog clouds + cross-region portal glyphs. Drawn on top of room
+  # glyphs so they're not buried by the player's current-room rect or its
+  # glow when the portal endpoint coincides with the player's room. No
+  # data-room-name / aria-label (FR-007 / FR-008 / FR-017).
+  defp map_exit_decoration(assigns) do
     cloud = @cloud_size_cells
     portal = @portal_size_cells
 
@@ -725,25 +772,7 @@ defmodule AgenticRealmsWeb.GameComponents do
     ~H"""
     <%= case @exit.kind do %>
       <% :normal -> %>
-        <line
-          class="map-line map-line--normal"
-          x1={@exit.from_x}
-          y1={@exit.from_y}
-          x2={@exit.to_x}
-          y2={@exit.to_y}
-          vector-effect="non-scaling-stroke"
-        />
       <% :fog_stub -> %>
-        <%!-- Fog-of-war stub: short line fading toward a hatched cloud.
-              NO data-room-name / data-room-id / aria-label (FR-007 / FR-017). --%>
-        <line
-          class="map-line map-fog-stub"
-          x1={@exit.from_x}
-          y1={@exit.from_y}
-          x2={@exit.to_x}
-          y2={@exit.to_y}
-          vector-effect="non-scaling-stroke"
-        />
         <rect
           class="map-fog-cloud"
           x={@cloud_x}
@@ -753,17 +782,6 @@ defmodule AgenticRealmsWeb.GameComponents do
           fill="url(#fog-hatch)"
         />
       <% :cross_region -> %>
-        <%!-- Cross-region affordance: dashed line into another region,
-              terminating in a portal glyph. NO destination identity in
-              the DOM (FR-008). --%>
-        <line
-          class="map-line map-line--cross-region"
-          x1={@exit.from_x}
-          y1={@exit.from_y}
-          x2={@exit.to_x}
-          y2={@exit.to_y}
-          vector-effect="non-scaling-stroke"
-        />
         <rect
           class="map-portal"
           x={@portal_x}
