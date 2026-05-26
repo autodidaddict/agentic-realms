@@ -185,14 +185,14 @@ Phoenix LiveView single project. All paths under repo root. Implementation under
 
 **Independent test**: Stand in the Atrium, open the map, type `north`. The Corridor appears as a new glyph and is highlighted; the Atrium retains its glyph without the current highlight; a line connects them.
 
-- [ ] T059 [US2] Extend `test/agenticrealms/world/map_view_test.exs` with US2 cases:
+- [X] T059 [US2] Extend `test/agenticrealms/world/map_view_test.exs` with US2 cases:
   - After a player moves between two rooms (simulated by directly updating `player_state.current_room_id` and inserting a `player_discovered_rooms` row), `MapView.for_player/1` returns the new room as `is_current?: true` and the old room as `is_current?: false`.
   - Two discovered, connected rooms render with a single `:normal` exit.
   - A fresh player who has discovered only the spawn room renders ONLY that room — no other Blackmire rooms appear even though they exist in the database.
 
   No new implementation tasks are needed for US2 — T055's `handle_info` clause for `%PlayerCurrentRoomChanged{}` and the discovery emission in T042 together make movement-driven map updates work. This phase is verification.
 
-- [ ] T060 [P] [US2] Extend `test/agenticrealms_web/components/game_components_mini_map_test.exs` (or add to the integration test in T080) with a sequence assertion: render the component with `single_room` fixture, then render again with `linear_three` fixture, assert the rendered HTML differs in the expected way (one → three glyphs; current highlight moves).
+- [X] T060 [P] [US2] Extend `test/agenticrealms_web/components/game_components_mini_map_test.exs` (or add to the integration test in T080) with a sequence assertion: render the component with `single_room` fixture, then render again with `linear_three` fixture, assert the rendered HTML differs in the expected way (one → three glyphs; current highlight moves).
 
 **Checkpoint**: US2 verified. Movement updates the map within the 1-second SC-002 latency budget.
 
