@@ -179,6 +179,10 @@ defmodule AgenticRealmsWeb.GameComponents.MiniMapTest do
     render_component(&GameComponents.mini_map/1, %{map_view: view})
   end
 
+  defp render_dir_pad do
+    render_component(&GameComponents.dir_pad/1, %{})
+  end
+
   # ----------------------------------------------------------------
   # US1 — single room
   # ----------------------------------------------------------------
@@ -507,6 +511,52 @@ defmodule AgenticRealmsWeb.GameComponents.MiniMapTest do
         end
 
       refute cross_section =~ "<title>"
+    end
+  end
+
+  # ----------------------------------------------------------------
+  # Polish — dir-pad expansion (research R7)
+  # ----------------------------------------------------------------
+
+  describe "dir-pad — 3x3 compass + Up/Down column" do
+    test "renders all 8 compass buttons + a center look button + Up/Dn" do
+      html = render_dir_pad()
+
+      for {label, aria} <- [
+            {"NW", "Move northwest"},
+            {"N", "Move north"},
+            {"NE", "Move northeast"},
+            {"W", "Move west"},
+            {"E", "Move east"},
+            {"SW", "Move southwest"},
+            {"S", "Move south"},
+            {"SE", "Move southeast"},
+            {"Up", "Move up"},
+            {"Dn", "Move down"}
+          ] do
+        assert Regex.match?(~r/>\s*#{Regex.escape(label)}\s*</, html),
+               "missing button label: #{label}"
+
+        assert html =~ ~s|aria-label="#{aria}"|, "missing aria-label: #{aria}"
+      end
+
+      assert html =~ ~s|aria-label="Look around"|
+    end
+
+    test "each direction button emits submit_command with the full direction name" do
+      html = render_dir_pad()
+
+      for cmd <- ~w(north south east west northeast northwest southeast southwest up down look) do
+        assert html =~ ~s|phx-value-text="#{cmd}"|, "missing phx-value-text=#{cmd}"
+      end
+    end
+
+    test "dir-pad uses the dir-btn class and wrapping containers" do
+      html = render_dir_pad()
+      assert html =~ "dir-pad-wrap"
+      assert html =~ "dir-pad-vert"
+      # The look button has the distinguishing class.
+      assert html =~ "dir-btn--look"
     end
   end
 

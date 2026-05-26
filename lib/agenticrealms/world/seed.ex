@@ -91,8 +91,12 @@ defmodule AgenticRealms.World.Seed do
 
   defp do_seed do
     # ---- regions ----
-    :ok = WorldCommands.create_region(@blackmire_region_id, "Blackmire")
-    :ok = WorldCommands.create_region(@hollowvale_region_id, "Hollowvale")
+    # Tests run Repo inside the SQL sandbox, but Commanded aggregates live
+    # in the application's supervision tree and survive across tests.
+    # Treat "already exists" as idempotent success so a sandbox-cleared
+    # test setup re-running the seed works against a hot aggregate cache.
+    :ok = ensure_region(@blackmire_region_id, "Blackmire")
+    :ok = ensure_region(@hollowvale_region_id, "Hollowvale")
 
     # ---- behaviors (carried over from feature 011) ----
     atrium_behaviors = [
@@ -348,6 +352,15 @@ defmodule AgenticRealms.World.Seed do
 
       {:error, reason} ->
         raise "Seed authoring error in #{label}: #{inspect(reason)}"
+    end
+  end
+
+  defp ensure_region(region_id, name) do
+    case WorldCommands.create_region(region_id, name) do
+      :ok -> :ok
+      {:error, :region_already_exists} -> :ok
+      {:error, :region_name_taken} -> :ok
+      {:error, reason} -> raise "Seed: failed to ensure region #{name}: #{inspect(reason)}"
     end
   end
 end

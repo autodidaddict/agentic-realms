@@ -384,21 +384,21 @@ Phoenix LiveView single project. All paths under repo root. Implementation under
 
 ### Mockup cleanup
 
-- [ ] T090 [P] In `lib/agenticrealms/game_data.ex`, DELETE `map_nodes/0` and `map_edges/0` (no longer used after T054/T055). Verify via `grep` that no caller remains.
-- [ ] T091 [P] In `lib/agenticrealms/game_data.ex`, scan for any other map-mock references (commented or active) and remove them. The `GameData` module retains everything not related to the map mockup.
+- [X] T090 [P] In `lib/agenticrealms/game_data.ex`, DELETE `map_nodes/0` and `map_edges/0` (no longer used after T054/T055). Verify via `grep` that no caller remains.
+- [X] T091 [P] In `lib/agenticrealms/game_data.ex`, scan for any other map-mock references (commented or active) and remove them. The `GameData` module retains everything not related to the map mockup.
 
 ### Dir-pad expansion (R7 — 4 → 10 directions)
 
-- [ ] T092 In `lib/agenticrealms_web/components/game_components.ex`, locate the existing `.dir-pad` markup (inline inside `mini_map/0` or `player_view/1`). EXTRACT it into a `dir_pad/1` function component (so it can be tested separately and so the panel layout is cleaner). EXPAND it per `research.md R7`:
+- [X] T092 In `lib/agenticrealms_web/components/game_components.ex`, locate the existing `.dir-pad` markup (inline inside `mini_map/0` or `player_view/1`). EXTRACT it into a `dir_pad/1` function component (so it can be tested separately and so the panel layout is cleaner). EXPAND it per `research.md R7`:
   - 3×3 compass pad with all eight cardinal buttons (NW, N, NE in top row; W, look-center, E in middle; SW, S, SE in bottom). Each button is a `<button phx-click="submit_command" phx-value-command="<direction-name>" aria-label="<full direction>">` (or uses the existing direction-button event the project uses).
   - Separate Up/Down column to the right of the pad: stacked Up and Dn buttons.
   - The center "look" button issues the existing `look` command.
-- [ ] T093 In `assets/css/game.css`, extend the `.dir-pad` rules to accommodate the new layout: keep the existing `grid-template-columns: repeat(3, 1fr)`, ensure the 9 buttons fit, and add a sibling `.dir-pad-vert` rule (or equivalent class) for the Up/Down column with `display: flex; flex-direction: column; gap: 4px`. Diagonal buttons share `.dir-pad button` styling; the look button gets a subtle visual distinction (e.g., dimmer border).
-- [ ] T094 [P] Add a small render test for `dir_pad/1` in `test/agenticrealms_web/components/game_components_dir_pad_test.exs` (or extend the mini-map test file): assert all 8 compass buttons + Up + Dn + look render with their respective `aria-label`s.
+- [X] T093 In `assets/css/game.css`, extend the `.dir-pad` rules to accommodate the new layout: keep the existing `grid-template-columns: repeat(3, 1fr)`, ensure the 9 buttons fit, and add a sibling `.dir-pad-vert` rule (or equivalent class) for the Up/Down column with `display: flex; flex-direction: column; gap: 4px`. Diagonal buttons share `.dir-pad button` styling; the look button gets a subtle visual distinction (e.g., dimmer border).
+- [X] T094 [P] Add a small render test for `dir_pad/1` in `test/agenticrealms_web/components/game_components_dir_pad_test.exs` (or extend the mini-map test file): assert all 8 compass buttons + Up + Dn + look render with their respective `aria-label`s.
 
 ### Integration test
 
-- [ ] T095 Create `test/agenticrealms_web/live/game_live_maps_test.exs` with `@moduletag :integration`. Exercise US1–US7 in sequence against the seeded world:
+- [X] T095 Create `test/agenticrealms_web/live/game_live_maps_test.exs` with `@moduletag :integration`. Exercise US1–US7 in sequence against the seeded world:
   - US1: mount; assert map header reads "Region · Blackmire"; one room glyph; current-highlight on the Atrium.
   - US2: send a movement command (`north`); assert the Corridor appears, highlight moves.
   - US3: assert the map renders any one-way exit as a plain line (find one in the seed or fixture-set up via direct Repo inserts before the test runs); assert any undiscovered-visible exit renders as a fog stub with no name reveal.
@@ -409,12 +409,12 @@ Phoenix LiveView single project. All paths under repo root. Implementation under
 
 ### Final manual verification
 
-- [ ] T096 Follow `quickstart.md` §1–§7 end-to-end on a developer machine. Confirm all acceptance behaviors visually. Capture any visual regressions and file follow-up tasks if needed.
+- [X] T096 Follow `quickstart.md` §1–§7 end-to-end on a developer machine. Confirm all acceptance behaviors visually. Capture any visual regressions and file follow-up tasks if needed.
 
 ### Success-criteria audit
 
-- [ ] T097 [P] Open a fresh page, view source on the rendered map, and confirm: zero occurrences of the integer elevation in any HTML attribute or visible text (SC-008); zero `data-*` attributes that leak fog-stub destination names (FR-017); zero arrowhead markers on any `.map-line` element (SC-003).
-- [ ] T098 [P] In `mix test` runs (full suite), assert no test references `GameData.map_nodes` or `GameData.map_edges` (the mockup symbols). `grep -r "map_nodes\|map_edges" test/` returns no hits.
+- [X] T097 [P] Open a fresh page, view source on the rendered map, and confirm: zero occurrences of the integer elevation in any HTML attribute or visible text (SC-008); zero `data-*` attributes that leak fog-stub destination names (FR-017); zero arrowhead markers on any `.map-line` element (SC-003).
+- [X] T098 [P] In `mix test` runs (full suite), assert no test references `GameData.map_nodes` or `GameData.map_edges` (the mockup symbols). `grep -r "map_nodes\|map_edges" test/` returns no hits.
 
 ---
 

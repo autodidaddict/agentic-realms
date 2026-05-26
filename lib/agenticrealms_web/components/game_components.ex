@@ -611,12 +611,112 @@ defmodule AgenticRealmsWeb.GameComponents do
         </svg>
       <% end %>
 
-      <div style="margin-top: 12px;">
-        <div class="dir-pad">
-          <span /><button>N</button> <span />
-          <button>W</button><button disabled>·</button><button>E</button>
-          <span /><button>S</button> <span />
-        </div>
+      <.dir_pad />
+    </div>
+    """
+  end
+
+  @doc """
+  Directional pad rendered alongside the map. Feature 012 expanded the
+  4-button mockup to a 3×3 compass (8 cardinals + a center "look") plus
+  a paired Up/Down column to the right. Buttons issue the corresponding
+  text command via the existing `submit_command` LiveView event.
+  """
+  def dir_pad(assigns) do
+    ~H"""
+    <div class="dir-pad-wrap">
+      <div class="dir-pad">
+        <button
+          class="dir-btn"
+          phx-click="submit_command"
+          phx-value-text="northwest"
+          aria-label="Move northwest"
+        >
+          NW
+        </button>
+        <button
+          class="dir-btn"
+          phx-click="submit_command"
+          phx-value-text="north"
+          aria-label="Move north"
+        >
+          N
+        </button>
+        <button
+          class="dir-btn"
+          phx-click="submit_command"
+          phx-value-text="northeast"
+          aria-label="Move northeast"
+        >
+          NE
+        </button>
+        <button
+          class="dir-btn"
+          phx-click="submit_command"
+          phx-value-text="west"
+          aria-label="Move west"
+        >
+          W
+        </button>
+        <button
+          class="dir-btn dir-btn--look"
+          phx-click="submit_command"
+          phx-value-text="look"
+          aria-label="Look around"
+          title="Look"
+        >
+          ·
+        </button>
+        <button
+          class="dir-btn"
+          phx-click="submit_command"
+          phx-value-text="east"
+          aria-label="Move east"
+        >
+          E
+        </button>
+        <button
+          class="dir-btn"
+          phx-click="submit_command"
+          phx-value-text="southwest"
+          aria-label="Move southwest"
+        >
+          SW
+        </button>
+        <button
+          class="dir-btn"
+          phx-click="submit_command"
+          phx-value-text="south"
+          aria-label="Move south"
+        >
+          S
+        </button>
+        <button
+          class="dir-btn"
+          phx-click="submit_command"
+          phx-value-text="southeast"
+          aria-label="Move southeast"
+        >
+          SE
+        </button>
+      </div>
+      <div class="dir-pad-vert">
+        <button
+          class="dir-btn"
+          phx-click="submit_command"
+          phx-value-text="up"
+          aria-label="Move up"
+        >
+          Up
+        </button>
+        <button
+          class="dir-btn"
+          phx-click="submit_command"
+          phx-value-text="down"
+          aria-label="Move down"
+        >
+          Dn
+        </button>
       </div>
     </div>
     """
