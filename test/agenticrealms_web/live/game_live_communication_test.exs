@@ -23,6 +23,7 @@ defmodule AgenticRealmsWeb.GameLiveCommunicationTest do
   #   mix test test/agenticrealms_web/live/game_live_communication_test.exs
   # or explicitly include with `mix test --include integration`.
   @moduletag :integration
+  @moduletag :commanded
 
   import Phoenix.LiveViewTest
 

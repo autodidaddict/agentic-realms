@@ -34,6 +34,12 @@ config :phoenix_live_view,
 config :phoenix,
   sort_verified_routes_query_params: true
 
+# Issue #10 — the Commanded chain (World.Application, projectors, event
+# handlers) is started per-test by tests tagged `:commanded`, NOT at boot.
+# Each test gets a fresh in-memory event store and fresh subscription
+# positions. See `AgenticRealms.DataCase.setup_commanded/0`.
+config :agenticrealms, start_commanded?: false
+
 # In tests use the in-memory event store adapter so we don't need a separate
 # Postgres database for event sourcing and tests stay fast/hermetic.
 #

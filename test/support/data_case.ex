@@ -12,6 +12,22 @@ defmodule AgenticRealms.DataCase do
   PostgreSQL, you can even run database tests asynchronously
   by setting `use AgenticRealms.DataCase, async: true`, although
   this option is not recommended for other databases.
+
+  ## Per-test Commanded isolation (`@moduletag :commanded`)
+
+  Tests that dispatch commands, exercise projectors, or depend on
+  `UIEventBroadcaster` / `Behaviors.Interpreter` MUST be tagged with
+  `@moduletag :commanded` (or per-test `@tag :commanded`). The setup
+  callback then `start_supervised!`s the full Commanded chain — the
+  `World.Application`, the in-memory event store it brings up, both
+  projectors, and the broadcast/behavior handlers — so each test gets a
+  fresh event store and fresh subscription positions. See issue #10.
+
+  Untagged tests do NOT get Commanded running; they can only exercise
+  pure functions (aggregate `execute/2`, projector `handle/2` calls,
+  PubSub broadcasts that bypass Commanded, etc.). Trying to dispatch a
+  command from an untagged test will fail because `World.Application`
+  isn't running.
   """
 
   use ExUnit.CaseTemplate
@@ -53,6 +69,7 @@ defmodule AgenticRealms.DataCase do
 
   setup tags do
     AgenticRealms.DataCase.setup_sandbox(tags)
+    if tags[:commanded], do: AgenticRealms.DataCase.setup_commanded()
     :ok
   end
 
@@ -62,6 +79,30 @@ defmodule AgenticRealms.DataCase do
   def setup_sandbox(tags) do
     pid = Ecto.Adapters.SQL.Sandbox.start_owner!(AgenticRealms.Repo, shared: not tags[:async])
     on_exit(fn -> Ecto.Adapters.SQL.Sandbox.stop_owner(pid) end)
+  end
+
+  @doc """
+  Start a fresh Commanded chain under the calling test's supervisor.
+
+  Brings up the `World.Application` (which transitively starts the
+  in-memory event store), the read-model projectors, and the broadcast
+  and behavior event handlers. `start_supervised!/1` registers each
+  child with the ExUnit test process, so the entire chain is torn down
+  when the test ends — including the event store's events table and
+  the handlers' subscription positions. Issue #10.
+
+  Triggered automatically when a test is tagged `:commanded`. Tests
+  using `AgenticRealmsWeb.ConnCase` inherit the same behavior because
+  `ConnCase.setup` delegates to `DataCase.setup_sandbox/1` and the
+  same `setup tags do ... end` callback above.
+  """
+  def setup_commanded do
+    ExUnit.Callbacks.start_supervised!(AgenticRealms.World.Application)
+    ExUnit.Callbacks.start_supervised!(AgenticRealms.World.Projections.WorldProjector)
+    ExUnit.Callbacks.start_supervised!(AgenticRealms.World.Projections.PlayerStateProjector)
+    ExUnit.Callbacks.start_supervised!(AgenticRealms.World.UIEventBroadcaster)
+    ExUnit.Callbacks.start_supervised!(AgenticRealms.World.Behaviors.Interpreter)
+    :ok
   end
 
   @doc """

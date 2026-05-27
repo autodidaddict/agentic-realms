@@ -20,6 +20,7 @@ defmodule AgenticRealmsWeb.GameLiveOfflineFilterTest do
   # store state accumulates across the suite; running this in the default
   # run would conflict with `game_live_presence_test`.
   @moduletag :integration
+  @moduletag :commanded
 
   import Phoenix.LiveViewTest
 

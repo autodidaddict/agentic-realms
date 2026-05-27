@@ -19,6 +19,7 @@ defmodule AgenticRealmsWeb.GameLiveIntentParserTest do
   use AgenticRealmsWeb.ConnCase, async: false
 
   @moduletag :integration
+  @moduletag :commanded
 
   import Phoenix.LiveViewTest
 

@@ -17,6 +17,7 @@ defmodule AgenticRealmsWeb.GameLiveBehaviorsTest do
   use AgenticRealmsWeb.ConnCase, async: false
 
   @moduletag :integration
+  @moduletag :commanded
 
   import Ecto.Query
   import Phoenix.LiveViewTest
