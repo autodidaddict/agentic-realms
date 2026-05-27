@@ -715,7 +715,7 @@ defmodule AgenticRealmsWeb.GameComponents do
   # extent on the line of attack is `portal_size * √2 ≈ size * 1.414`,
   # so it visually "reads" larger than a same-size unrotated square. Keep
   # it deliberately small — the dashed line carries most of the meaning.
-  @portal_size_cells 0.04
+  @portal_size_cells 0.02
 
   attr :exit, :map, required: true
 

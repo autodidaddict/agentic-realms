@@ -1570,9 +1570,11 @@ button { font: inherit; color: inherit; }
   stroke-dasharray: 4 3;
 }
 .map-portal {
+  /* Fill only — no stroke. A stroke-width in viewBox user units
+     translates to ~50 px on screen (we're rendering in cell units), which
+     would wrap the tiny diamond in a huge halo and hide most of the
+     dashed line behind it. */
   fill: var(--wizard);
-  stroke: var(--wizard);
-  stroke-width: 0.5;
 }
 
 
