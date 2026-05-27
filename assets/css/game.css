@@ -1558,16 +1558,20 @@ button { font: inherit; color: inherit; }
 /* Cross-region affordance: dashed line + portal glyph at the endpoint.
    Dashed stroke distinguishes it from intra-region lines without leaking
    any directionality (FR-005 still holds: both ends of a one-way cross-
-   region exit look identical). FR-008. */
+   region exit look identical). FR-008.
+
+   Color: --wizard (amber) instead of --player, so the affordance is
+   distinct from the current-room highlight. The amber reads as
+   "elsewhere" without competing with the player's own palette. */
 .map-line--cross-region {
-  stroke: var(--player-dim);
+  stroke: var(--wizard-dim);
   stroke-width: 2;
   stroke-linecap: round;
   stroke-dasharray: 4 3;
 }
 .map-portal {
-  fill: var(--player-dim);
-  stroke: var(--player-dim);
+  fill: var(--wizard);
+  stroke: var(--wizard);
   stroke-width: 0.5;
 }
 
