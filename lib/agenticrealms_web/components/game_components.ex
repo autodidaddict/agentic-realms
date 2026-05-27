@@ -837,6 +837,10 @@ defmodule AgenticRealmsWeb.GameComponents do
         vector-effect="non-scaling-stroke"
       />
 
+      <%!-- Staircase silhouettes (3 steps each). Conveys "this room has
+            stairs" — semantically richer than a directional chevron and
+            visually consistent with the detailed line-icon style of the
+            folded-map toggle. --%>
       <svg
         :if={@room.has_up?}
         class="map-icon-up"
@@ -848,10 +852,12 @@ defmodule AgenticRealmsWeb.GameComponents do
         overflow="visible"
       >
         <path
-          d="M0 6 L4 1 L8 6"
+          d="M1 7 L1 5 L3 5 L3 3 L5 3 L5 1 L7 1"
           stroke="currentColor"
           stroke-width="1.5"
           fill="none"
+          stroke-linecap="round"
+          stroke-linejoin="round"
           vector-effect="non-scaling-stroke"
         />
       </svg>
@@ -867,10 +873,12 @@ defmodule AgenticRealmsWeb.GameComponents do
         overflow="visible"
       >
         <path
-          d="M0 1 L4 6 L8 1"
+          d="M1 1 L3 1 L3 3 L5 3 L5 5 L7 5 L7 7"
           stroke="currentColor"
           stroke-width="1.5"
           fill="none"
+          stroke-linecap="round"
+          stroke-linejoin="round"
           vector-effect="non-scaling-stroke"
         />
       </svg>
