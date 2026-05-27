@@ -709,7 +709,10 @@ defmodule AgenticRealmsWeb.GameComponents do
   # plain compile-time constants — NOT module attributes (HEEx ~H blocks
   # treat @-prefixed names as assigns).
   @cell_inner_size 0.86
-  @icon_size_cells 0.24
+  @icon_size_cells 0.22
+  # Distance from the room rect's edge to the nearest edge of the icon —
+  # so the arrow never touches the rect border.
+  @icon_inset_cells 0.06
   @cloud_size_cells 0.32
   # The cross-region portal is a rotated diamond; its corner-to-corner
   # extent on the line of attack is `portal_size * √2 ≈ size * 1.414`,
@@ -802,22 +805,28 @@ defmodule AgenticRealmsWeb.GameComponents do
 
   defp map_cell(assigns) do
     # Cell centered at (room.x, room.y). Rect occupies a square inside the
-    # cell with `@cell_inner_size` slack on every side. Up/Down icons sit
-    # at the room's top-right / bottom-right corners in cell units.
+    # cell. Up/Down icons sit inside the room rect with clear padding
+    # (@icon_inset_cells) on every side so they never touch the border.
     inner = @cell_inner_size
     icon = @icon_size_cells
+    inset = @icon_inset_cells
 
     rect_x = assigns.room.x - inner / 2
     rect_y = assigns.room.y - inner / 2
-    icon_x = assigns.room.x + inner / 2 - icon
+    # Right edge of icon sits @inset cells inside the rect's right edge.
+    icon_x = assigns.room.x + inner / 2 - inset - icon
+    # Top edge of UP icon: @inset below the rect's top edge.
+    icon_up_y = assigns.room.y - inner / 2 + inset
+    # Bottom edge of DOWN icon: @inset above the rect's bottom edge.
+    icon_down_y = assigns.room.y + inner / 2 - inset - icon
 
     assigns =
       assigns
       |> assign(:rect_x, rect_x)
       |> assign(:rect_y, rect_y)
       |> assign(:icon_x, icon_x)
-      |> assign(:icon_up_y, assigns.room.y - inner / 2)
-      |> assign(:icon_down_y, assigns.room.y + inner / 2 - icon)
+      |> assign(:icon_up_y, icon_up_y)
+      |> assign(:icon_down_y, icon_down_y)
       |> assign(:cell_inner, inner)
       |> assign(:icon_size, icon)
 
@@ -837,10 +846,7 @@ defmodule AgenticRealmsWeb.GameComponents do
         vector-effect="non-scaling-stroke"
       />
 
-      <%!-- Staircase silhouettes (3 steps each). Conveys "this room has
-            stairs" — semantically richer than a directional chevron and
-            visually consistent with the detailed line-icon style of the
-            folded-map toggle. --%>
+      <%!-- Simple up/down arrows (shaft + chevron head). --%>
       <svg
         :if={@room.has_up?}
         class="map-icon-up"
@@ -852,7 +858,7 @@ defmodule AgenticRealmsWeb.GameComponents do
         overflow="visible"
       >
         <path
-          d="M1 7 L1 5 L3 5 L3 3 L5 3 L5 1 L7 1"
+          d="M4 7 L4 1 M1.5 3.5 L4 1 L6.5 3.5"
           stroke="currentColor"
           stroke-width="1.5"
           fill="none"
@@ -873,7 +879,7 @@ defmodule AgenticRealmsWeb.GameComponents do
         overflow="visible"
       >
         <path
-          d="M1 1 L3 1 L3 3 L5 3 L5 5 L7 5 L7 7"
+          d="M4 1 L4 7 M1.5 4.5 L4 7 L6.5 4.5"
           stroke="currentColor"
           stroke-width="1.5"
           fill="none"

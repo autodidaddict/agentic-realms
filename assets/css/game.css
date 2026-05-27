@@ -1439,7 +1439,12 @@ button { font: inherit; color: inherit; }
   max-height: 420px;
   z-index: 50;
   padding: 12px;
-  background: var(--bg-sunken);
+  /* Soft opacity: log content behind the panel reads through faintly
+     instead of being completely hidden. backdrop-filter softens what
+     bleeds through so the map itself stays the visual focus. */
+  background: color-mix(in srgb, var(--bg-sunken) 82%, transparent);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
   border: 1px solid var(--line);
   border-radius: 6px;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
