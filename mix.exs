@@ -85,6 +85,11 @@ defmodule AgenticRealms.MixProject do
       "ecto.reset": ["ecto.drop", "ecto.setup"],
       "event_store.setup": ["event_store.create", "event_store.init"],
       "event_store.reset": ["event_store.drop", "event_store.setup"],
+      # Full clean slate — drop & recreate BOTH the event store and the
+      # read-model database, then re-run migrations and seed. Use this
+      # after schema changes that need a paired event-store + read-model
+      # reset (e.g. feature 013).
+      "world.reset": ["event_store.reset", "ecto.reset"],
       test: ["ecto.create --quiet", "ecto.migrate --quiet", "test"],
       "assets.setup": ["tailwind.install --if-missing", "esbuild.install --if-missing"],
       "assets.build": ["compile", "tailwind agenticrealms", "esbuild agenticrealms"],

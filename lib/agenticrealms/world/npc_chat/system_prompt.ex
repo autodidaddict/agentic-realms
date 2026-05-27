@@ -17,22 +17,25 @@ defmodule AgenticRealms.World.NPCChat.SystemPrompt do
           required(:room_description) => String.t(),
           required(:other_players) => [String.t()],
           required(:objects) => [%{name: String.t(), short_description: String.t()}],
-          required(:player_name) => String.t()
+          required(:player_name) => String.t(),
+          optional(:quest_context) => map()
         }
 
   @doc """
   Render the system prompt string from `snapshot`. Pure.
   """
   @spec text(snapshot()) :: String.t()
-  def text(%{
-        npc_name: npc_name,
-        lore: lore,
-        room_name: room_name,
-        room_description: room_description,
-        other_players: other_players,
-        objects: objects,
-        player_name: player_name
-      }) do
+  def text(
+        %{
+          npc_name: npc_name,
+          lore: lore,
+          room_name: room_name,
+          room_description: room_description,
+          other_players: other_players,
+          objects: objects,
+          player_name: player_name
+        } = snapshot
+      ) do
     [
       "You are #{npc_name}, a character inside a text-based fantasy game.",
       "",
@@ -46,6 +49,9 @@ defmodule AgenticRealms.World.NPCChat.SystemPrompt do
       other_players_line(other_players),
       objects_line(objects),
       "",
+      # Feature 013 — quest section, omitted when this player has no
+      # offerable / active / completed quests with this NPC.
+      quests_section(Map.get(snapshot, :quest_context)),
       rules_section()
     ]
     |> Enum.reject(&is_nil/1)
@@ -85,6 +91,97 @@ defmodule AgenticRealms.World.NPCChat.SystemPrompt do
       end)
 
     "\nNearby you can see: #{rendered}."
+  end
+
+  # ── Feature 013 — quest section rendering ─────────────────────────────
+
+  defp quests_section(nil), do: nil
+
+  defp quests_section(%{
+         offerable_quests: [],
+         active_instances: [],
+         completed_slugs: []
+       }),
+       do: nil
+
+  defp quests_section(%{
+         offerable_quests: offerable,
+         active_instances: active,
+         completed_slugs: completed
+       }) do
+    [
+      "# Quests",
+      "",
+      offerable_block(offerable),
+      active_block(active),
+      completed_block(completed),
+      """
+      Quest tool selection:
+
+      - When the player expresses clear intent to ACCEPT one of your offerable \
+        quests ("yes", "I'll do it", "sure, I'll help"), call `accept_quest` \
+        with that quest's slug.
+
+      - When the player ASKS how they're doing on an active quest ("how am I \
+        doing?", "am I close?", "what's left?"), call `check_progress` with \
+        the relevant quest_id.
+
+      - When the player CLAIMS to have what you asked for and is offering \
+        to hand it over — phrases like "I brought your apples", "I have \
+        your X", "here are the things", "here you go", "I'm here to turn \
+        this in", or any other handover assertion — call `finalize_quest` \
+        with the relevant quest_id. `finalize_quest` is atomic: it checks \
+        inventory itself, so you do NOT need to call `check_progress` first. \
+        If the player is short, finalize_quest will tell you what's missing \
+        and you should narrate that.
+
+      All three tools may return a structured failure (ok: false, reason: \
+      ..., details: ...) — render any failure in character based on the \
+      reason and details.\
+      """
+      |> String.trim()
+    ]
+    |> Enum.reject(&is_nil/1)
+    |> Enum.join("\n")
+    |> Kernel.<>("\n")
+  end
+
+  defp offerable_block([]), do: nil
+
+  defp offerable_block(offerable) do
+    lines =
+      Enum.map(offerable, fn q ->
+        "- Slug: `#{q.slug}` — \"#{q.title}\"\n  Narrative: \"#{q.narrative}\"\n  Objective: #{q.criteria_summary}."
+      end)
+
+    "You can offer the following quests to this player:\n\n" <>
+      Enum.join(lines, "\n") <> "\n"
+  end
+
+  defp active_block([]), do: nil
+
+  defp active_block(active) do
+    lines =
+      Enum.map(active, fn inst ->
+        progress_lines =
+          inst.progress
+          |> Enum.map(fn c -> "  #{c.name}: #{c.count} / #{c.target}" end)
+          |> Enum.join("\n")
+
+        "- quest_id: `#{inst.quest_id}` — slug `#{inst.slug}` — \"#{inst.title}\"\n  Progress:\n#{progress_lines}"
+      end)
+
+    "This player has these quests open with you right now (use these quest_ids when calling check_progress or finalize_quest):\n\n" <>
+      Enum.join(lines, "\n") <> "\n"
+  end
+
+  defp completed_block([]), do: nil
+
+  defp completed_block(slugs) do
+    lines = Enum.map(slugs, fn s -> "- `#{s}`" end)
+
+    "This player has already completed these quests with you (react in character if they ask again; do NOT offer them):\n\n" <>
+      Enum.join(lines, "\n") <> "\n"
   end
 
   defp rules_section do

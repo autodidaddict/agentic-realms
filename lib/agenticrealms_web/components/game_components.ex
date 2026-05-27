@@ -433,12 +433,20 @@ defmodule AgenticRealmsWeb.GameComponents do
 
         <.hud_card title="Quest Log" count={"#{length(@quests)} active"} modal_type="quests">
           <div
+            :if={@quests == []}
+            style="font-size: 11px; color: var(--ink-faint);"
+          >
+            (no active quests)
+          </div>
+          <div
             :for={{quest, idx} <- Enum.with_index(@quests)}
             class="quest-item"
             style={if idx == length(@quests) - 1, do: "margin-bottom: 0;", else: ""}
           >
             <div class="qt">{quest.title}</div>
-            <div class="qp">{quest.progress}</div>
+            <div :for={c <- quest.criteria} class="qp">
+              {c.name}: {c.count} / {c.target}
+            </div>
           </div>
         </.hud_card>
 
@@ -476,7 +484,19 @@ defmodule AgenticRealmsWeb.GameComponents do
     # the viewBox attribute locally without server round-trips.
     initial_view_box = "#{cx - half} #{cy - half} #{zoom} #{zoom}"
 
-    assigns = assign(assigns, :initial_view_box, initial_view_box)
+    # Decoration dedupe: when two fog stubs share a destination cell, the
+    # OVERLAPPING translucent clouds composite to a darker spot. Same for
+    # cross-region portals if two ever converge on one cell. Render one
+    # decoration per (kind, to_x, to_y) — the connector lines still all
+    # render in Pass 1 so each known source visibly points at the cell.
+    decorations =
+      assigns.map_view.exits
+      |> Enum.uniq_by(fn e -> {e.kind, e.to_x, e.to_y} end)
+
+    assigns =
+      assigns
+      |> assign(:initial_view_box, initial_view_box)
+      |> assign(:decorations, decorations)
 
     ~H"""
     <div class="map-panel">
@@ -662,28 +682,7 @@ defmodule AgenticRealmsWeb.GameComponents do
           preserveAspectRatio="xMidYMid meet"
           xmlns="http://www.w3.org/2000/svg"
         >
-          <defs>
-            <linearGradient
-              id="fog-fade"
-              x1="0%"
-              y1="0%"
-              x2="100%"
-              y2="0%"
-              gradientUnits="objectBoundingBox"
-            >
-              <stop offset="0%" stop-color="var(--ink-dim)" stop-opacity="1" />
-              <stop offset="100%" stop-color="var(--ink-dim)" stop-opacity="0.1" />
-            </linearGradient>
-            <pattern
-              id="fog-hatch"
-              patternUnits="userSpaceOnUse"
-              width="6"
-              height="6"
-              patternTransform="rotate(45)"
-            >
-              <line x1="0" y1="0" x2="0" y2="6" stroke="var(--ink-faint)" stroke-width="1" />
-            </pattern>
-          </defs>
+          <defs></defs>
 
           <%!-- Pass 1: connector lines — drawn under everything. --%>
           <.map_exit_line :for={e <- @map_view.exits} exit={e} />
@@ -694,8 +693,10 @@ defmodule AgenticRealmsWeb.GameComponents do
           <%!-- Pass 3: endpoint decorations (fog clouds, cross-region
                 portal glyphs) — drawn LAST so they sit above the player's
                 current-room glyph and its glow, otherwise they get buried
-                when the portal coincides with the player's room. --%>
-          <.map_exit_decoration :for={e <- @map_view.exits} exit={e} />
+                when the portal coincides with the player's room. Deduped
+                upstream so two fog stubs sharing a destination cell
+                produce a single cloud. --%>
+          <.map_exit_decoration :for={e <- @decorations} exit={e} />
         </svg>
       <% end %>
     </div>
@@ -712,7 +713,6 @@ defmodule AgenticRealmsWeb.GameComponents do
   # Distance from the room rect's edge to the nearest edge of the icon —
   # so the arrow never touches the rect border.
   @icon_inset_cells 0.06
-  @cloud_size_cells 0.32
   # The cross-region portal is a rotated diamond; its corner-to-corner
   # extent on the line of attack is `portal_size * √2 ≈ size * 1.414`,
   # so it visually "reads" larger than a same-size unrotated square. Keep
@@ -721,8 +721,20 @@ defmodule AgenticRealmsWeb.GameComponents do
 
   attr :exit, :map, required: true
 
-  # Pass 1: just the line. Sits under room glyphs.
+  # Pass 1: just the line. Sits under room glyphs. Fog stubs retreat
+  # their visible endpoint inward from the cloud center by ~the cloud's
+  # near-edge radius so the dashed stroke stops at the cloud's edge
+  # instead of running into its middle.
+  @fog_line_retreat 0.18
+
   defp map_exit_line(assigns) do
+    {fog_to_x, fog_to_y} = fog_line_endpoint(assigns.exit)
+
+    assigns =
+      assigns
+      |> assign(:fog_to_x, fog_to_x)
+      |> assign(:fog_to_y, fog_to_y)
+
     ~H"""
     <%= case @exit.kind do %>
       <% :normal -> %>
@@ -739,8 +751,8 @@ defmodule AgenticRealmsWeb.GameComponents do
           class="map-line map-fog-stub"
           x1={@exit.from_x}
           y1={@exit.from_y}
-          x2={@exit.to_x}
-          y2={@exit.to_y}
+          x2={@fog_to_x}
+          y2={@fog_to_y}
           vector-effect="non-scaling-stroke"
         />
       <% :cross_region -> %>
@@ -756,6 +768,22 @@ defmodule AgenticRealmsWeb.GameComponents do
     """
   end
 
+  defp fog_line_endpoint(%{kind: :fog_stub, from_x: fx, from_y: fy, to_x: tx, to_y: ty}) do
+    dx = tx - fx
+    dy = ty - fy
+    mag = :math.sqrt(dx * dx + dy * dy)
+
+    if mag > 0 do
+      ux = dx / mag
+      uy = dy / mag
+      {tx - ux * @fog_line_retreat, ty - uy * @fog_line_retreat}
+    else
+      {tx, ty}
+    end
+  end
+
+  defp fog_line_endpoint(%{to_x: tx, to_y: ty}), do: {tx, ty}
+
   attr :exit, :map, required: true
 
   # Pass 3: fog clouds + cross-region portal glyphs. Drawn on top of room
@@ -763,14 +791,10 @@ defmodule AgenticRealmsWeb.GameComponents do
   # glow when the portal endpoint coincides with the player's room. No
   # data-room-name / aria-label (FR-007 / FR-008 / FR-017).
   defp map_exit_decoration(assigns) do
-    cloud = @cloud_size_cells
     portal = @portal_size_cells
 
     assigns =
       assigns
-      |> assign(:cloud_x, assigns.exit.to_x - cloud / 2)
-      |> assign(:cloud_y, assigns.exit.to_y - cloud / 2)
-      |> assign(:cloud_size, cloud)
       |> assign(:portal_x, assigns.exit.to_x - portal / 2)
       |> assign(:portal_y, assigns.exit.to_y - portal / 2)
       |> assign(:portal_size, portal)
@@ -779,14 +803,20 @@ defmodule AgenticRealmsWeb.GameComponents do
     <%= case @exit.kind do %>
       <% :normal -> %>
       <% :fog_stub -> %>
-        <rect
+        <%!-- Soft cloud built from five overlapping circles. Reads as a
+              fluffy puff at the line endpoint instead of a hatched
+              tile. No title/aria — FR-007 / FR-017 information hiding. --%>
+        <g
           class="map-fog-cloud"
-          x={@cloud_x}
-          y={@cloud_y}
-          width={@cloud_size}
-          height={@cloud_size}
-          fill="url(#fog-hatch)"
-        />
+          transform={"translate(#{@exit.to_x} #{@exit.to_y})"}
+        >
+          <circle cx="-0.13" cy="0.02" r="0.08" />
+          <circle cx="-0.05" cy="-0.07" r="0.10" />
+          <circle cx="0.05" cy="-0.09" r="0.11" />
+          <circle cx="0.13" cy="-0.02" r="0.09" />
+          <circle cx="0.06" cy="0.06" r="0.08" />
+          <circle cx="-0.05" cy="0.07" r="0.075" />
+        </g>
       <% :cross_region -> %>
         <rect
           class="map-portal"
@@ -1051,48 +1081,45 @@ defmodule AgenticRealmsWeb.GameComponents do
   end
 
   # ────────────────────────────────────────────────────────────
-  # Quest Modal
+  # Quest Modal (feature 013)
   # ────────────────────────────────────────────────────────────
+  #
+  # Active section: every active quest with per-criterion progress
+  # lines. Completed section: every completed quest with title, reward
+  # name, and completion timestamp.
 
-  attr :quest_details, :list, required: true
-  attr :selected_quest, :integer, required: true
+  attr :quests, :list, required: true
+  attr :completed_quests, :list, required: true
 
   def quest_modal(assigns) do
-    q = Enum.at(assigns.quest_details, assigns.selected_quest)
-    assigns = assign(assigns, :q, q)
-
     ~H"""
     <.modal title="Quest Log" glyph="✦">
-      <div class="quest-detail">
-        <div class="quest-nav">
-          <button
-            :for={{quest, idx} <- Enum.with_index(@quest_details)}
-            class={[@selected_quest == idx && "active"]}
-            phx-click="select_quest"
-            phx-value-index={idx}
-          >
-            <div class="t">{quest.title}</div>
-            <div class="s">
-              {Enum.count(quest.steps, & &1.done)} / {length(quest.steps)} steps
+      <div class="quest-log">
+        <div class="quest-section">
+          <div class="quest-section-title">Active ({length(@quests)})</div>
+          <div :if={@quests == []} class="quest-empty">No active quests.</div>
+          <div :for={quest <- @quests} class="quest-item">
+            <div class="qt">{quest.title}</div>
+            <div :if={quest[:narrative]} class="qn">{quest.narrative}</div>
+            <div :for={c <- quest.criteria} class="qp">
+              {c.name}: {c.count} / {c.target}
             </div>
-          </button>
+          </div>
         </div>
-        <div class="quest-body">
-          <h3>{@q.title}</h3>
-          <div class="giver">Given by {@q.giver}</div>
-          <p style="font-style: italic; color: var(--ink);">{@q.synopsis}</p>
-          <p>{@q.desc}</p>
-          <div class="quest-steps">
-            <div :for={step <- @q.steps} class={["quest-step", step.done && "done"]}>
-              <div class="check">{if step.done, do: "✓", else: ""}</div>
-              <div class="t">{step.t}</div>
+
+        <div class="quest-section">
+          <div class="quest-section-title">Completed ({length(@completed_quests)})</div>
+          <div :if={@completed_quests == []} class="quest-empty">
+            No completed quests yet.
+          </div>
+          <div
+            :for={quest <- @completed_quests}
+            class="quest-item quest-item--completed"
+          >
+            <div class="qt">✓ {quest.title}</div>
+            <div :if={quest[:reward_name]} class="qp">
+              Reward: {quest.reward_name}
             </div>
-          </div>
-          <div style="font-size: 10px; color: var(--ink-faint); letter-spacing: 0.12em; text-transform: uppercase; margin-top: 18px;">
-            Rewards
-          </div>
-          <div class="reward-row">
-            <span :for={reward <- @q.rewards} class="tag">{reward}</span>
           </div>
         </div>
       </div>

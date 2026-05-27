@@ -109,7 +109,9 @@ defmodule AgenticRealms.World.Room do
         short_description: short,
         long_description: long,
         fixed: fixed,
-        behaviors: behaviors
+        behaviors: behaviors,
+        quest_player_id: quest_player_id,
+        quest_instance_id: quest_instance_id
       }) do
     if MapSet.member?(ids, oid) do
       {:error, :object_already_in_room}
@@ -121,7 +123,12 @@ defmodule AgenticRealms.World.Room do
         short_description: short,
         long_description: long,
         fixed: fixed,
-        behaviors: behaviors || []
+        behaviors: behaviors || [],
+        # Feature 013 — both nil for non-quest placements (the seed
+        # path); both set for quest-scoped spawns. Carried straight
+        # through; aggregate state doesn't track them.
+        quest_player_id: quest_player_id,
+        quest_instance_id: quest_instance_id
       }
     end
   end

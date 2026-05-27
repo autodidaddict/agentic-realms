@@ -12,6 +12,35 @@ defmodule AgenticRealms.Application do
   @_behavior_atoms [:trigger, :actions, :type, :text, :interval_ms]
   def __behavior_atoms__, do: @_behavior_atoms
 
+  # Feature 013 — atoms used as keys inside `definition_snapshot` (jsonb)
+  # carried by QuestAccepted events. The JsonSerializer's `keys: :atoms!`
+  # decode requires these atoms to already exist at deserialize time.
+  # The same atoms also appear as keys in the `criteria` and `reward`
+  # nested maps — declaring them once here suffices.
+  @_quest_atoms [
+    :slug,
+    :title,
+    :narrative,
+    :criteria,
+    :reward,
+    :name,
+    :quest_tag,
+    :target_count,
+    :spawn_room_ids,
+    :description,
+    :tag,
+    # Per-criterion item descriptors carried inside the wizard-authored
+    # quest catalog. None of these are referenced as atoms in Elixir
+    # source (every read path uses string keys), so without this
+    # declaration String.to_existing_atom/1 inside the EventStore's
+    # JsonSerializer crashes the projector on the first NPCBlueprintCreated
+    # event whose `quests` payload includes them.
+    :item_name,
+    :item_short_description,
+    :item_long_description
+  ]
+  def __quest_atoms__, do: @_quest_atoms
+
   # See https://hexdocs.pm/elixir/Application.html
   # for more information on OTP Applications
   @moduledoc false
@@ -75,6 +104,10 @@ defmodule AgenticRealms.Application do
         AgenticRealms.World.Application,
         AgenticRealms.World.Projections.WorldProjector,
         AgenticRealms.World.Projections.PlayerStateProjector,
+        # Feature 013 — Quests. Handles the four finalize-side quest
+        # events; separate from WorldProjector to keep concerns focused
+        # and isolate replay positions.
+        AgenticRealms.World.Projections.QuestProjector,
         AgenticRealms.World.UIEventBroadcaster,
         AgenticRealms.World.Behaviors.Interpreter
       ]

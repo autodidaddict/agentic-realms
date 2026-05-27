@@ -22,6 +22,11 @@ defmodule AgenticRealms.World.Schemas.NPCBlueprint do
     field :behaviors, {:array, :map}, default: []
     field :lore, :string, default: ""
 
+    # Feature 013 — Quests. Per-NPC catalog of FetchQuest definitions.
+    # Wizard-authored at blueprint-creation time. Each entry follows the
+    # shape in `specs/013-quest-system/contracts/npc-blueprint-quests.md`.
+    field :quests, {:array, :map}, default: []
+
     has_many :clones, AgenticRealms.World.Schemas.NPCClone, foreign_key: :blueprint_id
 
     timestamps(type: :utc_datetime)

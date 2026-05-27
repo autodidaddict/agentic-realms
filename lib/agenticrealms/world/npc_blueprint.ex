@@ -22,6 +22,8 @@ defmodule AgenticRealms.World.NPCBlueprint do
             long_description: nil,
             behaviors: [],
             lore: "",
+            # Feature 013 — Quests. Per-NPC FetchQuest catalog.
+            quests: [],
             next_serial: 1,
             clone_ids: MapSet.new()
 
@@ -36,7 +38,8 @@ defmodule AgenticRealms.World.NPCBlueprint do
         short_description: short,
         long_description: long,
         behaviors: behaviors,
-        lore: lore
+        lore: lore,
+        quests: quests
       }) do
     cond do
       name in [nil, ""] ->
@@ -55,7 +58,10 @@ defmodule AgenticRealms.World.NPCBlueprint do
           short_description: short,
           long_description: long,
           behaviors: behaviors,
-          lore: lore || ""
+          lore: lore || "",
+          # Feature 013 — pass the catalog through verbatim; validation
+          # of catalog shape lives in `Commands.create_npc_blueprint/*`.
+          quests: quests || []
         }
     end
   end
@@ -102,14 +108,17 @@ defmodule AgenticRealms.World.NPCBlueprint do
 
   # --- apply/2 ------------------------------------------------------------
 
-  def apply(%__MODULE__{} = state, %NPCBlueprintCreated{
-        blueprint_id: bp_id,
-        name: name,
-        short_description: short,
-        long_description: long,
-        behaviors: behaviors,
-        lore: lore
-      }) do
+  def apply(
+        %__MODULE__{} = state,
+        %NPCBlueprintCreated{
+          blueprint_id: bp_id,
+          name: name,
+          short_description: short,
+          long_description: long,
+          behaviors: behaviors,
+          lore: lore
+        } = event
+      ) do
     %__MODULE__{
       state
       | id: bp_id,
@@ -117,7 +126,10 @@ defmodule AgenticRealms.World.NPCBlueprint do
         short_description: short,
         long_description: long,
         behaviors: behaviors,
-        lore: lore || ""
+        lore: lore || "",
+        # Feature 013 — Map.get/3 defends against legacy events
+        # serialized before this field existed.
+        quests: Map.get(event, :quests, []) || []
     }
   end
 

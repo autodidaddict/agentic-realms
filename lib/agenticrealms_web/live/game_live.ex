@@ -15,6 +15,7 @@ defmodule AgenticRealmsWeb.GameLive do
     IntentResolver,
     MapView,
     Queries,
+    Quests,
     Seed
   }
 
@@ -29,6 +30,9 @@ defmodule AgenticRealmsWeb.GameLive do
     BehaviorUtterance,
     PlayerCurrentRoomChanged,
     PlayerInventoryChanged,
+    PlayerQuestAccepted,
+    PlayerQuestProgress,
+    PlayerQuestFinalized,
     RoomUtterance,
     PrivateUtterance
   }
@@ -100,8 +104,12 @@ defmodule AgenticRealmsWeb.GameLive do
      |> assign(:input_locked, false)
      |> assign(:stats, GameData.player_stats())
      |> assign(:inventory, inventory)
-     |> assign(:quests, GameData.quests())
-     |> assign(:quest_details, GameData.quest_details())
+     # Feature 013 — Quests. `:quests` is the active-quest list rendered
+     # in the HUD card with per-criterion progress lines; `:completed_quests`
+     # backs the Completed section of the quest modal and is retained
+     # indefinitely (FR-025).
+     |> assign(:quests, Quests.active_for(player_id))
+     |> assign(:completed_quests, Quests.history_for(player_id))
      |> assign(:presence, presence)
      |> assign(:selected_quest, 0)
      |> assign(:wizard_kind, :item)
@@ -212,8 +220,11 @@ defmodule AgenticRealmsWeb.GameLive do
     {:noreply, update(socket, :map_open, &(!&1))}
   end
 
-  def handle_event("select_quest", %{"index" => index}, socket) do
-    {:noreply, assign(socket, :selected_quest, String.to_integer(index))}
+  # Feature 013 — `select_quest` is unused now (the rewritten quest_modal
+  # displays Active and Completed side-by-side without nav state). Kept
+  # as a no-op for forward compatibility with any stale client payload.
+  def handle_event("select_quest", _params, socket) do
+    {:noreply, socket}
   end
 
   def handle_event("set_wizard_kind", %{"kind" => kind}, socket) do
@@ -983,6 +994,72 @@ defmodule AgenticRealmsWeb.GameLive do
     # commits the world_objects update). The payload carries
     # everything list_inventory would return.
     {:noreply, apply_inventory_change(socket, msg)}
+  end
+
+  # Feature 013 — Quests. Move the just-completed quest from `:quests`
+  # into `:completed_quests`. The Completed section in the modal
+  # surfaces it immediately. Append a system log line for the player.
+  def handle_info(%PlayerQuestFinalized{} = msg, socket) do
+    active = Enum.reject(socket.assigns.quests, &(&1.quest_id == msg.quest_id))
+
+    completed_entry = %{
+      quest_id: msg.quest_id,
+      title: msg.title,
+      reward_name: msg.reward_name,
+      completed_at: msg.completed_at
+    }
+
+    completed = [completed_entry | socket.assigns.completed_quests]
+
+    {:noreply,
+     socket
+     |> assign(:quests, active)
+     |> assign(:completed_quests, completed)
+     |> append_log(%{
+       kind: :system,
+       text:
+         "Quest completed: #{msg.title}." <>
+           if(msg.reward_name, do: " You receive #{msg.reward_name}.", else: "")
+     })}
+  end
+
+  # Feature 013 — Quests. Update the matching quest's per-criterion
+  # counts in place. Silent no-op if the quest isn't in our active list
+  # (defensive — should not happen since broadcasts are per-player).
+  def handle_info(%PlayerQuestProgress{quest_id: qid, criteria: criteria}, socket) do
+    quests =
+      Enum.map(socket.assigns.quests, fn
+        %{quest_id: ^qid} = q -> %{q | criteria: criteria}
+        other -> other
+      end)
+
+    {:noreply, assign(socket, :quests, quests)}
+  end
+
+  # Feature 013 — Quests. Append the new active quest to the HUD card
+  # log. Idempotent: if a quest with this id already exists (shouldn't
+  # in normal flow), we leave the list unchanged.
+  def handle_info(%PlayerQuestAccepted{} = msg, socket) do
+    quests = socket.assigns.quests
+
+    if Enum.any?(quests, &(&1.quest_id == msg.quest_id)) do
+      {:noreply, socket}
+    else
+      new_quest = %{
+        quest_id: msg.quest_id,
+        title: msg.title,
+        narrative: msg.narrative,
+        criteria: msg.criteria
+      }
+
+      {:noreply,
+       socket
+       |> assign(:quests, quests ++ [new_quest])
+       |> append_log(%{
+         kind: :system,
+         text: "Quest accepted: #{msg.title}."
+       })}
+    end
   end
 
   def handle_info(%Phoenix.Socket.Broadcast{event: "presence_diff", payload: payload}, socket) do

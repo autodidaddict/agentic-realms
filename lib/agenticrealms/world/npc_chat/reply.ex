@@ -14,7 +14,11 @@ defmodule AgenticRealms.World.NPCChat.Reply do
 
   alias AgenticRealms.World.NPCChat.Tools
 
-  @type outcome :: {:speech, String.t()} | {:emote, String.t()} | {:error, :malformed}
+  @type outcome ::
+          {:speech, String.t()}
+          | {:emote, String.t()}
+          | {:tool_call, %{name: String.t(), input: map()}}
+          | {:error, :malformed}
 
   @spec parse(map() | term()) :: outcome()
   def parse(%{"content" => content}) when is_list(content) do
@@ -28,24 +32,53 @@ defmodule AgenticRealms.World.NPCChat.Reply do
 
   def parse(_), do: {:error, :malformed}
 
-  defp parse_block(%{"name" => name, "input" => %{"text" => text}})
-       when is_binary(text) do
-    trimmed = String.trim(text)
-
+  # `say` and `emote` carry an `input.text`. Feature 013 adds quest tools
+  # which carry domain-specific inputs (slug, quest_id, etc.).
+  defp parse_block(%{"name" => name, "input" => input}) do
     cond do
-      trimmed == "" ->
-        {:error, :malformed}
-
       not MapSet.member?(Tools.names(), name) ->
         {:error, :malformed}
 
-      name == "say" ->
-        {:speech, trimmed}
+      name in ["say", "emote"] ->
+        parse_text_tool(name, input)
 
-      name == "emote" ->
-        {:emote, trimmed}
+      name == "accept_quest" ->
+        parse_quest_tool(name, input, ["slug"])
+
+      name == "check_progress" ->
+        parse_quest_tool(name, input, ["quest_id"])
+
+      name == "finalize_quest" ->
+        parse_quest_tool(name, input, ["quest_id"])
+
+      true ->
+        {:error, :malformed}
     end
   end
 
   defp parse_block(_), do: {:error, :malformed}
+
+  defp parse_text_tool(name, %{"text" => text}) when is_binary(text) do
+    trimmed = String.trim(text)
+
+    cond do
+      trimmed == "" -> {:error, :malformed}
+      name == "say" -> {:speech, trimmed}
+      name == "emote" -> {:emote, trimmed}
+    end
+  end
+
+  defp parse_text_tool(_, _), do: {:error, :malformed}
+
+  defp parse_quest_tool(name, input, required_keys) when is_map(input) do
+    if Enum.all?(required_keys, fn k ->
+         is_binary(Map.get(input, k)) and Map.get(input, k) != ""
+       end) do
+      {:tool_call, %{name: name, input: input}}
+    else
+      {:error, :malformed}
+    end
+  end
+
+  defp parse_quest_tool(_, _, _), do: {:error, :malformed}
 end

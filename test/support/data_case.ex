@@ -100,6 +100,9 @@ defmodule AgenticRealms.DataCase do
     ExUnit.Callbacks.start_supervised!(AgenticRealms.World.Application)
     ExUnit.Callbacks.start_supervised!(AgenticRealms.World.Projections.WorldProjector)
     ExUnit.Callbacks.start_supervised!(AgenticRealms.World.Projections.PlayerStateProjector)
+    # Feature 013 — Quests. Handles the four finalize-side events. Must
+    # be supervised in tests too, otherwise QuestCompleted never lands.
+    ExUnit.Callbacks.start_supervised!(AgenticRealms.World.Projections.QuestProjector)
     ExUnit.Callbacks.start_supervised!(AgenticRealms.World.UIEventBroadcaster)
     ExUnit.Callbacks.start_supervised!(AgenticRealms.World.Behaviors.Interpreter)
     :ok

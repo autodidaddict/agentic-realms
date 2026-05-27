@@ -135,6 +135,45 @@ defmodule AgenticRealms.World.UIEvents do
     defstruct [:kind, :npc_clone_id, :npc_name, :text, :triggering_player_id]
   end
 
+  # ── Feature 013 — Quest UI broadcasts ──────────────────────────────────
+  #
+  # All three structs are broadcast on `player:<player_id>` ONLY. The
+  # `UIEventBroadcaster` emits them in response to QuestAccepted (→
+  # PlayerQuestAccepted), inventory changes touching a tagged item (→
+  # PlayerQuestProgress), and QuestCompleted (→ PlayerQuestFinalized).
+  # See `specs/013-quest-system/contracts/ui-broadcast-events.md`.
+
+  defmodule PlayerQuestAccepted do
+    @moduledoc """
+    Transient event signaling a quest has just been accepted. Broadcast
+    on `player:<player_id>` so `GameLive` can append the quest to the
+    visible log without re-querying.
+
+    `criteria` is the per-criterion progress at accept time — every
+    `count` is 0 in v1.
+    """
+    @enforce_keys [:quest_id, :title, :narrative, :criteria]
+    defstruct [:quest_id, :title, :narrative, :criteria]
+  end
+
+  defmodule PlayerQuestProgress do
+    @moduledoc """
+    Transient event signaling that progress on an active quest has
+    changed. Carries the recomputed per-criterion counts.
+    """
+    @enforce_keys [:quest_id, :criteria]
+    defstruct [:quest_id, :criteria]
+  end
+
+  defmodule PlayerQuestFinalized do
+    @moduledoc """
+    Transient event signaling that a quest has been completed. The UI
+    moves the entry out of the active list and into the completed view.
+    """
+    @enforce_keys [:quest_id, :title, :reward_name, :completed_at]
+    defstruct [:quest_id, :title, :reward_name, :completed_at]
+  end
+
   defmodule ChatSystemMessage do
     @moduledoc """
     Transient chat-frame system message (feature 010). Broadcast on

@@ -41,12 +41,24 @@ defmodule AgenticRealms.World.Projections.WorldProjector do
     NPCSpawnedInRoom,
     NPCBlueprintCreated,
     NPCClonedFromBlueprint,
-    RegionCreated
+    RegionCreated,
+    QuestAccepted
   }
 
   alias AgenticRealms.World.Events.PlayerDiscoveredRoom, as: PlayerDiscoveredRoomEvent
+  alias AgenticRealms.World.Application, as: WorldApp
+  alias AgenticRealms.World.Commands.PlaceObject
 
-  alias AgenticRealms.World.Schemas.{Room, Exit, Object, NPCBlueprint, NPCClone, Region}
+  alias AgenticRealms.World.Schemas.{
+    Room,
+    Exit,
+    Object,
+    NPCBlueprint,
+    NPCClone,
+    Region,
+    QuestInstance
+  }
+
   alias AgenticRealms.World.Schemas.PlayerDiscoveredRoom, as: PlayerDiscoveredRoomRow
 
   # Feature 012: regions are first-class. RegionCreated lands here before
@@ -121,7 +133,7 @@ defmodule AgenticRealms.World.Projections.WorldProjector do
           long_description: long,
           fixed: fixed,
           behaviors: behaviors
-        },
+        } = event,
         _meta
       ) do
     Repo.insert!(
@@ -133,7 +145,12 @@ defmodule AgenticRealms.World.Projections.WorldProjector do
         fixed: fixed,
         room_id: room_id,
         player_id: nil,
-        behaviors: behaviors || []
+        behaviors: behaviors || [],
+        # Feature 013 — both nil for non-quest placements and for legacy
+        # events that pre-date this feature. Map.get/3 with default nil
+        # makes replay safe.
+        quest_player_id: Map.get(event, :quest_player_id),
+        quest_instance_id: Map.get(event, :quest_instance_id)
       },
       on_conflict: :nothing,
       conflict_target: :id
@@ -173,7 +190,7 @@ defmodule AgenticRealms.World.Projections.WorldProjector do
           long_description: long,
           behaviors: behaviors,
           lore: lore
-        },
+        } = event,
         _meta
       ) do
     Repo.insert!(
@@ -184,7 +201,9 @@ defmodule AgenticRealms.World.Projections.WorldProjector do
         long_description: long,
         is_synthetic: false,
         behaviors: behaviors,
-        lore: lore || ""
+        lore: lore || "",
+        # Feature 013 — legacy events without :quests default to [].
+        quests: Map.get(event, :quests, []) || []
       },
       on_conflict: :nothing,
       conflict_target: :id
@@ -298,6 +317,116 @@ defmodule AgenticRealms.World.Projections.WorldProjector do
     )
 
     :ok
+  end
+
+  # Feature 013 — Quests. On QuestAccepted: (1) insert the quest_instances
+  # row with state="active", (2) for each criterion, for each spawn_room_id,
+  # dispatch a PlaceObject command stamped with quest_player_id +
+  # quest_instance_id. The PlaceObject flow lands the item via the normal
+  # Room aggregate + ObjectPlacedInRoom event path — the only special
+  # thing is the visibility fields it carries.
+  def handle(
+        %QuestAccepted{
+          quest_id: qid,
+          player_id: pid,
+          npc_blueprint_id: bp_id,
+          slug: slug,
+          definition_snapshot: snapshot,
+          accepted_at: at
+        },
+        _meta
+      ) do
+    Repo.insert!(
+      %QuestInstance{
+        id: qid,
+        player_id: pid,
+        npc_blueprint_id: bp_id,
+        slug: slug,
+        state: "active",
+        accepted_at: ensure_datetime(at),
+        definition_snapshot: snapshot
+      },
+      on_conflict: :nothing,
+      conflict_target: :id
+    )
+
+    # Spawn one quest-scoped item per (criterion, spawn_room_id) pair.
+    # The contract guarantees `length(spawn_room_ids) == target_count`
+    # so each room gets exactly one item.
+    criteria = snapshot_list(snapshot, "criteria")
+
+    for criterion <- criteria,
+        room_id <- snapshot_list(criterion, "spawn_room_ids") do
+      spawn_quest_object(criterion, room_id, pid, qid)
+    end
+
+    :ok
+  end
+
+  defp spawn_quest_object(criterion, room_id, player_id, quest_instance_id) do
+    item_name = snapshot_get(criterion, "item_name") || "quest item"
+    item_short = snapshot_get(criterion, "item_short_description") || "a quest item"
+    item_long = snapshot_get(criterion, "item_long_description") || item_short
+    tag = snapshot_get(criterion, "quest_tag")
+
+    # Idempotency under replay: PlaceObject's aggregate guard rejects a
+    # duplicate object_id with :object_already_in_room, but since we
+    # generate a fresh UUID each replay we would actually re-spawn. To
+    # make replay safe, derive a deterministic object id from
+    # (quest_instance_id, room_id, criterion tag) so the same triple
+    # never produces a new id on a re-run of the same event.
+    deterministic_oid =
+      :crypto.hash(:sha, "#{quest_instance_id}|#{room_id}|#{tag}")
+      |> Base.encode16(case: :lower)
+      |> binary_part(0, 32)
+      |> uuid_format()
+
+    WorldApp.dispatch(%PlaceObject{
+      room_id: room_id,
+      object_id: deterministic_oid,
+      name: item_name,
+      short_description: item_short,
+      long_description: item_long,
+      fixed: false,
+      behaviors: [%{"type" => "quest_tag", "tag" => tag}],
+      quest_player_id: player_id,
+      quest_instance_id: quest_instance_id
+    })
+
+    :ok
+  rescue
+    _ -> :ok
+  end
+
+  defp uuid_format(hex32) when byte_size(hex32) == 32 do
+    <<a::binary-size(8), b::binary-size(4), c::binary-size(4), d::binary-size(4),
+      e::binary-size(12)>> = hex32
+
+    "#{a}-#{b}-#{c}-#{d}-#{e}"
+  end
+
+  # Helpers for reading jsonb maps that may have string or atom keys.
+  defp snapshot_get(map, key) when is_map(map) and is_binary(key) do
+    case Map.get(map, key) do
+      nil ->
+        try do
+          Map.get(map, String.to_existing_atom(key))
+        rescue
+          ArgumentError -> nil
+        end
+
+      v ->
+        v
+    end
+  end
+
+  defp snapshot_get(_, _), do: nil
+
+  defp snapshot_list(map, key) do
+    case snapshot_get(map, key) do
+      list when is_list(list) -> list
+      _ -> []
+    end
   end
 
   # EventStore round-trips `%DateTime{}` through JSON as an ISO 8601 string.
