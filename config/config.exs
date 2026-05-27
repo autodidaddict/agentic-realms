@@ -13,17 +13,33 @@ config :agenticrealms,
   event_stores: [AgenticRealms.EventStore],
   generators: [timestamp_type: :utc_datetime]
 
-# Commanded application + EventStore adapter
+# Commanded application + EventStore adapter.
+#
+# Issue #6 — `snapshotting:` enables Commanded aggregate snapshots so
+# command latency stops growing linearly with the aggregate's event count.
+# `snapshot_every: 100` means a new snapshot is recorded after every 100
+# events on the stream; `snapshot_version: 1` lets us force-discard prior
+# snapshots if the aggregate state schema changes (bump the version).
+# Room and Player aggregates implement `Commanded.Serialization.JsonDecoder`
+# so their `MapSet` fields roundtrip cleanly through the serializer below.
 config :agenticrealms, AgenticRealms.World.Application,
   event_store: [
     adapter: Commanded.EventStore.Adapters.EventStore,
     event_store: AgenticRealms.EventStore
   ],
   pubsub: :local,
-  registry: :local
+  registry: :local,
+  snapshotting: %{
+    AgenticRealms.World.Room => [snapshot_every: 100, snapshot_version: 1],
+    AgenticRealms.World.Player => [snapshot_every: 100, snapshot_version: 1]
+  }
 
+# `AgenticRealms.EventStore.Serializer` is a thin wrapper over
+# `EventStore.JsonSerializer` that pipes deserialized structs through
+# `Commanded.Serialization.JsonDecoder` — required so aggregate snapshots
+# can rehydrate `MapSet` fields. Wire format is unchanged for events.
 config :agenticrealms, AgenticRealms.EventStore,
-  serializer: EventStore.JsonSerializer,
+  serializer: AgenticRealms.EventStore.Serializer,
   column_data_type: "jsonb",
   username: "postgres",
   password: "postgres",

@@ -36,13 +36,21 @@ config :phoenix,
 
 # In tests use the in-memory event store adapter so we don't need a separate
 # Postgres database for event sourcing and tests stay fast/hermetic.
+#
+# `snapshotting:` mirrors config.exs (issue #6). The test config block fully
+# overrides the prod block, so the snapshot config must be repeated here for
+# tests to exercise the snapshot path.
 config :agenticrealms, AgenticRealms.World.Application,
   event_store: [
     adapter: Commanded.EventStore.Adapters.InMemory,
     serializer: Commanded.Serialization.JsonSerializer
   ],
   pubsub: :local,
-  registry: :local
+  registry: :local,
+  snapshotting: %{
+    AgenticRealms.World.Room => [snapshot_every: 100, snapshot_version: 1],
+    AgenticRealms.World.Player => [snapshot_every: 100, snapshot_version: 1]
+  }
 
 # Anthropic API in tests: a dummy key (so the resolver does not take the
 # missing-key path) plus a Req.Test plug so no request ever leaves the BEAM.
