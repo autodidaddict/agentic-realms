@@ -53,9 +53,33 @@ defmodule AgenticRealmsWeb.GameComponents.MiniMapTest do
       off_map?: false,
       viewport_center: {1, 0},
       rooms: [
-        %RoomGlyph{id: "a", name: "A", x: 0, y: 0, is_current?: false, has_up?: false, has_down?: false},
-        %RoomGlyph{id: "b", name: "B", x: 1, y: 0, is_current?: true, has_up?: false, has_down?: false},
-        %RoomGlyph{id: "c", name: "C", x: 2, y: 0, is_current?: false, has_up?: false, has_down?: false}
+        %RoomGlyph{
+          id: "a",
+          name: "A",
+          x: 0,
+          y: 0,
+          is_current?: false,
+          has_up?: false,
+          has_down?: false
+        },
+        %RoomGlyph{
+          id: "b",
+          name: "B",
+          x: 1,
+          y: 0,
+          is_current?: true,
+          has_up?: false,
+          has_down?: false
+        },
+        %RoomGlyph{
+          id: "c",
+          name: "C",
+          x: 2,
+          y: 0,
+          is_current?: false,
+          has_up?: false,
+          has_down?: false
+        }
       ],
       exits: [
         %ExitLine{kind: :normal, from_x: 0, from_y: 0, to_x: 1, to_y: 0, direction: :east},

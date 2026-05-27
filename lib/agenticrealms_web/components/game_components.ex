@@ -698,7 +698,6 @@ defmodule AgenticRealmsWeb.GameComponents do
           <.map_exit_decoration :for={e <- @map_view.exits} exit={e} />
         </svg>
       <% end %>
-
     </div>
     """
   end

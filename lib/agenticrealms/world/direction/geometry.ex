@@ -121,7 +121,16 @@ defmodule AgenticRealms.World.Direction.Geometry do
             "vertical exits render as icons on the source room, not lines"
   end
 
-  @planar_directions [:north, :south, :east, :west, :northeast, :northwest, :southeast, :southwest]
+  @planar_directions [
+    :north,
+    :south,
+    :east,
+    :west,
+    :northeast,
+    :northwest,
+    :southeast,
+    :southwest
+  ]
 
   @doc """
   Whether a direction is a planar (compass) direction. Convenience for

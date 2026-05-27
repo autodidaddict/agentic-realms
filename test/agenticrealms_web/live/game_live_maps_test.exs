@@ -93,6 +93,7 @@ defmodule AgenticRealmsWeb.GameLiveMapsTest do
 
     assert html_in_vault =~ "Blackmire", "US5: region header preserved while off-map"
     assert html_in_vault =~ "map-canvas--off-map", "US5: blank canvas in Vault"
+
     refute html_in_vault =~ ~s|data-room-name="Hidden Vault"|,
            "US5: Vault never appears as a glyph"
 
