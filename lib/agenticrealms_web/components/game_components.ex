@@ -87,7 +87,7 @@ defmodule AgenticRealmsWeb.GameComponents do
           phx-click="submit_command"
           phx-value-text={exit.direction}
         >
-          <span class="arrow">→</span>
+          <span class="arrow">{direction_arrow(exit.direction)}</span>
           <span>{exit.direction} · {exit.target_name}</span>
         </button>
       </div>
@@ -127,7 +127,7 @@ defmodule AgenticRealmsWeb.GameComponents do
       <div class="room-body">{@entry.room.desc}</div>
       <div class="exits">
         <button :for={exit <- @entry.room.exits} class="exit-chip">
-          <span class="arrow">→</span>
+          <span class="arrow">{direction_arrow(exit.dir)}</span>
           <span>{exit.dir} · {exit.to}</span>
         </button>
       </div>
@@ -897,6 +897,33 @@ defmodule AgenticRealmsWeb.GameComponents do
     |> Keyword.get(:default_zoom_cells, 3)
   end
 
+  # Unicode arrow glyph for an exit direction. Accepts either the
+  # canonical atom (`:north`, `:northeast`, …) or its string form (the
+  # read-model stores directions as lowercase strings; the mock UI
+  # entries use the same strings). Up and north both render as ↑; down
+  # and south as ↓.
+  @arrow_by_dir %{
+    "north" => "↑",
+    "south" => "↓",
+    "east" => "→",
+    "west" => "←",
+    "northeast" => "↗",
+    "northwest" => "↖",
+    "southeast" => "↘",
+    "southwest" => "↙",
+    "up" => "↑",
+    "down" => "↓"
+  }
+
+  @doc false
+  def direction_arrow(dir) when is_atom(dir),
+    do: Map.get(@arrow_by_dir, Atom.to_string(dir), "·")
+
+  def direction_arrow(dir) when is_binary(dir),
+    do: Map.get(@arrow_by_dir, String.downcase(dir), "·")
+
+  def direction_arrow(_), do: "·"
+
   # ────────────────────────────────────────────────────────────
   # Modal Shell
   # ────────────────────────────────────────────────────────────
@@ -1245,7 +1272,7 @@ defmodule AgenticRealmsWeb.GameComponents do
           <% "exits" -> %>
             <div :for={exit <- @field[:exits] || []} class="exit-pair" style="width: 100%;">
               <span class="dir">{exit.dir}</span>
-              <span class="arrow">→</span>
+              <span class="arrow">{direction_arrow(exit.dir)}</span>
               <span class="dest">{exit.to}</span>
             </div>
           <% "entities" -> %>
