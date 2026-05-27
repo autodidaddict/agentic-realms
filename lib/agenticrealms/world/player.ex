@@ -101,3 +101,27 @@ defmodule AgenticRealms.World.Player do
     %__MODULE__{state | discovered_room_ids: MapSet.put(discovered, rid)}
   end
 end
+
+# Snapshot serialization for the Player aggregate (issue #6).
+# `discovered_room_ids` is a `MapSet`; we render it as a list on serialize
+# and rebuild the MapSet on deserialize via
+# `Commanded.Serialization.JsonDecoder`. The custom EventStore serializer
+# (`AgenticRealms.EventStore.Serializer`) and the Commanded JsonSerializer
+# both invoke that protocol after `struct/2`.
+defimpl Jason.Encoder, for: AgenticRealms.World.Player do
+  def encode(%AgenticRealms.World.Player{} = player, opts) do
+    player
+    |> Map.from_struct()
+    |> Map.update!(:discovered_room_ids, &MapSet.to_list/1)
+    |> Jason.Encode.map(opts)
+  end
+end
+
+defimpl Commanded.Serialization.JsonDecoder, for: AgenticRealms.World.Player do
+  def decode(%AgenticRealms.World.Player{discovered_room_ids: ids} = state)
+      when is_list(ids) do
+    %{state | discovered_room_ids: MapSet.new(ids)}
+  end
+
+  def decode(%AgenticRealms.World.Player{} = state), do: state
+end

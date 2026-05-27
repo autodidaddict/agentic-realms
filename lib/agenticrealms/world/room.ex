@@ -160,12 +160,15 @@ defmodule AgenticRealms.World.Room do
 
   # --- apply/2 ------------------------------------------------------------
 
-  def apply(%__MODULE__{} = state, %RoomCreated{
-        room_id: id,
-        name: name,
-        description: description,
-        behaviors: behaviors
-      } = event) do
+  def apply(
+        %__MODULE__{} = state,
+        %RoomCreated{
+          room_id: id,
+          name: name,
+          description: description,
+          behaviors: behaviors
+        } = event
+      ) do
     %__MODULE__{
       state
       | id: id,
@@ -205,4 +208,41 @@ defmodule AgenticRealms.World.Room do
   # This clause exists only so rehydrating a Room aggregate from its event
   # stream doesn't crash on historical events emitted by feature 007.
   def apply(%__MODULE__{} = state, %NPCSpawnedInRoom{}), do: state
+end
+
+# Snapshot serialization for the Room aggregate (issue #6).
+# `object_ids` is a `MapSet`, which has no Jason.Encoder impl; we render it
+# as a list on serialize and rebuild the MapSet on deserialize via
+# `Commanded.Serialization.JsonDecoder`. The custom EventStore serializer
+# (`AgenticRealms.EventStore.Serializer`) and the Commanded JsonSerializer
+# both invoke that protocol after `struct/2`.
+defimpl Jason.Encoder, for: AgenticRealms.World.Room do
+  def encode(%AgenticRealms.World.Room{} = room, opts) do
+    room
+    |> Map.from_struct()
+    |> Map.update!(:object_ids, &MapSet.to_list/1)
+    |> Jason.Encode.map(opts)
+  end
+end
+
+defimpl Commanded.Serialization.JsonDecoder, for: AgenticRealms.World.Room do
+  # The Jason :atoms!/:atoms key strategy atomizes ALL keys in the decoded
+  # JSON — including the keys of `exits`, which the aggregate populates
+  # with the string direction from each `ExitAdded` event (e.g. "north").
+  # Without re-stringifying, `Map.has_key?(exits, "north")` in execute
+  # clauses would miss after a snapshot rehydrate.
+  def decode(%AgenticRealms.World.Room{object_ids: ids, exits: exits} = state) do
+    %{
+      state
+      | object_ids: to_mapset(ids),
+        exits: stringify_keys(exits)
+    }
+  end
+
+  defp to_mapset(ids) when is_list(ids), do: MapSet.new(ids)
+  defp to_mapset(%MapSet{} = ids), do: ids
+
+  defp stringify_keys(map) when is_map(map) do
+    Map.new(map, fn {k, v} -> {to_string(k), v} end)
+  end
 end
