@@ -24,14 +24,22 @@ defmodule AgenticRealms.World.UIEventBroadcaster do
                                            + PlayerInventoryChanged(:removed)
   """
 
-  # `:strong` so dispatches with `consistency: :strong` (move, take, drop)
-  # block until the broadcast has been published. Without this, witness
-  # GameLives can race the publish: the test (or a fast user) sees a
-  # stale render between the projector commit and the PubSub fan-out.
+  # `:eventual` (issue #9). The earlier `:strong` declaration was added
+  # to fix a test race — `Phoenix.LiveViewTest.render/1` could fire
+  # before the broadcast reached the subscriber's inbox — but at the
+  # cost of serializing every `move` / `take` / `drop` / `spawn`
+  # dispatch on this single handler. On a distributed PubSub backend
+  # that means every dispatch waits for fan-out to every subscriber in
+  # the broadcasting node's process, which is the wrong place to pay
+  # that cost. Witness handlers mutate from the broadcast payload only
+  # (no DB reread), so runtime correctness doesn't need synchronous
+  # broadcast. Tests poll with `assert_eventually/3` (in
+  # `AgenticRealmsWeb.ConnCase`) when they need the witness render to
+  # reflect the broadcast.
   use Commanded.Event.Handler,
     application: AgenticRealms.World.Application,
     name: __MODULE__,
-    consistency: :strong
+    consistency: :eventual
 
   alias AgenticRealms.Accounts
   alias AgenticRealms.Repo

@@ -35,4 +35,50 @@ defmodule AgenticRealmsWeb.ConnCase do
     AgenticRealms.DataCase.setup_sandbox(tags)
     {:ok, conn: Phoenix.ConnTest.build_conn()}
   end
+
+  @doc """
+  Poll `check.()` against a `Phoenix.LiveViewTest` view until it returns
+  truthy or the timeout elapses; flunks otherwise.
+
+  Each poll first drains the LiveView's mailbox via `:sys.get_state/1`
+  so any queued PubSub messages (e.g. from `UIEventBroadcaster`, which
+  runs with `consistency: :eventual` per issue #9) have been processed
+  before the predicate fires. Returns `:ok` on success.
+
+  Options:
+    * `:timeout` — total wait in ms (default 1_000)
+    * `:label` — short string included in the flunk message
+    * `:on_timeout` — zero-arg fn returning extra diagnostic info to
+      include in the flunk message (e.g. `fn -> render(view) end`)
+  """
+  def assert_eventually(view, check, opts \\ []) when is_function(check, 0) do
+    timeout_ms = Keyword.get(opts, :timeout, 1_000)
+    label = Keyword.get(opts, :label, "predicate")
+    on_timeout = Keyword.get(opts, :on_timeout, fn -> nil end)
+
+    deadline = System.monotonic_time(:millisecond) + timeout_ms
+    do_assert_eventually(view, check, deadline, label, timeout_ms, on_timeout)
+  end
+
+  defp do_assert_eventually(view, check, deadline, label, timeout_ms, on_timeout) do
+    _ = :sys.get_state(view.pid)
+
+    cond do
+      check.() ->
+        :ok
+
+      System.monotonic_time(:millisecond) > deadline ->
+        extra =
+          case on_timeout.() do
+            nil -> ""
+            other -> "\nDiagnostic:\n" <> inspect(other, limit: :infinity, pretty: true)
+          end
+
+        ExUnit.Assertions.flunk("#{label} did not become true within #{timeout_ms}ms" <> extra)
+
+      true ->
+        Process.sleep(20)
+        do_assert_eventually(view, check, deadline, label, timeout_ms, on_timeout)
+    end
+  end
 end
