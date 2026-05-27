@@ -51,42 +51,6 @@
     }
   </script>
 
-  <script :type={Phoenix.LiveView.ColocatedHook} name=".ScrollBottom">
-    // Always pin the log to its newest entry on any DOM mutation.
-    // Driven by a MutationObserver because Phoenix LiveView's updated()
-    // hook callback doesn't reliably fire for every code path that
-    // appends to :log (background timer emissions and PubSub-driven
-    // utterances arrive on patches where the parent element's own
-    // attributes don't change).
-    //
-    // No sticky-bottom heuristic: a previous version of this hook only
-    // pinned when the user was already at the bottom, but LiveView's
-    // morph cycle can briefly shift scrollTop while the DOM grows,
-    // which races with the scroll-position check and stops the pin
-    // from firing. Always-pin is the user-visible contract: every new
-    // log entry shows up.
-    export default {
-      _pin() {
-        requestAnimationFrame(() => {
-          this.el.scrollTop = this.el.scrollHeight;
-        });
-      },
-      mounted() {
-        this._observer = new MutationObserver(() => this._pin());
-        this._observer.observe(this.el, { childList: true, subtree: true });
-
-        this._pin();
-
-        // Explicit server-side trigger (used by toggle_map after the
-        // panel covers/uncovers the bottom of the log).
-        this.handleEvent("scroll_log_to_bottom", () => this._pin());
-      },
-      destroyed() {
-        if (this._observer) this._observer.disconnect();
-      }
-    }
-  </script>
-
   <script :type={Phoenix.LiveView.ColocatedHook} name=".StreamingText">
     export default {
       mounted() {

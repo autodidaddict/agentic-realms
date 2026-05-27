@@ -332,7 +332,14 @@ button { font: inherit; color: inherit; }
 .player[data-layout="minimal"] .p-stats { grid-area: status; }
 .player[data-layout="minimal"] .p-log { grid-area: log; }
 .player[data-layout="minimal"] .p-input { grid-area: input; }
-.player[data-layout="minimal"] .p-log-inner { max-width: 720px; margin: 0 auto; }
+/* Minimal layout previously centered a .p-log-inner wrapper; with the
+   column-reverse refactor the wrapper is gone, so center .p-log itself
+   within its grid cell. */
+.player[data-layout="minimal"] .p-log {
+  max-width: 720px;
+  justify-self: center;
+  width: 100%;
+}
 
 /* When HUD hidden */
 .player[data-hud="hidden"] .p-stats { display: none; }
@@ -347,13 +354,25 @@ button { font: inherit; color: inherit; }
 /* --------- Log --------- */
 
 .p-log {
+  /* Auto-scroll-to-bottom via CSS only.
+     `flex-direction: column-reverse` makes the scroll container's "start"
+     sit at the visual bottom. New children (prepended in source order in
+     the template — we reverse @log there) appear at the visual bottom and
+     the browser auto-anchors the scroll to them. When the user scrolls up
+     to read backlog the position is preserved through subsequent
+     appends. */
+  display: flex;
+  flex-direction: column-reverse;
   overflow-y: auto;
   border-right: 1px solid var(--line);
   padding: 24px 28px 32px;
   scrollbar-width: thin;
   scrollbar-color: var(--line) transparent;
 }
-.player[data-layout="minimal"] .p-log { border-right: 0; padding: 32px 40px; }
+.player[data-layout="minimal"] .p-log {
+  border-right: 0;
+  padding: 32px 40px;
+}
 
 .p-log::-webkit-scrollbar { width: 8px; }
 .p-log::-webkit-scrollbar-thumb { background: var(--line); border-radius: 4px; }

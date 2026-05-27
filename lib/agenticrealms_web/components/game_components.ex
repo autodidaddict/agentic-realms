@@ -1130,18 +1130,24 @@ defmodule AgenticRealmsWeb.GameComponents do
     >
       <.mini_map :if={@map_open} map_view={@map_view} />
 
-      <main class="p-log" id="game-log" phx-hook=".ScrollBottom">
-        <div class="p-log-inner">
-          <.log_entry :for={entry <- @log} entry={entry} />
-          <div
-            :if={@streaming}
-            id="streaming-text"
-            phx-hook=".StreamingText"
-            class="log-entry narrate"
-          >
-            <span class="cursor" />
-          </div>
+      <%!-- Auto-scroll-to-bottom via `flex-direction: column-reverse` on
+            .p-log. Source order is newest-first (we reverse @log here so
+            the in-memory append-at-end semantics are unchanged); the
+            browser flips them visually so newest is at the bottom AND
+            auto-anchors the scroll to the flex "start" (visually the
+            bottom). No JS, no race conditions — when @log grows the
+            visible bottom updates instantly. When the user scrolls up
+            to read backlog the browser preserves their position. --%>
+      <main class="p-log" id="game-log">
+        <div
+          :if={@streaming}
+          id="streaming-text"
+          phx-hook=".StreamingText"
+          class="log-entry narrate"
+        >
+          <span class="cursor" />
         </div>
+        <.log_entry :for={entry <- Enum.reverse(@log)} entry={entry} />
       </main>
 
       <.stats_panel

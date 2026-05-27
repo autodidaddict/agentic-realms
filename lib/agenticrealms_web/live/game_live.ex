@@ -214,14 +214,7 @@ defmodule AgenticRealmsWeb.GameLive do
   end
 
   def handle_event("toggle_map", _params, socket) do
-    # Feature 012 — toggling the map opens or closes a floating overlay
-    # that covers the bottom of the log. Push a scroll-to-bottom event so
-    # the log re-pins its newest entry above the panel's top edge after
-    # the layout shift.
-    {:noreply,
-     socket
-     |> update(:map_open, &(!&1))
-     |> push_event("scroll_log_to_bottom", %{})}
+    {:noreply, update(socket, :map_open, &(!&1))}
   end
 
   def handle_event("select_quest", %{"index" => index}, socket) do
