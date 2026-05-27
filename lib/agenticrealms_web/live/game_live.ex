@@ -1042,8 +1042,20 @@ defmodule AgenticRealmsWeb.GameLive do
   defp arrival_text(%RoomPlayerArrived{actor_username: name, from_direction: nil}),
     do: "#{name} logged in."
 
+  defp arrival_text(%RoomPlayerArrived{actor_username: name, from_direction: :up}),
+    do: "#{name} arrives from above."
+
+  defp arrival_text(%RoomPlayerArrived{actor_username: name, from_direction: :down}),
+    do: "#{name} arrives from below."
+
   defp arrival_text(%RoomPlayerArrived{actor_username: name, from_direction: dir}),
     do: "#{name} arrives from the #{Direction.to_string(dir)}."
+
+  defp departure_text(%RoomPlayerLeft{actor_username: name, to_direction: :up}),
+    do: "#{name} leaves upward."
+
+  defp departure_text(%RoomPlayerLeft{actor_username: name, to_direction: :down}),
+    do: "#{name} leaves downward."
 
   defp departure_text(%RoomPlayerLeft{actor_username: name, to_direction: dir}),
     do: "#{name} leaves to the #{Direction.to_string(dir)}."
