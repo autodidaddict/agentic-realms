@@ -11,7 +11,12 @@ defmodule AgenticRealms.World.SnapshotTest do
   regressed they'd come back as plain lists / atom-keyed maps.
   """
 
-  use ExUnit.Case, async: true
+  use AgenticRealms.DataCase, async: false
+
+  # Issue #10 — opt in to the per-test Commanded chain. The `World.Application`
+  # is no longer started by the global supervisor in :test; `setup_commanded/0`
+  # spins up a fresh chain (incl. its in-memory event store) per test.
+  @moduletag :commanded
 
   alias AgenticRealms.World.Application, as: WorldApp
   alias AgenticRealms.World.{Player, Room}

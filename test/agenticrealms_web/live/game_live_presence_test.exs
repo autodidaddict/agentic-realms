@@ -9,6 +9,8 @@ defmodule AgenticRealmsWeb.GameLivePresenceTest do
 
   use AgenticRealmsWeb.ConnCase, async: false
 
+  @moduletag :commanded
+
   import Phoenix.LiveViewTest
 
   alias AgenticRealms.Accounts

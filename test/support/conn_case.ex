@@ -33,6 +33,7 @@ defmodule AgenticRealmsWeb.ConnCase do
 
   setup tags do
     AgenticRealms.DataCase.setup_sandbox(tags)
+    if tags[:commanded], do: AgenticRealms.DataCase.setup_commanded()
     {:ok, conn: Phoenix.ConnTest.build_conn()}
   end
 
