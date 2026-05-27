@@ -625,6 +625,7 @@ defmodule AgenticRealms.World.MapViewTest do
       discover(player_id, vault)
 
       view_before = MapView.for_player(player_id)
+
       assert view_before.exits == [],
              "before unhide: no east-going line or fog stub"
 
@@ -764,6 +765,7 @@ defmodule AgenticRealms.World.MapViewTest do
       hollowvale = insert_region("Hollowvale")
 
       border = insert_room(blackmire, map_x: 0, map_y: 0)
+
       hidden_outskirts =
         insert_room(hollowvale, map_visible: false, map_x: 0, map_y: 0)
 
