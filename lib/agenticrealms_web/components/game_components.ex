@@ -87,7 +87,7 @@ defmodule AgenticRealmsWeb.GameComponents do
           phx-click="submit_command"
           phx-value-text={exit.direction}
         >
-          <span class="arrow">→</span>
+          <span class="arrow">{direction_arrow(exit.direction)}</span>
           <span>{exit.direction} · {exit.target_name}</span>
         </button>
       </div>
@@ -127,7 +127,7 @@ defmodule AgenticRealmsWeb.GameComponents do
       <div class="room-body">{@entry.room.desc}</div>
       <div class="exits">
         <button :for={exit <- @entry.room.exits} class="exit-chip">
-          <span class="arrow">→</span>
+          <span class="arrow">{direction_arrow(exit.dir)}</span>
           <span>{exit.dir} · {exit.to}</span>
         </button>
       </div>
@@ -463,48 +463,466 @@ defmodule AgenticRealmsWeb.GameComponents do
   # Mini Map
   # ────────────────────────────────────────────────────────────
 
+  attr :map_view, :map, required: true
+
   def mini_map(assigns) do
-    nodes = GameData.map_nodes()
-    edges = GameData.map_edges()
-    by_id = Map.new(nodes, fn n -> {n.id, n} end)
-    assigns = assign(assigns, nodes: nodes, edges: edges, by_id: by_id)
+    {cx, cy} = assigns.map_view.viewport_center
+    zoom = map_default_zoom_cells()
+    half = zoom / 2.0
+
+    # SVG viewBox lives in CELL UNITS. Default view is `zoom` cells wide,
+    # centered on the player's current room. The .MapInteract JS hook
+    # owns mouse-wheel zoom and click-drag pan from there — it rewrites
+    # the viewBox attribute locally without server round-trips.
+    initial_view_box = "#{cx - half} #{cy - half} #{zoom} #{zoom}"
+
+    assigns = assign(assigns, :initial_view_box, initial_view_box)
 
     ~H"""
-    <div class="stat-block">
-      <h4>Region · Blackvane</h4>
-      <div class="map">
-        <div class="map-grid"></div>
-        <%= for {a_id, b_id} <- @edges do %>
-          <% a = @by_id[a_id] %>
-          <% b = @by_id[b_id] %>
-          <% dx = b.x - a.x %>
-          <% dy = b.y - a.y %>
-          <% len = :math.sqrt(dx * dx + dy * dy) %>
-          <% ang = :math.atan2(dy, dx) * 180 / :math.pi() %>
-          <div
-            class="map-edge"
-            style={"left: #{a.x}%; top: #{a.y}%; width: #{len}%; transform: rotate(#{ang}deg)"}
-          >
-          </div>
-        <% end %>
-        <div
-          :for={node <- @nodes}
-          class={"map-node #{node.state}"}
-          style={"left: #{node.x}%; top: #{node.y}%"}
-          title={node.label}
+    <div class="map-panel">
+      <h4 class="map-region">
+        <span class="map-region-label">Region</span>
+        <span class="map-region-sep">·</span>
+        <span class="map-region-name">{@map_view.region_name || "—"}</span>
+
+        <span
+          :if={@map_view.has_above_rooms?}
+          class="map-affordance map-affordance--above"
+          aria-label="Discovered rooms above"
+          title="Rooms above"
         >
-        </div>
-      </div>
-      <div style="margin-top: 12px;">
-        <div class="dir-pad">
-          <span /><button>N</button> <span />
-          <button>W</button><button disabled>·</button><button>E</button>
-          <span /><button>S</button> <span />
-        </div>
-      </div>
+          <svg width="10" height="10" viewBox="0 0 10 10" xmlns="http://www.w3.org/2000/svg">
+            <path d="M1 7 L5 2 L9 7" stroke="currentColor" stroke-width="1.5" fill="none" />
+          </svg>
+        </span>
+        <span
+          :if={@map_view.has_below_rooms?}
+          class="map-affordance map-affordance--below"
+          aria-label="Discovered rooms below"
+          title="Rooms below"
+        >
+          <svg width="10" height="10" viewBox="0 0 10 10" xmlns="http://www.w3.org/2000/svg">
+            <path d="M1 3 L5 8 L9 3" stroke="currentColor" stroke-width="1.5" fill="none" />
+          </svg>
+        </span>
+      </h4>
+
+      <%= if @map_view.off_map? do %>
+        <div class="map-canvas map-canvas--off-map"></div>
+      <% else %>
+        <script :type={Phoenix.LiveView.ColocatedHook} name=".MapInteract">
+          // Feature 012 — client-side map interaction. Combines:
+          //   * styled hover tooltip (reads data-room-name from .map-cell)
+          //   * mouse-wheel zoom around the cursor
+          //   * click-drag pan
+          //
+          // All viewBox manipulation is local — no LiveView round-trip per
+          // mousemove / wheel tick. The server re-emits a default viewBox
+          // (3 cells centered on the player) on every movement; the user's
+          // pan/zoom is reset on movement, which is the desired UX (we
+          // always recenter on the player after they move).
+          //
+          // FR-017 information hiding: fog stubs and cross-region portals
+          // do NOT carry data-room-name, so they silently no-op for the
+          // tooltip path.
+          export default {
+            mounted() { this._wire(); this._installTooltip(); },
+            updated() { this._wire(); },
+            destroyed() {
+              this.el.removeEventListener("mouseover", this._onOver);
+              this.el.removeEventListener("mousemove", this._onMove);
+              this.el.removeEventListener("mouseout", this._onOut);
+              this.el.removeEventListener("wheel", this._onWheel);
+              this.el.removeEventListener("mousedown", this._onDown);
+              window.removeEventListener("mouseup", this._onUp);
+              window.removeEventListener("mousemove", this._onPan);
+              if (this._tip && this._tip.parentNode) {
+                this._tip.parentNode.removeChild(this._tip);
+              }
+            },
+
+            // ----- tooltip --------------------------------------------
+            _installTooltip() {
+              this._tip = document.createElement("div");
+              this._tip.className = "map-tooltip";
+              this._tip.style.display = "none";
+              document.body.appendChild(this._tip);
+            },
+            _showTip(cell, x, y) {
+              const name = cell.getAttribute("data-room-name");
+              if (!name) return;
+              this._tip.textContent = name;
+              this._tip.style.left = (x + 12) + "px";
+              this._tip.style.top = (y + 12) + "px";
+              this._tip.style.display = "block";
+            },
+            _hideTip() { this._tip.style.display = "none"; },
+
+            // ----- viewBox helpers ------------------------------------
+            _getVB() {
+              const v = this.el.getAttribute("viewBox").split(/\s+/).map(parseFloat);
+              return { x: v[0], y: v[1], w: v[2], h: v[3] };
+            },
+            _setVB(vb) {
+              this.el.setAttribute("viewBox", `${vb.x} ${vb.y} ${vb.w} ${vb.h}`);
+            },
+            // Convert screen-pixel (clientX, clientY) to viewBox coords.
+            _screenToVB(clientX, clientY) {
+              const rect = this.el.getBoundingClientRect();
+              const vb = this._getVB();
+              const sx = (clientX - rect.left) / rect.width;
+              const sy = (clientY - rect.top) / rect.height;
+              return { x: vb.x + sx * vb.w, y: vb.y + sy * vb.h };
+            },
+
+            // ----- wiring ---------------------------------------------
+            _wire() {
+              if (this._wired) return;
+              this._wired = true;
+
+              this._onOver = (ev) => {
+                const cell = ev.target.closest("[data-room-name]");
+                if (!cell) return;
+                this._showTip(cell, ev.clientX, ev.clientY);
+              };
+              this._onMove = (ev) => {
+                if (this._dragging) return; // suppress tooltip while panning
+                const cell = ev.target.closest("[data-room-name]");
+                if (!cell) { this._hideTip(); return; }
+                this._showTip(cell, ev.clientX, ev.clientY);
+              };
+              this._onOut = (ev) => {
+                if (this.el.contains(ev.relatedTarget)) return;
+                this._hideTip();
+              };
+              this._onWheel = (ev) => {
+                ev.preventDefault();
+                const vb = this._getVB();
+                const anchor = this._screenToVB(ev.clientX, ev.clientY);
+                // Positive deltaY = wheel down = zoom out; multiplier > 1
+                const factor = Math.exp(ev.deltaY * 0.0015);
+                let nw = vb.w * factor;
+                let nh = vb.h * factor;
+                // Clamp: never below 1 cell or above 200 cells (regions
+                // are capped around that size in the spec).
+                nw = Math.max(1, Math.min(200, nw));
+                nh = Math.max(1, Math.min(200, nh));
+                // Keep the cursor anchor stable.
+                const nx = anchor.x - (anchor.x - vb.x) * (nw / vb.w);
+                const ny = anchor.y - (anchor.y - vb.y) * (nh / vb.h);
+                this._setVB({ x: nx, y: ny, w: nw, h: nh });
+              };
+              this._onDown = (ev) => {
+                if (ev.button !== 0) return; // left button only
+                ev.preventDefault();
+                this._dragging = true;
+                this._dragOriginX = ev.clientX;
+                this._dragOriginY = ev.clientY;
+                this._dragVB = this._getVB();
+                this._hideTip();
+                this.el.style.cursor = "grabbing";
+              };
+              this._onPan = (ev) => {
+                if (!this._dragging) return;
+                // Pan = subtract the cursor delta (in viewBox coords)
+                // from the viewBox at drag-start so the cursor stays
+                // anchored to the same world point.
+                const rect = this.el.getBoundingClientRect();
+                const dx = ((ev.clientX - this._dragOriginX) / rect.width) * this._dragVB.w;
+                const dy = ((ev.clientY - this._dragOriginY) / rect.height) * this._dragVB.h;
+                this._setVB({
+                  x: this._dragVB.x - dx,
+                  y: this._dragVB.y - dy,
+                  w: this._dragVB.w,
+                  h: this._dragVB.h,
+                });
+              };
+              this._onUp = () => {
+                if (!this._dragging) return;
+                this._dragging = false;
+                this.el.style.cursor = "";
+              };
+
+              this.el.addEventListener("mouseover", this._onOver);
+              this.el.addEventListener("mousemove", this._onMove);
+              this.el.addEventListener("mouseout", this._onOut);
+              this.el.addEventListener("wheel", this._onWheel, { passive: false });
+              this.el.addEventListener("mousedown", this._onDown);
+              window.addEventListener("mouseup", this._onUp);
+              window.addEventListener("mousemove", this._onPan);
+            }
+          }
+        </script>
+
+        <svg
+          id="map-canvas-svg"
+          phx-hook=".MapInteract"
+          class="map-canvas"
+          viewBox={@initial_view_box}
+          preserveAspectRatio="xMidYMid meet"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <defs>
+            <linearGradient
+              id="fog-fade"
+              x1="0%"
+              y1="0%"
+              x2="100%"
+              y2="0%"
+              gradientUnits="objectBoundingBox"
+            >
+              <stop offset="0%" stop-color="var(--ink-dim)" stop-opacity="1" />
+              <stop offset="100%" stop-color="var(--ink-dim)" stop-opacity="0.1" />
+            </linearGradient>
+            <pattern
+              id="fog-hatch"
+              patternUnits="userSpaceOnUse"
+              width="6"
+              height="6"
+              patternTransform="rotate(45)"
+            >
+              <line x1="0" y1="0" x2="0" y2="6" stroke="var(--ink-faint)" stroke-width="1" />
+            </pattern>
+          </defs>
+
+          <%!-- Pass 1: connector lines — drawn under everything. --%>
+          <.map_exit_line :for={e <- @map_view.exits} exit={e} />
+
+          <%!-- Pass 2: room glyphs — sit on top of the lines. --%>
+          <.map_cell :for={r <- @map_view.rooms} room={r} />
+
+          <%!-- Pass 3: endpoint decorations (fog clouds, cross-region
+                portal glyphs) — drawn LAST so they sit above the player's
+                current-room glyph and its glow, otherwise they get buried
+                when the portal coincides with the player's room. --%>
+          <.map_exit_decoration :for={e <- @map_view.exits} exit={e} />
+        </svg>
+      <% end %>
+
     </div>
     """
   end
+
+  # Coordinates are CELL UNITS throughout. The SVG viewBox sets the scale.
+  # A "cell" is the 1x1 unit; room rects sit inside their cell with a
+  # small padding so connecting lines have visible run-up. These are
+  # plain compile-time constants — NOT module attributes (HEEx ~H blocks
+  # treat @-prefixed names as assigns).
+  @cell_inner_size 0.86
+  @icon_size_cells 0.22
+  # Distance from the room rect's edge to the nearest edge of the icon —
+  # so the arrow never touches the rect border.
+  @icon_inset_cells 0.06
+  @cloud_size_cells 0.32
+  # The cross-region portal is a rotated diamond; its corner-to-corner
+  # extent on the line of attack is `portal_size * √2 ≈ size * 1.414`,
+  # so it visually "reads" larger than a same-size unrotated square. Keep
+  # it deliberately small — the dashed line carries most of the meaning.
+  @portal_size_cells 0.06
+
+  attr :exit, :map, required: true
+
+  # Pass 1: just the line. Sits under room glyphs.
+  defp map_exit_line(assigns) do
+    ~H"""
+    <%= case @exit.kind do %>
+      <% :normal -> %>
+        <line
+          class="map-line map-line--normal"
+          x1={@exit.from_x}
+          y1={@exit.from_y}
+          x2={@exit.to_x}
+          y2={@exit.to_y}
+          vector-effect="non-scaling-stroke"
+        />
+      <% :fog_stub -> %>
+        <line
+          class="map-line map-fog-stub"
+          x1={@exit.from_x}
+          y1={@exit.from_y}
+          x2={@exit.to_x}
+          y2={@exit.to_y}
+          vector-effect="non-scaling-stroke"
+        />
+      <% :cross_region -> %>
+        <line
+          class="map-line map-line--cross-region"
+          x1={@exit.from_x}
+          y1={@exit.from_y}
+          x2={@exit.to_x}
+          y2={@exit.to_y}
+          vector-effect="non-scaling-stroke"
+        />
+    <% end %>
+    """
+  end
+
+  attr :exit, :map, required: true
+
+  # Pass 3: fog clouds + cross-region portal glyphs. Drawn on top of room
+  # glyphs so they're not buried by the player's current-room rect or its
+  # glow when the portal endpoint coincides with the player's room. No
+  # data-room-name / aria-label (FR-007 / FR-008 / FR-017).
+  defp map_exit_decoration(assigns) do
+    cloud = @cloud_size_cells
+    portal = @portal_size_cells
+
+    assigns =
+      assigns
+      |> assign(:cloud_x, assigns.exit.to_x - cloud / 2)
+      |> assign(:cloud_y, assigns.exit.to_y - cloud / 2)
+      |> assign(:cloud_size, cloud)
+      |> assign(:portal_x, assigns.exit.to_x - portal / 2)
+      |> assign(:portal_y, assigns.exit.to_y - portal / 2)
+      |> assign(:portal_size, portal)
+
+    ~H"""
+    <%= case @exit.kind do %>
+      <% :normal -> %>
+      <% :fog_stub -> %>
+        <rect
+          class="map-fog-cloud"
+          x={@cloud_x}
+          y={@cloud_y}
+          width={@cloud_size}
+          height={@cloud_size}
+          fill="url(#fog-hatch)"
+        />
+      <% :cross_region -> %>
+        <rect
+          class="map-portal"
+          x={@portal_x}
+          y={@portal_y}
+          width={@portal_size}
+          height={@portal_size}
+          transform={"rotate(45 #{@exit.to_x} #{@exit.to_y})"}
+        />
+    <% end %>
+    """
+  end
+
+  attr :room, :map, required: true
+
+  defp map_cell(assigns) do
+    # Cell centered at (room.x, room.y). Rect occupies a square inside the
+    # cell. Up/Down icons sit inside the room rect with clear padding
+    # (@icon_inset_cells) on every side so they never touch the border.
+    inner = @cell_inner_size
+    icon = @icon_size_cells
+    inset = @icon_inset_cells
+
+    rect_x = assigns.room.x - inner / 2
+    rect_y = assigns.room.y - inner / 2
+    # Right edge of icon sits @inset cells inside the rect's right edge.
+    icon_x = assigns.room.x + inner / 2 - inset - icon
+    # Top edge of UP icon: @inset below the rect's top edge.
+    icon_up_y = assigns.room.y - inner / 2 + inset
+    # Bottom edge of DOWN icon: @inset above the rect's bottom edge.
+    icon_down_y = assigns.room.y + inner / 2 - inset - icon
+
+    assigns =
+      assigns
+      |> assign(:rect_x, rect_x)
+      |> assign(:rect_y, rect_y)
+      |> assign(:icon_x, icon_x)
+      |> assign(:icon_up_y, icon_up_y)
+      |> assign(:icon_down_y, icon_down_y)
+      |> assign(:cell_inner, inner)
+      |> assign(:icon_size, icon)
+
+    ~H"""
+    <g
+      class={["map-cell", @room.is_current? && "map-cell--current"]}
+      data-room-name={@room.name}
+      aria-label={@room.name}
+    >
+      <rect
+        class="map-rect"
+        x={@rect_x}
+        y={@rect_y}
+        width={@cell_inner}
+        height={@cell_inner}
+        rx="0.08"
+        vector-effect="non-scaling-stroke"
+      />
+
+      <%!-- Simple up/down arrows (shaft + chevron head). --%>
+      <svg
+        :if={@room.has_up?}
+        class="map-icon-up"
+        x={@icon_x}
+        y={@icon_up_y}
+        width={@icon_size}
+        height={@icon_size}
+        viewBox="0 0 8 8"
+        overflow="visible"
+      >
+        <path
+          d="M4 7 L4 1 M1.5 3.5 L4 1 L6.5 3.5"
+          stroke="currentColor"
+          stroke-width="1.5"
+          fill="none"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          vector-effect="non-scaling-stroke"
+        />
+      </svg>
+
+      <svg
+        :if={@room.has_down?}
+        class="map-icon-down"
+        x={@icon_x}
+        y={@icon_down_y}
+        width={@icon_size}
+        height={@icon_size}
+        viewBox="0 0 8 8"
+        overflow="visible"
+      >
+        <path
+          d="M4 1 L4 7 M1.5 4.5 L4 7 L6.5 4.5"
+          stroke="currentColor"
+          stroke-width="1.5"
+          fill="none"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          vector-effect="non-scaling-stroke"
+        />
+      </svg>
+    </g>
+    """
+  end
+
+  defp map_default_zoom_cells do
+    Application.get_env(:agenticrealms, AgenticRealms.MapRenderer, [])
+    |> Keyword.get(:default_zoom_cells, 3)
+  end
+
+  # Unicode arrow glyph for an exit direction. Accepts either the
+  # canonical atom (`:north`, `:northeast`, …) or its string form (the
+  # read-model stores directions as lowercase strings; the mock UI
+  # entries use the same strings). Up and north both render as ↑; down
+  # and south as ↓.
+  @arrow_by_dir %{
+    "north" => "↑",
+    "south" => "↓",
+    "east" => "→",
+    "west" => "←",
+    "northeast" => "↗",
+    "northwest" => "↖",
+    "southeast" => "↘",
+    "southwest" => "↙",
+    "up" => "↑",
+    "down" => "↓"
+  }
+
+  @doc false
+  def direction_arrow(dir) when is_atom(dir),
+    do: Map.get(@arrow_by_dir, Atom.to_string(dir), "·")
+
+  def direction_arrow(dir) when is_binary(dir),
+    do: Map.get(@arrow_by_dir, String.downcase(dir), "·")
+
+  def direction_arrow(_), do: "·"
 
   # ────────────────────────────────────────────────────────────
   # Modal Shell
@@ -721,10 +1139,10 @@ defmodule AgenticRealmsWeb.GameComponents do
   attr :inventory, :list, required: true
   attr :quests, :list, required: true
   attr :presence, :list, required: true
-  attr :suggestions, :list, required: true
   attr :input, :string, required: true
   attr :streaming, :boolean, required: true
   attr :map_open, :boolean, required: true
+  attr :map_view, :map, required: true
   attr :input_locked, :boolean, default: false
   attr :tweaks, :map, required: true
 
@@ -736,22 +1154,26 @@ defmodule AgenticRealmsWeb.GameComponents do
       data-hud={if @tweaks.show_hud, do: "shown", else: "hidden"}
       data-map={if @map_open, do: "open", else: "closed"}
     >
-      <aside :if={@map_open} class="p-side-left">
-        <.mini_map />
-      </aside>
+      <.mini_map :if={@map_open} map_view={@map_view} />
 
-      <main class="p-log" id="game-log" phx-hook=".ScrollBottom">
-        <div class="p-log-inner">
-          <.log_entry :for={entry <- @log} entry={entry} />
-          <div
-            :if={@streaming}
-            id="streaming-text"
-            phx-hook=".StreamingText"
-            class="log-entry narrate"
-          >
-            <span class="cursor" />
-          </div>
+      <%!-- Auto-scroll-to-bottom via `flex-direction: column-reverse` on
+            .p-log. Source order is newest-first (we reverse @log here so
+            the in-memory append-at-end semantics are unchanged); the
+            browser flips them visually so newest is at the bottom AND
+            auto-anchors the scroll to the flex "start" (visually the
+            bottom). No JS, no race conditions — when @log grows the
+            visible bottom updates instantly. When the user scrolls up
+            to read backlog the browser preserves their position. --%>
+      <main class="p-log" id="game-log">
+        <div
+          :if={@streaming}
+          id="streaming-text"
+          phx-hook=".StreamingText"
+          class="log-entry narrate"
+        >
+          <span class="cursor" />
         </div>
+        <.log_entry :for={entry <- Enum.reverse(@log)} entry={entry} />
       </main>
 
       <.stats_panel
@@ -803,17 +1225,6 @@ defmodule AgenticRealmsWeb.GameComponents do
             </form>
           </div>
         </div>
-        <div class="suggest-row">
-          <span class="suggest-label">suggested</span>
-          <button
-            :for={s <- @suggestions}
-            class="suggest-chip"
-            phx-click="click_suggestion"
-            phx-value-text={s}
-          >
-            {s}
-          </button>
-        </div>
       </footer>
     </div>
     """
@@ -849,7 +1260,7 @@ defmodule AgenticRealmsWeb.GameComponents do
           <% "exits" -> %>
             <div :for={exit <- @field[:exits] || []} class="exit-pair" style="width: 100%;">
               <span class="dir">{exit.dir}</span>
-              <span class="arrow">→</span>
+              <span class="arrow">{direction_arrow(exit.dir)}</span>
               <span class="dest">{exit.to}</span>
             </div>
           <% "entities" -> %>

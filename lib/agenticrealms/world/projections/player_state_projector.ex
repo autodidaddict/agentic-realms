@@ -22,6 +22,7 @@ defmodule AgenticRealms.World.Projections.PlayerStateProjector do
   import Ecto.Query
 
   alias AgenticRealms.Repo
+  alias AgenticRealms.World.Commands, as: WorldCommands
   alias AgenticRealms.World.Events.{PlayerSpawned, PlayerMoved}
   alias AgenticRealms.World.Schemas.{PlayerState, Room}
 
@@ -38,6 +39,12 @@ defmodule AgenticRealms.World.Projections.PlayerStateProjector do
       on_conflict: [set: [current_room_id: room_id, updated_at: now]],
       conflict_target: :player_id
     )
+
+    # Feature 012 — Maps. Unconditionally dispatch RecordRoomDiscovery; the
+    # World.Player aggregate's in-process MapSet decides whether to emit a
+    # PlayerDiscoveredRoom event. The projector NEVER pre-checks the read
+    # model — that would create a back door around event sourcing.
+    :ok = WorldCommands.record_room_discovery(pid, room_id)
 
     :ok
   end
@@ -59,6 +66,13 @@ defmodule AgenticRealms.World.Projections.PlayerStateProjector do
       from(ps in PlayerState, where: ps.player_id == ^pid),
       set: [current_room_id: target, updated_at: now]
     )
+
+    # Feature 012 — Maps. Dispatch discovery if the destination room is
+    # real (preserves the existing FR-022 guard for purged-destination
+    # safety). Aggregate handles idempotency for already-discovered rooms.
+    if not is_nil(target) do
+      :ok = WorldCommands.record_room_discovery(pid, target)
+    end
 
     :ok
   end

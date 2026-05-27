@@ -44,6 +44,13 @@ config :agenticrealms, AgenticRealms.World.Ticks,
   join_grace_ms: 250,
   leave_grace_ms: 5_000
 
+# Feature 012 — Maps.
+# `default_zoom_cells`: side length of the initial SVG viewBox in CELL
+#   units. Defaults to 3 (3×3 cells visible at first open, centered on the
+#   player's current room). The browser-side `.MapInteract` hook owns
+#   mouse-wheel zoom and click-drag pan from there.
+config :agenticrealms, AgenticRealms.MapRenderer, default_zoom_cells: 3
+
 # Configure the endpoint
 config :agenticrealms, AgenticRealmsWeb.Endpoint,
   url: [host: "localhost"],

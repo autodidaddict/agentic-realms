@@ -11,7 +11,17 @@ defmodule AgenticRealms.World.Queries do
   alias AgenticRealms.Repo
   alias AgenticRealms.Accounts.Player, as: AccountPlayer
   alias AgenticRealms.World.RoomView
-  alias AgenticRealms.World.Schemas.{Room, Exit, Object, PlayerState, NPCBlueprint, NPCClone}
+
+  alias AgenticRealms.World.Schemas.{
+    Room,
+    Exit,
+    Object,
+    PlayerState,
+    NPCBlueprint,
+    NPCClone,
+    PlayerDiscoveredRoom
+  }
+
   alias AgenticRealmsWeb.Presence
 
   @spec current_room_of(integer()) :: {:ok, String.t()} | {:error, :no_current_room}
@@ -400,5 +410,111 @@ defmodule AgenticRealms.World.Queries do
     |> String.downcase()
     |> String.split(~r/\s+/, trim: true)
     |> Enum.join(" ")
+  end
+
+  # ------------------------------------------------------------------------
+  # Feature 012 — Maps: read helpers for World.MapView
+  # ------------------------------------------------------------------------
+  #
+  # Performance posture: these queries are called every time the player's
+  # map needs to re-render (every move, every newly-discovered room). All
+  # five are constant-or-bounded-work given:
+  #   * `discovered_room_ids_for/1` — composite-PK index scan, no JOIN.
+  #   * `rooms_in_region_at_elevation_within_viewport/4` — bounded to the
+  #     viewport_cells² window via x/y BETWEEN clauses; uses the
+  #     `(region_id, elevation)` btree index plus the partial unique index
+  #     on `(region_id, elevation, map_x, map_y)`. Preloads exits + targets
+  #     in one round-trip to avoid N+1 when MapView builds `has_up?` /
+  #     `has_down?` flags and classifies exits.
+  #   * `exits_for_rooms/1` — single IN-list query against the
+  #     `(source_room_id, direction)` composite key.
+  #   * `has_discovered_rooms_above?/3` / `has_discovered_rooms_below?/3` —
+  #     EXISTS-style queries; Postgres short-circuits on the first match.
+
+  @doc """
+  Returns the set of room ids that `player_id` has personally discovered.
+  Constant-time-per-row index scan against the composite PK.
+  """
+  @spec discovered_room_ids_for(integer()) :: MapSet.t()
+  def discovered_room_ids_for(player_id) when is_integer(player_id) do
+    from(d in PlayerDiscoveredRoom,
+      where: d.player_id == ^player_id,
+      select: d.room_id
+    )
+    |> Repo.all()
+    |> MapSet.new()
+  end
+
+  @doc """
+  All discovered, map-visible, coord-bearing rooms in the given region at
+  the given elevation. The client-side pan/zoom logic owns the viewport
+  decision — the server emits the full set and the SVG `viewBox` handles
+  what's visible. Typical regions are ≤200 rooms so the over-fetch cost
+  is negligible.
+  """
+  @spec rooms_in_region_at_elevation(String.t(), integer(), MapSet.t()) :: [%Room{}]
+  def rooms_in_region_at_elevation(region_id, elevation, discovered_ids)
+      when is_binary(region_id) and is_integer(elevation) do
+    discovered_list = MapSet.to_list(discovered_ids)
+
+    from(r in Room,
+      where:
+        r.region_id == ^region_id and
+          r.elevation == ^elevation and
+          r.map_visible == true and
+          not is_nil(r.map_x) and
+          not is_nil(r.map_y) and
+          r.id in ^discovered_list
+    )
+    |> Repo.all()
+  end
+
+  @doc """
+  All exits whose `source_room_id` is in the given list, with the target
+  room preloaded enough for the MapView's classification step (just the
+  fields the classifier reads: `id`, `region_id`, `map_visible`, `map_x`,
+  `map_y`, `name`).
+  """
+  @spec exits_for_rooms([String.t()]) :: [%Exit{target_room: %Room{}}]
+  def exits_for_rooms([]), do: []
+
+  def exits_for_rooms(room_ids) when is_list(room_ids) do
+    from(e in Exit,
+      where: e.source_room_id in ^room_ids,
+      join: t in Room,
+      on: t.id == e.target_room_id,
+      preload: [target_room: t]
+    )
+    |> Repo.all()
+  end
+
+  @doc """
+  Whether the player has discovered ANY room in `region_id` at elevations
+  strictly greater than `current_elevation`. Postgres short-circuits on
+  the first match — sub-millisecond on realistic data.
+  """
+  @spec has_discovered_rooms_above?(String.t(), integer(), integer()) :: boolean()
+  def has_discovered_rooms_above?(region_id, current_elevation, player_id) do
+    Repo.exists?(
+      from(r in Room,
+        join: d in PlayerDiscoveredRoom,
+        on: d.room_id == r.id and d.player_id == ^player_id,
+        where: r.region_id == ^region_id and r.elevation > ^current_elevation
+      )
+    )
+  end
+
+  @doc """
+  Mirror of `has_discovered_rooms_above?/3` for lower elevations.
+  """
+  @spec has_discovered_rooms_below?(String.t(), integer(), integer()) :: boolean()
+  def has_discovered_rooms_below?(region_id, current_elevation, player_id) do
+    Repo.exists?(
+      from(r in Room,
+        join: d in PlayerDiscoveredRoom,
+        on: d.room_id == r.id and d.player_id == ^player_id,
+        where: r.region_id == ^region_id and r.elevation < ^current_elevation
+      )
+    )
   end
 end

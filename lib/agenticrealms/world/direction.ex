@@ -1,7 +1,9 @@
 defmodule AgenticRealms.World.Direction do
   @moduledoc """
-  Canonical direction handling for the world. Six directions are supported:
-  `:north`, `:south`, `:east`, `:west`, `:up`, `:down`.
+  Canonical direction handling for the world. Ten directions are supported:
+  the four cardinals (`:north`, `:south`, `:east`, `:west`), the four
+  diagonals (`:northeast`, `:northwest`, `:southeast`, `:southwest`), and
+  the two verticals (`:up`, `:down`).
 
   The parser, aggregates, and UI event broadcaster all funnel through this
   module so that direction aliases (`"n"`, `"NORTH"`, `"  go north  "`) and
@@ -9,9 +11,27 @@ defmodule AgenticRealms.World.Direction do
 
   Inputs to `parse/1` are matched literally against pre-allocated atoms;
   we never call `String.to_atom/1` on user input.
+
+  Feature 012 (maps) added the four diagonals. Geometric semantics — coord
+  deltas, fog-stub angles, exit-validation rules — live in
+  `AgenticRealms.World.Direction.Geometry`. This module remains a pure
+  name/parse/opposite/serialize helper with no coordinate awareness.
   """
 
-  @canonical [:north, :south, :east, :west, :up, :down]
+  @canonical [
+    :north,
+    :south,
+    :east,
+    :west,
+    :northeast,
+    :northwest,
+    :southeast,
+    :southwest,
+    :up,
+    :down
+  ]
+
+  @canonical_strings ~w(north south east west northeast northwest southeast southwest up down)
 
   @spec canonical() :: [atom()]
   def canonical, do: @canonical
@@ -42,6 +62,14 @@ defmodule AgenticRealms.World.Direction do
       "e" -> {:ok, :east}
       "west" -> {:ok, :west}
       "w" -> {:ok, :west}
+      "northeast" -> {:ok, :northeast}
+      "ne" -> {:ok, :northeast}
+      "northwest" -> {:ok, :northwest}
+      "nw" -> {:ok, :northwest}
+      "southeast" -> {:ok, :southeast}
+      "se" -> {:ok, :southeast}
+      "southwest" -> {:ok, :southwest}
+      "sw" -> {:ok, :southwest}
       "up" -> {:ok, :up}
       "u" -> {:ok, :up}
       "down" -> {:ok, :down}
@@ -61,6 +89,10 @@ defmodule AgenticRealms.World.Direction do
   def opposite(:south), do: :north
   def opposite(:east), do: :west
   def opposite(:west), do: :east
+  def opposite(:northeast), do: :southwest
+  def opposite(:southwest), do: :northeast
+  def opposite(:northwest), do: :southeast
+  def opposite(:southeast), do: :northwest
   def opposite(:up), do: :down
   def opposite(:down), do: :up
 
@@ -77,9 +109,13 @@ defmodule AgenticRealms.World.Direction do
   def to_string(:south), do: "south"
   def to_string(:east), do: "east"
   def to_string(:west), do: "west"
+  def to_string(:northeast), do: "northeast"
+  def to_string(:northwest), do: "northwest"
+  def to_string(:southeast), do: "southeast"
+  def to_string(:southwest), do: "southwest"
   def to_string(:up), do: "up"
   def to_string(:down), do: "down"
-  def to_string(s) when s in ["north", "south", "east", "west", "up", "down"], do: s
+  def to_string(s) when s in @canonical_strings, do: s
 
   defp strip_go_prefix("go " <> rest), do: rest
   defp strip_go_prefix(other), do: other

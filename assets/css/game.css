@@ -310,32 +310,13 @@ button { font: inherit; color: inherit; }
 .player[data-layout="classic"] .p-stats { grid-area: stats; }
 .player[data-layout="classic"] .p-input { grid-area: input; }
 
-.player[data-layout="classic"][data-map="open"] {
-  grid-template-columns: 220px 1fr 280px;
-  grid-template-areas:
-    "map log stats"
-    "input input input";
-}
-.player[data-layout="classic"][data-map="open"] .p-side-left { grid-area: map; }
-
-.player[data-layout="minimal"][data-map="open"] {
-  grid-template-columns: 220px 1fr;
-  grid-template-rows: auto 1fr auto;
-  grid-template-areas:
-    "map status"
-    "map log"
-    "input input";
-}
-.player[data-layout="minimal"][data-map="open"] .p-side-left { grid-area: map; display: flex; }
-
 .player[data-layout="panels"] {
-  grid-template-columns: 220px 1fr 260px;
+  grid-template-columns: 1fr 260px;
   grid-template-rows: 1fr auto;
   grid-template-areas:
-    "map log stats"
-    "input input input";
+    "log stats"
+    "input input";
 }
-.player[data-layout="panels"] .p-side-left { grid-area: map; }
 .player[data-layout="panels"] .p-log { grid-area: log; }
 .player[data-layout="panels"] .p-stats { grid-area: stats; }
 .player[data-layout="panels"] .p-input { grid-area: input; }
@@ -351,12 +332,17 @@ button { font: inherit; color: inherit; }
 .player[data-layout="minimal"] .p-stats { grid-area: status; }
 .player[data-layout="minimal"] .p-log { grid-area: log; }
 .player[data-layout="minimal"] .p-input { grid-area: input; }
-.player[data-layout="minimal"] .p-side-left { display: none; }
-.player[data-layout="minimal"] .p-log-inner { max-width: 720px; margin: 0 auto; }
+/* Minimal layout previously centered a .p-log-inner wrapper; with the
+   column-reverse refactor the wrapper is gone, so center .p-log itself
+   within its grid cell. */
+.player[data-layout="minimal"] .p-log {
+  max-width: 720px;
+  justify-self: center;
+  width: 100%;
+}
 
 /* When HUD hidden */
-.player[data-hud="hidden"] .p-stats,
-.player[data-hud="hidden"] .p-side-left { display: none; }
+.player[data-hud="hidden"] .p-stats { display: none; }
 .player[data-hud="hidden"][data-layout="classic"],
 .player[data-hud="hidden"][data-layout="panels"] {
   grid-template-columns: 1fr;
@@ -368,13 +354,25 @@ button { font: inherit; color: inherit; }
 /* --------- Log --------- */
 
 .p-log {
+  /* Auto-scroll-to-bottom via CSS only.
+     `flex-direction: column-reverse` makes the scroll container's "start"
+     sit at the visual bottom. New children (prepended in source order in
+     the template — we reverse @log there) appear at the visual bottom and
+     the browser auto-anchors the scroll to them. When the user scrolls up
+     to read backlog the position is preserved through subsequent
+     appends. */
+  display: flex;
+  flex-direction: column-reverse;
   overflow-y: auto;
   border-right: 1px solid var(--line);
   padding: 24px 28px 32px;
   scrollbar-width: thin;
   scrollbar-color: var(--line) transparent;
 }
-.player[data-layout="minimal"] .p-log { border-right: 0; padding: 32px 40px; }
+.player[data-layout="minimal"] .p-log {
+  border-right: 0;
+  padding: 32px 40px;
+}
 
 .p-log::-webkit-scrollbar { width: 8px; }
 .p-log::-webkit-scrollbar-thumb { background: var(--line); border-radius: 4px; }
@@ -1440,75 +1438,169 @@ button { font: inherit; color: inherit; }
 }
 .presence-dot.idle { background: var(--ink-faint); box-shadow: none; }
 
-/* --------- Left side panel (mini-map) --------- */
+/* Feature 012 — Maps. Floating overlay anchored above the chat input,
+   sized to roughly 1/3 of the content area in each dimension. The map
+   does NOT take a grid column anymore. The SVG itself owns mouse-wheel
+   zoom and click-drag pan via the .MapInteract ColocatedHook. */
 
-.p-side-left {
-  padding: 20px;
-  border-right: 1px solid var(--line);
-  background: var(--bg-sunken);
-  overflow-y: auto;
+.map-panel {
+  position: absolute;
+  /* Anchored above the map-toggle button (left side of the input row).
+     `bottom` clears the chat input bar; `left` aligns with the toggle's
+     left edge. */
+  bottom: 88px;
+  left: 24px;
+  width: 33%;
+  height: 33%;
+  min-width: 220px;
+  min-height: 180px;
+  max-width: 480px;
+  max-height: 420px;
+  z-index: 50;
+  padding: 12px;
+  /* Soft opacity: log content behind the panel reads through faintly
+     instead of being completely hidden. backdrop-filter softens what
+     bleeds through so the map itself stays the visual focus. */
+  background: color-mix(in srgb, var(--bg-sunken) 82%, transparent);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 8px;
 }
 
-.map {
-  position: relative;
-  aspect-ratio: 1;
+.map-region {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin: 0;
+  font-family: var(--serif);
+  font-size: var(--fs-sm);
+  color: var(--ink);
+}
+.map-region-label { color: var(--ink-faint); text-transform: uppercase; letter-spacing: 0.14em; font-size: var(--fs-xs); }
+.map-region-sep   { color: var(--ink-faint); }
+.map-region-name  { color: var(--ink); }
+
+.map-canvas {
   border: 1px solid var(--line);
   background: var(--bg-inset);
   border-radius: 4px;
-  padding: 10px;
+  display: block;
+  width: 100%;
+  flex: 1;
+  min-height: 0;
+  /* The SVG's viewBox lives in cell units; the .MapInteract hook
+     rewrites the viewBox attribute on wheel/drag. Element fills the
+     panel below the header. */
+  cursor: grab;
+  user-select: none;
 }
-.map-grid {
-  position: absolute;
-  inset: 0;
-  background-image:
-    linear-gradient(to right, var(--line-soft) 1px, transparent 1px),
-    linear-gradient(to bottom, var(--line-soft) 1px, transparent 1px);
-  background-size: 25% 25%;
-  opacity: 0.4;
-}
-.map-node {
-  position: absolute;
-  width: 10px;
-  height: 10px;
-  border: 1px solid var(--ink-faint);
-  background: var(--bg-inset);
-  transform: translate(-50%, -50%);
-}
-.map-node.current {
-  background: var(--player);
-  border-color: var(--player);
-  box-shadow: 0 0 12px var(--player);
-}
-.map-node.visited { border-color: var(--ink-dim); background: var(--ink-ghost); }
-.map-edge {
-  position: absolute;
-  background: var(--ink-ghost);
-  height: 1px;
-  transform-origin: left center;
+.map-canvas:active { cursor: grabbing; }
+.map-canvas--off-map {
+  /* Same dimensions; intentionally empty content per FR-003a */
 }
 
-.dir-pad {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 4px;
-  font-size: var(--fs-xs);
+/* Room glyphs */
+.map-cell { color: var(--ink-dim); cursor: default; }
+.map-cell:hover .map-rect { stroke: var(--player); }
+.map-rect {
+  fill: var(--bg-inset);
+  stroke: var(--ink-dim);
+  stroke-width: 1.5;
 }
-.dir-pad button {
-  padding: 6px 0;
-  background: var(--bg);
+.map-cell--current .map-rect {
+  fill: var(--player);
+  stroke: var(--player);
+  filter: drop-shadow(0 0 6px var(--player));
+}
+.map-icon-up, .map-icon-down { pointer-events: none; color: var(--ink-dim); }
+.map-cell--current .map-icon-up,
+.map-cell--current .map-icon-down { color: var(--bg-inset); }
+
+/* Above/Below header pips — visible only when the player has discovered
+   rooms on the corresponding adjacent elevation. NO numeric content
+   (FR-012). The aria-label carries the semantic meaning for screen
+   readers. */
+.map-affordance {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 4px;
+  color: var(--player-dim);
+}
+.map-affordance--above,
+.map-affordance--below { /* same styling for now */ }
+
+/* Exit lines */
+.map-line {
+  stroke: var(--ink-dim);
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+.map-line--normal { /* defaults */ }
+
+/* Fog-of-war stub: exit toward an undiscovered map-visible room.
+   Stroke fades along its length (the linearGradient is defined in the
+   SVG's <defs>). The hatched cloud sits at the endpoint as a visual
+   "something is over there" marker. Neither element carries a title or
+   data-room-name — FR-007 / FR-017. */
+.map-fog-stub {
+  stroke: url(#fog-fade);
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+.map-fog-cloud {
+  /* Pattern fill comes from the SVG <defs>. Slight transparency softens
+     the edge of the hatched square so it reads as a cloud, not a tile. */
+  opacity: 0.7;
+}
+
+/* Hover tooltip — driven by the .MapTooltip ColocatedHook + GameLive
+   handle_event clauses for tooltip:show / tooltip:move / tooltip:hide.
+   Position is set inline via mouse client coords; pointer-events: none
+   so the tooltip never intercepts clicks (we want the user to be able to
+   click through to the room glyph behind it, even though click-to-move
+   is out of scope per FR-018). */
+.map-tooltip {
+  position: fixed;
+  z-index: 100;
+  padding: 4px 8px;
+  background: var(--bg-sunken);
   border: 1px solid var(--line);
-  color: var(--ink-dim);
-  font-family: var(--mono);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  cursor: pointer;
   border-radius: 3px;
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: var(--fs-xs);
+  letter-spacing: 0.02em;
+  pointer-events: none;
+  white-space: nowrap;
 }
-.dir-pad button:hover:not(:disabled) { border-color: var(--player); color: var(--player); }
-.dir-pad button:disabled { color: var(--ink-ghost); cursor: not-allowed; opacity: 0.4; }
+
+/* Cross-region affordance: dashed line + portal glyph at the endpoint.
+   Dashed stroke distinguishes it from intra-region lines without leaking
+   any directionality (FR-005 still holds: both ends of a one-way cross-
+   region exit look identical). FR-008.
+
+   Color: --wizard (amber) instead of --player, so the affordance is
+   distinct from the current-room highlight. The amber reads as
+   "elsewhere" without competing with the player's own palette. */
+.map-line--cross-region {
+  stroke: var(--wizard-dim);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-dasharray: 4 3;
+}
+.map-portal {
+  /* Fill only — no stroke. A stroke-width in viewBox user units
+     translates to ~50 px on screen (we're rendering in cell units), which
+     would wrap the tiny diamond in a huge halo and hide most of the
+     dashed line behind it. */
+  fill: var(--wizard);
+}
+
 
 /* --------- Map toggle button --------- */
 .p-input-line {

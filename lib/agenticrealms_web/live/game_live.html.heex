@@ -7,10 +7,10 @@
         inventory={@inventory}
         quests={@quests}
         presence={@presence}
-        suggestions={@suggestions}
         input={@input}
         streaming={@streaming}
         map_open={@map_open}
+        map_view={@map_view}
         input_locked={@input_locked}
         tweaks={@tweaks}
       />
@@ -50,13 +50,6 @@
     }
   </script>
 
-  <script :type={Phoenix.LiveView.ColocatedHook} name=".ScrollBottom">
-    export default {
-      mounted() { this.el.scrollTop = this.el.scrollHeight; },
-      updated() { this.el.scrollTop = this.el.scrollHeight; }
-    }
-  </script>
-
   <script :type={Phoenix.LiveView.ColocatedHook} name=".StreamingText">
     export default {
       mounted() {
@@ -78,4 +71,5 @@
       }
     }
   </script>
+
 </Layouts.app>

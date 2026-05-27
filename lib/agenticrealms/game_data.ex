@@ -138,23 +138,8 @@ defmodule AgenticRealms.GameData do
     ]
   end
 
-  def suggestions do
-    ["read letter", "whisper sable", "order mead", "look odra", "examine sigil", "north"]
-  end
-
-  def map_nodes do
-    [
-      %{id: "tavern", x: 50, y: 55, label: "Kraken", state: "current"},
-      %{id: "back", x: 50, y: 25, label: "Back", state: "visited"},
-      %{id: "market", x: 80, y: 55, label: "Mkt", state: "visited"},
-      %{id: "cellar", x: 50, y: 82, label: "Cel", state: "unvisited"},
-      %{id: "stair", x: 20, y: 55, label: "Str", state: "unvisited"}
-    ]
-  end
-
-  def map_edges do
-    [{"tavern", "back"}, {"tavern", "market"}, {"tavern", "cellar"}, {"tavern", "stair"}]
-  end
+  # Feature 012 removed `map_nodes/0` and `map_edges/0` — the mini-map
+  # is now driven by `AgenticRealms.World.MapView` over real world state.
 
   def starter_prompts do
     %{

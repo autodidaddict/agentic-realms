@@ -27,6 +27,30 @@ defmodule AgenticRealms.DataCase do
     end
   end
 
+  @doc """
+  Insert a Region row for tests that need a Region FK target. Uses a
+  unique name per call to avoid collisions across concurrent tests in
+  the same sandbox.
+
+  Returns the Region's id (binary_id string).
+
+  Tests that build Room rows directly via `Repo.insert!(%Room{...})`
+  should pass `region_id: AgenticRealms.DataCase.insert_test_region()`
+  to satisfy the NOT NULL FK introduced in feature 012.
+  """
+  def insert_test_region(name_prefix \\ "TestRegion") do
+    alias AgenticRealms.Repo
+    alias AgenticRealms.World.Schemas.Region
+
+    {:ok, region} =
+      Repo.insert(%Region{
+        id: Ecto.UUID.generate(),
+        name: "#{name_prefix}-#{System.unique_integer([:positive])}"
+      })
+
+    region.id
+  end
+
   setup tags do
     AgenticRealms.DataCase.setup_sandbox(tags)
     :ok

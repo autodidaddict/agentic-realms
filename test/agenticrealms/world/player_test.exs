@@ -2,8 +2,8 @@ defmodule AgenticRealms.World.PlayerTest do
   use ExUnit.Case, async: true
 
   alias AgenticRealms.World.Player
-  alias AgenticRealms.World.Commands.{SpawnPlayer, MovePlayer}
-  alias AgenticRealms.World.Events.{PlayerSpawned, PlayerMoved}
+  alias AgenticRealms.World.Commands.{SpawnPlayer, MovePlayer, RecordRoomDiscovery}
+  alias AgenticRealms.World.Events.{PlayerSpawned, PlayerMoved, PlayerDiscoveredRoom}
 
   @atrium "00000000-0000-0000-0000-000000000001"
   @library "00000000-0000-0000-0000-000000000002"
@@ -85,6 +85,79 @@ defmodule AgenticRealms.World.PlayerTest do
         })
 
       assert state.current_room_id == @library
+    end
+  end
+
+  # --- Feature 012 — discovery ---
+
+  describe "RecordRoomDiscovery" do
+    test "first call on a fresh aggregate emits PlayerDiscoveredRoom" do
+      cmd = %RecordRoomDiscovery{player_id: 1, room_id: @atrium}
+      result = Player.execute(spawned(), cmd)
+
+      assert %PlayerDiscoveredRoom{
+               player_id: 1,
+               room_id: @atrium,
+               discovered_at: %DateTime{}
+             } = result
+    end
+
+    test "second call with the same room is :ok with no event" do
+      state =
+        spawned()
+        |> Player.apply(%PlayerDiscoveredRoom{
+          player_id: 1,
+          room_id: @atrium,
+          discovered_at: DateTime.utc_now() |> DateTime.truncate(:second)
+        })
+
+      assert :ok = Player.execute(state, %RecordRoomDiscovery{player_id: 1, room_id: @atrium})
+    end
+
+    test "second call with a DIFFERENT room emits another event" do
+      state =
+        spawned()
+        |> Player.apply(%PlayerDiscoveredRoom{
+          player_id: 1,
+          room_id: @atrium,
+          discovered_at: DateTime.utc_now() |> DateTime.truncate(:second)
+        })
+
+      assert %PlayerDiscoveredRoom{room_id: @library} =
+               Player.execute(state, %RecordRoomDiscovery{player_id: 1, room_id: @library})
+    end
+
+    test "apply/2 of PlayerDiscoveredRoom adds the room to discovered_room_ids" do
+      state =
+        Player.apply(spawned(), %PlayerDiscoveredRoom{
+          player_id: 1,
+          room_id: @atrium,
+          discovered_at: DateTime.utc_now() |> DateTime.truncate(:second)
+        })
+
+      assert MapSet.member?(state.discovered_room_ids, @atrium)
+    end
+
+    test "rehydration from event stream rebuilds the discovered set" do
+      events = [
+        %PlayerSpawned{player_id: 1, room_id: @atrium},
+        %PlayerDiscoveredRoom{
+          player_id: 1,
+          room_id: @atrium,
+          discovered_at: DateTime.utc_now() |> DateTime.truncate(:second)
+        },
+        %PlayerDiscoveredRoom{
+          player_id: 1,
+          room_id: @library,
+          discovered_at: DateTime.utc_now() |> DateTime.truncate(:second)
+        }
+      ]
+
+      state = Enum.reduce(events, %Player{}, &Player.apply(&2, &1))
+
+      assert MapSet.size(state.discovered_room_ids) == 2
+      assert MapSet.member?(state.discovered_room_ids, @atrium)
+      assert MapSet.member?(state.discovered_room_ids, @library)
     end
   end
 end

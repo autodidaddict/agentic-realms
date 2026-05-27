@@ -14,6 +14,7 @@ defmodule AgenticRealmsWeb.GameLive do
     Direction,
     Examine,
     IntentResolver,
+    MapView,
     Queries,
     Seed
   }
@@ -83,6 +84,7 @@ defmodule AgenticRealmsWeb.GameLive do
      |> assign(:mode, :player)
      |> assign(:modal, nil)
      |> assign(:map_open, false)
+     |> assign(:map_view, MapView.for_player(player_id))
      |> assign(:log, [%{kind: :room, room: room_view}])
      |> assign(:current_room_id, current_room_id)
      |> assign(:input, "")
@@ -101,7 +103,6 @@ defmodule AgenticRealmsWeb.GameLive do
      |> assign(:quests, GameData.quests())
      |> assign(:quest_details, GameData.quest_details())
      |> assign(:presence, presence)
-     |> assign(:suggestions, GameData.suggestions())
      |> assign(:selected_quest, 0)
      |> assign(:wizard_kind, :item)
      |> assign(:wizard_text, GameData.starter_prompts()[:item])
@@ -193,10 +194,6 @@ defmodule AgenticRealmsWeb.GameLive do
       {:unknown, raw} ->
         handle_unknown(socket, raw)
     end
-  end
-
-  def handle_event("click_suggestion", %{"text" => text}, socket) do
-    handle_event("submit_command", %{"text" => text}, socket)
   end
 
   def handle_event("update_input", %{"text" => text}, socket) do
@@ -443,6 +440,7 @@ defmodule AgenticRealmsWeb.GameLive do
             {:noreply,
              socket
              |> assign(:current_room_id, to_room_id)
+             |> refresh_map_view()
              |> append_log(%{kind: :room, room: room_view})
              |> refresh_presence()}
 
@@ -450,6 +448,7 @@ defmodule AgenticRealmsWeb.GameLive do
             {:noreply,
              socket
              |> assign(:current_room_id, to_room_id)
+             |> refresh_map_view()
              |> append_log(%{kind: :system, text: "You arrive somewhere."})
              |> refresh_presence()}
         end
@@ -1022,7 +1021,10 @@ defmodule AgenticRealmsWeb.GameLive do
 
       player_id = socket.assigns.current_player.id
 
-      socket = assign(socket, :current_room_id, to_room_id)
+      socket =
+        socket
+        |> assign(:current_room_id, to_room_id)
+        |> refresh_map_view()
 
       case Queries.look_room(player_id) do
         {:ok, room_view} ->
@@ -1054,6 +1056,18 @@ defmodule AgenticRealmsWeb.GameLive do
       )
 
     assign(socket, :presence, presence)
+  end
+
+  # Feature 012 — recompute the per-player MapView struct. Called every
+  # time the player's current room changes (own move, other-tab swap, or
+  # any future region/elevation transition). The MapView query is bounded
+  # by the configured viewport (default 11×11 cells) so this stays cheap.
+  #
+  # FR-015 / SC-005: a region transition is just a current-room change
+  # whose destination has a different `region_id`. `MapView.for_player/1`
+  # reads the region from the destination room — no special-casing here.
+  defp refresh_map_view(socket) do
+    assign(socket, :map_view, MapView.for_player(socket.assigns.current_player.id))
   end
 
   # Mutate :presence directly from the broadcast payload instead of

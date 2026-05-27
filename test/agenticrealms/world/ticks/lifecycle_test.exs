@@ -17,7 +17,8 @@ defmodule AgenticRealms.World.Ticks.LifecycleTest do
     Repo.insert!(%Room{
       id: Ecto.UUID.generate(),
       name: "T",
-      description: "."
+      description: ".",
+      region_id: AgenticRealms.DataCase.insert_test_region()
     })
   end
 

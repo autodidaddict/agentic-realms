@@ -20,7 +20,8 @@ defmodule AgenticRealms.World.NPCChatTest do
     Repo.insert!(%Room{
       id: Ecto.UUID.generate(),
       name: "Test Room",
-      description: "A room."
+      description: "A room.",
+      region_id: AgenticRealms.DataCase.insert_test_region()
     })
   end
 

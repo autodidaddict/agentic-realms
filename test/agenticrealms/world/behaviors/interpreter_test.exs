@@ -26,7 +26,8 @@ defmodule AgenticRealms.World.Behaviors.InterpreterTest do
       id: Ecto.UUID.generate(),
       name: "Test Room",
       description: "A room.",
-      behaviors: behaviors
+      behaviors: behaviors,
+      region_id: AgenticRealms.DataCase.insert_test_region()
     })
   end
 

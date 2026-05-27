@@ -40,10 +40,28 @@ defmodule AgenticRealms.World.Projections.WorldProjector do
     ObjectDroppedInRoom,
     NPCSpawnedInRoom,
     NPCBlueprintCreated,
-    NPCClonedFromBlueprint
+    NPCClonedFromBlueprint,
+    RegionCreated
   }
 
-  alias AgenticRealms.World.Schemas.{Room, Exit, Object, NPCBlueprint, NPCClone}
+  alias AgenticRealms.World.Events.PlayerDiscoveredRoom, as: PlayerDiscoveredRoomEvent
+
+  alias AgenticRealms.World.Schemas.{Room, Exit, Object, NPCBlueprint, NPCClone, Region}
+  alias AgenticRealms.World.Schemas.PlayerDiscoveredRoom, as: PlayerDiscoveredRoomRow
+
+  # Feature 012: regions are first-class. RegionCreated lands here before
+  # any RoomCreated event that references the region (Commanded ordering
+  # within an aggregate; cross-aggregate ordering preserved via the
+  # consistency: :strong dispatch in Commands.create_region/2).
+  def handle(%RegionCreated{region_id: id, name: name}, _meta) do
+    Repo.insert!(
+      %Region{id: id, name: name},
+      on_conflict: :nothing,
+      conflict_target: :id
+    )
+
+    :ok
+  end
 
   def handle(
         %RoomCreated{
@@ -51,11 +69,25 @@ defmodule AgenticRealms.World.Projections.WorldProjector do
           name: name,
           description: description,
           behaviors: behaviors
-        },
+        } = event,
         _meta
       ) do
+    # Feature 012: RoomCreated now carries region_id + map fields. Older
+    # events (pre-feature-012, replayed from the event store) lack these
+    # keys — pattern-match defensively via Map.get so historical replay
+    # still projects correctly.
     Repo.insert!(
-      %Room{id: id, name: name, description: description, behaviors: behaviors},
+      %Room{
+        id: id,
+        name: name,
+        description: description,
+        behaviors: behaviors,
+        region_id: Map.get(event, :region_id),
+        map_visible: Map.get(event, :map_visible, true),
+        elevation: Map.get(event, :elevation, 0),
+        map_x: Map.get(event, :map_x),
+        map_y: Map.get(event, :map_y)
+      },
       on_conflict: :nothing,
       conflict_target: :id
     )
@@ -241,6 +273,41 @@ defmodule AgenticRealms.World.Projections.WorldProjector do
     )
 
     :ok
+  end
+
+  # Feature 012 — Maps. Per-player room discovery projection. Inserts with
+  # `on_conflict: :nothing` so the composite-PK guarantee is leaned on for
+  # idempotency under replay. (The aggregate ALSO short-circuits duplicate
+  # emissions, but defense-in-depth is cheap here.)
+  def handle(
+        %PlayerDiscoveredRoomEvent{
+          player_id: pid,
+          room_id: rid,
+          discovered_at: ts
+        },
+        _meta
+      ) do
+    Repo.insert!(
+      %PlayerDiscoveredRoomRow{
+        player_id: pid,
+        room_id: rid,
+        discovered_at: ensure_datetime(ts)
+      },
+      on_conflict: :nothing,
+      conflict_target: [:player_id, :room_id]
+    )
+
+    :ok
+  end
+
+  # EventStore round-trips `%DateTime{}` through JSON as an ISO 8601 string.
+  # The projector accepts either shape so live-dispatched events (struct in
+  # memory) and replayed events (string after JSON deserialize) both work.
+  defp ensure_datetime(%DateTime{} = dt), do: dt
+
+  defp ensure_datetime(s) when is_binary(s) do
+    {:ok, dt, _offset} = DateTime.from_iso8601(s)
+    DateTime.truncate(dt, :second)
   end
 
   defp next_serial_for_blueprint(bp_id) do

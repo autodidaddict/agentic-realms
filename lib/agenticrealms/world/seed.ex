@@ -2,60 +2,87 @@ defmodule AgenticRealms.World.Seed do
   @moduledoc """
   Idempotent starter-map seeder. Run from `priv/repo/seeds.exs`.
 
-  Dispatches the sequence of `CreateRoom` / `AddExit` / `PlaceObject`
-  commands described in `specs/003-persisted-world/research.md` §D8:
+  Feature 012 (Maps) rewrite. The seeded world now lives inside two
+  regions — Blackmire (primary, where players spawn) and Hollowvale (a
+  stub region behind a cross-region exit). Every seed room carries
+  explicit `(map_x, map_y, elevation)` so the map renderer has meaningful
+  content on a fresh install.
 
-    * room_atrium (starting) — Stone Atrium with a brass lantern
-    * room_corridor — North Corridor (empty)
-    * room_library — Dusty Library with a leather-bound journal
-      and a fixed reading lectern
+  Layout (Blackmire, elevation 0 unless noted):
 
-  Paired exits atrium↔corridor (north/south) and atrium↔library (east/west).
+  ```text
+              map_x   0      1      2      3       4
+              ┌──────┬──────┬──────┬──────┬──────┐
+  map_y = -1 │ Cor  │      │      │      │      │
+              ├──────┼──────┼──────┼──────┼──────┤
+  map_y =  0 │ Atr  │~~~~~~~~~~~~~~│ Lib  │ Vlt† │
+              ├──────┼──────┼──────┼──────┼──────┤
+  map_y =  1 │      │      │      │      │      │
+              ├──────┼──────┼──────┼──────┼──────┤
+  map_y =  2 │      │      │      │ Brd  │      │
+              └──────┴──────┴──────┴──────┴──────┘
+  ```
 
-  The starting-room id is fixed in `@starting_room_id` so subsequent code
-  (`SpawnPlayer`, FR-022 recovery) can reference it without a DB lookup.
+  `~~~` denotes the long-distance bridge (Atrium↔Library, Δx = 3).
+  `Vlt†` is the Hidden Vault — `map_visible: false`, so it never appears
+  on the map and the Library→Vault exit shows no affordance at all.
+
+  Vertical: Atrium has an Up exit to the Atrium Loft at
+  `(0, 0, elevation 1)`. Loft has a Down back to Atrium.
+
+  Cross-region: Border (`3, 2, 0` in Blackmire) has an East exit into
+  Hollowvale Outskirts (`0, 0, 0` in Hollowvale).
+
+  The starting-room id is pinned in `@starting_room_id` so `SpawnPlayer`
+  / `Seed.starting_room_id/0` continue to work unchanged.
   """
 
   require Logger
 
   alias AgenticRealms.Repo
-  alias AgenticRealms.World.Application, as: WorldApp
   alias AgenticRealms.World.Behaviors.Validator, as: BehaviorsValidator
   alias AgenticRealms.World.Commands, as: WorldCommands
-  alias AgenticRealms.World.Commands.{CreateRoom, AddExit, PlaceObject, CreateNPCBlueprint}
-  alias AgenticRealms.World.Schemas.Room
+  alias AgenticRealms.World.Schemas.{Region, Room}
 
+  # --- regions
+  @blackmire_region_id "00000000-0000-4000-8000-000000000010"
+  @hollowvale_region_id "00000000-0000-4000-8000-000000000011"
+
+  # --- rooms (UUIDs pinned for test stability)
   @starting_room_id "00000000-0000-4000-8000-000000000001"
   @corridor_room_id "00000000-0000-4000-8000-000000000002"
   @library_room_id "00000000-0000-4000-8000-000000000003"
+  @loft_room_id "00000000-0000-4000-8000-000000000004"
+  @vault_room_id "00000000-0000-4000-8000-000000000005"
+  @border_room_id "00000000-0000-4000-8000-000000000006"
+  @outskirts_room_id "00000000-0000-4000-8000-000000000007"
 
+  # --- objects (existing)
   @brass_lantern_id "00000000-0000-4000-8000-100000000001"
   @leather_journal_id "00000000-0000-4000-8000-100000000002"
   @reading_lectern_id "00000000-0000-4000-8000-100000000003"
 
-  # Feature 008 — clone id preserved verbatim from feature 007's
-  # @innkeeper_garrick_id so any test referencing the literal UUID continues
-  # to work.
+  # --- NPC (existing — feature 008 clone id preserved verbatim)
   @innkeeper_garrick_clone_id "00000000-0000-4000-8000-200000000001"
   @innkeeper_garrick_blueprint_id "garrick_the_innkeeper"
 
   @doc """
-  Returns the UUID of the designated starting room. Stable across runs
-  because the seed pins every entity id.
+  Returns the UUID of the designated starting room. Stable across runs.
   """
   @spec starting_room_id() :: String.t()
   def starting_room_id, do: @starting_room_id
 
   @doc """
-  Seed the world if not yet seeded. Idempotent: re-running is a no-op.
+  Seed the world if not yet seeded. Idempotent: re-running is a no-op as
+  long as either a region or a room already exists.
   """
   @spec run() :: :ok | :already_seeded
   def run do
-    if Repo.aggregate(Room, :count) > 0 do
+    if Repo.aggregate(Room, :count) > 0 or Repo.aggregate(Region, :count) > 0 do
       Logger.info("[World.Seed] world already seeded — skipping")
       :already_seeded
     else
-      Logger.info("[World.Seed] seeding starter map")
+      Logger.info("[World.Seed] seeding starter map (Blackmire + Hollowvale)")
       do_seed()
       Logger.info("[World.Seed] starter map seeded")
       :ok
@@ -63,10 +90,15 @@ defmodule AgenticRealms.World.Seed do
   end
 
   defp do_seed do
-    # Feature 009 — behavior payloads for the seeded entities. The
-    # validator catches authoring errors at seed time (mis-typed trigger,
-    # missing/empty/over-cap text, etc.) so they surface during
-    # `mix ecto.reset` rather than at runtime.
+    # ---- regions ----
+    # Tests run Repo inside the SQL sandbox, but Commanded aggregates live
+    # in the application's supervision tree and survive across tests.
+    # Treat "already exists" as idempotent success so a sandbox-cleared
+    # test setup re-running the seed works against a hot aggregate cache.
+    :ok = ensure_region(@blackmire_region_id, "Blackmire")
+    :ok = ensure_region(@hollowvale_region_id, "Hollowvale")
+
+    # ---- behaviors (carried over from feature 011) ----
     atrium_behaviors = [
       %{
         "trigger" => "player_entered",
@@ -74,9 +106,6 @@ defmodule AgenticRealms.World.Seed do
           %{"type" => "say", "text" => "The cool air carries the scent of rain."}
         ]
       },
-      # Feature 011 — periodic ambient narration. Fires every ~30s while
-      # the room has at least one live occupant. Uses the `emote` action
-      # so it renders as plain ambient text (no "says" wrapper).
       %{
         "trigger" => "tick",
         "interval_ms" => 30_000,
@@ -104,11 +133,6 @@ defmodule AgenticRealms.World.Seed do
           %{"type" => "say", "text" => "Farewell, traveler."}
         ]
       },
-      # Feature 011 — periodic idle gesture. Fires every ~20s. Uses the
-      # `emote` action so it renders as third-person narration prefixed
-      # with the NPC's name, not as quoted speech. The text starts mid-
-      # sentence (no actor name); the renderer prepends "Garrick the
-      # Innkeeper" at render time.
       %{
         "trigger" => "tick",
         "interval_ms" => 20_000,
@@ -120,9 +144,6 @@ defmodule AgenticRealms.World.Seed do
 
     :ok = validate_behaviors!(garrick_behaviors, "garrick_behaviors")
 
-    # Feature 010 — Garrick's lore. The LLM-only voice/backstory; never
-    # shown on `look <npc>` (that's `long_description`), never recited on
-    # demand to the player (FR-008e — the system prompt forbids dumping).
     garrick_lore =
       """
       You are Garrick, a former bridge-guard from the Riverford garrison. \
@@ -138,82 +159,7 @@ defmodule AgenticRealms.World.Seed do
       |> String.replace("\n", " ")
       |> String.trim()
 
-    # Rooms. Feature 008 — use consistency: :strong so the read-model
-    # `world_rooms` rows exist by the time later seed dispatches (or any
-    # post-seed pre-dispatch checks that consult the read model — e.g.
-    # `Commands.spawn_npc_clone/3`'s `check_room_exists/1`) run.
-    :ok =
-      WorldApp.dispatch(
-        %CreateRoom{
-          room_id: @starting_room_id,
-          name: "Stone Atrium",
-          description:
-            "A wide, pillared hall of mossy granite. The air is cool and tastes faintly of rain. A single shaft of daylight falls from a slot high above, lighting motes of dust drifting in slow spirals.",
-          behaviors: atrium_behaviors
-        },
-        consistency: :strong
-      )
-
-    :ok =
-      WorldApp.dispatch(
-        %CreateRoom{
-          room_id: @corridor_room_id,
-          name: "North Corridor",
-          description:
-            "A narrow stone passage worn smooth by centuries of footsteps. The walls are bare. Your own breath sounds loud in the quiet."
-        },
-        consistency: :strong
-      )
-
-    :ok =
-      WorldApp.dispatch(
-        %CreateRoom{
-          room_id: @library_room_id,
-          name: "Dusty Library",
-          description:
-            "Shelves of crumbling tomes line three walls, their spines cracked and silver-leafed. A heavy reading lectern stands beneath the only window, its surface scratched with the marks of generations of scribes."
-        },
-        consistency: :strong
-      )
-
-    # Exits (paired both directions)
-    :ok =
-      WorldApp.dispatch(%AddExit{
-        room_id: @starting_room_id,
-        direction: :north,
-        target_room_id: @corridor_room_id
-      })
-
-    :ok =
-      WorldApp.dispatch(%AddExit{
-        room_id: @corridor_room_id,
-        direction: :south,
-        target_room_id: @starting_room_id
-      })
-
-    :ok =
-      WorldApp.dispatch(%AddExit{
-        room_id: @starting_room_id,
-        direction: :east,
-        target_room_id: @library_room_id
-      })
-
-    :ok =
-      WorldApp.dispatch(%AddExit{
-        room_id: @library_room_id,
-        direction: :west,
-        target_room_id: @starting_room_id
-      })
-
-    # Objects
     lantern_behaviors = [
-      # Feature 011 — flickering tick. Fires every ~10s, broadcasting an
-      # ambient line whenever the lantern is in a room with live
-      # occupants (whether on the floor or in a player's inventory).
-      # Uses the `emote` action so it renders as third-person narration
-      # prefixed with the object's name — NOT as "the brass lantern
-      # says, '...'". The text starts mid-sentence; the renderer
-      # prepends "brass lantern" at render time.
       %{
         "trigger" => "tick",
         "interval_ms" => 10_000,
@@ -224,6 +170,121 @@ defmodule AgenticRealms.World.Seed do
     ]
 
     :ok = validate_behaviors!(lantern_behaviors, "lantern_behaviors")
+
+    # ---- Blackmire rooms ----
+    :ok =
+      WorldCommands.create_room(
+        @starting_room_id,
+        "Stone Atrium",
+        "A wide, pillared hall of mossy granite. The air is cool and tastes faintly of rain. A single shaft of daylight falls from a slot high above, lighting motes of dust drifting in slow spirals.",
+        @blackmire_region_id,
+        behaviors: atrium_behaviors,
+        elevation: 0,
+        map_x: 0,
+        map_y: 0
+      )
+
+    :ok =
+      WorldCommands.create_room(
+        @corridor_room_id,
+        "North Corridor",
+        "A narrow stone passage worn smooth by centuries of footsteps. The walls are bare. Your own breath sounds loud in the quiet.",
+        @blackmire_region_id,
+        elevation: 0,
+        map_x: 0,
+        map_y: -1
+      )
+
+    :ok =
+      WorldCommands.create_room(
+        @library_room_id,
+        "Dusty Library",
+        "Shelves of crumbling tomes line three walls, their spines cracked and silver-leafed. A heavy reading lectern stands beneath the only window, its surface scratched with the marks of generations of scribes.",
+        @blackmire_region_id,
+        elevation: 0,
+        map_x: 3,
+        map_y: 0
+      )
+
+    :ok =
+      WorldCommands.create_room(
+        @loft_room_id,
+        "Atrium Loft",
+        "A narrow gallery overlooking the atrium below. Wooden rails run the length of the floor; pigeons nest in the rafters.",
+        @blackmire_region_id,
+        elevation: 1,
+        map_x: 0,
+        map_y: 0
+      )
+
+    # The Vault is map-hidden — appears nowhere on the map even when discovered.
+    :ok =
+      WorldCommands.create_room(
+        @vault_room_id,
+        "Hidden Vault",
+        "A windowless chamber lined with iron-shod chests. The air is dry and tastes of old copper. Whoever once kept this place left in a hurry.",
+        @blackmire_region_id,
+        map_visible: false,
+        elevation: 0,
+        map_x: 4,
+        map_y: 0
+      )
+
+    :ok =
+      WorldCommands.create_room(
+        @border_room_id,
+        "Blackmire Border",
+        "A weathered stone marker the height of a tall man, scored with weather and lichen. Beyond it the road turns to packed earth and the country grows unfamiliar.",
+        @blackmire_region_id,
+        elevation: 0,
+        map_x: 3,
+        map_y: 2
+      )
+
+    # ---- Hollowvale stub ----
+    :ok =
+      WorldCommands.create_room(
+        @outskirts_room_id,
+        "Hollowvale Outskirts",
+        "A village edge of crooked wooden fences and tilted gables. Smoke rises from a chimney far down the lane. The air smells of woodsmoke and turned earth.",
+        @hollowvale_region_id,
+        elevation: 0,
+        map_x: 0,
+        map_y: 0
+      )
+
+    # ---- Exits ----
+    # Atrium ↔ Corridor (Δy = 1)
+    :ok = WorldCommands.add_exit(@starting_room_id, :north, @corridor_room_id)
+    :ok = WorldCommands.add_exit(@corridor_room_id, :south, @starting_room_id)
+
+    # Atrium ↔ Library (Δx = 3 — long-distance "bridge" line)
+    :ok = WorldCommands.add_exit(@starting_room_id, :east, @library_room_id)
+    :ok = WorldCommands.add_exit(@library_room_id, :west, @starting_room_id)
+
+    # Atrium ↔ Loft (up/down between elev 0 and 1)
+    :ok = WorldCommands.add_exit(@starting_room_id, :up, @loft_room_id)
+    :ok = WorldCommands.add_exit(@loft_room_id, :down, @starting_room_id)
+
+    # Library ↔ Vault (east/west, distance 1). Vault is map-hidden so
+    # neither line nor fog stub appears on Library's east side.
+    :ok = WorldCommands.add_exit(@library_room_id, :east, @vault_room_id)
+    :ok = WorldCommands.add_exit(@vault_room_id, :west, @library_room_id)
+
+    # Library ↔ Border (south/north, Δy = 2)
+    :ok = WorldCommands.add_exit(@library_room_id, :south, @border_room_id)
+    :ok = WorldCommands.add_exit(@border_room_id, :north, @library_room_id)
+
+    # Border → Hollowvale Outskirts (one-way east, cross-region). The
+    # map renders a dashed cross-region affordance from Border's east side.
+    :ok = WorldCommands.add_exit(@border_room_id, :east, @outskirts_room_id)
+    # Return path west from Outskirts back to Border (two-way is friendlier;
+    # the cross-region affordance still shows on both sides).
+    :ok = WorldCommands.add_exit(@outskirts_room_id, :west, @border_room_id)
+
+    # ---- Objects (existing) ----
+    alias AgenticRealms.World.Commands.PlaceObject
+    alias AgenticRealms.World.Application, as: WorldApp
 
     :ok =
       WorldApp.dispatch(%PlaceObject{
@@ -259,10 +320,9 @@ defmodule AgenticRealms.World.Seed do
         fixed: true
       })
 
-    # NPCs (feature 007 + feature 008 blueprint/clone split + feature 009
-    # greeter/farewell behaviors). Use consistency: :strong so the
-    # blueprint is in the read model before the subsequent spawn-clone
-    # wrapper consults it.
+    # ---- NPC (existing) ----
+    alias AgenticRealms.World.Commands.CreateNPCBlueprint
+
     :ok =
       WorldApp.dispatch(
         %CreateNPCBlueprint{
@@ -292,6 +352,15 @@ defmodule AgenticRealms.World.Seed do
 
       {:error, reason} ->
         raise "Seed authoring error in #{label}: #{inspect(reason)}"
+    end
+  end
+
+  defp ensure_region(region_id, name) do
+    case WorldCommands.create_region(region_id, name) do
+      :ok -> :ok
+      {:error, :region_already_exists} -> :ok
+      {:error, :region_name_taken} -> :ok
+      {:error, reason} -> raise "Seed: failed to ensure region #{name}: #{inspect(reason)}"
     end
   end
 end
