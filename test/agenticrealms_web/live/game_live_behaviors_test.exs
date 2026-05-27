@@ -100,12 +100,14 @@ defmodule AgenticRealmsWeb.GameLiveBehaviorsTest do
                ~s(<div class="log-entry narrate narrate-room">The cool air carries the scent of rain.</div>),
            ":room_speech must render without 'X says' attribution and without quotation marks"
 
-    # FR-008a: room narration MUST appear BEFORE the NPC speech in the log.
-    room_pos = :binary.match(alice_html, "narrate-room") |> elem(0)
-    npc_pos = :binary.match(alice_html, "speech-npc") |> elem(0)
+    # FR-008a: room narration MUST appear visually BEFORE the NPC speech.
+    # See `newest_pos/2` below for why the comparison is `>` and not `<`.
+    room_pos = newest_pos(alice_html, "narrate-room")
+    npc_pos = newest_pos(alice_html, "speech-npc")
 
-    assert room_pos < npc_pos,
-           "FR-008a: room narration (#{room_pos}) must appear BEFORE NPC speech (#{npc_pos})"
+    assert room_pos > npc_pos,
+           "FR-008a: room narration (DOM @#{room_pos}) must appear visually BEFORE " <>
+             "NPC speech (DOM @#{npc_pos}); log is column-reverse so visually-earlier = higher byte offset"
 
     # ── US3 anti-spam: room_speech is triggering-player-only ──────────────
     # Bob now mounts a separate session. His arrival should trigger room
@@ -202,12 +204,12 @@ defmodule AgenticRealmsWeb.GameLiveBehaviorsTest do
     assert alice_html_multi_behavior =~ "Mind the loose flagstone by the door.",
            "second player_entered behavior should fire"
 
-    welcome_pos = find_last_occurrence(alice_html_multi_behavior, "Welcome to the Stone Atrium.")
-    flagstone_pos = find_last_occurrence(alice_html_multi_behavior, "Mind the loose flagstone")
+    welcome_pos = newest_pos(alice_html_multi_behavior, "Welcome to the Stone Atrium.")
+    flagstone_pos = newest_pos(alice_html_multi_behavior, "Mind the loose flagstone")
 
-    assert welcome_pos < flagstone_pos,
-           "multi-behavior ordering: 'Welcome' should appear before 'Mind the loose flagstone' " <>
-             "(positions #{welcome_pos} vs #{flagstone_pos})"
+    assert welcome_pos > flagstone_pos,
+           "multi-behavior ordering: 'Welcome' should fire before 'Mind the loose flagstone' " <>
+             "(welcome DOM @#{welcome_pos} vs flagstone DOM @#{flagstone_pos}; log is column-reverse)"
 
     # ── US5: Multi-action composition (single behavior, multiple actions) ─
     {1, _} =
@@ -251,11 +253,12 @@ defmodule AgenticRealmsWeb.GameLiveBehaviorsTest do
     assert alice_html_multi_action =~ "BETA_LINE",
            "second action in multi-action behavior should fire"
 
-    alpha_pos = find_last_occurrence(alice_html_multi_action, "ALPHA_LINE")
-    beta_pos = find_last_occurrence(alice_html_multi_action, "BETA_LINE")
+    alpha_pos = newest_pos(alice_html_multi_action, "ALPHA_LINE")
+    beta_pos = newest_pos(alice_html_multi_action, "BETA_LINE")
 
-    assert alpha_pos < beta_pos,
-           "multi-action ordering: ALPHA before BETA (positions #{alpha_pos} vs #{beta_pos})"
+    assert alpha_pos > beta_pos,
+           "multi-action ordering: ALPHA should fire before BETA " <>
+             "(alpha DOM @#{alpha_pos} vs beta DOM @#{beta_pos}; log is column-reverse)"
   end
 
   # --- Helpers ------------------------------------------------------------
@@ -272,15 +275,21 @@ defmodule AgenticRealmsWeb.GameLiveBehaviorsTest do
     |> Kernel.-(1)
   end
 
-  defp find_last_occurrence(haystack, needle) do
-    # Returns the byte position of the last occurrence of `needle` in
-    # `haystack`. Used for ordering assertions across multiple lines that
-    # may also appear earlier in the log (e.g., from previous moves).
-    haystack
-    |> String.split(needle)
-    |> Enum.drop(-1)
-    |> Enum.map(&byte_size/1)
-    |> Enum.sum()
-    |> Kernel.+(byte_size(needle) * (length(String.split(haystack, needle)) - 2))
+  # Returns the byte offset of the MOST RECENT (newest) occurrence of
+  # `needle` in the rendered log HTML. The log is rendered with
+  # `Enum.reverse(@log)` + CSS `flex-direction: column-reverse`
+  # (game_components.ex:1175, app.css:851), so newer entries render FIRST
+  # in the DOM (lower byte offsets) and CSS visually flips them to the
+  # bottom of the screen. Consequence: the most recent firing of a string
+  # is at the LOWEST byte offset — exactly what `:binary.match/2` returns.
+  #
+  # Ordering assertions therefore use `>` rather than `<`: visually
+  # earlier (chronologically older, displayed higher on screen) means
+  # HIGHER byte offset in the DOM.
+  defp newest_pos(haystack, needle) do
+    case :binary.match(haystack, needle) do
+      {pos, _len} -> pos
+      :nomatch -> flunk("newest_pos: #{inspect(needle)} not found in HTML")
+    end
   end
 end
