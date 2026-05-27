@@ -1139,7 +1139,6 @@ defmodule AgenticRealmsWeb.GameComponents do
   attr :inventory, :list, required: true
   attr :quests, :list, required: true
   attr :presence, :list, required: true
-  attr :suggestions, :list, required: true
   attr :input, :string, required: true
   attr :streaming, :boolean, required: true
   attr :map_open, :boolean, required: true
@@ -1225,17 +1224,6 @@ defmodule AgenticRealmsWeb.GameComponents do
               <button type="submit" class="send" disabled={@input_locked}>send ↵</button>
             </form>
           </div>
-        </div>
-        <div class="suggest-row">
-          <span class="suggest-label">suggested</span>
-          <button
-            :for={s <- @suggestions}
-            class="suggest-chip"
-            phx-click="click_suggestion"
-            phx-value-text={s}
-          >
-            {s}
-          </button>
         </div>
       </footer>
     </div>

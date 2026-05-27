@@ -138,10 +138,6 @@ defmodule AgenticRealms.GameData do
     ]
   end
 
-  def suggestions do
-    ["read letter", "whisper sable", "order mead", "look odra", "examine sigil", "north"]
-  end
-
   # Feature 012 removed `map_nodes/0` and `map_edges/0` — the mini-map
   # is now driven by `AgenticRealms.World.MapView` over real world state.
 

@@ -103,7 +103,6 @@ defmodule AgenticRealmsWeb.GameLive do
      |> assign(:quests, GameData.quests())
      |> assign(:quest_details, GameData.quest_details())
      |> assign(:presence, presence)
-     |> assign(:suggestions, GameData.suggestions())
      |> assign(:selected_quest, 0)
      |> assign(:wizard_kind, :item)
      |> assign(:wizard_text, GameData.starter_prompts()[:item])
@@ -195,10 +194,6 @@ defmodule AgenticRealmsWeb.GameLive do
       {:unknown, raw} ->
         handle_unknown(socket, raw)
     end
-  end
-
-  def handle_event("click_suggestion", %{"text" => text}, socket) do
-    handle_event("submit_command", %{"text" => text}, socket)
   end
 
   def handle_event("update_input", %{"text" => text}, socket) do
