@@ -52,24 +52,54 @@
   </script>
 
   <script :type={Phoenix.LiveView.ColocatedHook} name=".ScrollBottom">
-    // Keep the log pinned to its newest entry. Uses requestAnimationFrame
-    // so the scroll happens AFTER the new content's layout is applied —
-    // without the rAF, scrollHeight may still reflect the pre-update
-    // value and the scroll lands short of the bottom. Also listens for an
-    // explicit "scroll_log_to_bottom" push from the server so e.g.
-    // toggling the map panel (which suddenly covers the bottom of the
-    // log) can request a re-pin from above.
+    // Keep the log pinned to its newest entry. Driven by a
+    // MutationObserver on the log subtree because Phoenix LiveView's
+    // updated() hook doesn't reliably fire for every code path that
+    // appends to :log (esp. background timer / PubSub emissions where
+    // the DOM mutation arrives on a different patch than the parent
+    // element's own attributes).
+    //
+    // The observer also implements "smart pin": if the user has scrolled
+    // up to read older content, we leave them where they are. We only
+    // pin when they were already at (or within 48 px of) the bottom.
     export default {
+      _NEAR_BOTTOM_PX: 48,
+      _isAtBottom() {
+        const slack = this.el.scrollHeight - this.el.clientHeight - this.el.scrollTop;
+        return slack <= this._NEAR_BOTTOM_PX;
+      },
       _pin() {
+        // Defer one frame so the newly-inserted content's layout is
+        // applied before we read scrollHeight.
         requestAnimationFrame(() => {
           this.el.scrollTop = this.el.scrollHeight;
         });
       },
       mounted() {
+        this._wasAtBottom = true;
+        this._onScroll = () => { this._wasAtBottom = this._isAtBottom(); };
+        this.el.addEventListener("scroll", this._onScroll, { passive: true });
+
+        this._observer = new MutationObserver(() => {
+          if (this._wasAtBottom) this._pin();
+        });
+        this._observer.observe(this.el, { childList: true, subtree: true });
+
         this._pin();
-        this.handleEvent("scroll_log_to_bottom", () => this._pin());
+
+        // Explicit re-pin (e.g., when toggling the map panel — the
+        // backdrop-blurred panel covers the bottom of the log; the
+        // server pushes this event after the toggle so we snap to the
+        // newest line above the panel).
+        this.handleEvent("scroll_log_to_bottom", () => {
+          this._wasAtBottom = true;
+          this._pin();
+        });
       },
-      updated() { this._pin(); }
+      destroyed() {
+        if (this._observer) this._observer.disconnect();
+        if (this._onScroll) this.el.removeEventListener("scroll", this._onScroll);
+      }
     }
   </script>
 
