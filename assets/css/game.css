@@ -1419,7 +1419,43 @@ button { font: inherit; color: inherit; }
   background: var(--bg-inset);
 }
 .quest-item .qt { color: var(--ink); font-weight: 500; }
-.quest-item .qp { font-size: var(--fs-xs); color: var(--ink-faint); margin-top: 2px; }
+.quest-item .qn { font-size: var(--fs-xs); color: var(--ink-dim); margin: 4px 0; font-style: italic; }
+.quest-item .qp { font-size: var(--fs-xs); color: var(--ink-faint); margin-top: 2px; font-variant-numeric: tabular-nums; }
+
+/* Feature 013 — Quest modal: Active + Completed sections side-by-side
+   inside the modal. */
+.quest-log {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 4px 2px;
+}
+.quest-section {
+  display: flex;
+  flex-direction: column;
+}
+.quest-section-title {
+  font-size: 10px;
+  color: var(--ink-faint);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+.quest-empty {
+  font-size: var(--fs-xs);
+  color: var(--ink-faint);
+  font-style: italic;
+}
+
+/* Completed quests are visually de-emphasized but still readable. */
+.quest-item--completed {
+  border-left-color: var(--ink-faint);
+  opacity: 0.78;
+}
+.quest-item--completed .qt {
+  color: var(--ink-dim);
+  font-weight: 500;
+}
 
 .presence-row {
   display: flex;
@@ -1548,14 +1584,23 @@ button { font: inherit; color: inherit; }
    "something is over there" marker. Neither element carries a title or
    data-room-name — FR-007 / FR-017. */
 .map-fog-stub {
-  stroke: url(#fog-fade);
-  stroke-width: 2;
+  /* Direction-independent dashed stroke. Reads as "uncertain path"
+     at any angle (the previous objectBoundingBox linearGradient was
+     degenerate on vertical lines and fades the wrong way on west). */
+  stroke: var(--ink-dim);
+  stroke-width: 1.5;
   stroke-linecap: round;
+  stroke-dasharray: 3, 3;
+  opacity: 0.7;
 }
 .map-fog-cloud {
-  /* Pattern fill comes from the SVG <defs>. Slight transparency softens
-     the edge of the hatched square so it reads as a cloud, not a tile. */
-  opacity: 0.7;
+  /* Soft cloud silhouette: overlapping circles filled with a muted
+     ink tone. Visible enough that the fog stub is unmistakable, soft
+     enough that it reads as "something unknown out there" not as a
+     room glyph. No stroke — the overlap of the circles + the fill
+     does the work. */
+  fill: var(--ink-dim);
+  opacity: 0.45;
 }
 
 /* Hover tooltip — driven by the .MapTooltip ColocatedHook + GameLive

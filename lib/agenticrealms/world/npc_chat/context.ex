@@ -13,11 +13,36 @@ defmodule AgenticRealms.World.NPCChat.Context do
   """
 
   alias AgenticRealms.Accounts
+  alias AgenticRealms.Repo
   alias AgenticRealms.World.NPCChat.{SystemPrompt, Tools}
   alias AgenticRealms.World.Queries
+  alias AgenticRealms.World.Quests
+  alias AgenticRealms.World.Schemas.{NPCBlueprint, QuestInstance}
+
+  import Ecto.Query, only: [from: 2]
 
   @max_tokens 256
   @object_short_desc_limit 200
+
+  @type quest_context :: %{
+          offerable_quests: [
+            %{
+              slug: String.t(),
+              title: String.t(),
+              narrative: String.t(),
+              criteria_summary: String.t()
+            }
+          ],
+          active_instances: [
+            %{
+              quest_id: String.t(),
+              slug: String.t(),
+              title: String.t(),
+              progress: [Quests.criterion_progress()]
+            }
+          ],
+          completed_slugs: [String.t()]
+        }
 
   @type snapshot :: %{
           npc_name: String.t(),
@@ -26,7 +51,8 @@ defmodule AgenticRealms.World.NPCChat.Context do
           room_description: String.t(),
           other_players: [String.t()],
           objects: [%{name: String.t(), short_description: String.t()}],
-          player_name: String.t()
+          player_name: String.t(),
+          quest_context: quest_context()
         }
 
   @type turn ::
@@ -55,11 +81,100 @@ defmodule AgenticRealms.World.NPCChat.Context do
          room_description: room_view.description,
          other_players: Enum.map(room_view.other_players, &display_name/1),
          objects: Enum.map(room_view.objects, &object_entry/1),
-         player_name: player.username
+         player_name: player.username,
+         # Feature 013 — per-(viewer, NPC) quest context. Empty maps when
+         # the NPC has no catalog and the player has no history with it,
+         # in which case SystemPrompt omits the entire Quests section.
+         quest_context: quest_context(player_id, npc_clone.blueprint_id)
        }}
     else
       {:error, reason} -> {:error, reason}
     end
+  end
+
+  @doc """
+  Compute per-(viewer, NPC) quest context (feature 013).
+
+  Returns a map with three lists:
+    * `offerable_quests` — entries from the NPC's catalog that this
+      player has neither completed nor currently has active with this
+      NPC. These are the quests the LLM may choose to mention in prose.
+    * `active_instances` — open quest instances this player has with
+      this NPC, each with current per-criterion progress. The LLM uses
+      the `quest_id` here when calling `check_progress` / `finalize_quest`.
+    * `completed_slugs` — bare list of slugs this player has finished
+      with this NPC. The LLM is told to react in-character to repeat
+      requests without re-offering.
+  """
+  @spec quest_context(integer(), String.t()) :: quest_context()
+  def quest_context(player_id, npc_blueprint_id)
+      when is_integer(player_id) and is_binary(npc_blueprint_id) do
+    blueprint = Repo.get(NPCBlueprint, npc_blueprint_id)
+    catalog = (blueprint && blueprint.quests) || []
+
+    completed_slugs =
+      from(q in QuestInstance,
+        where:
+          q.player_id == ^player_id and
+            q.npc_blueprint_id == ^npc_blueprint_id and
+            q.state == "completed",
+        select: q.slug
+      )
+      |> Repo.all()
+
+    active_rows =
+      from(q in QuestInstance,
+        where:
+          q.player_id == ^player_id and
+            q.npc_blueprint_id == ^npc_blueprint_id and
+            q.state == "active",
+        order_by: q.accepted_at
+      )
+      |> Repo.all()
+
+    active_instances =
+      Enum.map(active_rows, fn inst ->
+        %{
+          quest_id: inst.id,
+          slug: inst.slug,
+          title: inst.definition_snapshot["title"],
+          progress: Quests.progress_for(inst)
+        }
+      end)
+
+    active_slugs = MapSet.new(active_rows, & &1.slug)
+    completed_set = MapSet.new(completed_slugs)
+
+    offerable_quests =
+      catalog
+      |> Enum.reject(fn q ->
+        slug = q["slug"]
+        MapSet.member?(completed_set, slug) or MapSet.member?(active_slugs, slug)
+      end)
+      |> Enum.map(fn q ->
+        %{
+          slug: q["slug"],
+          title: q["title"],
+          narrative: q["narrative"],
+          criteria_summary: criteria_summary(q["criteria"])
+        }
+      end)
+
+    %{
+      offerable_quests: offerable_quests,
+      active_instances: active_instances,
+      completed_slugs: completed_slugs
+    }
+  end
+
+  defp criteria_summary(nil), do: ""
+
+  defp criteria_summary(criteria) when is_list(criteria) do
+    criteria
+    |> Enum.map(fn c ->
+      "Bring #{c["target_count"]} #{c["name"]}"
+    end)
+    |> Enum.join("; ")
   end
 
   @doc """

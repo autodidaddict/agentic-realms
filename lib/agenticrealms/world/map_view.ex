@@ -297,19 +297,26 @@ defmodule AgenticRealms.World.MapView do
             end
 
           # Target undiscovered but map-visible + coord-set → :fog_stub.
+          # Anchor the stub's destination at the target room's actual
+          # cell coordinates (NOT some fixed offset from the source) so
+          # that two sources pointing at the same undiscovered room
+          # converge on a single cloud at one cell. The fog cloud then
+          # sits in the same cell the room glyph will occupy once
+          # discovered — visual continuity.
+          #
+          # Coordinates of the target are not an info leak: the player
+          # can already infer them geometrically from the source and
+          # exit direction (and from any other stub converging on the
+          # same cell). Only the target's id/name/region are withheld.
           not MapSet.member?(discovered, e.target_room.id) ->
             source = Map.fetch!(rendered_by_id, e.source_room_id)
-            {dx, dy} = Geometry.unit_vector(direction)
-            # Stub extends ~0.6 cells beyond the source room's center —
-            # short enough to feel like a teaser, long enough to read.
+
             stub = %ExitLine{
               kind: :fog_stub,
               from_x: source.map_x,
               from_y: source.map_y,
-              # Float endpoints render fine in SVG; the cell-to-pixel
-              # transform in the renderer multiplies by cell_size_px.
-              to_x: source.map_x + dx * 0.6,
-              to_y: source.map_y + dy * 0.6,
+              to_x: e.target_room.map_x,
+              to_y: e.target_room.map_y,
               direction: direction
             }
 

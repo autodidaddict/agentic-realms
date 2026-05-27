@@ -82,52 +82,9 @@ defmodule AgenticRealms.GameData do
     ]
   end
 
-  def quests do
-    [
-      %{
-        title: "The Serpent's Crown",
-        progress: "Deliver the sealed letter to the Archivist in Hollowvale."
-      },
-      %{
-        title: "By Candlelight",
-        progress: "Find out who is murdering the tallow-makers. 1 of 3 clues."
-      }
-    ]
-  end
-
-  def quest_details do
-    [
-      %{
-        title: "The Serpent's Crown",
-        giver: "Sable",
-        synopsis:
-          "A sealed letter has passed through three hands. The Archivist in Hollowvale must never read it — but he must believe that he has.",
-        desc:
-          "You were handed the letter in the Gilded Kraken. The wax sigil — a coiled serpent swallowing its own crown — belongs to no house you recognize. Sable will not say whose letter it is, only that if you deliver the truth, a city dies.",
-        steps: [
-          %{t: "Receive the letter from Sable", done: true},
-          %{t: "Leave the Gilded Kraken without being followed", done: false},
-          %{t: "Reach Hollowvale by the old pilgrim road", done: false},
-          %{t: "Decide: deliver, forge, or burn the letter", done: false}
-        ],
-        rewards: ["+800 xp", "Sable's favor +3", "Unlocks: Hollowvale"]
-      },
-      %{
-        title: "By Candlelight",
-        giver: "Odra the innkeep",
-        synopsis:
-          "Someone is killing the tallow-makers of Blackvane. Three dead in six nights, each without a mark.",
-        desc:
-          "Odra fears the candles themselves. She will not burn them after dusk. The third victim was found kneeling at his own workbench, hands folded as if in prayer.",
-        steps: [
-          %{t: "Examine the scene at Corvin's chandlery", done: true},
-          %{t: "Interview the other guild tallow-makers", done: false},
-          %{t: "Track the source of the black wax", done: false}
-        ],
-        rewards: ["+300 xp", "Blackvane guard +2"]
-      }
-    ]
-  end
+  # Feature 013 — quests/0 and quest_details/0 removed. Quest log is now
+  # backed by `AgenticRealms.World.Quests.active_for/1` and
+  # `history_for/1`, computed from `quest_instances` + current inventory.
 
   def presence do
     [

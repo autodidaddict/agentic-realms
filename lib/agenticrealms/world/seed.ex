@@ -66,6 +66,14 @@ defmodule AgenticRealms.World.Seed do
   @innkeeper_garrick_clone_id "00000000-0000-4000-8000-200000000001"
   @innkeeper_garrick_blueprint_id "garrick_the_innkeeper"
 
+  # --- Feature 013 — Hollowvale apple orchard + Orchard Keeper
+  @cottage_room_id "00000000-0000-4000-8000-000000000008"
+  @old_grove_room_id "00000000-0000-4000-8000-000000000009"
+  @wild_apple_room_id "00000000-0000-4000-8000-00000000000a"
+  @forgotten_corner_room_id "00000000-0000-4000-8000-00000000000b"
+  @orchard_keeper_clone_id "00000000-0000-4000-8000-200000000002"
+  @orchard_keeper_blueprint_id "amaranth_the_orchard_keeper"
+
   @doc """
   Returns the UUID of the designated starting room. Stable across runs.
   """
@@ -343,6 +351,184 @@ defmodule AgenticRealms.World.Seed do
         @starting_room_id,
         @innkeeper_garrick_clone_id
       )
+
+    # ---- Feature 013: Hollowvale apple orchard + Orchard Keeper ----
+    seed_hollowvale_orchard()
+  end
+
+  # ----------------------------------------------------------------------
+  # Feature 013 — Hollowvale apple orchard
+  # ----------------------------------------------------------------------
+  #
+  # The Orchard Keeper lives in her cottage just east of the Hollowvale
+  # Outskirts. The orchard spreads south of the cottage across three
+  # neighboring rooms — the wizard-authored spawn rooms for the
+  # `golden_apples` FetchQuest in her catalog.
+  #
+  # Players are NOT auto-assigned this quest. They must travel to the
+  # cottage, speak with the Keeper, and accept the quest in chat. The
+  # apples then spawn into the three orchard rooms scoped to that player
+  # only — two players on the quest each see their own apples.
+  #
+  # Layout (Hollowvale, elevation 0):
+  #
+  #              map_x =  0          1            2
+  #              ┌───────────────┬───────────┬─────────────┐
+  # map_y =  0  │ Outskirts ──── │ Cottage   │             │
+  #              ├───────────────┼───────────┼─────────────┤
+  # map_y =  1  │ Old Grove ────│ Wild Apple │ Forgotten   │
+  #              │               │            │   Corner    │
+  #              └───────────────┴───────────┴─────────────┘
+  defp seed_hollowvale_orchard do
+    :ok =
+      WorldCommands.create_room(
+        @cottage_room_id,
+        "Orchard Keeper's Cottage",
+        "A low stone-and-thatch cottage warm with the smell of cider and woodsmoke. Strings of dried apples hang from the rafters, and a battered ledger lies open on a scrubbed pine table.",
+        @hollowvale_region_id,
+        elevation: 0,
+        map_x: 1,
+        map_y: 0
+      )
+
+    :ok =
+      WorldCommands.create_room(
+        @old_grove_room_id,
+        "Old Apple Grove",
+        "A weathered orchard of gnarled apple trees, their bark grey and their branches knotted with age. Fallen leaves crunch underfoot and the air carries a faint sweetness.",
+        @hollowvale_region_id,
+        elevation: 0,
+        map_x: 0,
+        map_y: 1
+      )
+
+    :ok =
+      WorldCommands.create_room(
+        @wild_apple_room_id,
+        "Wild Apple Stand",
+        "A copse of younger apple trees, their branches more enthusiastic than orderly. Brambles tangle the ground between trunks and somewhere a wren scolds an intruder.",
+        @hollowvale_region_id,
+        elevation: 0,
+        map_x: 1,
+        map_y: 1
+      )
+
+    :ok =
+      WorldCommands.create_room(
+        @forgotten_corner_room_id,
+        "Forgotten Orchard Corner",
+        "The orchard's far edge, where the trees grow sparse and a low stone wall marks the property line. A single very old apple tree leans against the wall as if listening.",
+        @hollowvale_region_id,
+        elevation: 0,
+        map_x: 2,
+        map_y: 1
+      )
+
+    # Exits: Outskirts ↔ Cottage (east/west); orchard ring south of both.
+    :ok = WorldCommands.add_exit(@outskirts_room_id, :east, @cottage_room_id)
+    :ok = WorldCommands.add_exit(@cottage_room_id, :west, @outskirts_room_id)
+
+    :ok = WorldCommands.add_exit(@outskirts_room_id, :south, @old_grove_room_id)
+    :ok = WorldCommands.add_exit(@old_grove_room_id, :north, @outskirts_room_id)
+
+    :ok = WorldCommands.add_exit(@cottage_room_id, :south, @wild_apple_room_id)
+    :ok = WorldCommands.add_exit(@wild_apple_room_id, :north, @cottage_room_id)
+
+    :ok = WorldCommands.add_exit(@old_grove_room_id, :east, @wild_apple_room_id)
+    :ok = WorldCommands.add_exit(@wild_apple_room_id, :west, @old_grove_room_id)
+
+    :ok = WorldCommands.add_exit(@wild_apple_room_id, :east, @forgotten_corner_room_id)
+    :ok = WorldCommands.add_exit(@forgotten_corner_room_id, :west, @wild_apple_room_id)
+
+    # ---- Orchard Keeper NPC ----
+    alias AgenticRealms.World.Application, as: WorldApp
+    alias AgenticRealms.World.Commands.CreateNPCBlueprint
+
+    orchard_keeper_behaviors = [
+      %{
+        "trigger" => "player_entered",
+        "actions" => [
+          %{
+            "type" => "emote",
+            "text" => "looks up from her ledger, marking the page with a knot of dried thread."
+          }
+        ]
+      }
+    ]
+
+    :ok = validate_behaviors!(orchard_keeper_behaviors, "orchard_keeper_behaviors")
+
+    orchard_keeper_lore =
+      """
+      You are Amaranth, the orchard keeper of Hollowvale. You inherited this orchard \
+      from your grandmother and have tended it for nineteen seasons. You know each \
+      tree by name and have buried two dogs at the south wall. You speak plainly \
+      and you measure trust by whether someone returns what they borrow. The \
+      orchard has been in trouble lately — three of your finest golden apples \
+      have rolled away in a recent storm, scattered down the slope and into the \
+      neighboring rooms. You are not above asking for help, but you do not press \
+      anyone into service either; you wait to be offered.\
+      """
+      |> String.replace("\n", " ")
+      |> String.trim()
+
+    # Quest catalog — one FetchQuest. The wizard-authored quest_tag
+    # `quest.orchard.golden_apple` is the template-level tag; the
+    # accept_quest wrapper rewrites it to an instance-scoped tag on
+    # each acceptance so two concurrent quests don't share inventory.
+    orchard_quests = [
+      %{
+        "slug" => "golden_apples",
+        "title" => "The Orchard Keeper's Errand",
+        "narrative" =>
+          "Three golden apples have rolled away from Amaranth's orchard. Find them and bring them back.",
+        "criteria" => [
+          %{
+            "name" => "Golden Apples",
+            "item_name" => "golden apple",
+            "item_short_description" => "a gleaming golden apple",
+            "item_long_description" =>
+              "An apple of impossibly polished gold, warm to the touch and somehow heavier than it looks.",
+            "quest_tag" => "quest.orchard.golden_apple",
+            "target_count" => 3,
+            "spawn_room_ids" => [
+              @old_grove_room_id,
+              @wild_apple_room_id,
+              @forgotten_corner_room_id
+            ]
+          }
+        ],
+        "reward" => %{
+          "name" => "bigger golden apple",
+          "description" =>
+            "An impossibly large golden apple, warm to the touch, the prize of Amaranth's private cellar."
+        }
+      }
+    ]
+
+    :ok =
+      WorldApp.dispatch(
+        %CreateNPCBlueprint{
+          blueprint_id: @orchard_keeper_blueprint_id,
+          name: "Amaranth the Orchard Keeper",
+          short_description: "a weathered orchard keeper in a rough wool dress",
+          long_description:
+            "A weathered woman in a rough wool dress and an apron stained with cider. Her hands are calloused, her eyes patient, and she watches the door without quite seeming to.",
+          behaviors: orchard_keeper_behaviors,
+          lore: orchard_keeper_lore,
+          quests: orchard_quests
+        },
+        consistency: :strong
+      )
+
+    {:ok, _} =
+      WorldCommands.spawn_npc_clone(
+        @orchard_keeper_blueprint_id,
+        @cottage_room_id,
+        @orchard_keeper_clone_id
+      )
+
+    :ok
   end
 
   defp validate_behaviors!(behaviors, label) do

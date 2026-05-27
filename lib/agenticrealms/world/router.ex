@@ -8,7 +8,7 @@ defmodule AgenticRealms.World.Router do
 
   use Commanded.Commands.Router
 
-  alias AgenticRealms.World.{Room, Player, NPCBlueprint, Region}
+  alias AgenticRealms.World.{Room, Player, NPCBlueprint, Region, Quest}
 
   alias AgenticRealms.World.Commands.{
     CreateRoom,
@@ -21,13 +21,16 @@ defmodule AgenticRealms.World.Router do
     CreateNPCBlueprint,
     SpawnNPCClone,
     CreateRegion,
-    RecordRoomDiscovery
+    RecordRoomDiscovery,
+    AcceptQuest,
+    FinalizeQuest
   }
 
   identify(Room, by: :room_id, prefix: "room-")
   identify(Player, by: :player_id, prefix: "player-")
   identify(NPCBlueprint, by: :blueprint_id, prefix: "npc-blueprint-")
   identify(Region, by: :region_id, prefix: "region-")
+  identify(Quest, by: :quest_id, prefix: "quest-")
 
   # Phase 3 (US5) + Phase 6 (US3): room commands routed to Room
   dispatch([CreateRoom, AddExit, PlaceObject, TakeObject, DropObject], to: Room)
@@ -41,4 +44,8 @@ defmodule AgenticRealms.World.Router do
 
   # Feature 012: region authoring
   dispatch([CreateRegion], to: Region)
+
+  # Feature 013: quest lifecycle (accept + finalize). Each quest instance
+  # is its own aggregate identified by quest_id.
+  dispatch([AcceptQuest, FinalizeQuest], to: Quest)
 end

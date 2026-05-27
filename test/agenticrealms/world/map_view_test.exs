@@ -225,7 +225,7 @@ defmodule AgenticRealms.World.MapViewTest do
     end
 
     test "before move: only the Atrium renders, but exit toward Corridor emits a fog stub",
-         %{atrium: atrium, player_id: player_id} do
+         %{atrium: atrium, corridor: corridor, player_id: player_id} do
       view = MapView.for_player(player_id)
       assert [glyph] = view.rooms
       assert glyph.id == atrium.id
@@ -235,9 +235,12 @@ defmodule AgenticRealms.World.MapViewTest do
       assert stub.from_x == atrium.map_x
       assert stub.from_y == atrium.map_y
       assert stub.direction == :north
-      # Fog stub endpoint is fractional (~half a cell into the direction),
-      # NOT the actual destination's coords.
-      refute stub.to_y == -1
+      # Fog stub endpoint is the destination's actual cell — so the fog
+      # cloud sits in the same cell the room glyph will occupy once
+      # discovered, and two stubs converging on the same room land on
+      # one cloud rather than two.
+      assert stub.to_x == corridor.map_x
+      assert stub.to_y == corridor.map_y
     end
 
     test "after the player moves into the Corridor: both rooms render, line connects them",
@@ -302,7 +305,7 @@ defmodule AgenticRealms.World.MapViewTest do
       assert stub.direction == :east
     end
 
-    test "fog stub endpoint is NOT the destination's actual coords (info hiding)" do
+    test "fog stub endpoint IS the destination's actual coords (visual continuity)" do
       region = insert_region()
       a = insert_room(region, map_x: 0, map_y: 0)
       b = insert_room(region, map_x: 5, map_y: 0)
@@ -314,10 +317,13 @@ defmodule AgenticRealms.World.MapViewTest do
 
       view = MapView.for_player(player_id)
       [stub] = view.exits
-      # Stub points east but lands ~0.6 cells out — definitely not at x=5.
+      # The fog cloud lives in the same cell the destination room will
+      # occupy once discovered. Coords are inferrable from the source +
+      # direction anyway; only the destination's id / name / region are
+      # information-hidden (asserted separately in the renderer tests).
       assert stub.kind == :fog_stub
-      assert stub.to_x < 1
-      assert stub.to_x > 0
+      assert stub.to_x == b.map_x
+      assert stub.to_y == b.map_y
     end
 
     test "exit to a map-hidden target produces NO stub (FR-006 trumps fog)" do

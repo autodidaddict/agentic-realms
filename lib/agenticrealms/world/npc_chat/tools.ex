@@ -9,9 +9,14 @@ defmodule AgenticRealms.World.NPCChat.Tools do
   See `specs/010-npc-conversations/contracts/tools.md`.
   """
 
-  @doc "The set of recognized tool names (`say`, `emote`)."
+  @doc """
+  The set of recognized tool names.
+
+  Feature 013 adds `accept_quest` as a third tool. `check_progress` and
+  `finalize_quest` are deferred to US2/US3 in the implementation plan.
+  """
   @spec names() :: MapSet.t(String.t())
-  def names, do: MapSet.new(~w(say emote))
+  def names, do: MapSet.new(~w(say emote accept_quest check_progress finalize_quest))
 
   @doc "Tool definitions in wire format for the Anthropic `tools` field."
   @spec list() :: [map()]
@@ -61,6 +66,71 @@ defmodule AgenticRealms.World.NPCChat.Tools do
             }
           },
           "required" => ["text"]
+        }
+      },
+      # Feature 013 — quest acceptance. Only available when the player
+      # has expressed clear intent to take on a quest from your catalog
+      # (see the # Quests section of the system prompt). The slug must
+      # be one of the slugs listed in your offerable_quests.
+      %{
+        "name" => "accept_quest",
+        "description" =>
+          "Record that this player has formally accepted a quest from your " <>
+            "catalog. Call this when the player expresses clear acceptance " <>
+            "intent in natural language (\"yes\", \"sure, I'll help\", \"I'll " <>
+            "do it\"). The player will see the quest appear in their quest " <>
+            "log and the required items will appear in the designated rooms.",
+        "input_schema" => %{
+          "type" => "object",
+          "properties" => %{
+            "slug" => %{
+              "type" => "string",
+              "description" =>
+                "The slug of the quest from your catalog (provided to you " <>
+                  "in your system prompt under 'offerable quests')."
+            }
+          },
+          "required" => ["slug"]
+        }
+      },
+      %{
+        "name" => "check_progress",
+        "description" =>
+          "Look up the player's current progress on one of their active " <>
+            "quests with you. Read-only. Call this when the player asks " <>
+            "how they're doing or whether they're ready to turn it in.",
+        "input_schema" => %{
+          "type" => "object",
+          "properties" => %{
+            "quest_id" => %{
+              "type" => "string",
+              "description" =>
+                "The quest_id of an active quest instance (provided to you " <>
+                  "in your system prompt under 'this player's active quests')."
+            }
+          },
+          "required" => ["quest_id"]
+        }
+      },
+      %{
+        "name" => "finalize_quest",
+        "description" =>
+          "Complete the quest: take the required items from the player and " <>
+            "give them the reward. Atomic — if the player is missing any " <>
+            "required items you'll get back a structured failure listing " <>
+            "what's missing and no state changes occur. Call this when the " <>
+            "player expresses clear turn-in intent.",
+        "input_schema" => %{
+          "type" => "object",
+          "properties" => %{
+            "quest_id" => %{
+              "type" => "string",
+              "description" =>
+                "The quest_id of an active quest instance (provided to you " <>
+                  "in your system prompt under 'this player's active quests')."
+            }
+          },
+          "required" => ["quest_id"]
         }
       }
     ]

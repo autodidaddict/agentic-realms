@@ -19,8 +19,8 @@
       <.inventory_modal :if={@modal == :inv} inventory={@inventory} />
       <.quest_modal
         :if={@modal == :quests}
-        quest_details={@quest_details}
-        selected_quest={@selected_quest}
+        quests={@quests}
+        completed_quests={@completed_quests}
       />
       <.presence_modal :if={@modal == :presence} presence={@presence} />
     <% else %>

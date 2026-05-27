@@ -43,7 +43,9 @@ defmodule AgenticRealms.World.Queries do
          name: room.name,
          description: room.description,
          exits: list_exits(room_id),
-         objects: list_objects_in_room(room_id),
+         # Feature 013 — viewer-aware object listing. Quest-scoped items
+         # are visible only to their owning player.
+         objects: list_objects_in_room_for_viewer(room_id, player_id),
          other_players: list_other_players(room_id, player_id),
          npcs: list_npcs_in_room(room_id)
        }}
@@ -212,18 +214,24 @@ defmodule AgenticRealms.World.Queries do
   end
 
   @doc """
-  Resolve an object name within a room's current contents to its object_id.
+  Resolve an object name within a room's current contents to its object_id,
+  filtered for the given viewer per feature 013's per-viewer item
+  visibility (quest-scoped items are invisible to non-owners).
+
   Case-insensitive; whitespace-collapsed. Returns `:ambiguous` if more than
-  one object in the room matches.
+  one object in the room visible to this viewer matches.
   """
-  @spec resolve_object_in_room(String.t(), String.t()) ::
+  @spec resolve_object_in_room(String.t(), integer(), String.t()) ::
           {:ok, String.t()} | {:error, :no_such_object | :ambiguous}
-  def resolve_object_in_room(room_id, name) when is_binary(room_id) and is_binary(name) do
+  def resolve_object_in_room(room_id, viewer_player_id, name)
+      when is_binary(room_id) and is_integer(viewer_player_id) and is_binary(name) do
     needle = normalize_name(name)
 
     rows =
       from(o in Object,
-        where: o.room_id == ^room_id,
+        where:
+          o.room_id == ^room_id and
+            (is_nil(o.quest_player_id) or o.quest_player_id == ^viewer_player_id),
         select: %{id: o.id, name: o.name}
       )
       |> Repo.all()
@@ -307,9 +315,14 @@ defmodule AgenticRealms.World.Queries do
   end
 
   @doc """
-  All objects currently in `room_id`, ordered alphabetically. Used by
-  `look_room/1` (privately) and by `RoomTicks.Scope` (feature 011) to
-  build the tick-behavior scope set.
+  All objects currently in `room_id`, ordered alphabetically.
+
+  **WARNING — unsafe for rendering as of feature 013.** This function does
+  not honor quest-scoped item visibility (`quest_player_id`). Use
+  `list_objects_in_room_for_viewer/2` for any path that renders objects
+  to a specific player. Retained for tick-behavior scope assembly
+  (`RoomTicks.Scope`), where every present object should participate
+  regardless of quest scoping.
   """
   @spec list_objects_in_room(String.t()) :: [
           %{id: String.t(), name: String.t(), short_description: String.t()}
@@ -317,6 +330,29 @@ defmodule AgenticRealms.World.Queries do
   def list_objects_in_room(room_id) when is_binary(room_id) do
     from(o in Object,
       where: o.room_id == ^room_id,
+      order_by: o.name,
+      select: %{id: o.id, name: o.name, short_description: o.short_description}
+    )
+    |> Repo.all()
+  end
+
+  @doc """
+  Viewer-aware variant of `list_objects_in_room/1` (feature 013). Objects
+  carrying a `quest_player_id` are visible only to the player whose id
+  matches; objects without a `quest_player_id` are visible to everyone.
+
+  Used by every room-rendering call path (`look_room/1`, the room-view
+  composer, examine paths) to enforce per-player quest item visibility.
+  """
+  @spec list_objects_in_room_for_viewer(String.t(), integer()) :: [
+          %{id: String.t(), name: String.t(), short_description: String.t()}
+        ]
+  def list_objects_in_room_for_viewer(room_id, viewer_player_id)
+      when is_binary(room_id) and is_integer(viewer_player_id) do
+    from(o in Object,
+      where:
+        o.room_id == ^room_id and
+          (is_nil(o.quest_player_id) or o.quest_player_id == ^viewer_player_id),
       order_by: o.name,
       select: %{id: o.id, name: o.name, short_description: o.short_description}
     )

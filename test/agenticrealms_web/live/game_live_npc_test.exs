@@ -67,19 +67,15 @@ defmodule AgenticRealmsWeb.GameLiveNPCTest do
   test "static NPCs — US1, US2, US3, US4 in sequence",
        %{alice_conn: alice_conn, bob_conn: bob_conn, alice: alice, bob: bob} do
     # Foundational sanity (covers SC-002 from feature 008 + projection
-    # smoke). After Seed.run/0, the blueprint exists and one clone with
-    # serial 1 lives in the starting room.
-    assert [%NPCBlueprint{id: "garrick_the_innkeeper", is_synthetic: false}] =
-             Repo.all(NPCBlueprint)
+    # smoke). After Seed.run/0, the Garrick blueprint exists and one
+    # clone with serial 1 lives in the starting room. Feature 013 also
+    # seeds the Amaranth blueprint + clone in Hollowvale — we filter
+    # this assertion to Garrick specifically.
+    assert %NPCBlueprint{id: "garrick_the_innkeeper", is_synthetic: false} =
+             Repo.get(NPCBlueprint, "garrick_the_innkeeper")
 
-    assert [
-             %NPCClone{
-               name: "Garrick the Innkeeper",
-               blueprint_id: "garrick_the_innkeeper",
-               serial: 1,
-               room_id: room_id
-             }
-           ] = Repo.all(NPCClone)
+    [%NPCClone{name: "Garrick the Innkeeper", serial: 1, room_id: room_id}] =
+      Repo.all(from(c in NPCClone, where: c.blueprint_id == "garrick_the_innkeeper"))
 
     assert room_id == Seed.starting_room_id()
 

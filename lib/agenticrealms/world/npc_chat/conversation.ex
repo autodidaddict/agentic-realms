@@ -19,6 +19,7 @@ defmodule AgenticRealms.World.NPCChat.Conversation do
   require Logger
 
   alias AgenticRealms.Anthropic
+  alias AgenticRealms.World.Commands, as: WorldCommands
   alias AgenticRealms.World.NPCChat.{Context, Registry, Reply}
   alias AgenticRealms.World.UIEvents.{ChatSystemMessage, ChatUtterance}
   alias AgenticRealmsWeb.Topics
@@ -160,6 +161,7 @@ defmodule AgenticRealms.World.NPCChat.Conversation do
     case Reply.parse(response_body) do
       {:speech, text} -> handle_success(:chat_speech, :speech, text, state)
       {:emote, text} -> handle_success(:chat_emote, :emote, text, state)
+      {:tool_call, call} -> handle_tool_call(call, state)
       {:error, :malformed} -> handle_failure(state, :malformed_output)
     end
   end
@@ -167,6 +169,115 @@ defmodule AgenticRealms.World.NPCChat.Conversation do
   defp handle_llm_result({:error, reason}, state) do
     handle_failure(state, reason)
   end
+
+  # Feature 013 — Quest tool calls. For US1 we only handle accept_quest.
+  # The engine executes the command and synthesizes a brief NPC emote
+  # acknowledgement; the player's existing turn + this synthesized emote
+  # are recorded in history so the next round-trip continues coherently.
+  # The two-turn LLM follow-up flow (feeding tool_result back to the
+  # model for an in-character reply) is deferred to a polish iteration.
+  defp handle_tool_call(%{name: "accept_quest", input: %{"slug" => slug}}, state) do
+    case WorldCommands.accept_quest(state.player_id, blueprint_id_of(state.npc_clone), slug) do
+      {:ok, _quest_id} ->
+        text = accept_quest_emote_text(state.npc_name, :ok)
+        handle_success(:chat_emote, :emote, text, state)
+
+      {:error, :already_active, _qid} ->
+        text = accept_quest_emote_text(state.npc_name, {:error, :already_active})
+        handle_success(:chat_emote, :emote, text, state)
+
+      {:error, reason} ->
+        text = accept_quest_emote_text(state.npc_name, {:error, reason})
+        handle_success(:chat_emote, :emote, text, state)
+    end
+  end
+
+  defp handle_tool_call(%{name: "check_progress", input: %{"quest_id" => qid}}, state) do
+    case WorldCommands.check_progress(state.player_id, qid) do
+      {:ok, criteria} ->
+        text = check_progress_emote_text(criteria)
+        handle_success(:chat_emote, :emote, text, state)
+
+      {:error, _reason} ->
+        handle_success(
+          :chat_emote,
+          :emote,
+          "looks puzzled, as if they can't quite place which errand you mean.",
+          state
+        )
+    end
+  end
+
+  defp handle_tool_call(%{name: "finalize_quest", input: %{"quest_id" => qid}}, state) do
+    case WorldCommands.finalize_quest(state.player_id, qid) do
+      {:ok, %{reward_name: reward}} ->
+        handle_success(
+          :chat_emote,
+          :emote,
+          "beams and presses a #{reward} into your hand. \"You have my thanks, truly.\"",
+          state
+        )
+
+      {:error, :criteria_unmet, missing} ->
+        text = criteria_unmet_emote_text(missing)
+        handle_success(:chat_emote, :emote, text, state)
+
+      {:error, _reason} ->
+        handle_success(
+          :chat_emote,
+          :emote,
+          "looks confused, as if they cannot quite remember promising you anything.",
+          state
+        )
+    end
+  end
+
+  defp handle_tool_call(_unknown, state) do
+    handle_failure(state, :unknown_tool_call)
+  end
+
+  defp check_progress_emote_text(criteria) do
+    if Enum.all?(criteria, fn c -> c.count >= c.target end) do
+      # When the player visibly has everything, don't tell them to "bring
+      # them when ready" — they're standing right there. Acknowledge and
+      # wait for them to say the word.
+      "looks at your hands and gives a small approving nod. \"That's all of them. Say the word and we're settled.\""
+    else
+      summary =
+        criteria
+        |> Enum.map(fn c -> "#{c.name} #{c.count}/#{c.target}" end)
+        |> Enum.join(", ")
+
+      "tilts her head, considering. \"Still on the way then — #{summary}.\""
+    end
+  end
+
+  defp criteria_unmet_emote_text(missing) do
+    summary =
+      missing
+      |> Enum.map(fn c -> "#{c.name} #{c.count}/#{c.target}" end)
+      |> Enum.join(", ")
+
+    "looks at your empty hands and gently shakes her head. \"Not quite yet — you're still short #{summary}.\""
+  end
+
+  defp blueprint_id_of(%{blueprint_id: bp_id}) when is_binary(bp_id), do: bp_id
+  defp blueprint_id_of(_), do: nil
+
+  defp accept_quest_emote_text(_npc_name, :ok),
+    do: "nods solemnly. \"Good. You have my thanks already — bring them when you can.\""
+
+  defp accept_quest_emote_text(_npc_name, {:error, :already_completed}),
+    do: "smiles gently and waves a hand. \"You've already done me that favor, friend.\""
+
+  defp accept_quest_emote_text(_npc_name, {:error, :already_active}),
+    do: "raises a knowing eyebrow. \"You're already on that errand.\""
+
+  defp accept_quest_emote_text(_npc_name, {:error, :unknown_slug}),
+    do: "tilts their head, puzzled, as if they don't quite follow."
+
+  defp accept_quest_emote_text(_npc_name, {:error, _other}),
+    do: "frowns and shakes their head, troubled by something they can't quite name."
 
   defp handle_success(utterance_kind, mode, text, %__MODULE__{} = state) do
     new_turns =

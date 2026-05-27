@@ -324,22 +324,31 @@ defmodule AgenticRealmsWeb.GameComponents.MiniMapTest do
       assert stub_index >= 2
     end
 
-    test "the fog-cloud rect carries NO data-room-name or identifying attribute" do
+    test "the fog-cloud group carries NO data-room-name or identifying attribute" do
       html = render_map(fog_stub_view())
 
-      assert [cloud_chunk] = Regex.run(~r/<rect[^>]*map-fog-cloud[^>]*>/, html)
-      refute cloud_chunk =~ "data-room-name"
-      refute cloud_chunk =~ "data-room-id"
-      refute cloud_chunk =~ "data-target"
+      # The fog cloud is rendered as a <g class="map-fog-cloud"> wrapping
+      # overlapping <circle> elements (soft cloud silhouette). Inspect
+      # everything from the opening <g ... map-fog-cloud ...> through its
+      # closing </g> to confirm no identifying attributes leaked.
+      assert [cloud_block] =
+               Regex.run(
+                 ~r/<g[^>]*map-fog-cloud[^>]*>.*?<\/g>/s,
+                 html
+               )
+
+      refute cloud_block =~ "data-room-name"
+      refute cloud_block =~ "data-room-id"
+      refute cloud_block =~ "data-target"
     end
 
-    test "fog-stub render includes the <defs> linearGradient + pattern" do
+    test "fog-stub line renders with the map-fog-stub class" do
       html = render_map(fog_stub_view())
 
-      assert html =~ ~s|id="fog-fade"|
-      assert html =~ ~s|id="fog-hatch"|
-      assert html =~ "linearGradient"
-      assert html =~ "<pattern"
+      # Fog stubs use a direction-independent dashed stroke styled via
+      # the .map-fog-stub class — no SVG <defs> required (the prior
+      # linearGradient approach was degenerate on vertical lines).
+      assert html =~ ~s|class="map-line map-fog-stub"|
     end
 
     test "an undiscovered destination name is NEVER present in fog-stub markup" do
