@@ -711,7 +711,11 @@ defmodule AgenticRealmsWeb.GameComponents do
   @cell_inner_size 0.86
   @icon_size_cells 0.24
   @cloud_size_cells 0.32
-  @portal_size_cells 0.14
+  # The cross-region portal is a rotated diamond; its corner-to-corner
+  # extent on the line of attack is `portal_size * √2 ≈ size * 1.414`,
+  # so it visually "reads" larger than a same-size unrotated square. Keep
+  # it deliberately small — the dashed line carries most of the meaning.
+  @portal_size_cells 0.08
 
   attr :exit, :map, required: true
 

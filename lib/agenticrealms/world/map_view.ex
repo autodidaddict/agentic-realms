@@ -253,10 +253,11 @@ defmodule AgenticRealms.World.MapView do
           # FR-008 — cross-region exit. Source is rendered; target is in
           # a DIFFERENT region. The destination room is NOT drawn on this
           # view (regions are independent map planes); we emit a
-          # :cross_region affordance whose endpoint sits ~0.6 cells into
-          # the direction from the source — visually similar to a fog
-          # stub but with its own renderer treatment (dashed line +
-          # portal glyph). NO destination identity carried.
+          # :cross_region affordance whose endpoint sits ~0.85 cells into
+          # the direction from the source — slightly further out than a
+          # fog stub so the portal glyph has clear visual separation from
+          # the source room's rect edge (at ±0.43 cells) and the current-
+          # room glow. NO destination identity carried.
           e.target_room.region_id != Map.fetch!(rendered_by_id, e.source_room_id).region_id ->
             source = Map.fetch!(rendered_by_id, e.source_room_id)
             {dx, dy} = Geometry.unit_vector(direction)
@@ -265,8 +266,8 @@ defmodule AgenticRealms.World.MapView do
               kind: :cross_region,
               from_x: source.map_x,
               from_y: source.map_y,
-              to_x: source.map_x + dx * 0.6,
-              to_y: source.map_y + dy * 0.6,
+              to_x: source.map_x + dx * 0.85,
+              to_y: source.map_y + dy * 0.85,
               direction: direction
             }
 
