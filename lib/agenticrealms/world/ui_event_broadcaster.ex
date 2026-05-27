@@ -58,13 +58,15 @@ defmodule AgenticRealms.World.UIEventBroadcaster do
     PlayerInventoryChanged
   }
 
+  alias AgenticRealmsWeb.Topics
+
   @pubsub AgenticRealms.PubSub
 
   def handle(%PlayerSpawned{player_id: pid, room_id: room_id}, _meta) do
     actor_username = lookup_username(pid)
     carried_ids = lookup_carried_object_ids(pid)
 
-    Phoenix.PubSub.broadcast(@pubsub, AgenticRealms.World.room_topic(room_id), %RoomPlayerArrived{
+    Phoenix.PubSub.broadcast(@pubsub, Topics.room_topic(room_id), %RoomPlayerArrived{
       room_id: room_id,
       actor_id: pid,
       actor_username: actor_username,
@@ -74,7 +76,7 @@ defmodule AgenticRealms.World.UIEventBroadcaster do
 
     Phoenix.PubSub.broadcast(
       @pubsub,
-      AgenticRealms.World.player_topic(pid),
+      Topics.player_topic(pid),
       %PlayerCurrentRoomChanged{
         player_id: pid,
         from_room_id: nil,
@@ -98,7 +100,7 @@ defmodule AgenticRealms.World.UIEventBroadcaster do
     {:ok, direction_atom} = Direction.parse(direction)
     carried_ids = lookup_carried_object_ids(pid)
 
-    from_topic = AgenticRealms.World.room_topic(from)
+    from_topic = Topics.room_topic(from)
 
     Phoenix.PubSub.broadcast(@pubsub, from_topic, %RoomPlayerLeft{
       room_id: from,
@@ -108,7 +110,7 @@ defmodule AgenticRealms.World.UIEventBroadcaster do
       carried_object_ids: carried_ids
     })
 
-    Phoenix.PubSub.broadcast(@pubsub, AgenticRealms.World.room_topic(to), %RoomPlayerArrived{
+    Phoenix.PubSub.broadcast(@pubsub, Topics.room_topic(to), %RoomPlayerArrived{
       room_id: to,
       actor_id: pid,
       actor_username: actor_username,
@@ -118,7 +120,7 @@ defmodule AgenticRealms.World.UIEventBroadcaster do
 
     Phoenix.PubSub.broadcast(
       @pubsub,
-      AgenticRealms.World.player_topic(pid),
+      Topics.player_topic(pid),
       %PlayerCurrentRoomChanged{
         player_id: pid,
         from_room_id: from,
@@ -133,7 +135,7 @@ defmodule AgenticRealms.World.UIEventBroadcaster do
     actor_username = lookup_username(pid)
     {name, short} = lookup_object(oid)
 
-    Phoenix.PubSub.broadcast(@pubsub, AgenticRealms.World.room_topic(rid), %RoomObjectTaken{
+    Phoenix.PubSub.broadcast(@pubsub, Topics.room_topic(rid), %RoomObjectTaken{
       room_id: rid,
       actor_id: pid,
       actor_username: actor_username,
@@ -143,7 +145,7 @@ defmodule AgenticRealms.World.UIEventBroadcaster do
 
     Phoenix.PubSub.broadcast(
       @pubsub,
-      AgenticRealms.World.player_topic(pid),
+      Topics.player_topic(pid),
       %PlayerInventoryChanged{
         player_id: pid,
         change: :added,
@@ -160,7 +162,7 @@ defmodule AgenticRealms.World.UIEventBroadcaster do
     actor_username = lookup_username(pid)
     {name, short} = lookup_object(oid)
 
-    Phoenix.PubSub.broadcast(@pubsub, AgenticRealms.World.room_topic(rid), %RoomObjectDropped{
+    Phoenix.PubSub.broadcast(@pubsub, Topics.room_topic(rid), %RoomObjectDropped{
       room_id: rid,
       actor_id: pid,
       actor_username: actor_username,
@@ -170,7 +172,7 @@ defmodule AgenticRealms.World.UIEventBroadcaster do
 
     Phoenix.PubSub.broadcast(
       @pubsub,
-      AgenticRealms.World.player_topic(pid),
+      Topics.player_topic(pid),
       %PlayerInventoryChanged{
         player_id: pid,
         change: :removed,
@@ -186,7 +188,7 @@ defmodule AgenticRealms.World.UIEventBroadcaster do
   def handle(%NPCSpawnedInRoom{room_id: rid, npc_id: nid, name: name}, _meta) do
     Phoenix.PubSub.broadcast(
       @pubsub,
-      AgenticRealms.World.room_topic(rid),
+      Topics.room_topic(rid),
       %RoomNPCArrived{room_id: rid, npc_id: nid, npc_name: name}
     )
 
@@ -202,7 +204,7 @@ defmodule AgenticRealms.World.UIEventBroadcaster do
       ) do
     Phoenix.PubSub.broadcast(
       @pubsub,
-      AgenticRealms.World.room_topic(rid),
+      Topics.room_topic(rid),
       %RoomNPCArrived{room_id: rid, npc_id: cid, npc_name: name}
     )
 

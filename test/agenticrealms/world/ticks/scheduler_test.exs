@@ -9,7 +9,7 @@ defmodule AgenticRealms.World.Ticks.SchedulerTest do
 
   use AgenticRealms.DataCase, async: false
 
-  alias AgenticRealms.World
+  alias AgenticRealmsWeb.Topics
   alias AgenticRealms.World.Schemas.{NPCBlueprint, NPCClone, Object, PlayerState, Room}
   alias AgenticRealms.World.Ticks.{Registry, Scheduler, Supervisor}
 
@@ -103,7 +103,7 @@ defmodule AgenticRealms.World.Ticks.SchedulerTest do
   end
 
   defp subscribe_player(player),
-    do: Phoenix.PubSub.subscribe(@pubsub, World.player_topic(player.id))
+    do: Phoenix.PubSub.subscribe(@pubsub, Topics.player_topic(player.id))
 
   describe "scheduler lifecycle (US1)" do
     test "find_or_start returns a pid and registers it" do

@@ -20,11 +20,11 @@ defmodule AgenticRealms.World.Communication do
   check → broadcast. The first refusing step short-circuits the rest.
   """
 
-  alias AgenticRealms.World
   alias AgenticRealms.World.Communication.RecipientResolver
   alias AgenticRealms.World.Queries
   alias AgenticRealms.World.UIEvents.{RoomUtterance, PrivateUtterance}
   alias AgenticRealmsWeb.Presence
+  alias AgenticRealmsWeb.Topics
 
   @pubsub AgenticRealms.PubSub
   @max_length 500
@@ -189,12 +189,12 @@ defmodule AgenticRealms.World.Communication do
 
   @doc false
   def broadcast_room(room_id, %RoomUtterance{} = event) do
-    Phoenix.PubSub.broadcast(@pubsub, World.room_topic(room_id), event)
+    Phoenix.PubSub.broadcast(@pubsub, Topics.room_topic(room_id), event)
   end
 
   @doc false
   def broadcast_private(recipient_id, %PrivateUtterance{} = event) do
-    Phoenix.PubSub.broadcast(@pubsub, World.player_topic(recipient_id), event)
+    Phoenix.PubSub.broadcast(@pubsub, Topics.player_topic(recipient_id), event)
   end
 
   @doc false

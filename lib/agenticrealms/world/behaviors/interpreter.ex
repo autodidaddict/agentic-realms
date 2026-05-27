@@ -26,11 +26,11 @@ defmodule AgenticRealms.World.Behaviors.Interpreter do
     start_from: :current,
     consistency: :strong
 
-  alias AgenticRealms.World
   alias AgenticRealms.World.Behaviors.ActionExecutor
   alias AgenticRealms.World.Events.PlayerMoved
   alias AgenticRealms.World.Queries
   alias AgenticRealms.World.UIEvents.BehaviorUtterance
+  alias AgenticRealmsWeb.Topics
 
   @pubsub AgenticRealms.PubSub
 
@@ -244,7 +244,7 @@ defmodule AgenticRealms.World.Behaviors.Interpreter do
     }
 
     Enum.each(other_ids, fn p_id ->
-      Phoenix.PubSub.broadcast(@pubsub, World.player_topic(p_id), utterance)
+      Phoenix.PubSub.broadcast(@pubsub, Topics.player_topic(p_id), utterance)
     end)
 
     :ok

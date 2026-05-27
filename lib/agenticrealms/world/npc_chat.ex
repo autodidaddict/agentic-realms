@@ -15,8 +15,8 @@ defmodule AgenticRealms.World.NPCChat do
        new-vs-continuing indicator (or an in-flight rejection).
 
   Side effects from the Conversation (system messages, replies) flow
-  via PubSub broadcast on `World.player_topic(player_id)` — the caller
-  is the LiveView, which is already subscribed.
+  via PubSub broadcast on `AgenticRealmsWeb.Topics.player_topic(player_id)`
+  — the caller is the LiveView, which is already subscribed.
 
   See `specs/010-npc-conversations/contracts/npc_chat_api.md`.
   """
@@ -41,7 +41,7 @@ defmodule AgenticRealms.World.NPCChat do
   Send a chat message from `player_id` to the NPC identified by
   `npc_token` (a player-typed name like "garrick"). Returns the
   new-vs-continuing indicator on success; the reply itself is
-  broadcast asynchronously over `player_topic/1`.
+  broadcast asynchronously over `AgenticRealmsWeb.Topics.player_topic/1`.
   """
   @spec send(integer(), String.t(), String.t()) :: send_outcome()
   def send(player_id, npc_token, message)

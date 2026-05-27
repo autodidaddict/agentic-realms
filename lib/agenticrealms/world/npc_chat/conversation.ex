@@ -19,9 +19,9 @@ defmodule AgenticRealms.World.NPCChat.Conversation do
   require Logger
 
   alias AgenticRealms.Anthropic
-  alias AgenticRealms.World
   alias AgenticRealms.World.NPCChat.{Context, Registry, Reply}
   alias AgenticRealms.World.UIEvents.{ChatSystemMessage, ChatUtterance}
+  alias AgenticRealmsWeb.Topics
 
   @pubsub AgenticRealms.PubSub
   @history_cap_pairs 20
@@ -179,7 +179,7 @@ defmodule AgenticRealms.World.NPCChat.Conversation do
 
     Phoenix.PubSub.broadcast(
       @pubsub,
-      World.player_topic(state.player_id),
+      Topics.player_topic(state.player_id),
       %ChatUtterance{
         kind: utterance_kind,
         npc_clone_id: state.npc_clone_id,
@@ -203,7 +203,7 @@ defmodule AgenticRealms.World.NPCChat.Conversation do
   defp handle_failure(%__MODULE__{} = state, _reason) do
     Phoenix.PubSub.broadcast(
       @pubsub,
-      World.player_topic(state.player_id),
+      Topics.player_topic(state.player_id),
       %ChatSystemMessage{
         kind: :chat_fallback,
         npc_name: state.npc_name,
@@ -227,7 +227,7 @@ defmodule AgenticRealms.World.NPCChat.Conversation do
   defp broadcast_system_message(state, :new) do
     Phoenix.PubSub.broadcast(
       @pubsub,
-      World.player_topic(state.player_id),
+      Topics.player_topic(state.player_id),
       %ChatSystemMessage{
         kind: :chat_new,
         npc_name: state.npc_name,
@@ -240,7 +240,7 @@ defmodule AgenticRealms.World.NPCChat.Conversation do
   defp broadcast_system_message(state, :continuing) do
     Phoenix.PubSub.broadcast(
       @pubsub,
-      World.player_topic(state.player_id),
+      Topics.player_topic(state.player_id),
       %ChatSystemMessage{
         kind: :chat_continuing,
         npc_name: state.npc_name,

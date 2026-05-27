@@ -21,6 +21,10 @@ defmodule AgenticRealms.World do
 
   Player ids are integers (from `AgenticRealms.Accounts.Player.id`); Commanded
   identities must be strings.
+
+  Phoenix.PubSub topic names use the colon-separated form and live in
+  `AgenticRealmsWeb.Topics` so the two namespaces can't be confused at a
+  call site (issue #8).
   """
   @spec player_stream_id(integer()) :: String.t()
   def player_stream_id(player_id) when is_integer(player_id),
@@ -28,26 +32,10 @@ defmodule AgenticRealms.World do
 
   @doc """
   Build the Commanded stream identity for a room aggregate.
+
+  See note on `player_stream_id/1` regarding the corresponding PubSub
+  topic helper.
   """
   @spec room_stream_id(String.t()) :: String.t()
   def room_stream_id(room_id) when is_binary(room_id), do: "room-" <> room_id
-
-  @doc """
-  Build the Phoenix.PubSub topic name for a room (carries `RoomObjectTaken`,
-  `RoomObjectDropped`, `RoomPlayerArrived`, `RoomPlayerLeft`).
-
-  Distinct prefix from `room_stream_id/1` because the Commanded stream id
-  and the PubSub topic are different namespaces. The colon form matches
-  `contracts/ui_events.md`.
-  """
-  @spec room_topic(String.t()) :: String.t()
-  def room_topic(room_id) when is_binary(room_id), do: "room:" <> room_id
-
-  @doc """
-  Build the Phoenix.PubSub topic name for a player (carries
-  `PlayerCurrentRoomChanged`, `PlayerInventoryChanged`).
-  """
-  @spec player_topic(integer()) :: String.t()
-  def player_topic(player_id) when is_integer(player_id),
-    do: "player:" <> Integer.to_string(player_id)
 end
