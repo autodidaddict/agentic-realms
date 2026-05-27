@@ -10,7 +10,7 @@ defmodule AgenticRealms.World.Behaviors.InterpreterTest do
   use AgenticRealms.DataCase, async: false
 
   alias AgenticRealms.Accounts
-  alias AgenticRealms.World
+  alias AgenticRealmsWeb.Topics
   alias AgenticRealms.World.Behaviors.Interpreter
   alias AgenticRealms.World.Events.PlayerMoved
   alias AgenticRealms.World.Schemas.{Room, PlayerState, NPCBlueprint, NPCClone}
@@ -68,7 +68,7 @@ defmodule AgenticRealms.World.Behaviors.InterpreterTest do
   end
 
   defp subscribe(player_id) do
-    Phoenix.PubSub.subscribe(@pubsub, World.player_topic(player_id))
+    Phoenix.PubSub.subscribe(@pubsub, Topics.player_topic(player_id))
   end
 
   defp say_behavior(trigger, text) do

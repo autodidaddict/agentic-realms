@@ -14,7 +14,7 @@ defmodule AgenticRealms.World.NPCChat.ConversationTest do
   use AgenticRealms.DataCase, async: false
 
   alias AgenticRealms.Accounts
-  alias AgenticRealms.World
+  alias AgenticRealmsWeb.Topics
   alias AgenticRealms.World.NPCChat.Conversation
   alias AgenticRealms.World.Schemas.{NPCBlueprint, NPCClone, PlayerState, Room}
   alias AgenticRealms.World.UIEvents.{ChatSystemMessage, ChatUtterance}
@@ -66,7 +66,7 @@ defmodule AgenticRealms.World.NPCChat.ConversationTest do
   end
 
   defp subscribe(player_id) do
-    Phoenix.PubSub.subscribe(@pubsub, World.player_topic(player_id))
+    Phoenix.PubSub.subscribe(@pubsub, Topics.player_topic(player_id))
   end
 
   defp stub_say(text) do

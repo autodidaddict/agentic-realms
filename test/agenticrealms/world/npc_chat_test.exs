@@ -9,7 +9,7 @@ defmodule AgenticRealms.World.NPCChatTest do
   use AgenticRealms.DataCase, async: false
 
   alias AgenticRealms.Accounts
-  alias AgenticRealms.World
+  alias AgenticRealmsWeb.Topics
   alias AgenticRealms.World.NPCChat
   alias AgenticRealms.World.Schemas.{NPCBlueprint, NPCClone, PlayerState, Room}
   alias AgenticRealms.World.UIEvents.{ChatSystemMessage, ChatUtterance}
@@ -64,7 +64,7 @@ defmodule AgenticRealms.World.NPCChatTest do
     blueprint = insert_blueprint(lore: "Some lore.")
     clone = insert_clone(blueprint, room)
     player = register_and_place("alice", room)
-    Phoenix.PubSub.subscribe(@pubsub, World.player_topic(player.id))
+    Phoenix.PubSub.subscribe(@pubsub, Topics.player_topic(player.id))
     %{room: room, blueprint: blueprint, clone: clone, player: player}
   end
 

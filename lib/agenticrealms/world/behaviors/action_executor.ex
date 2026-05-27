@@ -23,9 +23,9 @@ defmodule AgenticRealms.World.Behaviors.ActionExecutor do
 
   require Logger
 
-  alias AgenticRealms.World
   alias AgenticRealms.World.Queries
   alias AgenticRealms.World.UIEvents.BehaviorUtterance
+  alias AgenticRealmsWeb.Topics
 
   @pubsub AgenticRealms.PubSub
 
@@ -46,7 +46,7 @@ defmodule AgenticRealms.World.Behaviors.ActionExecutor do
     recipients = compute_recipients(speaker_ctx, room_id, triggering_player_id)
 
     Enum.each(recipients, fn p_id ->
-      Phoenix.PubSub.broadcast(@pubsub, World.player_topic(p_id), utterance)
+      Phoenix.PubSub.broadcast(@pubsub, Topics.player_topic(p_id), utterance)
     end)
 
     :ok
@@ -62,7 +62,7 @@ defmodule AgenticRealms.World.Behaviors.ActionExecutor do
     recipients = compute_recipients(speaker_ctx, room_id, triggering_player_id)
 
     Enum.each(recipients, fn p_id ->
-      Phoenix.PubSub.broadcast(@pubsub, World.player_topic(p_id), utterance)
+      Phoenix.PubSub.broadcast(@pubsub, Topics.player_topic(p_id), utterance)
     end)
 
     :ok

@@ -5,7 +5,6 @@ defmodule AgenticRealmsWeb.GameLive do
 
   alias AgenticRealms.Accounts
   alias AgenticRealms.GameData
-  alias AgenticRealms.World
 
   alias AgenticRealms.World.{
     Commands,
@@ -35,6 +34,7 @@ defmodule AgenticRealmsWeb.GameLive do
   }
 
   alias AgenticRealmsWeb.Presence
+  alias AgenticRealmsWeb.Topics
 
   @pubsub AgenticRealms.PubSub
 
@@ -62,8 +62,8 @@ defmodule AgenticRealmsWeb.GameLive do
     presence = Queries.other_occupants_of(current_room_id, player_id)
 
     if connected?(socket) do
-      Phoenix.PubSub.subscribe(@pubsub, World.player_topic(player_id))
-      Phoenix.PubSub.subscribe(@pubsub, World.room_topic(current_room_id))
+      Phoenix.PubSub.subscribe(@pubsub, Topics.player_topic(player_id))
+      Phoenix.PubSub.subscribe(@pubsub, Topics.room_topic(current_room_id))
       Phoenix.PubSub.subscribe(@pubsub, Presence.topic())
       {:ok, _} = Presence.track_player(self(), player_id, username)
 
@@ -429,10 +429,10 @@ defmodule AgenticRealmsWeb.GameLive do
         if connected?(socket) do
           Phoenix.PubSub.unsubscribe(
             @pubsub,
-            World.room_topic(from_room_id)
+            Topics.room_topic(from_room_id)
           )
 
-          Phoenix.PubSub.subscribe(@pubsub, World.room_topic(to_room_id))
+          Phoenix.PubSub.subscribe(@pubsub, Topics.room_topic(to_room_id))
         end
 
         case Queries.look_room(player_id) do
@@ -1012,11 +1012,11 @@ defmodule AgenticRealmsWeb.GameLive do
       {:noreply, socket}
     else
       if connected?(socket) and socket.assigns.current_room_id do
-        Phoenix.PubSub.unsubscribe(@pubsub, World.room_topic(socket.assigns.current_room_id))
+        Phoenix.PubSub.unsubscribe(@pubsub, Topics.room_topic(socket.assigns.current_room_id))
       end
 
       if connected?(socket) do
-        Phoenix.PubSub.subscribe(@pubsub, World.room_topic(to_room_id))
+        Phoenix.PubSub.subscribe(@pubsub, Topics.room_topic(to_room_id))
       end
 
       player_id = socket.assigns.current_player.id

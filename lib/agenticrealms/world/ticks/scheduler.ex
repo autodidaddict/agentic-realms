@@ -18,7 +18,6 @@ defmodule AgenticRealms.World.Ticks.Scheduler do
 
   require Logger
 
-  alias AgenticRealms.World
   alias AgenticRealms.World.Behaviors.ActionExecutor
   alias AgenticRealms.World.Queries
   alias AgenticRealms.World.Ticks.{Registry, Scope}
@@ -31,6 +30,8 @@ defmodule AgenticRealms.World.Ticks.Scheduler do
     RoomPlayerArrived,
     RoomPlayerLeft
   }
+
+  alias AgenticRealmsWeb.Topics
 
   @pubsub AgenticRealms.PubSub
 
@@ -57,7 +58,7 @@ defmodule AgenticRealms.World.Ticks.Scheduler do
   def init(room_id) do
     base = base_tick_rate_ms()
 
-    Phoenix.PubSub.subscribe(@pubsub, World.room_topic(room_id))
+    Phoenix.PubSub.subscribe(@pubsub, Topics.room_topic(room_id))
 
     state = %__MODULE__{
       room_id: room_id,

@@ -27,6 +27,8 @@ defmodule AgenticRealms.World.Ticks.Lifecycle do
     RoomPlayerLeft
   }
 
+  alias AgenticRealmsWeb.Topics
+
   @pubsub AgenticRealms.PubSub
 
   defstruct live_per_room: %{},
@@ -165,7 +167,7 @@ defmodule AgenticRealms.World.Ticks.Lifecycle do
     if MapSet.member?(state.subscribed_rooms, room_id) do
       state
     else
-      Phoenix.PubSub.subscribe(@pubsub, AgenticRealms.World.room_topic(room_id))
+      Phoenix.PubSub.subscribe(@pubsub, Topics.room_topic(room_id))
       %{state | subscribed_rooms: MapSet.put(state.subscribed_rooms, room_id)}
     end
   end

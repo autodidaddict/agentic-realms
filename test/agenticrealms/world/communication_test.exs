@@ -15,7 +15,7 @@ defmodule AgenticRealms.World.CommunicationTest do
   use AgenticRealms.DataCase, async: false
 
   alias AgenticRealms.Accounts
-  alias AgenticRealms.World
+  alias AgenticRealmsWeb.Topics
   alias AgenticRealms.World.Communication
   alias AgenticRealms.World.UIEvents.{RoomUtterance, PrivateUtterance}
   alias AgenticRealmsWeb.Presence
@@ -48,7 +48,7 @@ defmodule AgenticRealms.World.CommunicationTest do
 
     test "accepts exactly 500 characters" do
       sender = sender()
-      Phoenix.PubSub.subscribe(@pubsub, World.room_topic(sender.room_id))
+      Phoenix.PubSub.subscribe(@pubsub, Topics.room_topic(sender.room_id))
       text = String.duplicate("x", 500)
       assert :ok = Communication.say(sender, text)
       assert_receive %RoomUtterance{kind: :say, text: ^text}
@@ -58,7 +58,7 @@ defmodule AgenticRealms.World.CommunicationTest do
       sender = sender()
       sender_room_id = sender.room_id
       session_id = sender.session_id
-      Phoenix.PubSub.subscribe(@pubsub, World.room_topic(sender_room_id))
+      Phoenix.PubSub.subscribe(@pubsub, Topics.room_topic(sender_room_id))
 
       assert :ok = Communication.say(sender, "hello there")
 
@@ -75,7 +75,7 @@ defmodule AgenticRealms.World.CommunicationTest do
 
     test "trims surrounding whitespace before broadcasting" do
       sender = sender()
-      Phoenix.PubSub.subscribe(@pubsub, World.room_topic(sender.room_id))
+      Phoenix.PubSub.subscribe(@pubsub, Topics.room_topic(sender.room_id))
 
       assert :ok = Communication.say(sender, "  hi  ")
       assert_receive %RoomUtterance{kind: :say, text: "hi"}
@@ -83,7 +83,7 @@ defmodule AgenticRealms.World.CommunicationTest do
 
     test "preserves internal whitespace in broadcast text" do
       sender = sender()
-      Phoenix.PubSub.subscribe(@pubsub, World.room_topic(sender.room_id))
+      Phoenix.PubSub.subscribe(@pubsub, Topics.room_topic(sender.room_id))
 
       assert :ok = Communication.say(sender, "hi   mom")
       assert_receive %RoomUtterance{kind: :say, text: "hi   mom"}
@@ -91,7 +91,7 @@ defmodule AgenticRealms.World.CommunicationTest do
 
     test "preserves casing of broadcast text" do
       sender = sender()
-      Phoenix.PubSub.subscribe(@pubsub, World.room_topic(sender.room_id))
+      Phoenix.PubSub.subscribe(@pubsub, Topics.room_topic(sender.room_id))
 
       assert :ok = Communication.say(sender, "HELLO World")
       assert_receive %RoomUtterance{kind: :say, text: "HELLO World"}
@@ -100,7 +100,7 @@ defmodule AgenticRealms.World.CommunicationTest do
     test "does NOT broadcast on a different room's topic" do
       sender = sender()
       other_room_id = "room-ffffffff-ffff-ffff-ffff-ffffffffffff"
-      Phoenix.PubSub.subscribe(@pubsub, World.room_topic(other_room_id))
+      Phoenix.PubSub.subscribe(@pubsub, Topics.room_topic(other_room_id))
 
       assert :ok = Communication.say(sender, "hello")
       refute_receive _, 50
@@ -119,7 +119,7 @@ defmodule AgenticRealms.World.CommunicationTest do
 
     test "broadcasts as :emote on sender's room topic" do
       sender = sender()
-      Phoenix.PubSub.subscribe(@pubsub, World.room_topic(sender.room_id))
+      Phoenix.PubSub.subscribe(@pubsub, Topics.room_topic(sender.room_id))
 
       assert :ok = Communication.emote(sender, "waves at the fire")
       assert_receive %RoomUtterance{kind: :emote, text: "waves at the fire."}
@@ -127,7 +127,7 @@ defmodule AgenticRealms.World.CommunicationTest do
 
     test "appends a trailing period when text does not end in . ! or ?" do
       sender = sender()
-      Phoenix.PubSub.subscribe(@pubsub, World.room_topic(sender.room_id))
+      Phoenix.PubSub.subscribe(@pubsub, Topics.room_topic(sender.room_id))
 
       assert :ok = Communication.emote(sender, "waves")
       assert_receive %RoomUtterance{kind: :emote, text: "waves."}
@@ -135,7 +135,7 @@ defmodule AgenticRealms.World.CommunicationTest do
 
     test "preserves trailing period" do
       sender = sender()
-      Phoenix.PubSub.subscribe(@pubsub, World.room_topic(sender.room_id))
+      Phoenix.PubSub.subscribe(@pubsub, Topics.room_topic(sender.room_id))
 
       assert :ok = Communication.emote(sender, "stands silent.")
       assert_receive %RoomUtterance{kind: :emote, text: "stands silent."}
@@ -143,7 +143,7 @@ defmodule AgenticRealms.World.CommunicationTest do
 
     test "preserves trailing exclamation mark (no double-punctuation)" do
       sender = sender()
-      Phoenix.PubSub.subscribe(@pubsub, World.room_topic(sender.room_id))
+      Phoenix.PubSub.subscribe(@pubsub, Topics.room_topic(sender.room_id))
 
       assert :ok = Communication.emote(sender, "laughs!")
       assert_receive %RoomUtterance{kind: :emote, text: "laughs!"}
@@ -151,7 +151,7 @@ defmodule AgenticRealms.World.CommunicationTest do
 
     test "preserves trailing question mark" do
       sender = sender()
-      Phoenix.PubSub.subscribe(@pubsub, World.room_topic(sender.room_id))
+      Phoenix.PubSub.subscribe(@pubsub, Topics.room_topic(sender.room_id))
 
       assert :ok = Communication.emote(sender, "tilts head?")
       assert_receive %RoomUtterance{kind: :emote, text: "tilts head?"}
@@ -206,7 +206,7 @@ defmodule AgenticRealms.World.CommunicationTest do
       # Track bob's presence from this test process so the online check passes.
       {:ok, _} = Presence.track_player(self(), bob.id, bob.username)
       # Subscribe to bob's topic to capture the broadcast.
-      Phoenix.PubSub.subscribe(@pubsub, World.player_topic(bob.id))
+      Phoenix.PubSub.subscribe(@pubsub, Topics.player_topic(bob.id))
 
       assert {:ok, %{recipient_id: rid, recipient_username: rname}} =
                Communication.tell(sender, bob.username, "psst")
@@ -223,7 +223,7 @@ defmodule AgenticRealms.World.CommunicationTest do
       suffix: suffix
     } do
       {:ok, _} = Presence.track_player(self(), bob.id, bob.username)
-      Phoenix.PubSub.subscribe(@pubsub, World.player_topic(bob.id))
+      Phoenix.PubSub.subscribe(@pubsub, Topics.player_topic(bob.id))
 
       # bob.username is "bob_<suffix>" — try the uppercase form.
       assert {:ok, %{recipient_id: rid}} =
