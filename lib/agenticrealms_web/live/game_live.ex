@@ -27,6 +27,8 @@ defmodule AgenticRealmsWeb.GameLive do
     RoomObjectTaken,
     RoomObjectDropped,
     RoomNPCArrived,
+    RoomTranceEntered,
+    RoomTranceExited,
     BehaviorUtterance,
     PlayerCurrentRoomChanged,
     PlayerInventoryChanged,
@@ -86,6 +88,15 @@ defmodule AgenticRealmsWeb.GameLive do
     {:ok,
      socket
      |> assign(:mode, :player)
+     # Feature 014 — wizard authorization + trance mode. `:is_wizard` is
+     # the FR-WIZ-1 flag; `:authoring_mode` is the world/blueprints
+     # sub-mode within Wizard view (only meaningful when :is_wizard and
+     # :mode == :wizard). Non-wizards never see the top-bar Wizard
+     # switch (FR-WIZ-3), enforced by the layout.
+     |> assign(:is_wizard, socket.assigns.current_player.is_wizard)
+     |> assign(:authoring_mode, if(socket.assigns.current_player.is_wizard, do: :world, else: nil))
+     |> assign(:focused_object_id, nil)
+     |> assign(:focused_blueprint_id, nil)
      |> assign(:modal, nil)
      |> assign(:map_open, false)
      |> assign(:map_view, MapView.for_player(player_id))
@@ -122,8 +133,46 @@ defmodule AgenticRealmsWeb.GameLive do
 
   @impl true
   def handle_event("switch_mode", %{"mode" => mode}, socket) do
-    {:noreply, assign(socket, :mode, String.to_existing_atom(mode))}
+    new_mode = String.to_existing_atom(mode)
+    # FR-WIZ-3 / FR-WIZ-4 — non-wizards must not be able to enter Wizard
+    # view, even via a crafted client event. The top-bar switch is
+    # already hidden for them by the layout; this is defense-in-depth.
+    if new_mode == :wizard and not socket.assigns.is_wizard do
+      {:noreply, socket}
+    else
+      {:noreply, assign(socket, :mode, new_mode)}
+    end
   end
+
+  # Feature 014 — wizard authoring mode toggle (FR-001 / FR-002 / FR-003).
+  # Flips `:authoring_mode` between `:world` and `:blueprints` and side-
+  # effects a transient broadcast on the wizard's current `room:` topic.
+  # No verb to type — the toggle IS the affordance.
+  def handle_event(
+        "toggle_authoring_mode",
+        _params,
+        %{assigns: %{is_wizard: true, mode: :wizard}} = socket
+      ) do
+    wizard_id = socket.assigns.current_player.id
+    wizard_username = socket.assigns.current_player.username
+    room_id = socket.assigns.current_room_id
+
+    case socket.assigns.authoring_mode do
+      :world ->
+        :ok = AgenticRealms.World.WizardTrance.enter(wizard_id, wizard_username, room_id)
+        {:noreply, assign(socket, :authoring_mode, :blueprints)}
+
+      :blueprints ->
+        :ok = AgenticRealms.World.WizardTrance.exit(wizard_id, wizard_username, room_id)
+
+        {:noreply,
+         socket
+         |> assign(:authoring_mode, :world)
+         |> assign(:focused_blueprint_id, nil)}
+    end
+  end
+
+  def handle_event("toggle_authoring_mode", _params, socket), do: {:noreply, socket}
 
   # While a natural-language resolver task is in flight the input is locked;
   # ignore any submit that slips through (e.g. a queued client event).
@@ -847,6 +896,28 @@ defmodule AgenticRealmsWeb.GameLive do
        socket
        |> append_log(%{kind: :system, text: departure_text(msg)})
        |> remove_from_presence(actor_id)}
+    end
+  end
+
+  # Feature 014 — wizard trance entry/exit witness (FR-002 / FR-003 /
+  # FR-004). Self-filter mirrors the FR-029 actor-exclusion pattern used
+  # for player arrivals: the wizard whose toggle fired the broadcast
+  # does NOT see the system entry in their own log (their chrome change
+  # is the feedback they get).
+  def handle_info(%RoomTranceEntered{wizard_id: wid, wizard_username: name}, socket) do
+    if wid == socket.assigns.current_player.id do
+      {:noreply, socket}
+    else
+      {:noreply, append_log(socket, %{kind: :system, text: "#{name} enters a trance."})}
+    end
+  end
+
+  def handle_info(%RoomTranceExited{wizard_id: wid, wizard_username: name}, socket) do
+    if wid == socket.assigns.current_player.id do
+      {:noreply, socket}
+    else
+      {:noreply,
+       append_log(socket, %{kind: :system, text: "#{name} appears to come out of a trance."})}
     end
   end
 

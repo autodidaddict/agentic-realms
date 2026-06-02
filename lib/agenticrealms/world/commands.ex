@@ -14,6 +14,7 @@ defmodule AgenticRealms.World.Commands do
 
   import Ecto.Query
 
+  alias AgenticRealms.Accounts
   alias AgenticRealms.Repo
   alias AgenticRealms.World.Application, as: WorldApp
 
@@ -28,8 +29,11 @@ defmodule AgenticRealms.World.Commands do
     AddExit,
     RecordRoomDiscovery,
     AcceptQuest,
-    FinalizeQuest
+    FinalizeQuest,
+    CreateObjectBlueprint
   }
+
+  alias AgenticRealms.World.ObjectBlueprint.Slug
 
   alias AgenticRealms.World.Direction
   alias AgenticRealms.World.Exits.Validator, as: ExitsValidator
@@ -675,6 +679,82 @@ defmodule AgenticRealms.World.Commands do
        }}
     end
   end
+
+  # ──────────────────────────────────────────────────────────────────────
+  # Feature 014 — Object Blueprint authoring
+  # ──────────────────────────────────────────────────────────────────────
+
+  @doc """
+  Author a new Object Blueprint.
+
+  Wrapper performs the FR-WIZ-5 authorization check, FR-007a slug-shape
+  validation, and FR-007b slug-uniqueness pre-check before dispatching
+  to the `ObjectBlueprint` aggregate.
+
+  Returns `{:ok, blueprint_id}` on success.
+  Refusals:
+    * `{:error, :not_a_wizard}` — caller's `is_wizard` is false.
+    * `{:error, :unknown_player}` — caller's player_id is unknown.
+    * `{:error, :invalid_slug}` — slug fails the regex / length rules.
+    * `{:error, :slug_already_exists}` — slug collides with an existing row.
+    * `{:error, :name_required}` / `:short_description_required` /
+      `:long_description_required` — content field missing.
+  """
+  @spec create_object_blueprint(
+          %{
+            required(:wizard_id) => integer(),
+            required(:blueprint_id) => String.t(),
+            required(:name) => String.t(),
+            required(:short_description) => String.t(),
+            required(:long_description) => String.t(),
+            optional(:fixed) => boolean()
+          },
+          keyword()
+        ) :: {:ok, String.t()} | {:error, atom()}
+  def create_object_blueprint(attrs, _opts \\ []) when is_map(attrs) do
+    with :ok <- ensure_wizard(attrs[:wizard_id]),
+         :ok <- validate_slug(attrs[:blueprint_id]),
+         :ok <- ensure_slug_unused(attrs[:blueprint_id]) do
+      cmd = %CreateObjectBlueprint{
+        blueprint_id: attrs[:blueprint_id],
+        wizard_id: attrs[:wizard_id],
+        name: attrs[:name],
+        short_description: attrs[:short_description],
+        long_description: attrs[:long_description],
+        kind: "object",
+        fixed: Map.get(attrs, :fixed, false)
+      }
+
+      case WorldApp.dispatch(cmd, consistency: :strong) do
+        :ok -> {:ok, attrs[:blueprint_id]}
+        {:error, _} = err -> err
+      end
+    end
+  end
+
+  defp validate_slug(slug) do
+    if Slug.valid?(slug), do: :ok, else: {:error, :invalid_slug}
+  end
+
+  defp ensure_slug_unused(slug) do
+    case Repo.get(AgenticRealms.World.Schemas.ObjectBlueprint, slug) do
+      nil -> :ok
+      _ -> {:error, :slug_already_exists}
+    end
+  end
+
+  # Feature 014 — wizard authorization gate. Synchronous read of the
+  # `players.is_wizard` flag (FR-WIZ-5). Used as the entry guard on every
+  # wizard-only command wrapper.
+  defp ensure_wizard(player_id) when is_integer(player_id) do
+    case Accounts.get_player(player_id) do
+      %Accounts.Player{is_wizard: true} -> :ok
+      %Accounts.Player{is_wizard: false} -> {:error, :not_a_wizard}
+      nil -> {:error, :unknown_player}
+    end
+  end
+
+  defp ensure_wizard(_), do: {:error, :unknown_player}
 
   defp match_criteria(criteria, in_inventory) do
     Enum.reduce(criteria, {[], []}, fn criterion, {consumed_acc, missing_acc} ->

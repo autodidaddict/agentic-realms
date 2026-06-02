@@ -16,6 +16,7 @@ defmodule AgenticRealms.World.Queries do
     Room,
     Exit,
     Object,
+    ObjectBlueprint,
     PlayerState,
     NPCBlueprint,
     NPCClone,
@@ -552,5 +553,28 @@ defmodule AgenticRealms.World.Queries do
         where: r.region_id == ^region_id and r.elevation < ^current_elevation
       )
     )
+  end
+
+  # ──────────────────────────────────────────────────────────────────────
+  # Feature 014 — Object Blueprints
+  # ──────────────────────────────────────────────────────────────────────
+
+  @doc """
+  List all Object Blueprints, ordered by name. Drives the wizard's
+  Blueprints registry tab (FR-026). Returns plain schema structs;
+  callers project to display rows as needed.
+  """
+  @spec list_object_blueprints() :: [%ObjectBlueprint{}]
+  def list_object_blueprints do
+    Repo.all(from(b in ObjectBlueprint, order_by: [asc: b.name, asc: b.id]))
+  end
+
+  @doc """
+  Fetch a single Object Blueprint by its slug id. Returns `nil` if no
+  such row exists.
+  """
+  @spec get_object_blueprint(String.t()) :: %ObjectBlueprint{} | nil
+  def get_object_blueprint(blueprint_id) when is_binary(blueprint_id) do
+    Repo.get(ObjectBlueprint, blueprint_id)
   end
 end

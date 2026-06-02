@@ -44,6 +44,37 @@ defmodule AgenticRealms.World.UIEvents do
     defstruct [:room_id, :npc_id, :npc_name]
   end
 
+  defmodule RoomTranceEntered do
+    @moduledoc """
+    Feature 014 — transient trance-entry log entry. Broadcast on
+    `room:<wizard's current room>` when a wizard flips their
+    `authoring_mode` to `:blueprints`. Renders as a `system` narrative-log
+    entry on every co-present player's view per FR-002.
+
+    The wizard themselves self-filters (FR-002 wording — "every other
+    player session") via their own `handle_info` clause checking
+    `wizard_id == current_player.id`.
+
+    Not persisted — there is no domain event behind it. Trance is a UI
+    signal, not world state. See
+    `specs/014-item-blueprints/research.md` R3.
+    """
+    @enforce_keys [:room_id, :wizard_id, :wizard_username]
+    defstruct [:room_id, :wizard_id, :wizard_username]
+  end
+
+  defmodule RoomTranceExited do
+    @moduledoc """
+    Feature 014 — transient trance-exit log entry. Broadcast on
+    `room:<wizard's current room>` when a wizard flips their
+    `authoring_mode` back to `:world` (FR-003). Suppressed on disconnect
+    per FR-005 by virtue of the LiveView's terminate callback NOT firing
+    this event (only an explicit toggle does).
+    """
+    @enforce_keys [:room_id, :wizard_id, :wizard_username]
+    defstruct [:room_id, :wizard_id, :wizard_username]
+  end
+
   defmodule RoomNPCArrived do
     @moduledoc """
     Transient NPC-arrival event. Broadcast on `room:<destination>` when an
