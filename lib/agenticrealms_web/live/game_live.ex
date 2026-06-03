@@ -394,7 +394,7 @@ defmodule AgenticRealmsWeb.GameLive do
         } = socket
       )
       when is_binary(object_id) do
-    case AgenticRealms.World.Queries.get_object(object_id) do
+    case AgenticRealms.World.Queries.get_object_for_wizard(object_id) do
       nil ->
         {:noreply, assign(socket, :blueprint_commit_error, :unknown_object)}
 
@@ -598,7 +598,7 @@ defmodule AgenticRealmsWeb.GameLive do
         } = socket
       )
       when is_binary(object_id) do
-    case AgenticRealms.World.Queries.get_object(object_id) do
+    case AgenticRealms.World.Queries.get_object_for_wizard(object_id) do
       nil ->
         {:noreply, assign(socket, :blueprint_commit_error, :unknown_object)}
 
@@ -1016,6 +1016,7 @@ defmodule AgenticRealmsWeb.GameLive do
              socket
              |> assign(:current_room_id, to_room_id)
              |> assign(:current_room_name, Map.get(room_view, :name))
+             |> clear_room_scoped_wizard_state()
              |> refresh_map_view()
              |> refresh_room_objects()
              |> append_log(%{kind: :room, room: room_view})
@@ -1025,6 +1026,7 @@ defmodule AgenticRealmsWeb.GameLive do
             {:noreply,
              socket
              |> assign(:current_room_id, to_room_id)
+             |> clear_room_scoped_wizard_state()
              |> refresh_map_view()
              |> refresh_room_objects()
              |> append_log(%{kind: :system, text: "You arrive somewhere."})
@@ -1786,6 +1788,7 @@ defmodule AgenticRealmsWeb.GameLive do
       socket =
         socket
         |> assign(:current_room_id, to_room_id)
+        |> clear_room_scoped_wizard_state()
         |> refresh_map_view()
         |> refresh_room_objects()
 
@@ -1951,6 +1954,20 @@ defmodule AgenticRealmsWeb.GameLive do
   end
 
   defp refresh_room_objects(socket), do: socket
+
+  # Feature 014 US4/US5 — wizard authoring assigns that refer to a
+  # specific world Object (Extract source / Edit target) are scoped to
+  # the room the wizard was in when they focused. Walking into a new
+  # room invalidates them — the security boundary in
+  # `Commands.edit_object/3` will refuse a stale commit anyway, but
+  # carrying the form into the new room is confusing UX. Clear them on
+  # any move.
+  defp clear_room_scoped_wizard_state(socket) do
+    socket
+    |> assign(:focused_object_id, nil)
+    |> assign(:focused_object_draft, nil)
+    |> assign(:focused_object_edit, nil)
+  end
 
   # Feature 014 US6 — apply a `WizardBlueprintRegistryChanged` payload
   # to the wizard's `:object_blueprints` list in place. Insert (with

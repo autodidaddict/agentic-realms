@@ -873,8 +873,20 @@ defmodule AgenticRealms.World.Commands do
 
   defp fetch_object(object_id) do
     case Repo.get(AgenticRealms.World.Schemas.Object, object_id) do
-      nil -> {:error, :unknown_object}
-      o -> {:ok, o}
+      nil ->
+        {:error, :unknown_object}
+
+      # Wizards cannot extract or edit quest-scoped objects in milestone
+      # 1 — these belong to a specific player. The Things-in-this-room
+      # panel already filters them out via
+      # `Queries.list_objects_in_room_for_wizard/1`; this is the
+      # defense-in-depth at the Commands wrapper boundary so a crafted
+      # client event or iex caller can't bypass.
+      %{quest_player_id: pid} when not is_nil(pid) ->
+        {:error, :unknown_object}
+
+      o ->
+        {:ok, o}
     end
   end
 
@@ -964,9 +976,16 @@ defmodule AgenticRealms.World.Commands do
 
   Refusals:
     * `{:error, :not_a_wizard}` / `{:error, :unknown_player}`.
-    * `{:error, :unknown_object}` — object_id not in `world_objects`.
-    * `{:error, :object_not_editable_here}` — object is not currently in
-      a room (e.g., carried by a player).
+    * `{:error, :unknown_object}` — object_id not in `world_objects`, OR
+      object is quest-scoped (wizards do not edit per-player quest items
+      in milestone 1).
+    * `{:error, :object_not_editable_here}` — object is not currently
+      in a room (e.g., carried by a player) OR it is in a different
+      room than the wizard's current room. Per `contracts/commands.md`,
+      both halves of this clause are part of the contract; the
+      same-room enforcement here is the security boundary that the
+      LiveView's focus-time pattern match (the UX gate) sits in front
+      of.
     * `{:error, :invalid_field}`.
   """
   @spec edit_object(
@@ -979,7 +998,8 @@ defmodule AgenticRealms.World.Commands do
     with :ok <- ensure_wizard(wizard_id),
          {:ok, object} <- fetch_object(object_id),
          :ok <- validate_edit_fields(fields_changed),
-         {:ok, room_id} <- ensure_in_room(object) do
+         {:ok, room_id} <- ensure_in_room(object),
+         :ok <- ensure_wizard_co_located(wizard_id, room_id) do
       cmd = %EditObject{
         room_id: room_id,
         object_id: object_id,
@@ -1002,6 +1022,20 @@ defmodule AgenticRealms.World.Commands do
 
   defp ensure_in_room(%{room_id: nil}), do: {:error, :object_not_editable_here}
   defp ensure_in_room(%{room_id: rid}) when is_binary(rid), do: {:ok, rid}
+
+  # Feature 014 US5 — cross-room defense in depth. The LiveView's
+  # `focus_object_for_edit` pattern matches `obj.room_id == ^room_id`
+  # at focus time (the UX gate), but the wizard's `:focused_object_edit`
+  # assign persists across PlayerMoved, so a focus-then-walk-then-commit
+  # sequence would otherwise let the wizard edit an object in a room
+  # they're no longer in. Per `contracts/commands.md`, the Commands
+  # wrapper IS the security boundary here.
+  defp ensure_wizard_co_located(wizard_id, object_room_id) do
+    case AgenticRealms.World.Queries.current_room_of(wizard_id) do
+      {:ok, ^object_room_id} -> :ok
+      _ -> {:error, :object_not_editable_here}
+    end
+  end
 
   defp only_actual_diff(object, fields_changed) do
     fields_changed

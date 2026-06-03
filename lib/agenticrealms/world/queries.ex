@@ -587,6 +587,24 @@ defmodule AgenticRealms.World.Queries do
   end
 
   @doc """
+  Wizard-facing variant of `get_object/1` — returns `nil` for rows
+  that are quest-scoped (carry a non-nil `quest_player_id`). Mirrors
+  the filter that `list_objects_in_room_for_wizard/1` applies to the
+  wizard's Things-in-this-room panel. Use this anywhere a wizard
+  command/handler resolves an object_id by user input so that
+  quest-scoped items (which belong to a specific player) cannot be
+  extracted, edited, or otherwise manipulated by wizards in
+  milestone 1.
+  """
+  @spec get_object_for_wizard(String.t()) :: %Object{} | nil
+  def get_object_for_wizard(object_id) when is_binary(object_id) do
+    case Repo.get(Object, object_id) do
+      %Object{quest_player_id: nil} = obj -> obj
+      _ -> nil
+    end
+  end
+
+  @doc """
   Wizard-facing variant of `list_objects_in_room/1` — includes the
   `fixed` flag plus full descriptions so the Wizard view's
   Things-in-this-room panel and the Extract-essence action have what

@@ -2193,7 +2193,14 @@ defmodule AgenticRealmsWeb.GameComponents do
         <label class="bp-field-label">
           Slug
           <span class="bp-field-hint">
-            <%= if Map.get(@draft, :slug_overridden, false), do: "manual", else: "auto from name" %>
+            <%= cond do %>
+              <% not is_nil(Map.get(@draft, :expected_revision)) -> %>
+                locked after creation
+              <% Map.get(@draft, :slug_overridden, false) -> %>
+                manual
+              <% true -> %>
+                auto from name
+            <% end %>
           </span>
         </label>
         <input
@@ -2201,6 +2208,7 @@ defmodule AgenticRealmsWeb.GameComponents do
           name="draft[proposed_slug]"
           value={@draft.proposed_slug}
           class="bp-input bp-input--mono"
+          readonly={not is_nil(Map.get(@draft, :expected_revision))}
           data-testid="blueprint-slug"
         />
       </div>

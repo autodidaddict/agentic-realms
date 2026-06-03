@@ -83,6 +83,20 @@ defmodule AgenticRealmsWeb.WizardEditTest do
     assert draft.expected_revision == 1
     assert draft.name == "edit-loop chest"
 
+    # bug_001 — slug input MUST be read-only in edit mode so the wizard
+    # doesn't silently lose typed-but-discarded slug edits. (Slugs are
+    # immutable after creation per FR-007a.)
+    html = render(view)
+    # Attribute order in the rendered HTML isn't fixed; assert the
+    # slug <input> has `readonly` regardless of where it sits relative
+    # to data-testid.
+    assert html =~ ~r/<input[^>]*data-testid="blueprint-slug"[^>]*\/>/
+    slug_input_match = Regex.run(~r/<input[^>]*data-testid="blueprint-slug"[^>]*\/>/, html)
+    assert slug_input_match, "expected to find the slug <input> in the rendered HTML"
+    [slug_input] = slug_input_match
+    assert slug_input =~ "readonly"
+    assert html =~ "locked after creation"
+
     # Edit short_description via the form, commit.
     render_hook(view, "update_blueprint_draft", %{
       "draft" => %{

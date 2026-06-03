@@ -198,8 +198,15 @@ defmodule AgenticRealms.World.Room do
 
   # --- EditObject (feature 014 US5) ---------------------------------------
   # The Room aggregate confirms the object is currently in this room
-  # (via its `object_ids` MapSet) before emitting `ObjectEdited`. The
-  # projector applies the diff to `world_objects` in place.
+  # (via its `object_ids` MapSet) and validates the `fields_changed`
+  # keys against an allowlist before emitting `ObjectEdited`. The
+  # allowlist is the aggregate-boundary defense-in-depth that mirrors
+  # `ObjectBlueprint.execute/2`'s policy — without it, a future iex /
+  # tool / test caller could dispatch a sparse diff that touches
+  # `:room_id`, `:player_id`, `:quest_player_id`, etc., and the
+  # projector would `Repo.update_all` it verbatim.
+
+  @editable_object_fields ~w(name short_description long_description fixed)a
 
   def execute(%__MODULE__{id: nil}, %AgenticRealms.World.Commands.EditObject{}),
     do: {:error, :room_not_found}
@@ -214,6 +221,9 @@ defmodule AgenticRealms.World.Room do
       )
       when is_map(fields_changed) do
     cond do
+      not Enum.all?(Map.keys(fields_changed), &(&1 in @editable_object_fields)) ->
+        {:error, :invalid_field}
+
       not MapSet.member?(ids, oid) ->
         {:error, :object_not_in_room}
 
