@@ -51,11 +51,16 @@ defmodule AgenticRealms.World.UIEventBroadcaster do
     PlayerMoved,
     ObjectTakenFromRoom,
     ObjectDroppedInRoom,
+    ObjectSpawned,
+    ObjectEdited,
+    ObjectBlueprintCreated,
+    ObjectBlueprintEdited,
     NPCSpawnedInRoom,
     NPCClonedFromBlueprint,
     QuestAccepted,
     QuestCompleted
   }
+
 
   alias AgenticRealms.World.Schemas.Object
 
@@ -64,7 +69,10 @@ defmodule AgenticRealms.World.UIEventBroadcaster do
     RoomPlayerLeft,
     RoomObjectTaken,
     RoomObjectDropped,
+    RoomObjectArrived,
+    RoomObjectEdited,
     RoomNPCArrived,
+    WizardBlueprintRegistryChanged,
     PlayerCurrentRoomChanged,
     PlayerInventoryChanged,
     PlayerQuestAccepted,
@@ -204,6 +212,97 @@ defmodule AgenticRealms.World.UIEventBroadcaster do
     # Feature 013 — symmetric to take: dropping a tagged quest item
     # decrements the player's progress.
     broadcast_quest_progress(pid, oid)
+
+    :ok
+  end
+
+  # Feature 014 US6 — live-updating Blueprint registry. Broadcast on
+  # the global `blueprints` topic so every wizard LiveView session
+  # with the registry open patches in place. Both branches read every
+  # field they need directly off the domain event — NO DB re-read —
+  # because the broadcaster's GenServer doesn't share the calling
+  # process's Ecto sandbox connection in tests, and a fresh DB read
+  # under :eventual consistency can race the projector anyway.
+  def handle(%ObjectBlueprintCreated{} = e, _meta) do
+    Phoenix.PubSub.broadcast(
+      @pubsub,
+      Topics.blueprints_topic(),
+      %WizardBlueprintRegistryChanged{
+        event: :created,
+        blueprint_id: e.blueprint_id,
+        revision: e.revision,
+        payload: %{
+          name: e.name,
+          short_description: e.short_description,
+          fixed: e.fixed,
+          kind: e.kind
+        }
+      }
+    )
+
+    :ok
+  end
+
+  def handle(
+        %ObjectBlueprintEdited{
+          blueprint_id: bp_id,
+          fields_changed: fields_changed,
+          revision: revision
+        },
+        _meta
+      ) do
+    Phoenix.PubSub.broadcast(
+      @pubsub,
+      Topics.blueprints_topic(),
+      %WizardBlueprintRegistryChanged{
+        event: :edited,
+        blueprint_id: bp_id,
+        revision: revision,
+        payload: fields_changed
+      }
+    )
+
+    :ok
+  end
+
+  # Feature 014 US2 — wizard-driven object spawn. Broadcast a
+  # `RoomObjectArrived` UI event to every subscriber of the destination
+  # room topic so co-present players' narrative logs gain a system entry.
+  def handle(
+        %ObjectSpawned{
+          room_id: rid,
+          object_id: oid,
+          name: name,
+          short_description: short
+        },
+        _meta
+      ) do
+    Phoenix.PubSub.broadcast(
+      @pubsub,
+      Topics.room_topic(rid),
+      %RoomObjectArrived{
+        room_id: rid,
+        object_id: oid,
+        name: name,
+        short_description: short
+      }
+    )
+
+    :ok
+  end
+
+  # Feature 014 US5 — wizard-driven in-place edit. Broadcast a
+  # `RoomObjectEdited` on the room topic so co-located subscribers can
+  # refresh their cached views.
+  def handle(
+        %ObjectEdited{room_id: rid, object_id: oid, fields_changed: fields_changed},
+        _meta
+      ) do
+    Phoenix.PubSub.broadcast(
+      @pubsub,
+      Topics.room_topic(rid),
+      %RoomObjectEdited{room_id: rid, object_id: oid, fields_changed: fields_changed}
+    )
 
     :ok
   end

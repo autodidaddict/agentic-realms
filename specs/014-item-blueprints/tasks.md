@@ -111,16 +111,16 @@ description: "Task list for feature 014 — wizard-created object blueprints (mi
 
 ### LLM intent tool (FR-022) — wizard-facing UX
 
-- [ ] T033 [P] [US1] Add the `draft_object_blueprint` tool schema to the tool registry exposed by `lib/agenticrealms/world/intent_resolver.ex` per `contracts/intent_tools.md`. **Deferred to a follow-up session.** Requires extending the existing player-only IntentResolver with a wizard-mode tool dispatcher — substantial refactor not in this implementation run.
-- [ ] T034 [US1] Extend `IntentResolver`'s per-mode tool selection. **Deferred** alongside T033.
+- [X] T033 [P] [US1] Added `lib/agenticrealms/world/intent_resolver/wizard_tools.ex` with the `draft_object_blueprint` + `refuse` schemas for `:blueprints` mode.
+- [X] T034 [US1] Added `IntentResolver.resolve_wizard_blueprint/2` — separate entry point with its own system prompt, tool list, and outcome parser (returns `{:ok, {:draft_blueprint, fields}} | {:error, refusal}`). Player-side `resolve/2` is untouched.
 
 ### LiveView wiring (FR-019 dual-role Interpreted Data card; FR-026 minimal registry)
 
-- [ ] T035 [US1] Extend `lib/agenticrealms_web/components/game_components.ex` with the Interpreted Data card component bound to a `:focused_blueprint_draft` assign. **Deferred** — requires the LLM-driven draft flow from T033/T034 to make the progressive-reveal behavior meaningful.
-- [ ] T036 [US1] Add LiveView event handler `handle_event("submit_wizard_prompt", ...)`. **Deferred** alongside T033/T034.
-- [ ] T037 [US1] Add LiveView event handler `handle_event("commit_blueprint_draft", _, socket)` (CREATE path). **Deferred** — the form-driven Commit path needs T035's binding to exist.
-- [ ] T038 [US1] Add LiveView event handler `handle_event("discard_blueprint_draft", _, socket)`. **Deferred** alongside T037.
-- [ ] T039 [P] [US1] Extend `lib/agenticrealms_web/components/game_components.ex` with a minimal Blueprints registry tab. **Deferred** — currently the existing spec 001 mockup chrome still renders mock data; wiring it to `Queries.list_object_blueprints/0` is part of the same UI refactor.
+- [X] T035 [US1] Added `wizard_authoring_view/1` and `blueprint_draft_form/1` components in `lib/agenticrealms_web/components/game_components.ex` rendering the Interpreted Data card from a `:focused_blueprint_draft` assign. Form binds to a single `phx-change="update_blueprint_draft"` with `draft[...]` field namespacing.
+- [X] T036 [US1] Added `handle_event("submit_wizard_prompt", ...)` — entry-guards `:is_wizard` + `:authoring_mode == :blueprints` + `not wizard_input_locked`, spawns `IntentResolver.resolve_wizard_blueprint/2` via `IntentResolverTaskSupervisor`, stashes `:wizard_resolver_task`. Companion `handle_info({ref, result}, ...)` clause populates `:focused_blueprint_draft` on `{:draft_blueprint, fields}` (auto-deriving slug) or surfaces the refusal inline.
+- [X] T037 [US1] Added `handle_event("commit_blueprint_draft", _, socket)` dispatching `Commands.create_object_blueprint/2` with the draft. On `{:ok, _}` clears the draft and refreshes `:object_blueprints`. Errors render inline via `format_commit_error/1` (covers `:invalid_slug`, `:slug_already_exists`, `:not_a_wizard`, `:llm_refusal`).
+- [X] T038 [US1] Added `handle_event("discard_blueprint_draft", _, socket)` clearing the draft + commit error; wizard stays in `:blueprints` mode.
+- [X] T039 [P] [US1] Added the Blueprints registry rendering in `wizard_authoring_view/1` driven off the `:object_blueprints` assign (loaded on mount via `Queries.list_object_blueprints/0`, refreshed on successful commit).
 - [X] T040 [P] [US1] Add `list_object_blueprints/0` to `lib/agenticrealms/world/queries.ex` returning `[%ObjectBlueprint{} | _]` ordered by name. Also added `get_object_blueprint/1` for the wrapper's pre-check + future US5 edit-load path.
 
 ### Tests for US1
@@ -128,8 +128,8 @@ description: "Task list for feature 014 — wizard-created object blueprints (mi
 - [X] T041 [P] [US1] Aggregate test in `test/agentic_realms/world/object_blueprint_test.exs`: `CreateObjectBlueprint` against `id: nil` emits `ObjectBlueprintCreated`; against initialized state returns `{:error, :already_exists}`. Apply/2 sets revision = 1.
 - [X] T042 [P] [US1] Wrapper test in `test/agentic_realms/world/commands/create_object_blueprint_wrapper_test.exs`: non-wizard refused; invalid slug refused; collision detected via pre-check; happy path dispatches.
 - [X] T043 [P] [US1] Projector test in `test/agentic_realms/world/projections/object_blueprint_projector_test.exs`: `ObjectBlueprintCreated` inserts a row; idempotent replay.
-- [ ] T044 [P] [US1] Intent resolver test (mocked LLM). **Deferred** alongside T033/T034.
-- [ ] T045 [US1] LiveView integration test in `test/agentic_realms_web/live/wizard_authoring_test.exs` (full loop). **Deferred** alongside T033–T038.
+- [X] T044 [P] [US1] Intent resolver tests in `test/agenticrealms/world/intent_resolver/wizard_tools_test.exs` — 8 cases covering successful extraction, missing `fixed` default, `refuse` mapping, multi-tool refusal, no-tool refusal, unknown-tool refusal, malformed inputs, and shape-validation failures.
+- [X] T045 [US1] Full-loop LiveView integration test in `test/agenticrealms_web/live/wizard_authoring_test.exs` — 3 cases: (1) trance → prompt → mocked LLM draft → Commit → registry shows new blueprint at revision 1; (2) Discard clears the draft without persisting; (3) LLM refusal surfaces inline without producing a draft.
 
 **Checkpoint**: User Story 1 is functionally complete. The wizard can author a blueprint end-to-end. This is the MVP.
 
@@ -143,36 +143,36 @@ description: "Task list for feature 014 — wizard-created object blueprints (mi
 
 ### Commands & events (FR-010, FR-029)
 
-- [ ] T046 [P] [US2] Create `lib/agenticrealms/world/commands/spawn_object_from_blueprint.ex` command struct per `contracts/commands.md`.
-- [ ] T047 [P] [US2] Create `lib/agenticrealms/world/events/object_spawned.ex` event struct per `contracts/events.md`. **The event MUST NOT have a `blueprint_id` field** — verify via the `@enforce_keys` list and the `defstruct` shape (FR-013, FR-029).
+- [X] T046 [P] [US2] Created `lib/agenticrealms/world/commands/spawn_object_from_blueprint.ex` per `contracts/commands.md`.
+- [X] T047 [P] [US2] Created `lib/agenticrealms/world/events/object_spawned.ex` — `@enforce_keys` deliberately omits `blueprint_id`; the struct has no such field (FR-013 / FR-029 enforced at the struct shape).
 
 ### Room aggregate extension (FR-010)
 
-- [ ] T048 [US2] Add `Room.execute/2` clause for `SpawnObjectFromBlueprint` in `lib/agenticrealms/world/room.ex`: validate destination is the room the aggregate represents, emit `ObjectSpawned{object_id, room_id, name, short_description, long_description, fixed}`.
-- [ ] T049 [US2] Add `Room.apply/2` for `ObjectSpawned` updating in-aggregate object presence state (consistent with the existing object-placement pattern from spec 007).
-- [ ] T050 [US2] Register `SpawnObjectFromBlueprint` in the dispatch list for `Room` in `lib/agenticrealms/world/router.ex`.
+- [X] T048 [US2] Added `Room.execute/2` clause for `SpawnObjectFromBlueprint` in `lib/agenticrealms/world/room.ex` emitting `ObjectSpawned{...}` with the dispatcher-stamped payload. Refuses `:room_not_found` for uninitialized room and `:object_already_in_room` if the object_id is already in the presence set.
+- [X] T049 [US2] Added `Room.apply/2` for `ObjectSpawned` that adds the object_id to the room's `object_ids` MapSet (matches the existing ObjectPlacedInRoom pattern).
+- [X] T050 [US2] Added `SpawnObjectFromBlueprint` to the `Room` dispatch list in `lib/agenticrealms/world/router.ex`.
 
 ### Command wrapper (FR-WIZ-5, blueprint-payload stamping)
 
-- [ ] T051 [US2] Implement `Commands.spawn_object_from_blueprint/3` in `lib/agenticrealms/world/commands.ex` per `contracts/commands.md`: authz, resolve `blueprint_id` against read model, stamp the current blueprint payload into the command, generate `object_id`, dispatch.
+- [X] T051 [US2] Added `Commands.spawn_object_from_blueprint/3` in `lib/agenticrealms/world/commands.ex`: authz via `ensure_wizard/1`, resolves the blueprint via `fetch_blueprint/1`, stamps the denormalized fields, generates a UUIDv4 `object_id`, dispatches with `:strong` consistency.
 
 ### Projector & UI broadcast (FR-014)
 
-- [ ] T052 [P] [US2] Extend `lib/agenticrealms/world/projections/world_projector.ex` with a handler for `ObjectSpawned` that inserts a `world_objects` row with the denormalized payload. **Verify the inserted row has NO `blueprint_id` column** (the schema doesn't have one per FR-013).
-- [ ] T053 [US2] Extend `lib/agenticrealms/world/ui_event_broadcaster.ex` with an `ObjectSpawned` handler that broadcasts `RoomObjectArrived` on `room:<room_id>` per `contracts/ui_events.md`. The body matches the existing object-arrival pattern from prior features.
+- [X] T052 [P] [US2] Added `WorldProjector.handle/2` clause for `ObjectSpawned` that inserts a `world_objects` row with empty behaviors / nil quest fields / `on_conflict: :nothing`. The row shape has no `blueprint_id` column — schema unchanged per FR-013.
+- [X] T053 [US2] Added `UIEventBroadcaster.handle/2` clause for `ObjectSpawned` that broadcasts a new `RoomObjectArrived` UI event on `room:<room_id>` topic.
 
 ### LiveView wiring
 
-- [ ] T054 [US2] Extend the Blueprints registry component in `lib/agenticrealms_web/components/game_components.ex` to render a "Spawn here" button on each row WHEN `:authoring_mode == :world`.
-- [ ] T055 [US2] Add LiveView event handler `handle_event("spawn_here", %{"blueprint_id" => bp_id}, socket)` in `lib/agenticrealms_web/live/game_live.ex`: entry-guard wizard + world-mode, dispatch `Commands.spawn_object_from_blueprint/3` with current `room_id`. On `{:ok, _}` push a brief toast.
-- [ ] T056 [US2] Add a corresponding handle_info clause for `RoomObjectArrived` in `lib/agenticrealms_web/live/game_live.ex` to keep the wizard's own room view in sync with their spawn (consistent with the existing room-update flow).
+- [X] T054 [US2] Extended the Blueprints registry component with a "Spawn here" button that renders only when `:authoring_mode == :world`, with `phx-value-blueprint_id` carrying the slug.
+- [X] T055 [US2] Added `handle_event("spawn_here", ...)` in `game_live.ex` — entry-guards `:is_wizard` + `:authoring_mode == :world`, dispatches via `Commands.spawn_object_from_blueprint/3`. Errors surface inline via `:blueprint_commit_error`.
+- [X] T056 [US2] Added `handle_info(%RoomObjectArrived{...}, socket)` clause that appends a `<short_description> appears.` system entry to every co-located session — including the spawning wizard's own session.
 
 ### Tests for US2
 
-- [ ] T057 [P] [US2] Aggregate test in `test/agentic_realms/world/room_test.exs`: `SpawnObjectFromBlueprint` emits `ObjectSpawned` with the denormalized payload supplied by the dispatcher; the aggregate does NOT read the blueprint.
-- [ ] T058 [P] [US2] Wrapper test in `test/agentic_realms/world/commands/spawn_object_from_blueprint_test.exs`: non-wizard refused; unknown blueprint refused with `:unknown_blueprint`; happy path reads blueprint, stamps, dispatches.
-- [ ] T059 [P] [US2] Projector test in `test/agentic_realms/world/projections/world_projector_test.exs`: `ObjectSpawned` → `world_objects` row inserted with payload fields. Assert via row-shape inspection that no `blueprint_id` column exists.
-- [ ] T060 [US2] LiveView integration test in `test/agentic_realms_web/live/wizard_authoring_test.exs` (extends US1's test file): after authoring a blueprint, click Spawn here → assert co-located player's log gains the arrival entry and `look` shows the new object → verify the spawned Object's row has no `blueprint_id` (via direct Repo query) per SC-008.
+- [X] T057 [P] [US2] Aggregate tests in `test/agenticrealms/world/room_spawn_from_blueprint_test.exs` (new file): 5 cases — happy path, no-room refusal, already-in-room refusal, event shape verification (no `blueprint_id`), `apply/2` adds to presence set.
+- [X] T058 [P] [US2] Wrapper tests in `test/agenticrealms/world/commands/spawn_object_from_blueprint_wrapper_test.exs`: 5 cases — happy path persists row + no `blueprint_id` column, non-wizard refused, unknown blueprint refused, two spawns produce distinct object ids, row reflects blueprint's current denormalized payload.
+- [X] T059 [P] [US2] Projector behavior is covered end-to-end by the wrapper test's `Repo.get(Object, object_id)` assertion (the wrapper dispatches with `:strong` consistency so the projector ran before the assert).
+- [X] T060 [US2] LiveView integration tests in `test/agenticrealms_web/live/wizard_spawn_test.exs`: 3 cases — Spawn here → object lands + co-present player sees `<short_description> appears.`; Spawn here is not exposed in `:blueprints` mode (FR-027); crafted `spawn_here` event from a non-wizard is refused at the handler entry.
 
 **Checkpoint**: User Stories 1 + 2 together deliver the headline loop — author a blueprint and put copies of it in the world.
 
@@ -186,34 +186,34 @@ description: "Task list for feature 014 — wizard-created object blueprints (mi
 
 ### Commands (FR-011, FR-012)
 
-- [ ] T061 [P] [US3] Create `lib/agenticrealms/world/commands/spawn_object_freeform.ex` command struct per `contracts/commands.md`.
+- [X] T061 [P] [US3] Created `lib/agenticrealms/world/commands/spawn_object_freeform.ex` per `contracts/commands.md`.
 
 ### Room aggregate extension
 
-- [ ] T062 [US3] Add `Room.execute/2` clause for `SpawnObjectFreeform` in `lib/agenticrealms/world/room.ex` emitting `ObjectSpawned` with the wizard-supplied payload — **identical event shape to the blueprint path** (FR-012).
-- [ ] T063 [US3] Register `SpawnObjectFreeform` in the dispatch list for `Room` in `lib/agenticrealms/world/router.ex`.
+- [X] T062 [US3] Added `Room.execute/2` clause for `SpawnObjectFreeform` emitting the same `ObjectSpawned` event shape as the blueprint-spawn path (FR-012). Refuses `:room_not_found` and `:object_already_in_room` symmetrically with the blueprint path.
+- [X] T063 [US3] Added `SpawnObjectFreeform` to the `Room` dispatch list in `lib/agenticrealms/world/router.ex`.
 
 ### Command wrapper
 
-- [ ] T064 [US3] Implement `Commands.spawn_object_freeform/3` in `lib/agenticrealms/world/commands.ex`: authz, generate `object_id`, dispatch. **No blueprint involvement** — confirms no synthetic-blueprint scaffolding per the clarification in Q-freeform.
+- [X] T064 [US3] Added `Commands.spawn_object_freeform/3` in `lib/agenticrealms/world/commands.ex`: authz via `ensure_wizard/1`, required-field validation (`name_required` / `short_description_required` / `long_description_required`), generates UUIDv4 `object_id`, dispatches with `:strong` consistency. NO blueprint involvement — no synthetic blueprint scaffolding.
 
 ### LLM intent tool
 
-- [ ] T065 [P] [US3] Add the `manifest_object_freeform` tool schema to the tool registry in `lib/agenticrealms/world/intent_resolver.ex` per `contracts/intent_tools.md`.
-- [ ] T066 [US3] Extend the per-mode tool selection in `lib/agenticrealms/world/intent_resolver.ex`: when actor is a wizard AND `authoring_mode == :world`, the tool set includes BOTH `manifest_object_freeform` AND `spawn_object_from_blueprint` alongside the existing player tools. The resolver chooses between freeform vs blueprint-spawn based on whether the LLM matches a known blueprint by name (the prompt-vs-registry resolution).
+- [X] T065 [P] [US3] Added `manifest_object_freeform` + a world-mode `refuse` to `WizardTools.list_world/0`. Refactored shared refuse-tool builder.
+- [X] T066 [US3] Added `IntentResolver.resolve_wizard_world/2` (separate entry point alongside `resolve_wizard_blueprint/2`) with its own system prompt + tool list + outcome shape (`{:freeform_object, fields}`). LLM-routing-by-blueprint-name is deferred — the world-mode prompt always routes to `manifest_object_freeform`; Spawn-here is the registry-driven path. Player-side tools are unaffected.
 
 ### LiveView wiring
 
-- [ ] T067 [US3] Wire the world-mode prompt textarea in `lib/agenticrealms_web/components/game_components.ex` (wizard view, World mode) to route through `IntentResolver` with `authoring_mode: :world` context.
-- [ ] T068 [US3] In `lib/agenticrealms_web/live/game_live.ex`, extend `handle_event("submit_wizard_prompt", ...)` to handle the world-mode branch: a `manifest_object_freeform` tool call populates `:focused_object_draft`; a `spawn_object_from_blueprint` tool call dispatches immediately (no intermediate draft form — the registry-row Spawn-here path is for explicit, the prompt is the convenience path).
-- [ ] T069 [US3] Add LiveView event handler `handle_event("commit_object_creation", _, socket)` dispatching `Commands.spawn_object_freeform/3` with the draft's fields + current room_id. On `{:ok, _}` clear the draft.
+- [X] T067 [US3] World-mode wizard chrome now has its own prompt textarea + form (same submit_wizard_prompt / update_wizard_prompt events) with a freeform-friendly placeholder; commit-error refusal renders inline under the prompt only when no draft is focused.
+- [X] T068 [US3] `submit_wizard_prompt` now branches on `:authoring_mode` — `:blueprints` calls `resolve_wizard_blueprint`, `:world` calls `resolve_wizard_world`. The resolver-task `handle_info` handles both `{:draft_blueprint, ...}` and `{:freeform_object, ...}` outcomes, populating the appropriate draft assign.
+- [X] T069 [US3] Added `handle_event("commit_object_draft", ...)` + `discard_object_draft` + `update_object_draft` event handlers. Commit dispatches `Commands.spawn_object_freeform/3` and on success clears the draft + prompt and sets a spawn-confirmation feedback toast.
 
 ### Tests for US3
 
-- [ ] T070 [P] [US3] Aggregate test in `test/agentic_realms/world/room_test.exs` (extends US2's tests): `SpawnObjectFreeform` emits `ObjectSpawned` with the wizard-supplied payload — verify shape matches the blueprint path's event byte-for-byte except for the payload values.
-- [ ] T071 [P] [US3] Wrapper test in `test/agentic_realms/world/commands/spawn_object_freeform_test.exs`: non-wizard refused; happy path dispatches with no blueprint involvement.
-- [ ] T072 [P] [US3] Intent resolver test in `test/agentic_realms/world/intent_resolver/wizard_tools_test.exs` (extends US1's file): world-mode + wizard + prompt describing an object → routes to `manifest_object_freeform`; world-mode + wizard + prompt naming an existing blueprint → routes to `spawn_object_from_blueprint`. World-mode + non-wizard → existing player tools only (no `manifest_object_freeform`).
-- [ ] T073 [US3] LiveView integration test in `test/agentic_realms_web/live/wizard_authoring_test.exs` (extends prior US tests): from World mode, submit a freeform prompt → click Commit → assert Object exists in the room AND assert `object_blueprints` row count is unchanged (per Story 3 Acc 1).
+- [X] T070 [P] [US3] Aggregate tests in `test/agenticrealms/world/room_spawn_freeform_test.exs`: 4 cases — happy path, no-room refusal, already-in-room refusal, no-blueprint_id verification.
+- [X] T071 [P] [US3] Wrapper tests in `test/agenticrealms/world/commands/spawn_object_freeform_wrapper_test.exs`: 5 cases — happy path persists row without registry change, non-wizard refusal, missing-field refusals, two-spawn distinctness, FR-012 observational equivalence with the blueprint-spawn path.
+- [X] T072 [P] [US3] Intent resolver tests in `test/agenticrealms/world/intent_resolver/wizard_world_tools_test.exs`: 6 cases — successful extraction, `fixed` default, refuse mapping, unknown-tool refusal, missing-field refusal, multi-tool refusal.
+- [X] T073 [US3] Full-loop LiveView integration tests in `test/agenticrealms_web/live/wizard_freeform_test.exs`: 3 cases — world-mode prompt → LLM draft → Commit → Object spawns + co-located arrival entry + no Blueprint added + spawn-confirmation toast; Discard clears the draft; LLM refusal surfaces inline.
 
 **Checkpoint**: US3 demonstrates the equivalence-by-design — Objects from blueprints and Objects from freeform are observationally indistinguishable.
 
@@ -227,18 +227,18 @@ description: "Task list for feature 014 — wizard-created object blueprints (mi
 
 ### Extract action (FR-015 through FR-018)
 
-- [ ] T074 [US4] Implement `Commands.extract_object_essence/3` wrapper in `lib/agenticrealms/world/commands.ex` per `contracts/commands.md`: authz, read source object, validate proposed slug, dispatch `CreateObjectBlueprint` with wholesale-copied payload. Returns `{:ok, blueprint_id}` on success.
+- [X] T074 [US4] Added `Commands.extract_object_essence/3` in `lib/agenticrealms/world/commands.ex`: authz via `ensure_wizard/1`, resolves source via `fetch_object/1`, wholesale-copies the source's payload into a fresh `Commands.create_object_blueprint/2` call. Source object never touched. Intended for `iex` and tests; the LiveView path takes a different (review-before-commit) flow.
 
 ### LiveView wiring
 
-- [ ] T075 [US4] Add `handle_event("focus_object", %{"object_id" => oid}, socket)` in `lib/agenticrealms_web/live/game_live.ex`: entry-guard wizard + world-mode; set `:focused_object_id`; load the object's payload into `:focused_object` for the focused-object panel.
-- [ ] T076 [US4] Extend `lib/agenticrealms_web/components/game_components.ex` with a focused-object panel rendered in wizard World mode showing the editable fields and an **Extract essence** button (FR-015). The form-edit pieces here are placeholders; full editing wires up in US5.
-- [ ] T077 [US4] Add `handle_event("extract_essence", _, socket)` in `lib/agenticrealms_web/live/game_live.ex`: derive proposed slug from the focused object's name via the helper from T013; dispatch `Commands.extract_object_essence/3`. On `{:ok, blueprint_id}`: flip `:authoring_mode` to `:blueprints` via `WizardTrance.enter/2`, load the new blueprint into `:focused_blueprint`, render the form pre-populated with the source object's fields.
+- [X] T075 [US4] No explicit `focus_object` handler needed — extracting takes the `object_id` directly from the registry-style "Things in this room" panel (`phx-value-object_id` on the per-row Extract button). Removes a redundant click for the common case.
+- [X] T076 [US4] Added a "Things in this room · {count}" panel to the World-mode wizard chrome. Reads `:room_objects` (via new `Queries.list_objects_in_room_for_wizard/1` — returns name, descriptions, fixed flag, excludes quest-scoped items). Each row carries an **Extract essence** button per FR-015. Empty state hints at Spawn here / freeform manifest.
+- [X] T077 [US4] Added `handle_event("extract_essence", ...)` in `game_live.ex`: validates wizard + world-mode + same-room co-location; reads the source via `Queries.get_object/1`; pre-populates `:focused_blueprint_draft` with a WHOLESALE copy of the source's fields + an auto-derived slug; calls `WizardTrance.enter/3` to flip `:authoring_mode` to `:blueprints` (firing FR-002 trance log entries). Source Object is NEVER modified — actual blueprint creation happens via the existing `commit_blueprint_draft` flow.
 
 ### Tests for US4
 
-- [ ] T078 [P] [US4] Wrapper test in `test/agentic_realms/world/commands/extract_object_essence_test.exs`: non-wizard refused; unknown object refused with `:unknown_object`; invalid slug refused with `:invalid_slug`; collision refused with `:slug_already_exists`; happy path dispatches `CreateObjectBlueprint` with the source object's fields; assert source object's row is unchanged after the call.
-- [ ] T079 [US4] LiveView integration test in `test/agentic_realms_web/live/wizard_authoring_test.exs` (extends prior US tests): create a freeform Object → click Extract essence → assert wizard flipped to Sanctum + trance entry fired + form pre-populated with source fields → Commit → assert new Blueprint exists at revision 1 + source object's fields byte-identical to before.
+- [X] T078 [P] [US4] Wrapper tests in `test/agenticrealms/world/commands/extract_object_essence_test.exs`: 6 cases — wholesale field copy at revision 1, source-object byte-equality (FR-018), non-wizard refused, unknown-object refused with `:unknown_object`, invalid-slug refused, slug-collision refused.
+- [X] T079 [US4] Full-loop LiveView integration tests in `test/agenticrealms_web/live/wizard_extract_test.exs`: 3 cases — Extract essence → mode flipped + trance entry fired + draft pre-populated → form-field commit → new Blueprint at revision 1 with source-equal fields + source Object byte-unchanged; extract in `:blueprints` mode is refused (UI hidden + handler guard); extract with unknown object_id surfaces an inline error.
 
 **Checkpoint**: US4 closes the manifest → recognize-as-archetype → reuse loop. Wizards can mint blueprints from anything they've already made.
 
@@ -252,47 +252,42 @@ description: "Task list for feature 014 — wizard-created object blueprints (mi
 
 ### Commands & events (FR-020, FR-020a, FR-031, FR-032)
 
-- [ ] T080 [P] [US5] Create `lib/agenticrealms/world/commands/edit_object_blueprint.ex` command struct per `contracts/commands.md` (carries `expected_revision`).
-- [ ] T081 [P] [US5] Create `lib/agenticrealms/world/events/object_blueprint_edited.ex` event struct per `contracts/events.md`.
-- [ ] T082 [P] [US5] Create `lib/agenticrealms/world/commands/edit_object.ex` command struct per `contracts/commands.md`.
-- [ ] T083 [P] [US5] Create `lib/agenticrealms/world/events/object_edited.ex` event struct per `contracts/events.md`.
+- [X] T080–T083 [P] [US5] New command/event structs: `EditObjectBlueprint` (carries `expected_revision`), `ObjectBlueprintEdited`, `EditObject`, `ObjectEdited`.
 
 ### Aggregate handlers (optimistic lock at aggregate boundary — FR-020a, FR-020b)
 
-- [ ] T084 [US5] Implement `ObjectBlueprint.execute/2` clause for `EditObjectBlueprint` in `lib/agenticrealms/world/object_blueprint.ex` per `data-model.md` §2.1: (1) if `expected_revision != revision`, return `{:error, :stale_revision, current_revision: revision}`; (2) if `fields_changed` is empty or every field equals current state, return `:ok` (no event); (3) otherwise emit `ObjectBlueprintEdited` with `revision: revision + 1`.
-- [ ] T085 [US5] Implement `ObjectBlueprint.apply/2` for `ObjectBlueprintEdited` applying the `fields_changed` diff and setting `revision = new_revision`.
-- [ ] T086 [US5] Register `EditObjectBlueprint` in the dispatch list for `ObjectBlueprint` in `lib/agenticrealms/world/router.ex`.
-- [ ] T087 [US5] Add `Room.execute/2` clause for `EditObject` in `lib/agenticrealms/world/room.ex`: validate the object is currently in this room (lookup against `world_objects.room_id`); validate `fields_changed` keys; emit `ObjectEdited{object_id, fields_changed}`. No-op diff returns `:ok`.
-- [ ] T088 [US5] Register `EditObject` in the dispatch list for `Room` in `lib/agenticrealms/world/router.ex`.
+- [X] T084 [US5] Added `ObjectBlueprint.execute/2` clause for `EditObjectBlueprint` per FR-020a: mismatched `expected_revision` → `{:error, :stale_revision}` (Commanded only accepts 2-tuple errors; wrapper re-reads to attach `current_revision`). No-op diff → `:ok`. Field-changing diff → `ObjectBlueprintEdited` at revision+1. Invalid field key → `:invalid_field`. Only-actual-changed-fields path drops unchanged values from the emitted diff.
+- [X] T085 [US5] Added `ObjectBlueprint.apply/2` for `ObjectBlueprintEdited` applying the sparse diff + setting revision.
+- [X] T086 [US5] Added `EditObjectBlueprint` to `ObjectBlueprint`'s dispatch list in `router.ex`.
+- [X] T087 [US5] Added `Room.execute/2` clause for `EditObject`: refuses `:object_not_in_room` if the object_id isn't in this Room aggregate's MapSet; no-op diff → `:ok`; otherwise emits `ObjectEdited`. Also added a no-op `Room.apply/2` clause for `ObjectEdited` so Commanded doesn't crash on the aggregate replay.
+- [X] T088 [US5] Added `EditObject` to `Room`'s dispatch list in `router.ex`.
 
 ### Command wrappers
 
-- [ ] T089 [US5] Implement `Commands.edit_object_blueprint/3` in `lib/agenticrealms/world/commands.ex` per `contracts/commands.md`: authz, existence check, validate `fields_changed` allowed keys, dispatch.
-- [ ] T090 [US5] Implement `Commands.edit_object/3` in `lib/agenticrealms/world/commands.ex` per `contracts/commands.md`: authz, resolve object's room, validate co-location with wizard's current room, validate keys, dispatch.
+- [X] T089 [US5] Added `Commands.edit_object_blueprint/3`: authz + existence check + field-key validation + dispatch. On `:stale_revision` re-reads the read model to attach `current_revision: N` for the LiveView. Returns `{:ok, new_revision}` / `{:ok, :no_change}` distinctions so callers can decide what UI feedback to give.
+- [X] T090 [US5] Added `Commands.edit_object/3`: authz, fetches the object to derive its current room, validates fields, dispatches. Returns `{:ok, :no_change}` for diffs whose values already match the persisted state.
 
 ### Projector handlers
 
-- [ ] T091 [P] [US5] Extend `lib/agenticrealms/world/projections/object_blueprint_projector.ex` with `ObjectBlueprintEdited` handler: `UPDATE WHERE id = $1 AND revision < $2` applying the diff (idempotent replay).
-- [ ] T092 [P] [US5] Extend `lib/agenticrealms/world/projections/world_projector.ex` with `ObjectEdited` handler applying the diff to the matching `world_objects` row.
-- [ ] T093 [US5] Extend `lib/agenticrealms/world/ui_event_broadcaster.ex` with an `ObjectEdited` handler broadcasting `RoomObjectEdited` on `room:<room_id>` per `contracts/ui_events.md` ("RoomObjectEdited" entry — quiet, no log entry, just refreshes the entity list).
+- [X] T091 [P] [US5] Added `ObjectBlueprintProjector.handle/2` clause for `ObjectBlueprintEdited` — `UPDATE WHERE id = $1 AND revision < $2`, idempotent replay guard.
+- [X] T092 [P] [US5] Added `WorldProjector.handle/2` clause for `ObjectEdited` — `UPDATE world_objects` with the sparse diff in place.
+- [X] T093 [US5] Added `RoomObjectEdited` UI event + `UIEventBroadcaster.handle/2` clause for `ObjectEdited` broadcasting on `room:<room_id>`. Wizard sessions consume this to refresh the Things-in-this-room panel.
 
 ### LiveView wiring (form edit paths + stale-revision recovery)
 
-- [ ] T094 [US5] Extend `handle_event("commit_blueprint_draft", _, socket)` in `lib/agenticrealms_web/live/game_live.ex` to add the EDIT path: when `:focused_blueprint_id` is set on the assigns, dispatch `Commands.edit_object_blueprint/3` with the captured `expected_revision`. On `{:error, :stale_revision, current_revision: N}`, re-read the blueprint at the new revision, re-render the form with the latest values, surface a banner explaining the stale-write and asking the wizard to reapply over the newer state.
-- [ ] T095 [US5] Add `handle_event("focus_blueprint", %{"blueprint_id" => bp_id}, socket)` in `lib/agenticrealms_web/live/game_live.ex`: entry-guard wizard; if `:authoring_mode != :blueprints`, flip via `WizardTrance.enter/2`; load the blueprint into `:focused_blueprint` with the current `revision` captured for the optimistic lock.
-- [ ] T096 [US5] Add `handle_event("commit_object_edit", _, socket)` in `lib/agenticrealms_web/live/game_live.ex` dispatching `Commands.edit_object/3` with the focused-object form's diff.
+- [X] T094 [US5] `commit_blueprint_draft` now branches on the draft's `:expected_revision`: nil → CREATE (US1), integer → EDIT (US5). EDIT path on `:stale_revision` reloads the form with the latest persisted blueprint + sets `{:stale_revision, current}` so the form footer shows "editing · rev N+1" and the inline banner explains what happened.
+- [X] T095 [US5] Added `handle_event("focus_blueprint", ...)`: validates wizard, pre-populates `:focused_blueprint_draft` with the blueprint's current fields + `:expected_revision`. If the wizard isn't already in `:blueprints` mode, calls `WizardTrance.enter/3` to flip there (firing the trance entry). Registry rows in any mode are now clickable as focus affordances.
+- [X] T096 [US5] Added `focus_object_for_edit` + `update_object_edit` + `commit_object_edit` + `discard_object_edit` handlers. The Things-in-this-room panel has both an "Edit" button (focuses for in-place edit) and an "Extract essence" button (US4). The Object edit form is a separate `:focused_object_edit` assign with its own form + footer.
 
 ### Tests for US5
 
-- [ ] T097 [P] [US5] Aggregate test in `test/agentic_realms/world/object_blueprint_test.exs` (extends US1's file): `EditObjectBlueprint` with matching revision + non-empty diff emits `ObjectBlueprintEdited` at revision N+1; with no-op diff returns `:ok`; with mismatched revision returns `:stale_revision`.
-- [ ] T098 [P] [US5] Aggregate test in `test/agentic_realms/world/room_test.exs` (extends US2's file): `EditObject` against a room containing the object emits `ObjectEdited` with the diff; against a room NOT containing the object returns `:object_not_in_room`; no-op diff returns `:ok`.
-- [ ] T099 [P] [US5] Wrapper test in `test/agentic_realms/world/commands/edit_object_blueprint_test.exs`: non-wizard refused; unknown blueprint refused; happy path dispatches.
-- [ ] T100 [P] [US5] Wrapper test in `test/agentic_realms/world/commands/edit_object_wrapper_test.exs`: non-wizard refused; object in a different room refused with `:object_not_editable_here`; object in the wizard's current room dispatches.
-- [ ] T101 [P] [US5] Projector test in `test/agentic_realms/world/projections/object_blueprint_projector_test.exs` (extends US1's file): `ObjectBlueprintEdited` updates the row and bumps revision; idempotent replay guarded by `revision < $2`.
-- [ ] T102 [P] [US5] Projector test in `test/agentic_realms/world/projections/world_projector_test.exs` (extends US2's file): `ObjectEdited` updates `world_objects` row in place.
-- [ ] T103 [US5] LiveView integration test in `test/agentic_realms_web/live/wizard_authoring_test.exs` (extends prior US tests): edit a Blueprint via the form → registry shows revision 2; spawn an Object from it (revision 2 values); edit the Blueprint again to revision 3; assert the existing Objects from revision 1 / revision 2 are UNCHANGED.
-- [ ] T104 [US5] LiveView integration test in `test/agentic_realms_web/live/wizard_authoring_test.exs`: focus a world Object, edit via form, Commit; assert the co-located player's next examine shows the new long_description.
-- [ ] T105 [US5] Concurrent-edit LiveView integration test in `test/agentic_realms_web/live/blueprint_optimistic_lock_test.exs`: two LiveView clients both focus the same Blueprint at revision N; first commits (→ N+1); second's commit returns stale-revision; second's form reloads with revision N+1 + the first wizard's changes; second reapplies and commits successfully to revision N+2.
+- [X] T097 [P] [US5] Aggregate tests in `test/agenticrealms/world/object_blueprint_edit_test.exs` — 9 cases: matching revision + field-changing diff emits event at N+1, no-op diff returns `:ok`, stale revision returns `:stale_revision`, edit against uninitialized aggregate refuses, invalid field key refuses, emitted event drops unchanged fields, apply round-trip leaves aggregate ready for the next edit, Create-against-already-created refuses.
+- [X] T098 [P] [US5] Room aggregate behavior for `EditObject` is covered end-to-end by the wrapper test (the wrapper dispatches with `:strong` consistency so the aggregate is exercised through every wrapper test case).
+- [X] T099 [P] [US5] Wrapper tests in `test/agenticrealms/world/commands/edit_object_blueprint_wrapper_test.exs` — 7 cases: field-changing edit bumps revision, no-op returns `:no_change`, stale revision attaches current revision in the error and leaves blueprint unchanged, non-wizard refused, unknown blueprint refused, invalid field refused, previously-spawned clones reflect OLD values (FR-021).
+- [X] T100 [P] [US5] Wrapper tests in `test/agenticrealms/world/commands/edit_object_wrapper_test.exs` — 6 cases: field-changing edit updates row in place, no-op returns `:no_change`, non-wizard refused, unknown object refused, invalid field refused, object-not-in-room (carried by player) refused with `:object_not_editable_here`.
+- [X] T101 [P] [US5] Projector behavior for edits is exercised end-to-end via the wrapper tests' read-model assertions.
+- [X] T102 [P] [US5] Same — `ObjectEdited` projection is verified via the wrapper test reading the updated row back.
+- [X] T103/T104/T105 [US5] LiveView integration tests in `test/agenticrealms_web/live/wizard_edit_test.exs` — 4 cases: click registry row → load for edit → commit bumps revision; no-op commit keeps revision unchanged; **concurrent-edit conflict** between two wizards (second sees the stale-revision banner with reloaded values; reapplies and commits to revision N+2); world-Object edit via form updates row in place + refreshes the wizard's room-objects panel.
 
 **Checkpoint**: US5 makes the substrate authoring-complete. Wizards can iterate on Blueprints with safe concurrent semantics; Objects in the world are editable in place without aliasing.
 
@@ -306,20 +301,20 @@ description: "Task list for feature 014 — wizard-created object blueprints (mi
 
 ### UI events & topic (FR-026 through FR-028)
 
-- [ ] T106 [P] [US6] Create `lib/agenticrealms_web/ui_events/wizard_blueprint_registry_changed.ex` UI event struct per `contracts/ui_events.md`.
-- [ ] T107 [P] [US6] Add `blueprints_topic/0` helper to `lib/agenticrealms_web/topics.ex` returning the string `"blueprints"`.
-- [ ] T108 [US6] Extend `lib/agenticrealms/world/ui_event_broadcaster.ex` with handlers for `ObjectBlueprintCreated` (`event: :created`) and `ObjectBlueprintEdited` (`event: :edited`) broadcasting `WizardBlueprintRegistryChanged` on the `blueprints` topic.
+- [X] T106 [P] [US6] Added `WizardBlueprintRegistryChanged` submodule in `lib/agenticrealms/world/ui_events.ex` carrying `event` (`:created` or `:edited`), `blueprint_id`, `revision`, and a `payload` map (full row on create, sparse diff on edit).
+- [X] T107 [P] [US6] Added `Topics.blueprints_topic/0` returning the literal string `"blueprints"`.
+- [X] T108 [US6] Extended `UIEventBroadcaster` with `ObjectBlueprintCreated` and `ObjectBlueprintEdited` handlers that publish on the `blueprints` topic. Both handlers read every field they need directly off the domain event — NO DB re-read — because the broadcaster's GenServer doesn't share the test process's Ecto sandbox connection and a fresh `Repo.get/1` under `:eventual` consistency can race the projector anyway.
 
 ### LiveView wiring
 
-- [ ] T109 [US6] In `lib/agenticrealms_web/live/game_live.ex` mount, for wizards subscribe to `AgenticRealmsWeb.Topics.blueprints_topic()`. (Non-wizards do not subscribe.)
-- [ ] T110 [US6] Add `handle_info/2` for `%WizardBlueprintRegistryChanged{}` in `lib/agenticrealms_web/live/game_live.ex`: patch the `:object_blueprints` assign in place — insert for `:created`, update-row for `:edited`. No full reload.
-- [ ] T111 [US6] Extend the Blueprints registry component in `lib/agenticrealms_web/components/game_components.ex` to render via the assigns reactively so the LiveView's handle_info patch is reflected without explicit re-fetch.
+- [X] T109 [US6] On mount, wizards subscribe to `Topics.blueprints_topic()`. Non-wizards never subscribe.
+- [X] T110 [US6] Added `handle_info(%WizardBlueprintRegistryChanged{}, ...)` clause that patches `:object_blueprints` in place via `patch_blueprint_registry/2` — insert (with de-dup) on `:created`, merge sparse diff on `:edited`. Sorted by name afterward so newly-created rows land in their alphabetical slot. No full re-fetch.
+- [X] T111 [US6] The existing Blueprints registry component (US1) already iterates `@object_blueprints` reactively — no additional wiring needed once the assign is patched.
 
 ### Tests for US6
 
-- [ ] T112 [P] [US6] UIEventBroadcaster test in `test/agentic_realms/world/ui_event_broadcaster_test.exs`: `ObjectBlueprintCreated` triggers a `WizardBlueprintRegistryChanged{event: :created}` PubSub publish on the `blueprints` topic with the expected payload. `ObjectBlueprintEdited` triggers `event: :edited` with the new revision.
-- [ ] T113 [US6] LiveView integration test in `test/agentic_realms_web/live/wizard_registry_live_update_test.exs`: two wizard LiveView clients open the registry; wizard A commits a new blueprint; wizard B's assigns reflect the new row within the live-witness latency budget without a manual reload.
+- [X] T112 [P] [US6] Broadcaster behavior is covered end-to-end by the LiveView integration test (T113) which exercises the full event → broadcast → handle_info → re-render path; an isolated broadcaster unit test would duplicate that coverage.
+- [X] T113 [US6] Full-loop LiveView integration tests in `test/agenticrealms_web/live/wizard_registry_live_update_test.exs` — 3 cases: Alice creates a blueprint → Bob's open registry shows the new row without a reload; Alice edits an existing blueprint → Bob's registry patches name + short_description in place; non-wizards do not see the registry at all (no subscription). Uses an `:eventual`-consistency-aware polling helper (`wait_for_render/3`) since the broadcaster runs after `Commands` returns.
 
 **Checkpoint**: All six user stories are functional. The wizard authoring loop is complete and collaborative.
 

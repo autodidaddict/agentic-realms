@@ -30,7 +30,11 @@ defmodule AgenticRealms.World.Commands do
     RecordRoomDiscovery,
     AcceptQuest,
     FinalizeQuest,
-    CreateObjectBlueprint
+    CreateObjectBlueprint,
+    EditObjectBlueprint,
+    SpawnObjectFromBlueprint,
+    SpawnObjectFreeform,
+    EditObject
   }
 
   alias AgenticRealms.World.ObjectBlueprint.Slug
@@ -731,6 +735,293 @@ defmodule AgenticRealms.World.Commands do
       end
     end
   end
+
+  @doc """
+  Spawn a clone of an Object Blueprint into a room.
+
+  Wrapper performs the FR-WIZ-5 authorization check, resolves the
+  blueprint payload from the read model (the aggregate cannot — by
+  design — see FR-013), stamps the denormalized fields into the
+  command, and dispatches.
+
+  Returns `{:ok, object_id}` on success.
+  Refusals:
+    * `{:error, :not_a_wizard}` — caller's `is_wizard` is false.
+    * `{:error, :unknown_player}` — caller's player_id is unknown.
+    * `{:error, :unknown_blueprint}` — `blueprint_id` does not exist.
+    * `{:error, :object_already_in_room}` — defensive; should not occur
+      for a freshly-generated UUID.
+  """
+  @spec spawn_object_from_blueprint(
+          wizard_id :: integer(),
+          blueprint_id :: String.t(),
+          room_id :: String.t()
+        ) :: {:ok, String.t()} | {:error, atom()}
+  def spawn_object_from_blueprint(wizard_id, blueprint_id, room_id)
+      when is_integer(wizard_id) and is_binary(blueprint_id) and is_binary(room_id) do
+    with :ok <- ensure_wizard(wizard_id),
+         {:ok, blueprint} <- fetch_blueprint(blueprint_id) do
+      object_id = Ecto.UUID.generate()
+
+      cmd = %SpawnObjectFromBlueprint{
+        room_id: room_id,
+        object_id: object_id,
+        blueprint_id: blueprint_id,
+        wizard_id: wizard_id,
+        name: blueprint.name,
+        short_description: blueprint.short_description,
+        long_description: blueprint.long_description,
+        fixed: blueprint.fixed
+      }
+
+      case WorldApp.dispatch(cmd, consistency: :strong) do
+        :ok -> {:ok, object_id}
+        {:error, _} = err -> err
+      end
+    end
+  end
+
+  defp fetch_blueprint(blueprint_id) do
+    case Repo.get(AgenticRealms.World.Schemas.ObjectBlueprint, blueprint_id) do
+      nil -> {:error, :unknown_blueprint}
+      bp -> {:ok, bp}
+    end
+  end
+
+  @doc """
+  Spawn a freeform Object into a room — no Object Blueprint involvement,
+  no synthetic blueprint, no registry change. The wizard's authored
+  payload goes straight onto an `ObjectSpawned` event (FR-011 / FR-012).
+
+  Returns `{:ok, object_id}` on success.
+  Refusals:
+    * `{:error, :not_a_wizard}` — caller's `is_wizard` is false.
+    * `{:error, :unknown_player}` — caller's player_id is unknown.
+    * `{:error, :name_required}` / `:short_description_required` /
+      `:long_description_required` — required content field missing.
+  """
+  @spec spawn_object_freeform(
+          wizard_id :: integer(),
+          room_id :: String.t(),
+          attrs :: %{
+            required(:name) => String.t(),
+            required(:short_description) => String.t(),
+            required(:long_description) => String.t(),
+            optional(:fixed) => boolean()
+          }
+        ) :: {:ok, String.t()} | {:error, atom()}
+  def spawn_object_freeform(wizard_id, room_id, attrs)
+      when is_integer(wizard_id) and is_binary(room_id) and is_map(attrs) do
+    with :ok <- ensure_wizard(wizard_id),
+         :ok <- validate_object_attrs(attrs) do
+      object_id = Ecto.UUID.generate()
+
+      cmd = %SpawnObjectFreeform{
+        room_id: room_id,
+        object_id: object_id,
+        wizard_id: wizard_id,
+        name: attrs[:name],
+        short_description: attrs[:short_description],
+        long_description: attrs[:long_description],
+        fixed: Map.get(attrs, :fixed, false)
+      }
+
+      case WorldApp.dispatch(cmd, consistency: :strong) do
+        :ok -> {:ok, object_id}
+        {:error, _} = err -> err
+      end
+    end
+  end
+
+  @doc """
+  One-shot extract-essence — read a world Object's denormalized fields
+  and persist a new Object Blueprint at `revision: 1` populated with a
+  wholesale copy of those fields (FR-016 / FR-018). The source Object
+  is NOT modified.
+
+  Returns `{:ok, blueprint_id}` on success.
+  Refusals:
+    * `{:error, :not_a_wizard}` / `{:error, :unknown_player}`.
+    * `{:error, :unknown_object}` — `source_object_id` not in `world_objects`.
+    * `{:error, :invalid_slug}` / `{:error, :slug_already_exists}` —
+      same as `create_object_blueprint/2`.
+
+  Intended for use from `iex` or test setup; the LiveView path
+  (`handle_event("extract_essence", ...)`) instead populates the
+  Interpreted Data card and lets the wizard refine the draft before
+  dispatching via the normal `commit_blueprint_draft` flow.
+  """
+  @spec extract_object_essence(
+          wizard_id :: integer(),
+          source_object_id :: String.t(),
+          proposed_slug :: String.t()
+        ) :: {:ok, String.t()} | {:error, atom()}
+  def extract_object_essence(wizard_id, source_object_id, proposed_slug)
+      when is_integer(wizard_id) and is_binary(source_object_id) and is_binary(proposed_slug) do
+    with :ok <- ensure_wizard(wizard_id),
+         {:ok, object} <- fetch_object(source_object_id) do
+      create_object_blueprint(%{
+        wizard_id: wizard_id,
+        blueprint_id: proposed_slug,
+        name: object.name,
+        short_description: object.short_description,
+        long_description: object.long_description,
+        fixed: object.fixed
+      })
+    end
+  end
+
+  defp fetch_object(object_id) do
+    case Repo.get(AgenticRealms.World.Schemas.Object, object_id) do
+      nil -> {:error, :unknown_object}
+      o -> {:ok, o}
+    end
+  end
+
+  @edit_object_blueprint_fields ~w(name short_description long_description fixed)a
+
+  @doc """
+  Edit an existing Object Blueprint. `expected_revision` MUST equal the
+  blueprint's current revision (FR-020a). On stale revision the wrapper
+  returns `{:error, :stale_revision, current_revision: N}` so the
+  LiveView can reload the form with the latest values.
+
+  Returns `{:ok, new_revision}` on a field-changing commit. Returns
+  `{:ok, :no_change}` when every field in `fields_changed` already
+  equals the current state (FR-008 — no revision bump for no-op).
+
+  Refusals:
+    * `{:error, :not_a_wizard}` / `{:error, :unknown_player}`.
+    * `{:error, :unknown_blueprint}`.
+    * `{:error, :invalid_field}` — `fields_changed` contains an
+      unrecognized key.
+    * `{:error, :stale_revision, current_revision: N}` — optimistic
+      lock fired.
+  """
+  @spec edit_object_blueprint(
+          wizard_id :: integer(),
+          blueprint_id :: String.t(),
+          %{
+            required(:expected_revision) => integer(),
+            required(:fields_changed) => map()
+          }
+        ) ::
+          {:ok, new_revision :: integer()}
+          | {:ok, :no_change}
+          | {:error, atom()}
+          | {:error, :stale_revision, [current_revision: integer()]}
+  def edit_object_blueprint(wizard_id, blueprint_id, params)
+      when is_integer(wizard_id) and is_binary(blueprint_id) and is_map(params) do
+    with :ok <- ensure_wizard(wizard_id),
+         {:ok, blueprint} <- fetch_blueprint(blueprint_id),
+         :ok <- validate_edit_fields(params[:fields_changed]) do
+      cmd = %EditObjectBlueprint{
+        blueprint_id: blueprint_id,
+        wizard_id: wizard_id,
+        expected_revision: params[:expected_revision],
+        fields_changed: params[:fields_changed]
+      }
+
+      case WorldApp.dispatch(cmd, consistency: :strong) do
+        :ok ->
+          # Aggregate accepted but emitted no event (no-op diff) OR
+          # accepted and emitted the edit event. Re-read to determine
+          # the actual new revision.
+          updated = Repo.get(AgenticRealms.World.Schemas.ObjectBlueprint, blueprint_id)
+
+          cond do
+            updated.revision == blueprint.revision -> {:ok, :no_change}
+            true -> {:ok, updated.revision}
+          end
+
+        {:error, :stale_revision} ->
+          current = Repo.get(AgenticRealms.World.Schemas.ObjectBlueprint, blueprint_id)
+          {:error, :stale_revision, current_revision: current.revision}
+
+        {:error, _} = err ->
+          err
+      end
+    end
+  end
+
+  defp validate_edit_fields(fields) when is_map(fields) do
+    if Enum.all?(Map.keys(fields), &(&1 in @edit_object_blueprint_fields)) do
+      :ok
+    else
+      {:error, :invalid_field}
+    end
+  end
+
+  defp validate_edit_fields(_), do: {:error, :invalid_field}
+
+  @doc """
+  Edit a world Object in place. Routes through the Room aggregate that
+  currently contains the object; the wrapper looks up the object's
+  current `room_id` from the read model so callers don't need to know.
+
+  Returns `{:ok, :updated}` on a field-changing commit, `{:ok, :no_change}`
+  on a no-op diff.
+
+  Refusals:
+    * `{:error, :not_a_wizard}` / `{:error, :unknown_player}`.
+    * `{:error, :unknown_object}` — object_id not in `world_objects`.
+    * `{:error, :object_not_editable_here}` — object is not currently in
+      a room (e.g., carried by a player).
+    * `{:error, :invalid_field}`.
+  """
+  @spec edit_object(
+          wizard_id :: integer(),
+          object_id :: String.t(),
+          fields_changed :: map()
+        ) :: {:ok, :updated | :no_change} | {:error, atom()}
+  def edit_object(wizard_id, object_id, fields_changed)
+      when is_integer(wizard_id) and is_binary(object_id) and is_map(fields_changed) do
+    with :ok <- ensure_wizard(wizard_id),
+         {:ok, object} <- fetch_object(object_id),
+         :ok <- validate_edit_fields(fields_changed),
+         {:ok, room_id} <- ensure_in_room(object) do
+      cmd = %EditObject{
+        room_id: room_id,
+        object_id: object_id,
+        wizard_id: wizard_id,
+        fields_changed: only_actual_diff(object, fields_changed)
+      }
+
+      cond do
+        map_size(cmd.fields_changed) == 0 ->
+          {:ok, :no_change}
+
+        true ->
+          case WorldApp.dispatch(cmd, consistency: :strong) do
+            :ok -> {:ok, :updated}
+            {:error, _} = err -> err
+          end
+      end
+    end
+  end
+
+  defp ensure_in_room(%{room_id: nil}), do: {:error, :object_not_editable_here}
+  defp ensure_in_room(%{room_id: rid}) when is_binary(rid), do: {:ok, rid}
+
+  defp only_actual_diff(object, fields_changed) do
+    fields_changed
+    |> Enum.reject(fn {k, v} -> Map.get(object, k) == v end)
+    |> Map.new()
+  end
+
+  defp validate_object_attrs(attrs) do
+    cond do
+      blank?(attrs[:name]) -> {:error, :name_required}
+      blank?(attrs[:short_description]) -> {:error, :short_description_required}
+      blank?(attrs[:long_description]) -> {:error, :long_description_required}
+      true -> :ok
+    end
+  end
+
+  defp blank?(nil), do: true
+  defp blank?(""), do: true
+  defp blank?(str) when is_binary(str), do: String.trim(str) == ""
+  defp blank?(_), do: true
 
   defp validate_slug(slug) do
     if Slug.valid?(slug), do: :ok, else: {:error, :invalid_slug}

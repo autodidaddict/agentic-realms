@@ -18,7 +18,7 @@ defmodule AgenticRealms.World.IntentResolver do
   require Logger
 
   alias AgenticRealms.Anthropic
-  alias AgenticRealms.World.IntentResolver.{ContextSnapshot, SystemPrompt, Tools}
+  alias AgenticRealms.World.IntentResolver.{ContextSnapshot, SystemPrompt, Tools, WizardTools}
 
   @max_input_length 500
   @max_tokens 256
@@ -180,6 +180,308 @@ defmodule AgenticRealms.World.IntentResolver do
   # Recognized tool name but the input failed schema validation
   # (missing/empty required field, bad direction enum, etc.).
   defp to_action(_name, _input), do: {:error, @generic_refusal}
+
+  # ─────────────────────────────────────────────────────────────────────
+  # Feature 014 — wizard authoring resolver (`:blueprints` mode)
+  # ─────────────────────────────────────────────────────────────────────
+
+  @wizard_system_prompt """
+  You are a tool-call dispatcher for a wizard authoring object archetypes
+  ("blueprints") in a text-driven game. The wizard speaks a prompt
+  describing the kind of thing they want to author. Your sole job is to
+  call exactly one tool — either `draft_object_blueprint` (extracting
+  fields) or `refuse` — and never to produce free-form prose.
+
+  Guidelines for `draft_object_blueprint`:
+  - `name` is a short lowercase noun phrase (1–4 words).
+  - `short_description` is one concrete sentence (≤ 100 chars).
+  - `long_description` is multi-sentence prose; sensory, evocative, but
+    grounded in what the wizard wrote — do not invent facts the wizard
+    did not imply.
+  - Set `fixed: true` only when the wizard's prompt implies the thing is
+    embedded, bolted, mounted, or otherwise immobile.
+
+  Refuse if the prompt is a question, asks for an edit to an existing
+  thing, describes a place / NPC / quest, or is otherwise not an object
+  archetype description.
+  """
+
+  @doc """
+  Resolve a wizard's natural-language prompt into a blueprint *draft*.
+  Returns `{:ok, {:draft_blueprint, fields_map}}` or
+  `{:error, refusal_message}`. Never raises — failures collapse to
+  refusals — and never persists anything.
+
+  Used by `GameLive` when a wizard submits the prompt textarea while in
+  `:blueprints` mode (`:authoring_mode == :blueprints`).
+  """
+  @spec resolve_wizard_blueprint(integer(), String.t()) ::
+          {:ok, {:draft_blueprint, map()}} | {:error, String.t()}
+  def resolve_wizard_blueprint(player_id, raw_input)
+      when is_integer(player_id) and is_binary(raw_input) do
+    started_at = System.monotonic_time(:millisecond)
+    outcome = do_resolve_wizard_blueprint(raw_input)
+    emit_wizard_telemetry(player_id, raw_input, outcome, started_at)
+    outcome
+  end
+
+  defp do_resolve_wizard_blueprint(raw_input) do
+    trimmed = String.trim(raw_input)
+
+    cond do
+      trimmed == "" ->
+        {:error, @generic_refusal}
+
+      String.length(trimmed) > @max_input_length ->
+        {:error, @too_long_refusal}
+
+      true ->
+        request = build_wizard_blueprint_request(trimmed)
+
+        case Anthropic.create_message(request) do
+          {:ok, response} -> parse_wizard_blueprint_response(response)
+          {:error, :no_api_key} -> {:error, @no_key_refusal}
+          {:error, _reason} -> {:error, @generic_refusal}
+        end
+    end
+  end
+
+  defp build_wizard_blueprint_request(user_message) do
+    %{
+      "max_tokens" => 512,
+      "system" => [
+        %{
+          "type" => "text",
+          "text" => @wizard_system_prompt,
+          "cache_control" => %{"type" => "ephemeral"}
+        }
+      ],
+      "tools" => WizardTools.list_blueprints(),
+      "tool_choice" => %{"type" => "any"},
+      "messages" => [%{"role" => "user", "content" => user_message}]
+    }
+  end
+
+  @doc """
+  Parse an Anthropic Messages API response body into a wizard blueprint
+  draft outcome. Exposed for unit testing without HTTP.
+  """
+  @spec parse_wizard_blueprint_response(map()) ::
+          {:ok, {:draft_blueprint, map()}} | {:error, String.t()}
+  def parse_wizard_blueprint_response(%{"content" => content}) when is_list(content) do
+    case Enum.filter(content, &(&1["type"] == "tool_use")) do
+      [tool_use] -> map_wizard_tool_use(tool_use)
+      [_ | _] -> {:error, @multi_step_refusal}
+      [] -> {:error, @generic_refusal}
+    end
+  end
+
+  def parse_wizard_blueprint_response(_), do: {:error, @generic_refusal}
+
+  defp map_wizard_tool_use(%{"name" => name, "input" => input}) when is_map(input) do
+    if MapSet.member?(WizardTools.names_blueprints(), name) do
+      to_wizard_outcome(name, input)
+    else
+      {:error, @generic_refusal}
+    end
+  end
+
+  defp map_wizard_tool_use(_), do: {:error, @generic_refusal}
+
+  defp to_wizard_outcome("draft_object_blueprint", input) do
+    with name when is_binary(name) and name != "" <- input["name"],
+         short when is_binary(short) and short != "" <- input["short_description"],
+         long when is_binary(long) and long != "" <- input["long_description"] do
+      {:ok,
+       {:draft_blueprint,
+        %{
+          name: name,
+          short_description: short,
+          long_description: long,
+          fixed: input["fixed"] == true
+        }}}
+    else
+      _ -> {:error, @generic_refusal}
+    end
+  end
+
+  defp to_wizard_outcome("refuse", %{"message" => m}) when is_binary(m) and m != "",
+    do: {:error, m}
+
+  defp to_wizard_outcome(_, _), do: {:error, @generic_refusal}
+
+  @wizard_world_system_prompt """
+  You are a tool-call dispatcher for a wizard manifesting a one-off
+  Object directly into their current room in a text-driven game. The
+  wizard speaks a prompt describing a specific concrete thing they
+  want to exist in the world right now. Your sole job is to call
+  exactly one tool — either `manifest_object_freeform` (extracting
+  fields) or `refuse` — and never to produce free-form prose.
+
+  The thing being manifested is a one-off, NOT a reusable archetype.
+  Use `manifest_object_freeform` for concrete particulars
+  ("the small clay pot leaning against the eastern wall, half-empty");
+  refuse if the prompt is a question, an edit request, or describes
+  a place / NPC / quest.
+
+  Field formatting rules:
+  - `name`: short lowercase noun phrase (1–4 words), no leading article.
+  - `short_description`: lowercase noun phrase WITH an indefinite
+    article (e.g., "a small clay pot"), ≤ 40 chars, NO trailing
+    period. This is the line shown in room listings.
+  - `long_description`: multi-sentence prose for the examine view.
+  - `fixed`: true only if the wizard's prompt implies the thing is
+    embedded, bolted, mounted, or otherwise immobile.
+  """
+
+  @doc """
+  Resolve a wizard's natural-language prompt while in `:world` mode
+  into an Object draft. Returns
+  `{:ok, {:freeform_object, fields_map}}` or `{:error, refusal}`.
+  Mirrors `resolve_wizard_blueprint/2` but uses the world-mode tool
+  set + system prompt.
+  """
+  @spec resolve_wizard_world(integer(), String.t()) ::
+          {:ok, {:freeform_object, map()}} | {:error, String.t()}
+  def resolve_wizard_world(player_id, raw_input)
+      when is_integer(player_id) and is_binary(raw_input) do
+    started_at = System.monotonic_time(:millisecond)
+    outcome = do_resolve_wizard_world(raw_input)
+    emit_wizard_world_telemetry(player_id, raw_input, outcome, started_at)
+    outcome
+  end
+
+  defp do_resolve_wizard_world(raw_input) do
+    trimmed = String.trim(raw_input)
+
+    cond do
+      trimmed == "" ->
+        {:error, @generic_refusal}
+
+      String.length(trimmed) > @max_input_length ->
+        {:error, @too_long_refusal}
+
+      true ->
+        request = build_wizard_world_request(trimmed)
+
+        case Anthropic.create_message(request) do
+          {:ok, response} -> parse_wizard_world_response(response)
+          {:error, :no_api_key} -> {:error, @no_key_refusal}
+          {:error, _reason} -> {:error, @generic_refusal}
+        end
+    end
+  end
+
+  defp build_wizard_world_request(user_message) do
+    %{
+      "max_tokens" => 512,
+      "system" => [
+        %{
+          "type" => "text",
+          "text" => @wizard_world_system_prompt,
+          "cache_control" => %{"type" => "ephemeral"}
+        }
+      ],
+      "tools" => WizardTools.list_world(),
+      "tool_choice" => %{"type" => "any"},
+      "messages" => [%{"role" => "user", "content" => user_message}]
+    }
+  end
+
+  @doc """
+  Parse an Anthropic Messages API response body into a wizard
+  world-mode freeform-Object outcome. Exposed for unit testing without
+  HTTP.
+  """
+  @spec parse_wizard_world_response(map()) ::
+          {:ok, {:freeform_object, map()}} | {:error, String.t()}
+  def parse_wizard_world_response(%{"content" => content}) when is_list(content) do
+    case Enum.filter(content, &(&1["type"] == "tool_use")) do
+      [tool_use] -> map_wizard_world_tool_use(tool_use)
+      [_ | _] -> {:error, @multi_step_refusal}
+      [] -> {:error, @generic_refusal}
+    end
+  end
+
+  def parse_wizard_world_response(_), do: {:error, @generic_refusal}
+
+  defp map_wizard_world_tool_use(%{"name" => name, "input" => input}) when is_map(input) do
+    if MapSet.member?(WizardTools.names_world(), name) do
+      to_wizard_world_outcome(name, input)
+    else
+      {:error, @generic_refusal}
+    end
+  end
+
+  defp map_wizard_world_tool_use(_), do: {:error, @generic_refusal}
+
+  defp to_wizard_world_outcome("manifest_object_freeform", input) do
+    with name when is_binary(name) and name != "" <- input["name"],
+         short when is_binary(short) and short != "" <- input["short_description"],
+         long when is_binary(long) and long != "" <- input["long_description"] do
+      {:ok,
+       {:freeform_object,
+        %{
+          name: name,
+          short_description: short,
+          long_description: long,
+          fixed: input["fixed"] == true
+        }}}
+    else
+      _ -> {:error, @generic_refusal}
+    end
+  end
+
+  defp to_wizard_world_outcome("refuse", %{"message" => m}) when is_binary(m) and m != "",
+    do: {:error, m}
+
+  defp to_wizard_world_outcome(_, _), do: {:error, @generic_refusal}
+
+  defp emit_wizard_world_telemetry(player_id, raw_input, outcome, started_at) do
+    latency_ms = System.monotonic_time(:millisecond) - started_at
+
+    {result, tool_name} =
+      case outcome do
+        {:ok, {:freeform_object, _}} -> {:object_chosen, "manifest_object_freeform"}
+        {:error, _} -> {:refused, nil}
+      end
+
+    Logger.info(
+      "intent_resolver mode=wizard_world player_id=#{player_id} " <>
+        "input_length=#{byte_size(raw_input)} outcome=#{result} " <>
+        "tool_name=#{tool_name || "-"} latency_ms=#{latency_ms}"
+    )
+
+    :telemetry.execute(
+      [:agenticrealms, :intent_resolver, :resolve_wizard_world],
+      %{latency_ms: latency_ms},
+      %{player_id: player_id, outcome: result, tool_name: tool_name}
+    )
+  end
+
+  defp emit_wizard_telemetry(player_id, raw_input, outcome, started_at) do
+    latency_ms = System.monotonic_time(:millisecond) - started_at
+
+    {result, tool_name} =
+      case outcome do
+        {:ok, {:draft_blueprint, _}} -> {:draft_chosen, "draft_object_blueprint"}
+        {:error, _} -> {:refused, nil}
+      end
+
+    Logger.info(
+      "intent_resolver mode=wizard_blueprints player_id=#{player_id} " <>
+        "input_length=#{byte_size(raw_input)} outcome=#{result} " <>
+        "tool_name=#{tool_name || "-"} latency_ms=#{latency_ms}"
+    )
+
+    :telemetry.execute(
+      [:agenticrealms, :intent_resolver, :resolve_wizard_blueprint],
+      %{latency_ms: latency_ms},
+      %{player_id: player_id, outcome: result, tool_name: tool_name}
+    )
+  end
+
+  # ─────────────────────────────────────────────────────────────────────
 
   defp emit_telemetry(player_id, raw_input, outcome, started_at) do
     latency_ms = System.monotonic_time(:millisecond) - started_at

@@ -577,4 +577,45 @@ defmodule AgenticRealms.World.Queries do
   def get_object_blueprint(blueprint_id) when is_binary(blueprint_id) do
     Repo.get(ObjectBlueprint, blueprint_id)
   end
+
+  @doc """
+  Fetch a single Object by id. Returns `nil` if no such row exists.
+  """
+  @spec get_object(String.t()) :: %Object{} | nil
+  def get_object(object_id) when is_binary(object_id) do
+    Repo.get(Object, object_id)
+  end
+
+  @doc """
+  Wizard-facing variant of `list_objects_in_room/1` — includes the
+  `fixed` flag plus full descriptions so the Wizard view's
+  Things-in-this-room panel and the Extract-essence action have what
+  they need.
+
+  Excludes quest-scoped items (rows with a `quest_player_id`) — wizards
+  do not author / extract from per-player quest items in milestone 1.
+  """
+  @spec list_objects_in_room_for_wizard(String.t()) :: [
+          %{
+            id: String.t(),
+            name: String.t(),
+            short_description: String.t(),
+            long_description: String.t(),
+            fixed: boolean()
+          }
+        ]
+  def list_objects_in_room_for_wizard(room_id) when is_binary(room_id) do
+    from(o in Object,
+      where: o.room_id == ^room_id and is_nil(o.quest_player_id),
+      order_by: o.name,
+      select: %{
+        id: o.id,
+        name: o.name,
+        short_description: o.short_description,
+        long_description: o.long_description,
+        fixed: o.fixed
+      }
+    )
+    |> Repo.all()
+  end
 end

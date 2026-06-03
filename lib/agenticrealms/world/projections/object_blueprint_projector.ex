@@ -19,8 +19,10 @@ defmodule AgenticRealms.World.Projections.ObjectBlueprintProjector do
     name: __MODULE__,
     consistency: :strong
 
+  import Ecto.Query
+
   alias AgenticRealms.Repo
-  alias AgenticRealms.World.Events.ObjectBlueprintCreated
+  alias AgenticRealms.World.Events.{ObjectBlueprintCreated, ObjectBlueprintEdited}
   alias AgenticRealms.World.Schemas.ObjectBlueprint
 
   def handle(%ObjectBlueprintCreated{} = e, _meta) do
@@ -39,6 +41,25 @@ defmodule AgenticRealms.World.Projections.ObjectBlueprintProjector do
     }
 
     Repo.insert!(row, on_conflict: :nothing, conflict_target: :id)
+    :ok
+  end
+
+  # Feature 014 US5 — edit projection. Replay-safe via the `revision <
+  # new_revision` guard: an already-applied edit becomes a no-op.
+  def handle(%ObjectBlueprintEdited{} = e, _meta) do
+    now = DateTime.utc_now() |> DateTime.truncate(:second)
+
+    updates =
+      e.fields_changed
+      |> Map.put(:revision, e.revision)
+      |> Map.put(:updated_at, now)
+      |> Map.to_list()
+
+    from(b in ObjectBlueprint,
+      where: b.id == ^e.blueprint_id and b.revision < ^e.revision
+    )
+    |> Repo.update_all(set: updates)
+
     :ok
   end
 end

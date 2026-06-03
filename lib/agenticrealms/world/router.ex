@@ -24,7 +24,11 @@ defmodule AgenticRealms.World.Router do
     RecordRoomDiscovery,
     AcceptQuest,
     FinalizeQuest,
-    CreateObjectBlueprint
+    CreateObjectBlueprint,
+    EditObjectBlueprint,
+    SpawnObjectFromBlueprint,
+    SpawnObjectFreeform,
+    EditObject
   }
 
   identify(Room, by: :room_id, prefix: "room-")
@@ -39,8 +43,23 @@ defmodule AgenticRealms.World.Router do
   # store can resolve the stream prefix.
   identify(ObjectBlueprint, by: :blueprint_id, prefix: "object-blueprint-")
 
-  # Phase 3 (US5) + Phase 6 (US3): room commands routed to Room
-  dispatch([CreateRoom, AddExit, PlaceObject, TakeObject, DropObject], to: Room)
+  # Phase 3 (US5) + Phase 6 (US3): room commands routed to Room.
+  # Feature 014 US2: SpawnObjectFromBlueprint also routed to Room (the
+  # destination Room aggregate owns object presence, exactly like
+  # PlaceObject).
+  dispatch(
+    [
+      CreateRoom,
+      AddExit,
+      PlaceObject,
+      TakeObject,
+      DropObject,
+      SpawnObjectFromBlueprint,
+      SpawnObjectFreeform,
+      EditObject
+    ],
+    to: Room
+  )
 
   # Phase 4 (US1) + Phase 5 (US2): player lifecycle + movement routed to Player.
   # Feature 012: per-player room discovery also routed to Player.
@@ -56,6 +75,6 @@ defmodule AgenticRealms.World.Router do
   # is its own aggregate identified by quest_id.
   dispatch([AcceptQuest, FinalizeQuest], to: Quest)
 
-  # Feature 014 US1: Object Blueprint authoring. Edit dispatch lands in US5.
-  dispatch([CreateObjectBlueprint], to: ObjectBlueprint)
+  # Feature 014 US1 + US5: Object Blueprint authoring + editing.
+  dispatch([CreateObjectBlueprint, EditObjectBlueprint], to: ObjectBlueprint)
 end

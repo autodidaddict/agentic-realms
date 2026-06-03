@@ -44,6 +44,52 @@ defmodule AgenticRealms.World.UIEvents do
     defstruct [:room_id, :npc_id, :npc_name]
   end
 
+  defmodule WizardBlueprintRegistryChanged do
+    @moduledoc """
+    Feature 014 US6 — broadcast on the global `blueprints` topic when an
+    `ObjectBlueprintCreated` or `ObjectBlueprintEdited` domain event
+    fires. Wizard LiveView sessions patch their `:object_blueprints`
+    assign in place — insert on `:created`, update-row on `:edited` —
+    so every open registry stays live without a manual reload.
+
+    For `:created`, `payload` carries the full row (name +
+    short_description). For `:edited`, `payload` carries the sparse
+    `fields_changed` diff; subscribers merge into the existing row.
+    """
+    @enforce_keys [:event, :blueprint_id, :revision, :payload]
+    defstruct [:event, :blueprint_id, :revision, :payload]
+  end
+
+  defmodule RoomObjectEdited do
+    @moduledoc """
+    Feature 014 US5 — transient object-edit notice. Broadcast on
+    `room:<room_id>` when an `ObjectEdited` event fires. Quiet (no
+    narrative log entry by default — wizard edits don't generate an
+    in-fiction "the chest was modified" entry). Subscribers refresh
+    their room-view caches so a subsequent `look <object>` reflects
+    the new values.
+    """
+    @enforce_keys [:room_id, :object_id, :fields_changed]
+    defstruct [:room_id, :object_id, :fields_changed]
+  end
+
+  defmodule RoomObjectArrived do
+    @moduledoc """
+    Feature 014 US2 — transient object-arrival entry. Broadcast on
+    `room:<destination>` when an `ObjectSpawned` domain event fires
+    while live sessions are present. Mirror of `RoomNPCArrived` from
+    feature 007. Co-located players' narrative logs gain a system entry
+    `<object short description> appears.`
+
+    No actor exclusion — wizards see the entry too (it's the same
+    confirmation that the spawn landed; they don't need a separate
+    self-only confirmation given the registry/world view will reflect
+    the new object on the next look).
+    """
+    @enforce_keys [:room_id, :object_id, :name, :short_description]
+    defstruct [:room_id, :object_id, :name, :short_description]
+  end
+
   defmodule RoomTranceEntered do
     @moduledoc """
     Feature 014 — transient trance-entry log entry. Broadcast on

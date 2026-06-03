@@ -25,8 +25,10 @@ defmodule AgenticRealms.World.ObjectBlueprint do
             fixed: false,
             revision: 0
 
-  alias AgenticRealms.World.Commands.CreateObjectBlueprint
-  alias AgenticRealms.World.Events.ObjectBlueprintCreated
+  alias AgenticRealms.World.Commands.{CreateObjectBlueprint, EditObjectBlueprint}
+  alias AgenticRealms.World.Events.{ObjectBlueprintCreated, ObjectBlueprintEdited}
+
+  @editable_fields ~w(name short_description long_description fixed)a
 
   # --- CreateObjectBlueprint ----------------------------------------------
 
@@ -64,6 +66,58 @@ defmodule AgenticRealms.World.ObjectBlueprint do
   def execute(%__MODULE__{}, %CreateObjectBlueprint{}),
     do: {:error, :blueprint_already_exists}
 
+  # --- EditObjectBlueprint (feature 014 US5) ------------------------------
+
+  def execute(%__MODULE__{id: nil}, %EditObjectBlueprint{}),
+    do: {:error, :blueprint_not_found}
+
+  def execute(
+        %__MODULE__{revision: current_revision} = state,
+        %EditObjectBlueprint{
+          expected_revision: expected_revision,
+          fields_changed: fields_changed
+        }
+      )
+      when is_map(fields_changed) do
+    cond do
+      # FR-020a — optimistic lock at the aggregate boundary. If the
+      # wizard's known revision doesn't match the aggregate's current
+      # revision, refuse without emitting an event. The wrapper re-reads
+      # the read model to surface the current revision in the error
+      # tuple that the LiveView consumes (Commanded itself only allows
+      # 2-tuple errors out of execute/2).
+      expected_revision != current_revision ->
+        {:error, :stale_revision}
+
+      # Validate keys.
+      not Enum.all?(Map.keys(fields_changed), &(&1 in @editable_fields)) ->
+        {:error, :invalid_field}
+
+      # No-op diff returns :ok with no event (FR-008).
+      no_changes?(state, fields_changed) ->
+        :ok
+
+      true ->
+        %ObjectBlueprintEdited{
+          blueprint_id: state.id,
+          fields_changed: only_changed(state, fields_changed),
+          revision: current_revision + 1
+        }
+    end
+  end
+
+  defp no_changes?(state, fields_changed) do
+    Enum.all?(fields_changed, fn {k, v} ->
+      Map.get(state, k) == v
+    end)
+  end
+
+  defp only_changed(state, fields_changed) do
+    fields_changed
+    |> Enum.reject(fn {k, v} -> Map.get(state, k) == v end)
+    |> Map.new()
+  end
+
   # --- apply/2 ------------------------------------------------------------
 
   def apply(%__MODULE__{} = state, %ObjectBlueprintCreated{} = e) do
@@ -77,5 +131,14 @@ defmodule AgenticRealms.World.ObjectBlueprint do
         fixed: e.fixed,
         revision: e.revision
     }
+  end
+
+  def apply(%__MODULE__{} = state, %ObjectBlueprintEdited{
+        fields_changed: fields_changed,
+        revision: revision
+      }) do
+    Enum.reduce(fields_changed, %__MODULE__{state | revision: revision}, fn {k, v}, acc ->
+      Map.put(acc, k, v)
+    end)
   end
 end
