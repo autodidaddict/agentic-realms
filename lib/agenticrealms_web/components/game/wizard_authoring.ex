@@ -115,7 +115,7 @@ defmodule AgenticRealmsWeb.GameComponents.WizardAuthoring do
                   Discard
                 </button>
                 <button type="button" class="btn-primary" phx-click="commit_blueprint_draft">
-                  Commit
+                  Save Blueprint
                 </button>
               </div>
             </div>
@@ -167,7 +167,7 @@ defmodule AgenticRealmsWeb.GameComponents.WizardAuthoring do
                   Discard
                 </button>
                 <button type="button" class="btn-primary" phx-click="commit_object_draft">
-                  Commit
+                  Spawn
                 </button>
               </div>
             </div>
