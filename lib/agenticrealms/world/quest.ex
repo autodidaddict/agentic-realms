@@ -36,6 +36,15 @@ defmodule AgenticRealms.World.Quest do
 
   # --- AcceptQuest --------------------------------------------------------
 
+  @spec execute(%__MODULE__{}, %AcceptQuest{} | %FinalizeQuest{}) ::
+          %QuestAccepted{}
+          | [
+              %QuestItemsConsumed{}
+              | %QuestRewardMinted{}
+              | %QuestCompleted{}
+              | %QuestItemsCleanedUp{}
+            ]
+          | {:error, atom()}
   def execute(%__MODULE__{state: :initial}, %AcceptQuest{
         quest_id: qid,
         player_id: pid,
@@ -104,6 +113,14 @@ defmodule AgenticRealms.World.Quest do
 
   # --- apply/2 ------------------------------------------------------------
 
+  @spec apply(
+          %__MODULE__{},
+          %QuestAccepted{}
+          | %QuestCompleted{}
+          | %QuestItemsConsumed{}
+          | %QuestRewardMinted{}
+          | %QuestItemsCleanedUp{}
+        ) :: %__MODULE__{}
   def apply(%__MODULE__{} = state, %QuestAccepted{
         quest_id: qid,
         player_id: pid,

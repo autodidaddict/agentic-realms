@@ -60,6 +60,7 @@ defmodule AgenticRealms.World.NPCChat.Conversation do
   Start a Conversation registered under `{player_id, npc_clone_id}` via
   `Horde.Registry`. Init args: `{player_id, npc_clone_struct}`.
   """
+  @spec start_link({integer(), map()}) :: GenServer.on_start()
   def start_link({player_id, %{id: clone_id} = clone}) do
     GenServer.start_link(__MODULE__, {player_id, clone},
       name: Registry.via_tuple({player_id, clone_id})
@@ -177,7 +178,7 @@ defmodule AgenticRealms.World.NPCChat.Conversation do
   # The two-turn LLM follow-up flow (feeding tool_result back to the
   # model for an in-character reply) is deferred to a polish iteration.
   defp handle_tool_call(%{name: "accept_quest", input: %{"slug" => slug}}, state) do
-    case WorldCommands.accept_quest(state.player_id, blueprint_id_of(state.npc_clone), slug) do
+    case WorldCommands.accept_quest(state.player_id, state.npc_clone.blueprint_id, slug) do
       {:ok, _quest_id} ->
         text = accept_quest_emote_text(state.npc_name, :ok)
         handle_success(:chat_emote, :emote, text, state)
@@ -260,9 +261,6 @@ defmodule AgenticRealms.World.NPCChat.Conversation do
 
     "looks at your empty hands and gently shakes her head. \"Not quite yet — you're still short #{summary}.\""
   end
-
-  defp blueprint_id_of(%{blueprint_id: bp_id}) when is_binary(bp_id), do: bp_id
-  defp blueprint_id_of(_), do: nil
 
   defp accept_quest_emote_text(_npc_name, :ok),
     do: "nods solemnly. \"Good. You have my thanks already — bring them when you can.\""

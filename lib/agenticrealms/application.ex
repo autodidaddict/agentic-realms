@@ -10,6 +10,7 @@ defmodule AgenticRealms.Application do
   # module attribute guarantees they exist in the atom table.
   # Feature 011 adds :interval_ms (used by tick behaviors).
   @_behavior_atoms [:trigger, :actions, :type, :text, :interval_ms]
+  @spec __behavior_atoms__() :: [atom()]
   def __behavior_atoms__, do: @_behavior_atoms
 
   # Feature 013 — atoms used as keys inside `definition_snapshot` (jsonb)
@@ -39,6 +40,7 @@ defmodule AgenticRealms.Application do
     :item_short_description,
     :item_long_description
   ]
+  @spec __quest_atoms__() :: [atom()]
   def __quest_atoms__, do: @_quest_atoms
 
   # See https://hexdocs.pm/elixir/Application.html

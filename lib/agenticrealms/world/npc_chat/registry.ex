@@ -12,6 +12,7 @@ defmodule AgenticRealms.World.NPCChat.Registry do
   """
 
   @doc false
+  @spec child_spec(term()) :: Supervisor.child_spec()
   def child_spec(_arg) do
     %{
       id: __MODULE__,

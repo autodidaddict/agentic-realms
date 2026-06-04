@@ -16,8 +16,21 @@ defmodule AgenticRealms.Accounts.Player do
     timestamps(type: :utc_datetime)
   end
 
+  @type t :: %__MODULE__{
+          id: integer() | nil,
+          username: String.t() | nil,
+          hashed_password: String.t() | nil,
+          password: String.t() | nil,
+          theme: String.t() | nil,
+          density: String.t() | nil,
+          is_wizard: boolean() | nil,
+          inserted_at: DateTime.t() | nil,
+          updated_at: DateTime.t() | nil
+        }
+
   @username_format ~r/^[a-zA-Z0-9_-]+$/
 
+  @spec valid_password?(t() | term(), String.t()) :: boolean()
   def valid_password?(%__MODULE__{hashed_password: hashed_password}, password)
       when is_binary(hashed_password) and byte_size(password) > 0 do
     Bcrypt.verify_pass(password, hashed_password)
@@ -28,6 +41,7 @@ defmodule AgenticRealms.Accounts.Player do
     false
   end
 
+  @spec registration_changeset(t() | Ecto.Changeset.t(), map()) :: Ecto.Changeset.t()
   def registration_changeset(player, attrs) do
     player
     |> cast(attrs, [:username, :password])
@@ -35,12 +49,14 @@ defmodule AgenticRealms.Accounts.Player do
     |> validate_password()
   end
 
+  @spec username_changeset(t() | Ecto.Changeset.t(), map()) :: Ecto.Changeset.t()
   def username_changeset(player, attrs) do
     player
     |> cast(attrs, [:username])
     |> validate_username()
   end
 
+  @spec preferences_changeset(t() | Ecto.Changeset.t(), map()) :: Ecto.Changeset.t()
   def preferences_changeset(player, attrs) do
     player
     |> cast(attrs, [:theme, :density])
@@ -48,6 +64,7 @@ defmodule AgenticRealms.Accounts.Player do
     |> validate_inclusion(:density, @valid_densities)
   end
 
+  @spec password_changeset(t() | Ecto.Changeset.t(), map()) :: Ecto.Changeset.t()
   def password_changeset(player, attrs) do
     player
     |> cast(attrs, [:password])

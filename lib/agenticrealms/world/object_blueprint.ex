@@ -32,6 +32,8 @@ defmodule AgenticRealms.World.ObjectBlueprint do
 
   # --- CreateObjectBlueprint ----------------------------------------------
 
+  @spec execute(%__MODULE__{}, %CreateObjectBlueprint{} | %EditObjectBlueprint{}) ::
+          %ObjectBlueprintCreated{} | %ObjectBlueprintEdited{} | :ok | {:error, atom()}
   def execute(%__MODULE__{id: nil}, %CreateObjectBlueprint{
         blueprint_id: bp_id,
         name: name,
@@ -120,6 +122,8 @@ defmodule AgenticRealms.World.ObjectBlueprint do
 
   # --- apply/2 ------------------------------------------------------------
 
+  @spec apply(%__MODULE__{}, %ObjectBlueprintCreated{} | %ObjectBlueprintEdited{}) ::
+          %__MODULE__{}
   def apply(%__MODULE__{} = state, %ObjectBlueprintCreated{} = e) do
     %__MODULE__{
       state
