@@ -51,7 +51,8 @@ rebases its "spawn an NPC" onto `clone_into(room)` and inherits the lineage fold
 - `AgenticRealms.World.Router` — add `identify(Entity, by: :entity_id, prefix: "entity-")` + dispatch
   `[CloneEntity, MoveEntity, EditEntity]`; remove object/NPC placement commands from `Room` /
   `NPCBlueprint` dispatch lists.
-- `AgenticRealms.World.Commands` — add `clone_entity/2`, `move_entity/3`, `clone_into/4`; re-express
+- `AgenticRealms.World.Commands` — add `clone_entity/2`, `move_entity/4` (with `expected_from` for
+  conflict-rejection), `clone_into/4`; re-express
   `spawn_object_from_blueprint/3`, `spawn_object_freeform/3`, seed `place_object`, `take/2`, `drop/2`,
   `spawn_npc_clone/3`, and the quest reward/consume call sites on top of them. `ensure_wizard/1`
   authz unchanged on wizard wrappers.

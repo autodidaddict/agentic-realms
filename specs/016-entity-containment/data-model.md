@@ -32,7 +32,7 @@ entity's existence and location.
 | Command | Guard | Emits / returns |
 |---|---|---|
 | `CloneEntity` | `id == nil` | `EntityCloned{entity_id, kind, fields}` (container implicitly void). If already created → `{:error, :already_exists}` |
-| `MoveEntity` | created; `to` valid type | no-op if `to == container` → `:ok` (no event, FR-009); else `EntityMoved{entity_id, from: container, to, cause}`. Stale caller-supplied `from` ignored — current `container` is authoritative (FR-005). Unknown type → `{:error, :unsupported_container}` |
+| `MoveEntity` | created; `to` valid type; `expected_from` matches current `container` | no-op if `to == container` → `:ok` (no event, FR-009); else if `expected_from != container` → `{:error, :container_conflict}` (FR-005 — preserves take/drop "already taken/moved" semantics under concurrency); else `EntityMoved{entity_id, from: container, to, cause}`. Unknown type → `{:error, :unsupported_container}` |
 | `EditEntity` | created | no-op diff → `:ok`; else `EntityEdited{entity_id, fields_changed}` |
 
 **`apply/2`**: `EntityCloned` → set `kind`, `container = void`. `EntityMoved` → set `container = to`.
@@ -48,7 +48,7 @@ entity's existence and location.
 | Command | Routed to | Fields | Status |
 |---|---|---|---|
 | `CloneEntity` | Entity | `entity_id, kind, fields` (map of frozen read-model fields) | **new** |
-| `MoveEntity` | Entity | `entity_id, from (ContainerRef), to (ContainerRef), cause` | **new** |
+| `MoveEntity` | Entity | `entity_id, expected_from (ContainerRef), to (ContainerRef), cause` | **new** — `expected_from` is the container the caller believes the entity is in; the aggregate **rejects** a move whose `expected_from` disagrees with the entity's actual current container (`:container_conflict`), so a concurrent second take/move cannot "steal" an entity (FR-005) |
 | `EditEntity` | Entity | `entity_id, fields_changed` | **new** (absorbs `EditObject`) |
 | `PlaceObject` | — | — | **removed** (→ clone_into) |
 | `SpawnObjectFromBlueprint` | — | — | **removed** (wrapper → clone_into) |
@@ -122,15 +122,15 @@ is `container_type='void', container_id=NULL`. NPC-inventory rows would be `cont
 | Wrapper | Behavior |
 |---|---|
 | `clone_entity(kind, fields)` | mint `entity_id`; dispatch `CloneEntity`; ⇒ `{:ok, entity_id}` |
-| `move_entity(entity_id, to, cause)` | validate destination exists (read model) + room name-collision pre-check (R7); dispatch `MoveEntity` |
-| `clone_into(kind, fields, to, cause)` | `clone_entity` then `move_entity`; on move failure entity is left in void (FR-003) |
+| `move_entity(entity_id, expected_from, to, cause)` | validate destination exists (read model) + room name-collision pre-check (R7); dispatch `MoveEntity` carrying `expected_from` (the source the caller resolved against); a `:container_conflict` from the aggregate surfaces as "no longer there" (e.g. already taken) |
+| `clone_into(kind, fields, to, cause)` | `clone_entity` then `move_entity(id, ContainerRef.void(), to, cause)` (fresh clone's `expected_from` is the void); on move failure entity is left in void (FR-003) |
 | `spawn_object_from_blueprint/3` | reads blueprint payload → `clone_into(:object, fields, room, :spawned)` |
 | `spawn_object_freeform/3` | `clone_into(:object, fields, room, :spawned)` |
 | `place_object` (seed/quest) | `clone_into(:object, fields+quest scope, room, :placed)` |
-| `take/2` | resolve object in room → `move_entity(id, player, :taken)` |
-| `drop/2` | resolve object in inventory → `move_entity(id, room, :dropped)` |
+| `take/2` | resolve object in room → `move_entity(id, ContainerRef.room(room_id), ContainerRef.player(pid), :taken)` — `expected_from` = the room, so a concurrent take that already moved it returns `:container_conflict` ("already taken") |
+| `drop/2` | resolve object in inventory → `move_entity(id, ContainerRef.player(pid), ContainerRef.room(rid), :dropped)` (`expected_from` = the player) |
 | `spawn_npc_clone/3` | reads blueprint payload → `clone_into(:npc, fields, room, :spawned)` |
-| quest consume/cleanup | `move_entity(id, ContainerRef.void(), :relocated)` (removal-via-void, R5) |
+| quest consume/cleanup | `move_entity(id, <current container>, ContainerRef.void(), :relocated)` (removal-via-void, R5) |
 | quest reward | `clone_into(:object, reward, player, :spawned)` |
 
 Authorization (`ensure_wizard/1`) stays on the wizard-only wrappers exactly as today.
@@ -156,8 +156,10 @@ owns rooms, exits, regions, quest orchestration only).
 Replace the per-event object/NPC handlers with **one** `EntityMoved` handler that maps
 `(kind, cause, from.type → to.type)` to the existing UI structs (full table in research §R3):
 `RoomObjectArrived`, `RoomObjectTaken`, `RoomObjectDropped`, `RoomNPCArrived`, and inventory/quest
-side-broadcasts (`PlayerInventoryChanged`, `PlayerQuestProgress`) preserved on take/drop. `EntityCloned`
-and moves into the void broadcast nothing. No new "X picks up Y"-style announcement is introduced
+side-broadcasts (`PlayerInventoryChanged`, `PlayerQuestProgress`) preserved on take/drop. The **one
+new** UI struct is **`RoomObjectDeparted`** (`room_id, object_id, name`) — fired only for the
+`:relocated` room→room case (which has no existing convention), paired with `RoomObjectArrived` in
+the destination. `EntityCloned` and moves into the void broadcast nothing. No new "X picks up Y"-style announcement is introduced
 (FR-014). `:eventual` consistency unchanged.
 
 ---

@@ -22,7 +22,13 @@ Containers serialize as maps `%{"type" => "...", "id" => ... | null}`. All event
   | object/dropped/player→room | `RoomObjectDropped` + `PlayerInventoryChanged(:removed)` (+ quest progress) |
   | npc/spawned/void→room | `RoomNPCArrived` |
   | */→void | none |
-  | object/relocated/room→room | `RoomObjectArrived` in dest (+ minimal departure in source) |
+  | object/relocated/room→room | `RoomObjectDeparted` in source room + `RoomObjectArrived` in destination room |
+
+> **`RoomObjectDeparted`** (new UI event, `lib/agenticrealms/world/ui_events.ex`): enforce keys
+> `room_id, object_id, name`; broadcast on `room:<source>` when an object leaves a room for another
+> real container via a `:relocated` move. It is **not** emitted for `:taken` (which already has
+> `RoomObjectTaken`) or for moves into the void — only the room→room relocation case, which has no
+> existing convention. Mirrors the dormant `RoomNPCLeft` shape.
 
 ## EntityEdited
 - **Payload**: `entity_id`, `fields_changed` (sparse map).

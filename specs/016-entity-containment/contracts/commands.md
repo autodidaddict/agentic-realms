@@ -10,17 +10,21 @@ All commands route to the `Entity` aggregate (`identify(Entity, by: :entity_id, 
 - **Result**: entity exists with `container = void`.
 
 ## MoveEntity
-- **Fields**: `entity_id` (required), `from` (ContainerRef), `to` (ContainerRef, required), `cause`
+- **Fields**: `entity_id` (required), `expected_from` (ContainerRef, required — the container the
+  caller resolved the entity in), `to` (ContainerRef, required), `cause`
   (`:spawned|:placed|:taken|:dropped|:relocated`).
-- **Aggregate guards**:
+- **Aggregate guards** (evaluated in order):
   - not created ⇒ `{:error, :not_found}`
   - `to.type` not in supported set ⇒ `{:error, :unsupported_container}`
   - `to == current container` ⇒ `:ok` (no event) *(FR-009)*
-  - else emit `EntityMoved{from: <current>, to, cause}` — current container authoritative over
-    supplied `from` *(FR-005)*.
-- **Wrapper pre-checks (`move_entity/3`)**: destination container row exists; for `to.type=:room`,
+  - `expected_from != current container` ⇒ `{:error, :container_conflict}` *(FR-005 — the entity's
+    actual container is authoritative; a stale/concurrent move is refused, not silently applied, so
+    a second `take` of an already-taken object fails instead of stealing it)*
+  - else emit `EntityMoved{from: <current>, to, cause}`.
+- **Wrapper pre-checks (`move_entity/4`)**: destination container row exists; for `to.type=:room`,
   no name collision in destination *(feature 007, FR-010/FR-012b)*; `ensure_wizard/1` on wizard-only
-  callers.
+  callers. The wrapper passes the resolved source as `expected_from`; a `:container_conflict`
+  surfaces to the caller as "no longer there" (e.g. already taken).
 
 ## EditEntity
 - **Fields**: `entity_id` (required), `fields_changed` (sparse map).
@@ -30,8 +34,10 @@ All commands route to the `Entity` aggregate (`identify(Entity, by: :entity_id, 
 ## Service wrappers (thin world service, not commands)
 - `clone_entity(kind, fields) ⇒ {:ok, entity_id}` — mints id, dispatches `CloneEntity`.
 - `move_entity(entity_id, to, cause) ⇒ :ok | {:error, reason}`.
-- `clone_into(kind, fields, to, cause) ⇒ {:ok, entity_id}` — clone then move; move failure leaves the
-  entity in the void *(FR-003)*.
+- `move_entity(entity_id, expected_from, to, cause) ⇒ :ok | {:error, reason}` — `:container_conflict`
+  when the entity is no longer in `expected_from`.
+- `clone_into(kind, fields, to, cause) ⇒ {:ok, entity_id}` — clone then `move_entity(id, void, to,
+  cause)`; move failure leaves the entity in the void *(FR-003)*.
 
 ## Removed commands (retrofit)
 `PlaceObject`, `SpawnObjectFromBlueprint`, `SpawnObjectFreeform`, `TakeObject`, `DropObject`,

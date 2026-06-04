@@ -219,11 +219,13 @@ container's type tag.
 
 - **Move to the same container** (no-op move): the entity stays put; no spurious departure/arrival
   is witnessed.
-- **Move of a void-resident entity with origin stated as a real container** (stale origin): the
-  move is rejected or reconciled — an entity's actual current container is authoritative, not the
-  caller-supplied origin.
+- **Move with a stated origin that disagrees with the entity's actual container** (stale origin): the
+  move is **rejected** (a conflict) — the entity's actual current container is authoritative, not the
+  caller-supplied origin. The caller must re-resolve and retry.
 - **Concurrent moves of the same entity**: the entity ends in exactly one container; the model
-  serializes moves of a single entity so it cannot be double-placed.
+  serializes moves of a single entity so it cannot be double-placed, and the loser is **refused**
+  (e.g., a second player taking an already-taken object gets an "already taken" refusal — the object
+  is not stolen from the first taker), preserving today's take/drop semantics.
 - **Arrival into a destination that no longer exists** (e.g., a room removed): the move is rejected;
   the entity is not stranded.
 - **Per-room name uniqueness** (feature 007): moving/cloning an entity whose name collides with one
@@ -247,6 +249,9 @@ container's type tag.
   counts as a container). It MUST never be simultaneously in two containers, and never in none.
 - **FR-005**: Moves of a single entity MUST be serialized so concurrent moves cannot place it in two
   containers; the entity's actual current container is authoritative over any caller-supplied origin.
+  A move whose stated origin disagrees with the actual current container MUST be **refused** (a
+  conflict), not silently applied — so a second concurrent take/move of an entity that already moved
+  fails ("already taken") instead of relocating it from the first mover.
 
 ### Functional Requirements — Containers & the arrival/departure pathway
 

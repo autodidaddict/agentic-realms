@@ -58,14 +58,14 @@ suite stays green.
 
 ### Entity aggregate + routing
 
-- [ ] T010 Create `lib/agenticrealms/world/entity.ex` aggregate (struct `id/kind/container`); `execute/2` for `CloneEntity` (nil→`EntityCloned` void, else `:already_exists`), `MoveEntity` (no-op→`:ok` no event; current-container authoritative; unsupported type→`:unsupported_container`), `EditEntity` (no-op→`:ok`; else `EntityEdited`); `apply/2` clauses; `ContainerRef` JSON (de)serialization per contracts/events.md.
+- [ ] T010 Create `lib/agenticrealms/world/entity.ex` aggregate (struct `id/kind/container`); `execute/2` for `CloneEntity` (nil→`EntityCloned` void, else `:already_exists`), `MoveEntity` (no-op→`:ok` no event; **`expected_from != current container` → `{:error, :container_conflict}`** so a stale/concurrent move is refused not silently applied — FR-005; unsupported type→`:unsupported_container`; else `EntityMoved`), `EditEntity` (no-op→`:ok`; else `EntityEdited`); `apply/2` clauses; `ContainerRef` JSON (de)serialization per contracts/events.md.
 - [ ] T011 Register in `lib/agenticrealms/world/router.ex`: `identify(Entity, by: :entity_id, prefix: "entity-")` and dispatch `[CloneEntity, MoveEntity, EditEntity] → Entity`. (Additive — leave existing dispatch intact.)
-- [ ] T012 [P] Aggregate unit tests `test/agentic_realms/world/entity_test.exs` — clone happy/already_exists; move no-op/real/stale-from-ignored/unsupported-type; edit sparse/no-op; mid-stream replay reconstructs `container`.
+- [ ] T012 [P] Aggregate unit tests `test/agentic_realms/world/entity_test.exs` — clone happy/already_exists; move no-op/real/unsupported-type; **`MoveEntity` with `expected_from` ≠ current container → `{:error, :container_conflict}` (no event)**; edit sparse/no-op; mid-stream replay reconstructs `container`.
 
 ### Projector + service + witness (written, not yet active)
 
 - [ ] T013 Create `lib/agenticrealms/world/projections/entity_projector.ex` (`:strong`) handling `EntityCloned` (insert `world_objects`|`npc_clones` by kind at `container_type='void'`, `on_conflict: :nothing`), `EntityMoved` (absolute container update), `EntityEdited` (apply sparse diff) per data-model.md §7. (Not yet supervised.)
-- [ ] T014 Add service wrappers to `lib/agenticrealms/world/commands.ex` — `clone_entity/2`, `move_entity/3`, `clone_into/4` (mint id; destination-exists + room name-collision pre-checks; clone-then-move leaves entity in void on move failure) per contracts/commands.md. (Not yet wired into existing call sites.)
+- [ ] T014 Add service wrappers to `lib/agenticrealms/world/commands.ex` — `clone_entity/2`, `move_entity/4` (`entity_id, expected_from, to, cause`), `clone_into/4` (mint id; destination-exists + room name-collision pre-checks; `move_entity` passes the resolved source as `expected_from` and maps `:container_conflict` to a caller-facing "no longer there"; clone-then-move uses `expected_from = void` and leaves the entity in void on move failure) per contracts/commands.md. (Not yet wired into existing call sites.)
 - [ ] T015 Add an `EntityMoved` witness-mapping helper to `lib/agenticrealms/world/ui_event_broadcaster.ex` mapping `(kind, cause, from.type→to.type)` to legacy UI structs per research.md §R3 (pure function; not yet subscribed).
 - [ ] T016 [P] Tests `test/agentic_realms/world/entity_service_test.exs` + `..._witness_test.exs` — `clone_into` void-on-failure; pre-check refusals; every witness-mapping row; void moves silent.
 
@@ -93,14 +93,16 @@ and every object call site. The suite is green again at T031.
 - [ ] T021 [US1] Subscribe the `EntityMoved` handler in `lib/agenticrealms/world/ui_event_broadcaster.ex` (object cause rows) and preserve `PlayerInventoryChanged` / `PlayerQuestProgress` side-broadcasts on take/drop.
 - [ ] T022 [US1] Re-express `spawn_object_from_blueprint/3` and `spawn_object_freeform/3` in `lib/agenticrealms/world/commands.ex` via `clone_into(:object, fields, ContainerRef.room(room_id), :spawned)`.
 - [ ] T023 [US2] Re-express seed object placement in `lib/agenticrealms/world/seed.ex` via `clone_into(:object, fields, room, :placed)` (carry behaviors + quest scope in `fields`).
-- [ ] T024 [US2] Re-express `take/2` (→ `move_entity(id, ContainerRef.player(pid), :taken)`) and `drop/2` (→ `move_entity(id, ContainerRef.room(rid), :dropped)`) in `lib/agenticrealms/world/commands.ex`.
-- [ ] T025 [US2] Re-express quest object paths: quest-item spawn (dispatched on `QuestAccepted`) via `clone_into(:object, …, :placed)`; `QuestRewardMinted` reward via `clone_into(:object, reward, ContainerRef.player(pid), :spawned)`; `QuestItemsConsumed`/`QuestItemsCleanedUp` via `move_entity(id, ContainerRef.void(), :relocated)` (removal-via-void, research §R5). Update the dispatch site in `lib/agenticrealms/world/projections/world_projector.ex`.
+- [ ] T024 [US2] Re-express `take/2` (→ `move_entity(id, ContainerRef.room(rid), ContainerRef.player(pid), :taken)`) and `drop/2` (→ `move_entity(id, ContainerRef.player(pid), ContainerRef.room(rid), :dropped)`) in `lib/agenticrealms/world/commands.ex`, passing the resolved source as `expected_from` and surfacing `:container_conflict` as the existing "you don't see that here" / "already taken" refusal.
+- [ ] T025 [US2] Re-express quest **creation** paths: quest-item spawn (dispatched on `QuestAccepted`) via `clone_into(:object, fields incl. `quest_player_id`/`quest_instance_id`, ContainerRef.room(rid), :placed)`; `QuestRewardMinted` reward via `clone_into(:object, reward, ContainerRef.player(pid), :spawned)`. Update the dispatch site in `lib/agenticrealms/world/projections/world_projector.ex`.
+- [ ] T025a [US2] Re-express quest **removal** paths: `QuestItemsConsumed`/`QuestItemsCleanedUp` via `move_entity(id, <current container>, ContainerRef.void(), :relocated)` (removal-via-void, research §R5), resolving each target's current container as `expected_from`. Ensure only the intended `quest_player_id`/`quest_instance_id`-scoped rows are targeted (no over-removal of other players' quest items).
 - [ ] T026 [US1] Remove the `object_ids` field and all object placement/spawn/take/drop/edit `execute`+`apply` clauses (and the vestigial `NPCSpawnedInRoom` apply) from `lib/agenticrealms/world/room.ex`.
 - [ ] T027 [US1] Remove the object placement handlers (`ObjectPlacedInRoom`, `ObjectSpawned`, `ObjectTakenFromRoom`, `ObjectDroppedInRoom`, `ObjectEdited`) from `lib/agenticrealms/world/projections/world_projector.ex`.
 - [ ] T028 [US1] Delete obsolete object commands/events and remove them from `router.ex` dispatch: commands `place_object`, `spawn_object_from_blueprint`, `spawn_object_freeform`, `take_object`, `drop_object`, `edit_object`; events `object_placed_in_room`, `object_spawned`, `object_taken_from_room`, `object_dropped_in_room`, `object_edited`.
 - [ ] T029 [US1] EntityProjector object tests `test/agentic_realms/world/projections/entity_projector_test.exs` — `EntityCloned(:object)` inserts a `world_objects` row at void; `EntityMoved` updates container; replay idempotent.
 - [ ] T030 [US1] Arrival test `test/agentic_realms_web/.../object_clone_move_test.exs` — `clone_into(room)` ⇒ co-present player sees `RoomObjectArrived` within budget; `examine` shows fields; spawning is one clone+move.
 - [ ] T031 [US2] Object non-regression: update event-shape references and confirm green — feature 014 object suites, the `take`/`drop`/`inventory` suites, and feature 013 quest suites (mechanical updates only).
+- [ ] T031a [US2] Concurrent-take regression test (replaces the old `Room`-aggregate "already taken" guard): two players `take` the same object near-simultaneously — exactly one succeeds, the loser receives the "already taken / not here" refusal (`:container_conflict`), and the object is **not** stolen from the winner (ends in the first taker's inventory, never relocated to the second). Asserts FR-005 at the integration level (the aggregate unit case is T012).
 
 **Checkpoint**: Objects fully on clone/move; suite green. MVP complete.
 
@@ -138,7 +140,7 @@ arrival witnessing.
 **Independent Test**: Move an object from room A to room B — A's occupants witness departure, B's
 witness arrival, entity in exactly one container.
 
-- [ ] T041 [US3] Add the `:relocated` room→room mapping in `lib/agenticrealms/world/ui_event_broadcaster.ex` — arrival in destination (`RoomObjectArrived`) + a minimal departure broadcast in the source room; ensure no double-placement.
+- [ ] T041 [US3] Add a new `RoomObjectDeparted` UI struct (`room_id, object_id, name`) to `lib/agenticrealms/world/ui_events.ex` (mirrors the dormant `RoomNPCLeft` shape), then add the `:relocated` room→room mapping in `lib/agenticrealms/world/ui_event_broadcaster.ex` — `RoomObjectDeparted` on the source room + `RoomObjectArrived` on the destination; not emitted for `:taken`/`:dropped` or moves into the void; ensure no double-placement.
 - [ ] T042 [US3] Relocation tests `test/agentic_realms/world/entity_relocation_test.exs` — A→B leaves A / arrives B / exactly one container; departure + arrival witnessed; →void leaves the room and is visible nowhere.
 
 ---
@@ -151,7 +153,7 @@ witness arrival, entity in exactly one container.
 into a room ⇒ normal arrival.
 
 - [ ] T043 [US4] Void-state tests `test/agentic_realms/world/entity_void_test.exs` — `clone_entity` (no move) ⇒ row at `container_type='void'`, absent from room view and inventory, zero arrival witnesses; subsequent move into a room fires arrival.
-- [ ] T044 [US4] Move-to-void tests — quest consume/cleanup (T025) removes objects from all containers (invisible everywhere); exactly-one-container invariant holds with void as the container.
+- [ ] T044 [US4] Move-to-void tests — quest consume/cleanup (T025a) removes objects from all containers (invisible everywhere); exactly-one-container invariant holds with void as the container; **a quest with two players' scoped items consumes only the finalizing player's `quest_player_id`/`quest_instance_id` rows** (no cross-player over-removal).
 
 ---
 
@@ -165,7 +167,7 @@ but unwired.
 
 - [ ] T045 [US5] NPC-inventory dormancy: confirm `move_entity` accepts/validates a `:npc` destination (the NPC must exist) but no read model/UI/query exists and no call site writes `container_type='npc'`; test in `test/agentic_realms/world/container_uniformity_test.exs`.
 - [ ] T046 [US5] Uniformity test — move into a room vs a player inventory route through the same pathway differing only by type tag; an unknown/unsupported container type is rejected with a clear error (FR-010).
-- [ ] T047 [US5] Invariant + concurrency tests — exactly-one-container after every operation (FR-004); concurrent moves of one entity converge to a single terminal container via stream serialization (FR-005).
+- [ ] T047 [US5] Invariant + concurrency tests — exactly-one-container after every operation (FR-004); concurrent moves of one entity are serialized so the loser is **refused** with `:container_conflict` (not merely "converge to one container") and the entity stays with the first mover (FR-005; complements the take-specific T031a).
 
 ---
 
