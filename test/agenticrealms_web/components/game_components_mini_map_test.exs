@@ -15,7 +15,7 @@ defmodule AgenticRealmsWeb.GameComponents.MiniMapTest do
 
   alias AgenticRealms.World.MapView
   alias AgenticRealms.World.MapView.{RoomGlyph, ExitLine}
-  alias AgenticRealmsWeb.GameComponents
+  alias AgenticRealmsWeb.GameComponents.MiniMap
 
   # ----------------------------------------------------------------
   # Fixtures
@@ -200,7 +200,7 @@ defmodule AgenticRealmsWeb.GameComponents.MiniMapTest do
   end
 
   defp render_map(view) do
-    render_component(&GameComponents.mini_map/1, %{map_view: view})
+    render_component(&MiniMap.mini_map/1, %{map_view: view})
   end
 
   # ----------------------------------------------------------------

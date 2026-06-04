@@ -1,7 +1,7 @@
 defmodule AgenticRealmsWeb.GameLive do
   use AgenticRealmsWeb, :live_view
 
-  import AgenticRealmsWeb.GameComponents
+  use AgenticRealmsWeb.GameComponents
 
   alias AgenticRealms.Accounts
   alias AgenticRealms.GameData
@@ -160,11 +160,6 @@ defmodule AgenticRealmsWeb.GameLive do
      |> assign(:completed_quests, Quests.history_for(player_id))
      |> assign(:presence, presence)
      |> assign(:selected_quest, 0)
-     |> assign(:wizard_kind, :item)
-     |> assign(:wizard_text, GameData.starter_prompts()[:item])
-     |> assign(:wizard_user_edited, false)
-     |> assign(:wizard_examples, GameData.wizard_examples())
-     |> assign(:open_trigger, nil)
      |> assign(:tweaks, build_tweaks(socket.assigns.current_player))}
   end
 
@@ -802,45 +797,6 @@ defmodule AgenticRealmsWeb.GameLive do
   # as a no-op for forward compatibility with any stale client payload.
   def handle_event("select_quest", _params, socket) do
     {:noreply, socket}
-  end
-
-  def handle_event("set_wizard_kind", %{"kind" => kind}, socket) do
-    kind_atom = String.to_existing_atom(kind)
-
-    socket =
-      socket
-      |> assign(:wizard_kind, kind_atom)
-      |> then(fn s ->
-        if not s.assigns.wizard_user_edited do
-          assign(s, :wizard_text, GameData.starter_prompts()[kind_atom] || "")
-        else
-          s
-        end
-      end)
-
-    {:noreply, socket}
-  end
-
-  def handle_event("update_wizard_text", %{"text" => text}, socket) do
-    {:noreply,
-     socket
-     |> assign(:wizard_text, text)
-     |> assign(:wizard_user_edited, true)}
-  end
-
-  def handle_event("open_trigger", %{"id" => id}, socket) do
-    example = socket.assigns.wizard_examples[socket.assigns.wizard_kind]
-
-    trigger =
-      if example do
-        Enum.find(example[:triggers] || [], fn t -> t.id == id end)
-      end
-
-    {:noreply, assign(socket, :open_trigger, trigger)}
-  end
-
-  def handle_event("close_trigger", _params, socket) do
-    {:noreply, assign(socket, :open_trigger, nil)}
   end
 
   def handle_event("stream_done", _params, socket) do
