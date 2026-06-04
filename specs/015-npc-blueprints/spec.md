@@ -5,6 +5,17 @@
 **Status**: Draft
 **Input**: User description: "Wizard-Created NPC Blueprints (Milestone 2 of the wizard-authoring arc). Extend the feature 014 wizard-authoring substrate to NPCs as a second blueprint kind. Reuse the wizard role/authz, trance/authoring-mode toggle, the Interpreted Data card, the registry, monotonic revision + optimistic-locking, the LLM extraction entry points, and the freeform-spawn / spawn-from-blueprint / in-place-edit / essence-extraction flows. NPC blueprints carry display name, short/long description, the fixed/ungettable flag, a dedicated lore field, the behaviors list, and one or more composable toolsets. Toolsets are named groups of behaviors that compose via union and can be applied to items, NPCs, or rooms. Fold in the feature 008 event/lineage design by renaming its NPC events to the simpler NPCSpawned shape and dropping the lineage FK. Out of scope: republish-to-clones, new behavior triggers/actions, room digging, blueprint deletion, conversation-system changes."
 
+> **⚠️ Dependency / sequencing note (added 2026-06-04):** This milestone now **depends on a
+> foundational clone/move/containment substrate milestone** that ships first. In that model,
+> entities are *created into "the void"* then *moved into a typed container* (room / player
+> inventory / NPC inventory); "spawn" = clone + move, with a uniform "arrived" handler — and
+> the spec-014 object spawn path is retrofitted onto it. Consequently the **spawn mechanics**
+> and the **feature-008 event fold-in** (FR-021–FR-023 below) move to the substrate milestone;
+> here, "spawn an NPC" becomes `clone_into(room)` over that substrate. The NPC-authoring scope
+> below (blueprint create/edit/extract, toolsets, lore, the wizard trance UX, unified registry)
+> is unchanged and rebases on the substrate. Planning artifacts (research/data-model/plan) will
+> be regenerated once the substrate spec exists. See the `clone/move/containment` design memory.
+
 ## Overview
 
 Feature 014 (milestone 1) shipped the wizard-authoring **substrate** for one entity kind — Objects. A wizard drops into a trance (the `:blueprints` authoring mode), describes an item in natural language, watches the LLM extract structured fields into an Interpreted Data card, and commits it to a registry of reusable blueprints. The wizard can then spawn instances into the world, create one-off freeform instances, edit blueprints (revision-tracked, optimistically locked), edit in-world instances in place, and extract a new blueprint from an existing world instance.
