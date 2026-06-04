@@ -308,7 +308,7 @@ defmodule AgenticRealms.World.NPCChat.ConversationTest do
 
       rendered =
         Phoenix.LiveViewTest.rendered_to_string(
-          AgenticRealmsWeb.GameComponents.log_entry(assigns)
+          AgenticRealmsWeb.GameComponents.LogEntry.log_entry(assigns)
         )
 
       refute rendered =~ "as an AI"
