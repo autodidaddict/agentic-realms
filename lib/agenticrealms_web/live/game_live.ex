@@ -104,7 +104,10 @@ defmodule AgenticRealmsWeb.GameLive do
      # :mode == :wizard). Non-wizards never see the top-bar Wizard
      # switch (FR-WIZ-3), enforced by the layout.
      |> assign(:is_wizard, socket.assigns.current_player.is_wizard)
-     |> assign(:authoring_mode, if(socket.assigns.current_player.is_wizard, do: :world, else: nil))
+     |> assign(
+       :authoring_mode,
+       if(socket.assigns.current_player.is_wizard, do: :world, else: nil)
+     )
      |> assign(:focused_object_id, nil)
      |> assign(:focused_blueprint_id, nil)
      # Feature 014 US1 — blueprint authoring state. Populated by the
@@ -291,8 +294,14 @@ defmodule AgenticRealmsWeb.GameLive do
     updated =
       draft
       |> Map.put(:name, new_name)
-      |> Map.put(:short_description, Map.get(params, "short_description", draft.short_description) || "")
-      |> Map.put(:long_description, Map.get(params, "long_description", draft.long_description) || "")
+      |> Map.put(
+        :short_description,
+        Map.get(params, "short_description", draft.short_description) || ""
+      )
+      |> Map.put(
+        :long_description,
+        Map.get(params, "long_description", draft.long_description) || ""
+      )
       |> Map.put(:fixed, Map.get(params, "fixed") == "true")
       |> Map.put(:proposed_slug, proposed_slug)
 
@@ -528,7 +537,14 @@ defmodule AgenticRealmsWeb.GameLive do
   def handle_event(
         "commit_object_draft",
         _params,
-        %{assigns: %{is_wizard: true, mode: :wizard, authoring_mode: :world, focused_object_draft: draft}} = socket
+        %{
+          assigns: %{
+            is_wizard: true,
+            mode: :wizard,
+            authoring_mode: :world,
+            focused_object_draft: draft
+          }
+        } = socket
       )
       when not is_nil(draft) do
     attrs = %{

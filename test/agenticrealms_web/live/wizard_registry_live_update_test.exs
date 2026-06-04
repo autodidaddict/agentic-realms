@@ -114,7 +114,9 @@ defmodule AgenticRealmsWeb.WizardRegistryLiveUpdateTest do
     |> Ecto.Changeset.change(is_wizard: false)
     |> AgenticRealms.Repo.update!()
 
-    bob_conn = conn |> Plug.Test.init_test_session(%{}) |> Plug.Conn.put_session(:player_id, bob.id)
+    bob_conn =
+      conn |> Plug.Test.init_test_session(%{}) |> Plug.Conn.put_session(:player_id, bob.id)
+
     {:ok, view, _} = live(bob_conn, ~p"/play")
     refute render(view) =~ "blueprints-registry"
   end

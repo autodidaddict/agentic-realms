@@ -1,4 +1,9 @@
-<Layouts.app flash={@flash} current_player={@current_player} game_mode={@mode} is_wizard={@is_wizard}>
+<Layouts.app
+  flash={@flash}
+  current_player={@current_player}
+  game_mode={@mode}
+  is_wizard={@is_wizard}
+>
   <div class="app" id="game-root" phx-hook=".ThemeSwitch">
     <%= if @mode == :player do %>
       <.player_view

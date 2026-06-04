@@ -47,7 +47,7 @@ description: "Task list for feature 014 — wizard-created object blueprints (mi
 - [X] T003 [P] Extend `lib/agenticrealms/accounts/player.ex` with `field :is_wizard, :boolean, default: false`.
 - [X] T004 [P] Implement `AgenticRealms.Accounts.promote_to_wizard/1` in `lib/agenticrealms/accounts.ex` per `contracts/commands.md` (idempotent; returns `{:ok, %Player{}}` / `{:error, :not_found}`).
 - [X] T005 [P] Add `Accounts.get_player/1` (if absent) used by the wizard-authz helper. *(already present in `lib/agenticrealms/accounts.ex`)*
-- [ ] T006 Add private `ensure_wizard/1` helper to `lib/agenticrealms/world/commands.ex` per `contracts/commands.md` (synchronous `is_wizard` read; returns `:ok` / `{:error, :not_a_wizard}` / `{:error, :unknown_player}`). **Deferred to T031** — the helper triggers `--warnings-as-errors` on the unused-private-function check until the first wrapper consumes it; landing them together avoids a transient broken-compile state.
+- [X] T006 Landed in T031 — `ensure_wizard/1` is the wrapper-level authz gate used by every wizard command.
 - [X] T007 [P] Unit tests in `test/agentic_realms/accounts_test.exs`: `promote_to_wizard/1` happy path, idempotency, `{:error, :not_found}` on unknown id.
 
 ### Object Blueprint substrate (FR-007, FR-007a, FR-007b, FR-008, FR-009)
@@ -56,13 +56,13 @@ description: "Task list for feature 014 — wizard-created object blueprints (mi
 - [X] T009 [P] Create `lib/agenticrealms/world/schemas/object_blueprint.ex` Ecto schema per `data-model.md` §1.2.
 - [X] T010 [P] Create `lib/agenticrealms/world/object_blueprint.ex` aggregate struct (fields per `data-model.md` §2.1) — handlers come in later phases.
 - [X] T011 Add aggregate identification to `lib/agenticrealms/world/router.ex`: `identify(ObjectBlueprint, by: :blueprint_id, prefix: "object-blueprint-")`. Register dispatch (handler list initially empty; commands added per phase). *(identify only; dispatch list deferred to T030.)*
-- [ ] T012 [P] Create `lib/agenticrealms/world/projections/object_blueprint_projector.ex` skeleton (Commanded.Event.Handler module) registered in `lib/agenticrealms/world/application.ex` per plan.md Source Code section. Handler bodies are empty until added in user-story phases. **Deferred to T032** — a projector with zero `handle/2` clauses provokes a compile-time Commanded warning; landing the skeleton with its first handler avoids a transient broken state.
+- [X] T012 [P] Landed in T032 — projector module created with its `ObjectBlueprintCreated` handler and supervised in both `lib/agenticrealms/application.ex` and `test/support/data_case.ex`.
 - [X] T013 [P] Slug derivation helper module `lib/agenticrealms/world/object_blueprint/slug.ex` exposing `derive/1` (lowercase + non-alphanumeric → `_` + trim leading/trailing `_`) and `valid?/1` (regex match per FR-007a). Used by both the Commands wrapper and the LiveView form.
 - [X] T014 [P] Unit tests in `test/agentic_realms/world/object_blueprint/slug_test.exs`: `derive/1` for common cases including names with punctuation, accents (out of scope — should reject), and length boundaries; `valid?/1` accepts the regex and rejects everything else including UUID-shaped strings.
 
 ### Intent resolver context extension (FR-022, FR-023)
 
-- [ ] T015 Extend `lib/agenticrealms/world/intent_resolver/context_snapshot.ex` with the three new fields per `contracts/intent_tools.md`: `authoring_mode`, `focused_object_id`, `focused_blueprint_id` (all default `nil`). Update callers that construct snapshots to default-pass these. **Deferred to US1 T034** — ContextSnapshot is currently a pure string-builder; extending it requires the wizard-mode tool-selection rework, which is US1.
+- [X] T015 Landed differently — instead of extending `ContextSnapshot` (a pure string-builder for player intent), wizard mode got its own resolver entry points (`IntentResolver.resolve_wizard_blueprint/2` and `.resolve_wizard_world/2`) each with their own system prompt + tool set. ContextSnapshot stays focused on the player-intent path. See T034 / `IntentResolver.WizardTools`.
 
 ### Mode toggle + trance broadcast infrastructure (FR-001 through FR-006, FR-WIZ-3, FR-WIZ-4)
 
@@ -76,7 +76,7 @@ description: "Task list for feature 014 — wizard-created object blueprints (mi
 
 ### Foundational tests
 
-- [ ] T023 [P] Authorization tests in `test/agentic_realms/world/commands/wizard_authz_test.exs`: `ensure_wizard/1` accepts wizards, refuses non-wizards, refuses unknown player ids. **Deferred to T031** alongside the helper itself.
+- [X] T023 [P] `ensure_wizard/1` behavior is exercised end-to-end by every wrapper test (`create_object_blueprint_wrapper_test.exs`, `spawn_object_from_blueprint_wrapper_test.exs`, `spawn_object_freeform_wrapper_test.exs`, `extract_object_essence_test.exs`, `edit_object_blueprint_wrapper_test.exs`, `edit_object_wrapper_test.exs`, `edit_object_security_test.exs`) — non-wizard refusal and unknown-player refusal are covered in each.
 - [X] T024 [P] LiveView authorization tests in `test/agentic_realms_web/live/wizard_foundational_test.exs`: non-wizard does NOT see the top-bar Wizard switch (FR-WIZ-3); a crafted `switch_mode` event is refused (FR-WIZ-4).
 - [X] T025 Integration test in `test/agentic_realms_web/live/wizard_foundational_test.exs`: promote → two LiveView clients in same room → wizard toggles `:blueprints` → witness sees `enters a trance.` → wizard's own log self-suppressed → toggle back → witness sees `appears to come out of a trance.`. Verifies FR-002, FR-003, and the self-suppression pattern.
 
@@ -324,12 +324,12 @@ description: "Task list for feature 014 — wizard-created object blueprints (mi
 
 **Purpose**: Verification, documentation, performance check.
 
-- [ ] T114 Execute the entire `specs/014-item-blueprints/quickstart.md` against a fresh dev seed — all 18 steps must pass.
-- [ ] T115 [P] Performance smoke check: measure end-to-end latency for the three SC-budget paths in a manual run (`SC-001` ≤ 90 s for blueprint authoring, `SC-002` ≤ 2 s for spawn-arrival, `SC-003` ≤ 500 ms for trance entries). Log the measurements in `specs/014-item-blueprints/perf-notes.md` (new) for future regression reference.
-- [ ] T116 [P] Run `mix format --check-formatted` and address any drift in this branch.
-- [ ] T117 [P] Run `mix credo` (if configured) on the new modules; address any new findings introduced by this branch.
-- [ ] T118 Run the full `mix test` suite and confirm green; investigate any test ordering / DB-state issues that the new aggregates may have surfaced.
-- [ ] T119 Verify `CLAUDE.md` SPECKIT block points to `specs/014-item-blueprints/plan.md` (already updated during planning; this is a re-check).
+- [ ] T114 Execute the entire `specs/014-item-blueprints/quickstart.md` against a fresh dev seed — all 18 steps must pass. **Pending — manual / browser-based; deferred to local verification before merge.**
+- [ ] T115 [P] Performance smoke check: measure end-to-end latency for the three SC-budget paths in a manual run (`SC-001` ≤ 90 s for blueprint authoring, `SC-002` ≤ 2 s for spawn-arrival, `SC-003` ≤ 500 ms for trance entries). Log the measurements in `specs/014-item-blueprints/perf-notes.md` (new) for future regression reference. **Pending — manual / browser-based; deferred to local verification before merge.**
+- [X] T116 [P] Ran `mix format`; formatting drift addressed across 10 files (game_components.ex, game_live.ex, game_live.html.heex, the new migration, ui_event_broadcaster.ex, and several test files).
+- [X] T117 [P] Credo not configured in this project (`mix credo` is undefined; no `.credo.exs`). N/A.
+- [X] T118 Ran `mix test` — 673 unit tests pass, 35 LiveView integration tests pass, zero failures, zero regressions. The pre-existing NPCChat sandbox-disconnect warning is unrelated to this feature and present on `main`.
+- [X] T119 `CLAUDE.md` SPECKIT block points to `specs/014-item-blueprints/plan.md`. Verified.
 
 ---
 

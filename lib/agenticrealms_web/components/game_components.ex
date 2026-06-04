@@ -1895,8 +1895,7 @@ defmodule AgenticRealmsWeb.GameComponents do
           <div class="w-input-wrap">
             <div class="w-prompt-label">
               <span class="hint">
-                Describe a one-off object to manifest into
-                <strong>{@current_room_name || "your current room"}</strong>,
+                Describe a one-off object to manifest into <strong>{@current_room_name || "your current room"}</strong>,
                 or click <strong>Spawn here</strong> on any blueprint to drop a copy in.
               </span>
             </div>
@@ -2056,8 +2055,7 @@ defmodule AgenticRealmsWeb.GameComponents do
                   <div>
                     <div class="title">No objects here yet</div>
                     <div>
-                      Manifest something with a prompt, or
-                      <strong>Spawn here</strong>
+                      Manifest something with a prompt, or <strong>Spawn here</strong>
                       from the registry.
                     </div>
                   </div>
@@ -2193,7 +2191,7 @@ defmodule AgenticRealmsWeb.GameComponents do
         <label class="bp-field-label">
           Slug
           <span class="bp-field-hint">
-            <%= slug_hint(@draft) %>
+            {slug_hint(@draft)}
           </span>
         </label>
         <input
@@ -2364,6 +2362,7 @@ defmodule AgenticRealmsWeb.GameComponents do
 
   defp format_commit_error(:not_a_wizard), do: "Not authorized."
   defp format_commit_error(:unknown_player), do: "Account no longer exists."
+
   defp format_commit_error(:invalid_slug),
     do: "Slug must be lowercase letters, digits, and underscores; 1–64 characters."
 

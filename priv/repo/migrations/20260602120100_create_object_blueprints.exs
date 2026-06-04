@@ -21,13 +21,9 @@ defmodule AgenticRealms.Repo.Migrations.CreateObjectBlueprints do
 
     # Milestone 1 ships only :object kind. Milestone 2 will add :npc to the
     # allowed list (see specs/014-item-blueprints/data-model.md §1.2).
-    create constraint(:object_blueprints, :kind_in_allowed_set,
-             check: "kind IN ('object')"
-           )
+    create constraint(:object_blueprints, :kind_in_allowed_set, check: "kind IN ('object')")
 
-    create constraint(:object_blueprints, :revision_positive,
-             check: "revision > 0"
-           )
+    create constraint(:object_blueprints, :revision_positive, check: "revision > 0")
 
     create index(:object_blueprints, [:kind])
   end
