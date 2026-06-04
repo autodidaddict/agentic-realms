@@ -169,6 +169,7 @@ defmodule AgenticRealmsWeb.WizardReviewCleanupTest do
     await_wizard_unlock(view)
 
     assigns = :sys.get_state(view.pid).socket.assigns
+
     assert is_nil(assigns.focused_blueprint_draft),
            "orphan blueprint draft from a mode-toggled task should be dropped"
 

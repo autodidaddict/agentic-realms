@@ -60,7 +60,10 @@ defmodule AgenticRealms.World.Commands.EditObjectBlueprintWrapperTest do
     assert {:ok, :no_change} =
              Commands.edit_object_blueprint(w.id, slug, %{
                expected_revision: 1,
-               fields_changed: %{name: bp_before.name, short_description: bp_before.short_description}
+               fields_changed: %{
+                 name: bp_before.name,
+                 short_description: bp_before.short_description
+               }
              })
 
     bp_after = Queries.get_object_blueprint(slug)
@@ -116,7 +119,11 @@ defmodule AgenticRealms.World.Commands.EditObjectBlueprintWrapperTest do
   test "previously-spawned clones reflect the OLD revision values (FR-021)",
        %{wizard: w, slug: slug} do
     {:ok, object_id} =
-      Commands.spawn_object_from_blueprint(w.id, slug, AgenticRealms.World.Seed.starting_room_id())
+      Commands.spawn_object_from_blueprint(
+        w.id,
+        slug,
+        AgenticRealms.World.Seed.starting_room_id()
+      )
 
     # Edit the blueprint AFTER spawning.
     {:ok, 2} =

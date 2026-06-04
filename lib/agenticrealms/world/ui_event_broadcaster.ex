@@ -61,7 +61,6 @@ defmodule AgenticRealms.World.UIEventBroadcaster do
     QuestCompleted
   }
 
-
   alias AgenticRealms.World.Schemas.Object
 
   alias AgenticRealms.World.UIEvents.{

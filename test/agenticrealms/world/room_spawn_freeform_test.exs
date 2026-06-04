@@ -47,14 +47,15 @@ defmodule AgenticRealms.World.RoomSpawnFreeformTest do
     end
 
     test "refuses when the same object_id is already present" do
-      state = Room.apply(created_room(), %ObjectSpawned{
-        object_id: @object_id,
-        room_id: @room_id,
-        name: "x",
-        short_description: "x",
-        long_description: "x",
-        fixed: false
-      })
+      state =
+        Room.apply(created_room(), %ObjectSpawned{
+          object_id: @object_id,
+          room_id: @room_id,
+          name: "x",
+          short_description: "x",
+          long_description: "x",
+          fixed: false
+        })
 
       assert {:error, :object_already_in_room} = Room.execute(state, valid_cmd())
     end
