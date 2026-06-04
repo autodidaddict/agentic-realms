@@ -275,19 +275,17 @@ defmodule AgenticRealmsWeb.GameLive do
       )
       when not is_nil(draft) do
     new_name = Map.get(params, "name", draft.name) || ""
-
     slug_input = Map.get(params, "proposed_slug", "") || ""
 
-    slug_overridden? = Map.get(draft, :slug_overridden, false)
-
-    slug_overridden_now? =
-      slug_overridden? or
-        (slug_input != "" and slug_input != Map.get(draft, :proposed_slug, ""))
-
+    # The slug input itself is the source of truth: blank input means
+    # "auto-derive from name", anything else is the wizard's explicit
+    # override. No separate sticky flag — clearing the field and then
+    # renaming the blueprint correctly re-derives.
     proposed_slug =
-      cond do
-        slug_overridden_now? and slug_input != "" -> slug_input
-        true -> AgenticRealms.World.ObjectBlueprint.Slug.derive(new_name)
+      if slug_input == "" do
+        AgenticRealms.World.ObjectBlueprint.Slug.derive(new_name)
+      else
+        slug_input
       end
 
     updated =
@@ -297,7 +295,6 @@ defmodule AgenticRealmsWeb.GameLive do
       |> Map.put(:long_description, Map.get(params, "long_description", draft.long_description) || "")
       |> Map.put(:fixed, Map.get(params, "fixed") == "true")
       |> Map.put(:proposed_slug, proposed_slug)
-      |> Map.put(:slug_overridden, slug_overridden_now?)
 
     {:noreply,
      socket
@@ -348,7 +345,6 @@ defmodule AgenticRealmsWeb.GameLive do
           long_description: bp.long_description,
           fixed: bp.fixed,
           proposed_slug: bp.id,
-          slug_overridden: true,
           expected_revision: bp.revision
         }
 
@@ -497,6 +493,7 @@ defmodule AgenticRealmsWeb.GameLive do
   def handle_event("discard_blueprint_draft", _, socket) do
     {:noreply,
      socket
+     |> cancel_wizard_resolver_task()
      |> assign(:focused_blueprint_draft, nil)
      |> assign(:blueprint_commit_error, nil)}
   end
@@ -573,6 +570,7 @@ defmodule AgenticRealmsWeb.GameLive do
   def handle_event("discard_object_draft", _, socket) do
     {:noreply,
      socket
+     |> cancel_wizard_resolver_task()
      |> assign(:focused_object_draft, nil)
      |> assign(:blueprint_commit_error, nil)}
   end
@@ -610,8 +608,7 @@ defmodule AgenticRealmsWeb.GameLive do
           short_description: object.short_description || "",
           long_description: object.long_description || "",
           fixed: object.fixed == true,
-          proposed_slug: slug,
-          slug_overridden: false
+          proposed_slug: slug
         }
 
         :ok =
@@ -1384,7 +1381,18 @@ defmodule AgenticRealmsWeb.GameLive do
   # in: :draft_blueprint → focused_blueprint_draft (US1),
   # :freeform_object → focused_object_draft (US3). Refusals surface
   # via :blueprint_commit_error (reused for both forms).
-  def handle_info({ref, result}, %{assigns: %{wizard_resolver_task: %{ref: ref}}} = socket) do
+  #
+  # If the wizard switched modes between submit and completion (bug_007
+  # — toggle race within the 1-3s LLM window), the draft is dropped
+  # silently. Surfacing a stale draft in the other mode would surprise
+  # the wizard with a forgotten prompt's output; refusing the toggle
+  # would block them for the LLM call duration. Quietly discarding
+  # respects both. The launching mode is stashed on the resolver task
+  # at submit time so the comparison is exact.
+  def handle_info(
+        {ref, result},
+        %{assigns: %{wizard_resolver_task: %{ref: ref} = task}} = socket
+      ) do
     Process.demonitor(ref, [:flush])
 
     socket =
@@ -1392,40 +1400,16 @@ defmodule AgenticRealmsWeb.GameLive do
       |> assign(:wizard_resolver_task, nil)
       |> assign(:wizard_input_locked, false)
 
-    case result do
-      {:ok, {:draft_blueprint, fields}} ->
-        slug = AgenticRealms.World.ObjectBlueprint.Slug.derive(fields.name)
+    launching_mode = Map.get(task, :mode)
+    current_mode = socket.assigns.authoring_mode
 
-        draft = %{
-          name: fields.name,
-          short_description: fields.short_description,
-          long_description: fields.long_description,
-          fixed: fields.fixed,
-          proposed_slug: slug,
-          slug_overridden: false
-        }
+    cond do
+      launching_mode != nil and launching_mode != current_mode ->
+        # Orphaned by a mode toggle. Drop the draft; keep input unlocked.
+        {:noreply, socket}
 
-        {:noreply,
-         socket
-         |> assign(:focused_blueprint_draft, draft)
-         |> assign(:blueprint_commit_error, nil)}
-
-      {:ok, {:freeform_object, fields}} ->
-        draft = %{
-          name: fields.name,
-          short_description: fields.short_description,
-          long_description: fields.long_description,
-          fixed: fields.fixed
-        }
-
-        {:noreply,
-         socket
-         |> assign(:focused_object_draft, draft)
-         |> assign(:blueprint_commit_error, nil)
-         |> assign(:last_spawn, nil)}
-
-      {:error, message} ->
-        {:noreply, assign(socket, :blueprint_commit_error, {:llm_refusal, message})}
+      true ->
+        apply_resolver_outcome(socket, result)
     end
   end
 
@@ -1881,7 +1865,6 @@ defmodule AgenticRealmsWeb.GameLive do
           long_description: bp.long_description,
           fixed: bp.fixed,
           proposed_slug: bp.id,
-          slug_overridden: true,
           expected_revision: current
         }
 
@@ -1969,6 +1952,65 @@ defmodule AgenticRealmsWeb.GameLive do
     |> assign(:focused_object_edit, nil)
   end
 
+  # Feature 014 — cancelling an in-flight wizard LLM resolver task on
+  # discard. Demonitors so the trailing :DOWN message is flushed; the
+  # completion message that arrives later will fail to match the
+  # `wizard_resolver_task: %{ref: ref}` guard and hit the generic
+  # stale-task fallback. Prevents a discarded draft from re-populating
+  # after the wizard thought they cancelled.
+  defp cancel_wizard_resolver_task(%{assigns: %{wizard_resolver_task: %{ref: ref}}} = socket)
+       when is_reference(ref) do
+    Process.demonitor(ref, [:flush])
+
+    socket
+    |> assign(:wizard_resolver_task, nil)
+    |> assign(:wizard_input_locked, false)
+  end
+
+  defp cancel_wizard_resolver_task(socket), do: socket
+
+  # Feature 014 US1 / US3 — apply the resolver-task outcome to the
+  # appropriate draft assign. Helper extracted from the handle_info
+  # clause so the same logic isn't repeated for the mode-matched and
+  # mode-mismatched branches (the mismatched branch deliberately
+  # skips this — see bug_007 in the PR #30 review).
+  defp apply_resolver_outcome(socket, result) do
+    case result do
+      {:ok, {:draft_blueprint, fields}} ->
+        slug = AgenticRealms.World.ObjectBlueprint.Slug.derive(fields.name)
+
+        draft = %{
+          name: fields.name,
+          short_description: fields.short_description,
+          long_description: fields.long_description,
+          fixed: fields.fixed,
+          proposed_slug: slug
+        }
+
+        {:noreply,
+         socket
+         |> assign(:focused_blueprint_draft, draft)
+         |> assign(:blueprint_commit_error, nil)}
+
+      {:ok, {:freeform_object, fields}} ->
+        draft = %{
+          name: fields.name,
+          short_description: fields.short_description,
+          long_description: fields.long_description,
+          fixed: fields.fixed
+        }
+
+        {:noreply,
+         socket
+         |> assign(:focused_object_draft, draft)
+         |> assign(:blueprint_commit_error, nil)
+         |> assign(:last_spawn, nil)}
+
+      {:error, message} ->
+        {:noreply, assign(socket, :blueprint_commit_error, {:llm_refusal, message})}
+    end
+  end
+
   # Feature 014 US6 — apply a `WizardBlueprintRegistryChanged` payload
   # to the wizard's `:object_blueprints` list in place. Insert (with
   # de-dup) on :created; merge the sparse diff into the matching row
@@ -1984,14 +2026,23 @@ defmodule AgenticRealmsWeb.GameLive do
     if Enum.any?(list, &(&1.id == bp_id)) do
       socket
     else
-      row = %{
+      # Build a real %ObjectBlueprint{} struct so the :object_blueprints
+      # assign stays homogeneous (consumers can pattern-match on the
+      # struct, access timestamps, etc.). Timestamps are slightly off
+      # from the projector's canonical values but within the same
+      # second.
+      now = DateTime.utc_now() |> DateTime.truncate(:second)
+
+      row = %AgenticRealms.World.Schemas.ObjectBlueprint{
         id: bp_id,
+        kind: Map.get(payload, :kind, "object"),
         name: Map.get(payload, :name, ""),
         short_description: Map.get(payload, :short_description, ""),
         long_description: Map.get(payload, :long_description, ""),
         fixed: Map.get(payload, :fixed, false),
-        kind: Map.get(payload, :kind, "object"),
-        revision: revision
+        revision: revision,
+        inserted_at: now,
+        updated_at: now
       }
 
       assign(

@@ -2193,14 +2193,7 @@ defmodule AgenticRealmsWeb.GameComponents do
         <label class="bp-field-label">
           Slug
           <span class="bp-field-hint">
-            <%= cond do %>
-              <% not is_nil(Map.get(@draft, :expected_revision)) -> %>
-                locked after creation
-              <% Map.get(@draft, :slug_overridden, false) -> %>
-                manual
-              <% true -> %>
-                auto from name
-            <% end %>
+            <%= slug_hint(@draft) %>
           </span>
         </label>
         <input
@@ -2351,10 +2344,31 @@ defmodule AgenticRealmsWeb.GameComponents do
     """
   end
 
+  # Pure helper for the slug field hint — distinguishes locked
+  # (edit mode), auto-derived (slug == Slug.derive(name)), and manual
+  # (slug differs from what derive would produce). No sticky flag —
+  # the slug value itself is the source of truth.
+  defp slug_hint(draft) do
+    cond do
+      not is_nil(Map.get(draft, :expected_revision)) ->
+        "locked after creation"
+
+      Map.get(draft, :proposed_slug, "") ==
+          AgenticRealms.World.ObjectBlueprint.Slug.derive(Map.get(draft, :name, "")) ->
+        "auto from name"
+
+      true ->
+        "manual"
+    end
+  end
+
   defp format_commit_error(:not_a_wizard), do: "Not authorized."
   defp format_commit_error(:unknown_player), do: "Account no longer exists."
   defp format_commit_error(:invalid_slug),
     do: "Slug must be lowercase letters, digits, and underscores; 1–64 characters."
+
+  defp format_commit_error(:invalid_field),
+    do: "That field can't be edited from here."
 
   defp format_commit_error(:slug_already_exists),
     do: "A blueprint with that slug already exists. Choose a different slug."
@@ -2367,6 +2381,18 @@ defmodule AgenticRealmsWeb.GameComponents do
 
   defp format_commit_error(:object_not_in_room),
     do: "That object isn't in this room anymore."
+
+  defp format_commit_error(:object_not_editable_here),
+    do: "That object isn't in this room anymore — someone just picked it up, or you've moved on."
+
+  defp format_commit_error(:blueprint_already_exists),
+    do: "Another wizard just created a blueprint with that slug. Choose a different slug."
+
+  defp format_commit_error(:blueprint_not_found),
+    do: "That blueprint no longer exists."
+
+  defp format_commit_error(:room_not_found),
+    do: "That room isn't available right now — try again in a moment."
 
   defp format_commit_error({:llm_refusal, message}), do: message
 
