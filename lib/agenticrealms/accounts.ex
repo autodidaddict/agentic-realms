@@ -2,20 +2,25 @@ defmodule AgenticRealms.Accounts do
   alias AgenticRealms.Repo
   alias AgenticRealms.Accounts.Player
 
+  @spec register_player(map()) :: {:ok, Player.t()} | {:error, Ecto.Changeset.t()}
   def register_player(attrs) do
     %Player{}
     |> Player.registration_changeset(attrs)
     |> Repo.insert()
   end
 
+  @spec get_player!(term()) :: Player.t()
   def get_player!(id), do: Repo.get!(Player, id)
 
+  @spec get_player(term()) :: Player.t() | nil
   def get_player(id), do: Repo.get(Player, id)
 
+  @spec get_player_by_username(String.t()) :: Player.t() | nil
   def get_player_by_username(username) when is_binary(username) do
     Repo.get_by(Player, username: username)
   end
 
+  @spec get_player_by_username_and_password(String.t(), String.t()) :: Player.t() | nil
   def get_player_by_username_and_password(username, password)
       when is_binary(username) and is_binary(password) do
     player = get_player_by_username(username)
@@ -25,24 +30,31 @@ defmodule AgenticRealms.Accounts do
     end
   end
 
+  @spec change_player_registration(Player.t(), map()) :: Ecto.Changeset.t()
   def change_player_registration(%Player{} = player, attrs \\ %{}) do
     Player.registration_changeset(player, attrs)
   end
 
+  @spec change_player_username(Player.t(), map()) :: Ecto.Changeset.t()
   def change_player_username(%Player{} = player, attrs \\ %{}) do
     Player.username_changeset(player, attrs)
   end
 
+  @spec update_player_username(Player.t(), map()) ::
+          {:ok, Player.t()} | {:error, Ecto.Changeset.t()}
   def update_player_username(%Player{} = player, attrs) do
     player
     |> Player.username_changeset(attrs)
     |> Repo.update()
   end
 
+  @spec change_player_password(Player.t(), map()) :: Ecto.Changeset.t()
   def change_player_password(%Player{} = player, attrs \\ %{}) do
     Player.password_changeset(player, attrs)
   end
 
+  @spec update_player_password(Player.t(), String.t(), map()) ::
+          {:ok, Player.t()} | {:error, Ecto.Changeset.t()}
   def update_player_password(%Player{} = player, current_password, attrs) do
     changeset = Player.password_changeset(player, attrs)
 
@@ -56,6 +68,8 @@ defmodule AgenticRealms.Accounts do
     end
   end
 
+  @spec update_player_preferences(Player.t(), map()) ::
+          {:ok, Player.t()} | {:error, Ecto.Changeset.t()}
   def update_player_preferences(%Player{} = player, attrs) do
     player
     |> Player.preferences_changeset(attrs)
@@ -99,6 +113,8 @@ defmodule AgenticRealms.Accounts do
   patching `world_objects` directly here would leave the aggregate
   unaware that the object is now in its room, breaking subsequent takes.
   """
+  @spec delete_player(Player.t()) ::
+          {:ok, Player.t()} | {:error, term()}
   def delete_player(%Player{} = player) do
     alias AgenticRealms.World.{Queries, Seed}
 

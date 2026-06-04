@@ -13,6 +13,7 @@ defmodule AgenticRealms.World.NPCChat.TaskSupervisor do
   """
 
   @doc false
+  @spec child_spec(term()) :: Supervisor.child_spec()
   def child_spec(_arg) do
     Supervisor.child_spec({Task.Supervisor, name: __MODULE__}, id: __MODULE__)
   end

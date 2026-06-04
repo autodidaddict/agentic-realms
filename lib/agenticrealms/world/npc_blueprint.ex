@@ -32,6 +32,8 @@ defmodule AgenticRealms.World.NPCBlueprint do
 
   # --- CreateNPCBlueprint -------------------------------------------------
 
+  @spec execute(%__MODULE__{}, %CreateNPCBlueprint{} | %SpawnNPCClone{}) ::
+          %NPCBlueprintCreated{} | %NPCClonedFromBlueprint{} | {:error, atom()}
   def execute(%__MODULE__{id: nil}, %CreateNPCBlueprint{
         blueprint_id: bp_id,
         name: name,
@@ -108,6 +110,7 @@ defmodule AgenticRealms.World.NPCBlueprint do
 
   # --- apply/2 ------------------------------------------------------------
 
+  @spec apply(%__MODULE__{}, %NPCBlueprintCreated{} | %NPCClonedFromBlueprint{}) :: %__MODULE__{}
   def apply(
         %__MODULE__{} = state,
         %NPCBlueprintCreated{

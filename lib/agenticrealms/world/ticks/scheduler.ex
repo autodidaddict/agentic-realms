@@ -48,6 +48,7 @@ defmodule AgenticRealms.World.Ticks.Scheduler do
   # --- Client -------------------------------------------------------------
 
   @doc "Start a Scheduler registered for `room_id`."
+  @spec start_link(room_id :: String.t()) :: GenServer.on_start()
   def start_link(room_id) when is_binary(room_id) do
     GenServer.start_link(__MODULE__, room_id, name: Registry.via_tuple(room_id))
   end

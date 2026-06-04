@@ -14,6 +14,8 @@ defmodule AgenticRealms.World.Region do
 
   # --- CreateRegion -------------------------------------------------------
 
+  @spec execute(%__MODULE__{}, %CreateRegion{}) ::
+          %RegionCreated{} | {:error, atom()}
   def execute(%__MODULE__{id: nil}, %CreateRegion{region_id: id, name: name}) do
     case validate_name(name) do
       :ok -> %RegionCreated{region_id: id, name: name}
@@ -25,6 +27,7 @@ defmodule AgenticRealms.World.Region do
 
   # --- apply/2 ------------------------------------------------------------
 
+  @spec apply(%__MODULE__{}, %RegionCreated{}) :: %__MODULE__{}
   def apply(%__MODULE__{} = state, %RegionCreated{region_id: id, name: name}) do
     %__MODULE__{state | id: id, name: name}
   end

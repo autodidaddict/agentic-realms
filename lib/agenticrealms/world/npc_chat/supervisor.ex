@@ -13,6 +13,7 @@ defmodule AgenticRealms.World.NPCChat.Supervisor do
   alias AgenticRealms.World.NPCChat.{Conversation, Registry}
 
   @doc false
+  @spec child_spec(term()) :: Supervisor.child_spec()
   def child_spec(_arg) do
     %{
       id: __MODULE__,

@@ -188,16 +188,19 @@ defmodule AgenticRealms.World.Communication do
   end
 
   @doc false
+  @spec broadcast_room(binary(), %RoomUtterance{}) :: :ok | {:error, term()}
   def broadcast_room(room_id, %RoomUtterance{} = event) do
     Phoenix.PubSub.broadcast(@pubsub, Topics.room_topic(room_id), event)
   end
 
   @doc false
+  @spec broadcast_private(integer(), %PrivateUtterance{}) :: :ok | {:error, term()}
   def broadcast_private(recipient_id, %PrivateUtterance{} = event) do
     Phoenix.PubSub.broadcast(@pubsub, Topics.player_topic(recipient_id), event)
   end
 
   @doc false
+  @spec ensure_trailing_punctuation(String.t()) :: String.t()
   def ensure_trailing_punctuation(text) do
     if String.match?(text, ~r/[.!?]$/), do: text, else: text <> "."
   end

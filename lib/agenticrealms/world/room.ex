@@ -55,6 +55,26 @@ defmodule AgenticRealms.World.Room do
 
   # --- CreateRoom ---------------------------------------------------------
 
+  @spec execute(
+          %__MODULE__{},
+          %CreateRoom{}
+          | %AddExit{}
+          | %PlaceObject{}
+          | %AgenticRealms.World.Commands.SpawnObjectFromBlueprint{}
+          | %AgenticRealms.World.Commands.SpawnObjectFreeform{}
+          | %AgenticRealms.World.Commands.EditObject{}
+          | %TakeObject{}
+          | %DropObject{}
+        ) ::
+          %RoomCreated{}
+          | %ExitAdded{}
+          | %ObjectPlacedInRoom{}
+          | %AgenticRealms.World.Events.ObjectSpawned{}
+          | %AgenticRealms.World.Events.ObjectEdited{}
+          | %ObjectTakenFromRoom{}
+          | %ObjectDroppedInRoom{}
+          | :ok
+          | {:error, atom()}
   def execute(%__MODULE__{id: nil}, %CreateRoom{
         room_id: id,
         name: name,
@@ -273,6 +293,17 @@ defmodule AgenticRealms.World.Room do
 
   # --- apply/2 ------------------------------------------------------------
 
+  @spec apply(
+          %__MODULE__{},
+          %RoomCreated{}
+          | %ExitAdded{}
+          | %AgenticRealms.World.Events.ObjectSpawned{}
+          | %ObjectPlacedInRoom{}
+          | %ObjectTakenFromRoom{}
+          | %ObjectDroppedInRoom{}
+          | %NPCSpawnedInRoom{}
+          | %AgenticRealms.World.Events.ObjectEdited{}
+        ) :: %__MODULE__{}
   def apply(
         %__MODULE__{} = state,
         %RoomCreated{

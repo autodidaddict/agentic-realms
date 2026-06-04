@@ -26,6 +26,8 @@ defmodule AgenticRealms.World.Player do
 
   # --- SpawnPlayer --------------------------------------------------------
 
+  @spec execute(%__MODULE__{}, %SpawnPlayer{} | %MovePlayer{} | %RecordRoomDiscovery{}) ::
+          %PlayerSpawned{} | %PlayerMoved{} | %PlayerDiscoveredRoom{} | :ok | {:error, atom()}
   def execute(%__MODULE__{current_room_id: nil}, %SpawnPlayer{
         player_id: pid,
         starting_room_id: room_id
@@ -87,6 +89,8 @@ defmodule AgenticRealms.World.Player do
 
   # --- apply/2 ------------------------------------------------------------
 
+  @spec apply(%__MODULE__{}, %PlayerSpawned{} | %PlayerMoved{} | %PlayerDiscoveredRoom{}) ::
+          %__MODULE__{}
   def apply(%__MODULE__{} = state, %PlayerSpawned{player_id: pid, room_id: room_id}) do
     %__MODULE__{state | id: pid, current_room_id: room_id}
   end

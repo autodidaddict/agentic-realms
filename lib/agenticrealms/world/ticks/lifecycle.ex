@@ -40,17 +40,20 @@ defmodule AgenticRealms.World.Ticks.Lifecycle do
   # --- Client -------------------------------------------------------------
 
   @doc false
+  @spec start_link(keyword()) :: GenServer.on_start()
   def start_link(opts \\ []) do
     GenServer.start_link(__MODULE__, opts, name: __MODULE__)
   end
 
   @doc "Test/debug-only state inspection."
+  @spec get_state() :: %__MODULE__{}
   def get_state, do: GenServer.call(__MODULE__, :get_state)
 
   @doc """
   Test helper: inject a room event as if it had been received via PubSub.
   Routes through the same handle_info clauses production traffic uses.
   """
+  @spec notify(term()) :: term()
   def notify(event), do: send(__MODULE__, event)
 
   # --- Server -------------------------------------------------------------

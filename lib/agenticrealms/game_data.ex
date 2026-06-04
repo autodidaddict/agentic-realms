@@ -4,6 +4,7 @@ defmodule AgenticRealms.GameData do
   All game data is hardcoded here for the GUI design language feature.
   """
 
+  @spec rooms() :: map()
   def rooms do
     %{
       tavern: %{
@@ -28,6 +29,7 @@ defmodule AgenticRealms.GameData do
     }
   end
 
+  @spec starting_log() :: [map()]
   def starting_log do
     tavern = rooms().tavern
 
@@ -60,6 +62,7 @@ defmodule AgenticRealms.GameData do
     ]
   end
 
+  @spec player_stats() :: map()
   def player_stats do
     %{
       name: "Veyr of Ashfall",
@@ -70,6 +73,7 @@ defmodule AgenticRealms.GameData do
     }
   end
 
+  @spec inventory() :: [map()]
   def inventory do
     [
       %{name: "warhammer of dawn", qty: 1, equipped: true},
@@ -86,6 +90,7 @@ defmodule AgenticRealms.GameData do
   # backed by `AgenticRealms.World.Quests.active_for/1` and
   # `history_for/1`, computed from `quest_instances` + current inventory.
 
+  @spec presence() :: [map()]
   def presence do
     [
       %{name: "Sable", status: "active", npc: false},
@@ -98,6 +103,7 @@ defmodule AgenticRealms.GameData do
   # Feature 012 removed `map_nodes/0` and `map_edges/0` — the mini-map
   # is now driven by `AgenticRealms.World.MapView` over real world state.
 
+  @spec starter_prompts() :: map()
   def starter_prompts do
     %{
       item:
@@ -113,6 +119,7 @@ defmodule AgenticRealms.GameData do
     }
   end
 
+  @spec default_tweaks() :: map()
   def default_tweaks do
     %{
       theme: "phosphor",
@@ -123,6 +130,7 @@ defmodule AgenticRealms.GameData do
     }
   end
 
+  @spec wizard_examples() :: map()
   def wizard_examples do
     %{
       room: %{
@@ -380,6 +388,7 @@ defmodule AgenticRealms.GameData do
   @doc """
   Returns the streaming response text for the "read letter" command.
   """
+  @spec streaming_response() :: String.t()
   def streaming_response do
     "You break the wax seal. Beneath the parchment, in ink that smells faintly of iron, the letter begins: 'If you are reading this, I am already in the Archivist's debt, and you are the only one I trust to settle it.'"
   end
@@ -387,6 +396,7 @@ defmodule AgenticRealms.GameData do
   @doc """
   Maps presence names to their detailed role info for the modal.
   """
+  @spec presence_roles() :: map()
   def presence_roles do
     %{
       "Sable" => %{role: "Informant · tier 3", kind: "other"},
@@ -399,6 +409,7 @@ defmodule AgenticRealms.GameData do
   @doc """
   Returns the ability scores for the player character sheet modal.
   """
+  @spec ability_scores() :: [map()]
   def ability_scores do
     [
       %{name: "Strength", value: "14", modifier: "+2"},
@@ -413,6 +424,7 @@ defmodule AgenticRealms.GameData do
   @doc """
   Maps trigger action kind atoms to human-readable labels.
   """
+  @spec action_labels() :: map()
   def action_labels do
     %{
       "emit_text" => "Emit text",
@@ -428,6 +440,7 @@ defmodule AgenticRealms.GameData do
   @doc """
   Maps condition operator codes to display labels.
   """
+  @spec condition_ops() :: map()
   def condition_ops do
     %{
       "equals" => "equals",
@@ -443,6 +456,7 @@ defmodule AgenticRealms.GameData do
   @doc """
   Returns the list of available trigger intents for the intent dropdown.
   """
+  @spec trigger_intents() :: [String.t()]
   def trigger_intents do
     ["Friendly Touch", "Look", "Use", "Take", "Attack", "Speak", "Whisper", "Move"]
   end
