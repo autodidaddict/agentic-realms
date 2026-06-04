@@ -32,6 +32,11 @@ defmodule AgenticRealmsWeb.Layouts do
     default: nil,
     doc: "current game mode (:player or :wizard) — only set on the game page"
 
+  attr :is_wizard, :boolean,
+    default: false,
+    doc:
+      "feature 014 FR-WIZ-3 — gates the Wizard/Player top-bar switch. Non-wizards never see the switch."
+
   slot :inner_block, required: true
 
   def app(assigns) do
@@ -52,7 +57,7 @@ defmodule AgenticRealmsWeb.Layouts do
       </div>
       <div class="ar-navbar-right">
         <%= if @current_player do %>
-          <%= if @game_mode do %>
+          <%= if @game_mode && @is_wizard do %>
             <div class="mode-switch" role="tablist">
               <button
                 class={[@game_mode == :player && "active"]}

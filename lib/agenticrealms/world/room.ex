@@ -133,6 +133,112 @@ defmodule AgenticRealms.World.Room do
     end
   end
 
+  # --- SpawnObjectFromBlueprint (feature 014 US2) -------------------------
+
+  def execute(%__MODULE__{id: nil}, %AgenticRealms.World.Commands.SpawnObjectFromBlueprint{}),
+    do: {:error, :room_not_found}
+
+  def execute(
+        %__MODULE__{id: rid, object_ids: ids},
+        %AgenticRealms.World.Commands.SpawnObjectFromBlueprint{
+          room_id: rid,
+          object_id: oid,
+          name: name,
+          short_description: short,
+          long_description: long,
+          fixed: fixed
+        }
+      ) do
+    if MapSet.member?(ids, oid) do
+      {:error, :object_already_in_room}
+    else
+      %AgenticRealms.World.Events.ObjectSpawned{
+        object_id: oid,
+        room_id: rid,
+        name: name,
+        short_description: short,
+        long_description: long,
+        fixed: fixed
+      }
+    end
+  end
+
+  # --- SpawnObjectFreeform (feature 014 US3) ------------------------------
+  # Identical event shape to SpawnObjectFromBlueprint — the freeform
+  # path produces the same `ObjectSpawned` event so the projector and
+  # the UI broadcaster don't have to discriminate.
+
+  def execute(%__MODULE__{id: nil}, %AgenticRealms.World.Commands.SpawnObjectFreeform{}),
+    do: {:error, :room_not_found}
+
+  def execute(
+        %__MODULE__{id: rid, object_ids: ids},
+        %AgenticRealms.World.Commands.SpawnObjectFreeform{
+          room_id: rid,
+          object_id: oid,
+          name: name,
+          short_description: short,
+          long_description: long,
+          fixed: fixed
+        }
+      ) do
+    if MapSet.member?(ids, oid) do
+      {:error, :object_already_in_room}
+    else
+      %AgenticRealms.World.Events.ObjectSpawned{
+        object_id: oid,
+        room_id: rid,
+        name: name,
+        short_description: short,
+        long_description: long,
+        fixed: fixed
+      }
+    end
+  end
+
+  # --- EditObject (feature 014 US5) ---------------------------------------
+  # The Room aggregate confirms the object is currently in this room
+  # (via its `object_ids` MapSet) and validates the `fields_changed`
+  # keys against an allowlist before emitting `ObjectEdited`. The
+  # allowlist is the aggregate-boundary defense-in-depth that mirrors
+  # `ObjectBlueprint.execute/2`'s policy — without it, a future iex /
+  # tool / test caller could dispatch a sparse diff that touches
+  # `:room_id`, `:player_id`, `:quest_player_id`, etc., and the
+  # projector would `Repo.update_all` it verbatim.
+
+  @editable_object_fields ~w(name short_description long_description fixed)a
+
+  def execute(%__MODULE__{id: nil}, %AgenticRealms.World.Commands.EditObject{}),
+    do: {:error, :room_not_found}
+
+  def execute(
+        %__MODULE__{id: rid, object_ids: ids},
+        %AgenticRealms.World.Commands.EditObject{
+          room_id: rid,
+          object_id: oid,
+          fields_changed: fields_changed
+        }
+      )
+      when is_map(fields_changed) do
+    cond do
+      not Enum.all?(Map.keys(fields_changed), &(&1 in @editable_object_fields)) ->
+        {:error, :invalid_field}
+
+      not MapSet.member?(ids, oid) ->
+        {:error, :object_not_in_room}
+
+      map_size(fields_changed) == 0 ->
+        :ok
+
+      true ->
+        %AgenticRealms.World.Events.ObjectEdited{
+          object_id: oid,
+          room_id: rid,
+          fields_changed: fields_changed
+        }
+    end
+  end
+
   # --- TakeObject ---------------------------------------------------------
 
   def execute(%__MODULE__{id: nil}, %TakeObject{}), do: {:error, :room_not_found}
@@ -197,6 +303,12 @@ defmodule AgenticRealms.World.Room do
     %__MODULE__{state | exits: Map.put(exits, direction, target)}
   end
 
+  def apply(%__MODULE__{object_ids: ids} = state, %AgenticRealms.World.Events.ObjectSpawned{
+        object_id: oid
+      }) do
+    %__MODULE__{state | object_ids: MapSet.put(ids, oid)}
+  end
+
   def apply(%__MODULE__{object_ids: ids} = state, %ObjectPlacedInRoom{object_id: oid}) do
     %__MODULE__{state | object_ids: MapSet.put(ids, oid)}
   end
@@ -215,6 +327,11 @@ defmodule AgenticRealms.World.Room do
   # This clause exists only so rehydrating a Room aggregate from its event
   # stream doesn't crash on historical events emitted by feature 007.
   def apply(%__MODULE__{} = state, %NPCSpawnedInRoom{}), do: state
+
+  # Feature 014 US5 — in-place Object edit. No effect on the Room
+  # aggregate's tracked object_ids; the projector applies the field
+  # diff to `world_objects` directly.
+  def apply(%__MODULE__{} = state, %AgenticRealms.World.Events.ObjectEdited{}), do: state
 end
 
 # Snapshot serialization for the Room aggregate (issue #6).

@@ -11,6 +11,7 @@ defmodule AgenticRealms.Accounts.Player do
     field :password, :string, virtual: true, redact: true
     field :theme, :string, default: "phosphor"
     field :density, :string, default: "comfortable"
+    field :is_wizard, :boolean, default: false
 
     timestamps(type: :utc_datetime)
   end

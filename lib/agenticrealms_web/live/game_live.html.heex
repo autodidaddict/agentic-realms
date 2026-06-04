@@ -1,4 +1,4 @@
-<Layouts.app flash={@flash} current_player={@current_player} game_mode={@mode}>
+<Layouts.app flash={@flash} current_player={@current_player} game_mode={@mode} is_wizard={@is_wizard}>
   <div class="app" id="game-root" phx-hook=".ThemeSwitch">
     <%= if @mode == :player do %>
       <.player_view
@@ -24,14 +24,21 @@
       />
       <.presence_modal :if={@modal == :presence} presence={@presence} />
     <% else %>
-      <.wizard_view
-        kind={@wizard_kind}
-        text={@wizard_text}
+      <.wizard_authoring_view
+        authoring_mode={@authoring_mode}
+        focused_blueprint_draft={@focused_blueprint_draft}
+        focused_object_draft={@focused_object_draft}
+        focused_object_edit={@focused_object_edit}
+        object_blueprints={@object_blueprints}
+        room_objects={@room_objects}
+        wizard_prompt={@wizard_prompt}
+        wizard_input_locked={@wizard_input_locked}
+        blueprint_commit_error={@blueprint_commit_error}
+        current_room_id={@current_room_id}
+        current_room_name={@current_room_name}
+        last_spawn={@last_spawn}
         tweaks={@tweaks}
-        wizard_examples={@wizard_examples}
       />
-
-      <.trigger_modal :if={@open_trigger} trigger={@open_trigger} />
     <% end %>
   </div>
 

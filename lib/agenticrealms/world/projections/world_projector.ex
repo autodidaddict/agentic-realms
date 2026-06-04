@@ -36,6 +36,8 @@ defmodule AgenticRealms.World.Projections.WorldProjector do
     RoomCreated,
     ExitAdded,
     ObjectPlacedInRoom,
+    ObjectSpawned,
+    ObjectEdited,
     ObjectTakenFromRoom,
     ObjectDroppedInRoom,
     NPCSpawnedInRoom,
@@ -119,6 +121,58 @@ defmodule AgenticRealms.World.Projections.WorldProjector do
       },
       on_conflict: :nothing,
       conflict_target: [:source_room_id, :direction]
+    )
+
+    :ok
+  end
+
+  # Feature 014 US5 — wizard-driven in-place Object edit. Applies the
+  # sparse diff to the matching `world_objects` row.
+  def handle(%ObjectEdited{object_id: oid, fields_changed: fields_changed}, _meta) do
+    now = DateTime.utc_now() |> DateTime.truncate(:second)
+
+    updates =
+      fields_changed
+      |> Map.put(:updated_at, now)
+      |> Map.to_list()
+
+    import Ecto.Query
+
+    from(o in AgenticRealms.World.Schemas.Object, where: o.id == ^oid)
+    |> Repo.update_all(set: updates)
+
+    :ok
+  end
+
+  # Feature 014 US2 — wizard-driven spawn. Identical row insert to the
+  # ObjectPlacedInRoom path; the event simply carries no behaviors and
+  # no quest scoping. Idempotent replay via on_conflict: :nothing.
+  def handle(
+        %ObjectSpawned{
+          object_id: oid,
+          room_id: room_id,
+          name: name,
+          short_description: short,
+          long_description: long,
+          fixed: fixed
+        },
+        _meta
+      ) do
+    Repo.insert!(
+      %Object{
+        id: oid,
+        name: name,
+        short_description: short,
+        long_description: long,
+        fixed: fixed,
+        room_id: room_id,
+        player_id: nil,
+        behaviors: [],
+        quest_player_id: nil,
+        quest_instance_id: nil
+      },
+      on_conflict: :nothing,
+      conflict_target: :id
     )
 
     :ok

@@ -63,6 +63,30 @@ defmodule AgenticRealms.Accounts do
   end
 
   @doc """
+  Promote a player to wizard status. Idempotent on already-wizard accounts.
+
+  Intended invocation: `iex` during local development. No UI for promotion
+  ships in feature 014 milestone 1 — see
+  `specs/014-item-blueprints/spec.md` Clarifications + FR-WIZ-2.
+  """
+  @spec promote_to_wizard(integer()) ::
+          {:ok, %Player{}} | {:error, :not_found}
+  def promote_to_wizard(player_id) when is_integer(player_id) do
+    case Repo.get(Player, player_id) do
+      nil ->
+        {:error, :not_found}
+
+      %Player{is_wizard: true} = player ->
+        {:ok, player}
+
+      %Player{} = player ->
+        player
+        |> Ecto.Changeset.change(is_wizard: true)
+        |> Repo.update()
+    end
+  end
+
+  @doc """
   Delete a player's account.
 
   Per FR-023, any objects the player is carrying are returned to the room

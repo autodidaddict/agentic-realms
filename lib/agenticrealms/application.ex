@@ -108,6 +108,10 @@ defmodule AgenticRealms.Application do
         # events; separate from WorldProjector to keep concerns focused
         # and isolate replay positions.
         AgenticRealms.World.Projections.QuestProjector,
+        # Feature 014 — Object Blueprints. Separate projector for the
+        # `object_blueprints` read-model; handles ObjectBlueprintCreated
+        # (US1) and ObjectBlueprintEdited (US5).
+        AgenticRealms.World.Projections.ObjectBlueprintProjector,
         AgenticRealms.World.UIEventBroadcaster,
         AgenticRealms.World.Behaviors.Interpreter
       ]

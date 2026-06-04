@@ -28,4 +28,13 @@ defmodule AgenticRealmsWeb.Topics do
   @spec player_topic(integer()) :: String.t()
   def player_topic(player_id) when is_integer(player_id),
     do: "player:" <> Integer.to_string(player_id)
+
+  @doc """
+  Feature 014 US6 — global topic for Object Blueprint registry change
+  events (`WizardBlueprintRegistryChanged`). Every wizard LiveView
+  subscribes on mount so that all open registries patch in place when
+  any wizard creates or edits a Blueprint anywhere in the world.
+  """
+  @spec blueprints_topic() :: String.t()
+  def blueprints_topic, do: "blueprints"
 end

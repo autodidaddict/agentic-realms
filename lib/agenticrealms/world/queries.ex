@@ -16,6 +16,7 @@ defmodule AgenticRealms.World.Queries do
     Room,
     Exit,
     Object,
+    ObjectBlueprint,
     PlayerState,
     NPCBlueprint,
     NPCClone,
@@ -552,5 +553,87 @@ defmodule AgenticRealms.World.Queries do
         where: r.region_id == ^region_id and r.elevation < ^current_elevation
       )
     )
+  end
+
+  # ──────────────────────────────────────────────────────────────────────
+  # Feature 014 — Object Blueprints
+  # ──────────────────────────────────────────────────────────────────────
+
+  @doc """
+  List all Object Blueprints, ordered by name. Drives the wizard's
+  Blueprints registry tab (FR-026). Returns plain schema structs;
+  callers project to display rows as needed.
+  """
+  @spec list_object_blueprints() :: [%ObjectBlueprint{}]
+  def list_object_blueprints do
+    Repo.all(from(b in ObjectBlueprint, order_by: [asc: b.name, asc: b.id]))
+  end
+
+  @doc """
+  Fetch a single Object Blueprint by its slug id. Returns `nil` if no
+  such row exists.
+  """
+  @spec get_object_blueprint(String.t()) :: %ObjectBlueprint{} | nil
+  def get_object_blueprint(blueprint_id) when is_binary(blueprint_id) do
+    Repo.get(ObjectBlueprint, blueprint_id)
+  end
+
+  @doc """
+  Fetch a single Object by id. Returns `nil` if no such row exists.
+  """
+  @spec get_object(String.t()) :: %Object{} | nil
+  def get_object(object_id) when is_binary(object_id) do
+    Repo.get(Object, object_id)
+  end
+
+  @doc """
+  Wizard-facing variant of `get_object/1` — returns `nil` for rows
+  that are quest-scoped (carry a non-nil `quest_player_id`). Mirrors
+  the filter that `list_objects_in_room_for_wizard/1` applies to the
+  wizard's Things-in-this-room panel. Use this anywhere a wizard
+  command/handler resolves an object_id by user input so that
+  quest-scoped items (which belong to a specific player) cannot be
+  extracted, edited, or otherwise manipulated by wizards in
+  milestone 1.
+  """
+  @spec get_object_for_wizard(String.t()) :: %Object{} | nil
+  def get_object_for_wizard(object_id) when is_binary(object_id) do
+    case Repo.get(Object, object_id) do
+      %Object{quest_player_id: nil} = obj -> obj
+      _ -> nil
+    end
+  end
+
+  @doc """
+  Wizard-facing variant of `list_objects_in_room/1` — includes the
+  `fixed` flag plus full descriptions so the Wizard view's
+  Things-in-this-room panel and the Extract-essence action have what
+  they need.
+
+  Excludes quest-scoped items (rows with a `quest_player_id`) — wizards
+  do not author / extract from per-player quest items in milestone 1.
+  """
+  @spec list_objects_in_room_for_wizard(String.t()) :: [
+          %{
+            id: String.t(),
+            name: String.t(),
+            short_description: String.t(),
+            long_description: String.t(),
+            fixed: boolean()
+          }
+        ]
+  def list_objects_in_room_for_wizard(room_id) when is_binary(room_id) do
+    from(o in Object,
+      where: o.room_id == ^room_id and is_nil(o.quest_player_id),
+      order_by: o.name,
+      select: %{
+        id: o.id,
+        name: o.name,
+        short_description: o.short_description,
+        long_description: o.long_description,
+        fixed: o.fixed
+      }
+    )
+    |> Repo.all()
   end
 end
