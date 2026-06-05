@@ -146,6 +146,63 @@ defmodule AgenticRealmsWeb.WizardNpcAuthoringTest do
     assert Enum.any?(clone.behaviors, &(&1["trigger"] == "player_entered"))
   end
 
+  test "direct-behavior editor: add a behavior alongside a toolset → both commit (FR-015a)",
+       %{wizard_conn: wzc, suffix: suffix} do
+    {:ok, view, _} = live(wzc, ~p"/play")
+    render_hook(view, "switch_mode", %{"mode" => "wizard"})
+    render_hook(view, "toggle_authoring_mode", %{})
+
+    name = "warden #{suffix}"
+
+    stub_tool_use("draft_npc_blueprint", %{
+      "name" => name,
+      "short_description" => "a stern gate warden",
+      "long_description" => "A scarred warden in studded leather.",
+      "lore" => "You keep the gate and trust no one after dark.",
+      "toolsets" => ["greeter"]
+    })
+
+    view
+    |> form("form[phx-submit='submit_wizard_prompt']", %{"text" => "a gate warden"})
+    |> render_submit()
+
+    await_wizard_unlock(view)
+
+    # The direct-behavior editor is present and starts empty.
+    assert render(view) =~ "Direct behaviors"
+
+    # Add a row, then fill it via the form-change with the toolset preserved.
+    render_hook(view, "add_direct_behavior", %{})
+
+    render_hook(view, "update_blueprint_draft", %{
+      "draft" => %{
+        "name" => name,
+        "short_description" => "a stern gate warden",
+        "long_description" => "A scarred warden in studded leather.",
+        "lore" => "You keep the gate and trust no one after dark.",
+        "toolsets" => ["greeter"],
+        "behaviors" => %{
+          "0" => %{"trigger" => "player_left", "type" => "emote", "text" => "narrows his eyes."}
+        }
+      }
+    })
+
+    render_hook(view, "commit_blueprint_draft", %{})
+
+    slug = name |> String.replace(~r/[^a-z0-9]+/, "_") |> String.trim("_")
+    bp = Queries.get_npc_blueprint_row(slug)
+
+    # The blueprint carries BOTH the toolset and the individually-added behavior.
+    assert bp.toolsets == ["greeter"]
+
+    assert bp.behaviors == [
+             %{
+               "trigger" => "player_left",
+               "actions" => [%{"type" => "emote", "text" => "narrows his eyes."}]
+             }
+           ]
+  end
+
   # --- Helpers ------------------------------------------------------------
 
   defp conn_for(conn, player_id) do

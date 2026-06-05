@@ -379,6 +379,39 @@ defmodule AgenticRealmsWeb.GameLive do
 
   def handle_event("update_blueprint_draft", _, socket), do: {:noreply, socket}
 
+  # Feature 015 US4 — direct-behavior editor add/remove (FR-015a). The rows
+  # themselves are edited through the form's phx-change; add/remove mutate the
+  # draft's behavior list directly and re-render.
+  def handle_event(
+        "add_direct_behavior",
+        _params,
+        %{assigns: %{is_wizard: true, focused_blueprint_draft: draft}} = socket
+      )
+      when not is_nil(draft) do
+    blank = %{"trigger" => "player_entered", "actions" => [%{"type" => "say", "text" => ""}]}
+    behaviors = (Map.get(draft, :behaviors) || []) ++ [blank]
+    {:noreply, assign(socket, :focused_blueprint_draft, Map.put(draft, :behaviors, behaviors))}
+  end
+
+  def handle_event("add_direct_behavior", _, socket), do: {:noreply, socket}
+
+  def handle_event(
+        "remove_direct_behavior",
+        %{"index" => index},
+        %{assigns: %{is_wizard: true, focused_blueprint_draft: draft}} = socket
+      )
+      when not is_nil(draft) do
+    behaviors =
+      case Integer.parse(index) do
+        {i, _} -> (Map.get(draft, :behaviors) || []) |> List.delete_at(i)
+        :error -> Map.get(draft, :behaviors) || []
+      end
+
+    {:noreply, assign(socket, :focused_blueprint_draft, Map.put(draft, :behaviors, behaviors))}
+  end
+
+  def handle_event("remove_direct_behavior", _, socket), do: {:noreply, socket}
+
   # Feature 014 US1 + US5 — commit the focused blueprint draft.
   # Branches on whether the draft carries `:expected_revision`:
   #   * nil → CREATE path (US1) → Wizard.commit_blueprint_create/2
@@ -991,7 +1024,27 @@ defmodule AgenticRealmsWeb.GameLive do
     draft
     |> Map.put(:lore, Map.get(params, "lore", Map.get(draft, :lore, "")) || "")
     |> Map.put(:toolsets, params |> Map.get("toolsets", []) |> List.wrap())
+    |> Map.put(:behaviors, parse_direct_behaviors(params, draft))
   end
 
   defp put_npc_draft_fields(draft, _params), do: draft
+
+  # Rebuild the direct-behavior list from the form's nested params. Rows are
+  # kept even when blank so a freshly-added row stays editable; blank rows are
+  # dropped at commit time. When the form rendered no rows the key is absent —
+  # keep whatever the draft already held.
+  defp parse_direct_behaviors(%{"behaviors" => rows}, _draft) when is_map(rows) do
+    rows
+    |> Enum.sort_by(fn {k, _v} -> String.to_integer(k) end)
+    |> Enum.map(fn {_k, row} ->
+      %{
+        "trigger" => Map.get(row, "trigger", "player_entered"),
+        "actions" => [
+          %{"type" => Map.get(row, "type", "say"), "text" => Map.get(row, "text", "")}
+        ]
+      }
+    end)
+  end
+
+  defp parse_direct_behaviors(_params, draft), do: Map.get(draft, :behaviors, []) || []
 end

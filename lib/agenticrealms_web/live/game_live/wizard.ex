@@ -36,7 +36,7 @@ defmodule AgenticRealmsWeb.GameLive.Wizard do
         long_description: Map.get(draft, :long_description, ""),
         fixed: Map.get(draft, :fixed, false),
         lore: Map.get(draft, :lore, ""),
-        behaviors: Map.get(draft, :behaviors, []),
+        behaviors: draft |> Map.get(:behaviors, []) |> drop_blank_behaviors(),
         toolsets: Map.get(draft, :toolsets, [])
       }
 
@@ -58,6 +58,21 @@ defmodule AgenticRealmsWeb.GameLive.Wizard do
   # a flat atom the component's `format_commit_error/1` already understands.
   defp normalize_error({:unknown_toolset, _name}), do: :unknown_toolset
   defp normalize_error(reason), do: reason
+
+  # US4 — a freshly-added editor row with no text is incomplete; drop it before
+  # the command's feature-009 validation rejects the empty say/emote text.
+  defp drop_blank_behaviors(behaviors) when is_list(behaviors) do
+    Enum.reject(behaviors, fn b ->
+      b
+      |> Map.get("actions", [])
+      |> List.first(%{})
+      |> Map.get("text", "")
+      |> to_string()
+      |> String.trim() == ""
+    end)
+  end
+
+  defp drop_blank_behaviors(_), do: []
 
   @doc """
   Feature 014 US5 commit-edit. Stale-revision response reloads the

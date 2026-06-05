@@ -158,9 +158,9 @@ spawn flows route through it. Drop the two old tables/aggregates (reseed). Keep 
 **Goal**: attach ≥1 toolset + direct behaviors; effective set = union; "orc shopkeeper" by stacking.
 **Independent Test**: attach two seeded toolsets + a direct behavior → effective = union (no dupes dropped); spawned clone exhibits all.
 
-- [ ] T034 [US4] Verify the authoring card supports **toolsets AND direct behaviors together** (FR-015/FR-015a) — picker + direct-behavior editor both committable; refuse unknown toolset names (FR-018).
-- [ ] T035 [P] [US4] Composition tests — blueprint with two toolsets → effective = union; toolset + direct combined; same-trigger behaviors all retained (FR-016); spawned clone exhibits both toolsets' behaviors.
-- [ ] T036 [P] [US4] No-retro-propagation test — editing a toolset (seed-level) after a clone spawned leaves the clone's frozen effective behaviors unchanged (FR-017).
+- [X] T034 [US4] Verify the authoring card supports **toolsets AND direct behaviors together** (FR-015/FR-015a) — picker + direct-behavior editor both committable; refuse unknown toolset names (FR-018).
+- [X] T035 [P] [US4] Composition tests — blueprint with two toolsets → effective = union; toolset + direct combined; same-trigger behaviors all retained (FR-016); spawned clone exhibits both toolsets' behaviors.
+- [X] T036 [P] [US4] No-retro-propagation test — editing a toolset (seed-level) after a clone spawned leaves the clone's frozen effective behaviors unchanged (FR-017).
 
 ---
 

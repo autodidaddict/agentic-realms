@@ -503,6 +503,68 @@ defmodule AgenticRealmsWeb.GameComponents.WizardAuthoring do
             </div>
           <% end %>
         </div>
+
+        <div class="bp-field">
+          <label class="bp-field-label">
+            Direct behaviors
+            <span class="bp-field-hint">individual triggers, on top of any toolsets (FR-015a)</span>
+          </label>
+          <div
+            data-testid="blueprint-direct-behaviors"
+            style="display: flex; flex-direction: column; gap: 6px;"
+          >
+            <div
+              :for={{b, i} <- Enum.with_index(Map.get(@draft, :behaviors, []) || [])}
+              class="bp-behavior-row"
+              data-testid={"direct-behavior-#{i}"}
+              style="display: flex; gap: 6px; align-items: center;"
+            >
+              <select
+                name={"draft[behaviors][#{i}][trigger]"}
+                class="bp-input"
+                style="flex: 0 0 auto;"
+              >
+                <option value="player_entered" selected={behavior_trigger(b) == "player_entered"}>
+                  on enter
+                </option>
+                <option value="player_left" selected={behavior_trigger(b) == "player_left"}>
+                  on leave
+                </option>
+              </select>
+              <select name={"draft[behaviors][#{i}][type]"} class="bp-input" style="flex: 0 0 auto;">
+                <option value="say" selected={behavior_type(b) == "say"}>say</option>
+                <option value="emote" selected={behavior_type(b) == "emote"}>emote</option>
+              </select>
+              <input
+                type="text"
+                name={"draft[behaviors][#{i}][text]"}
+                value={behavior_text(b)}
+                class="bp-input"
+                placeholder="text the NPC says / emotes…"
+                style="flex: 1 1 auto;"
+              />
+              <button
+                type="button"
+                class="btn-ghost"
+                phx-click="remove_direct_behavior"
+                phx-value-index={i}
+                title="Remove this behavior"
+                style="flex: 0 0 auto;"
+              >
+                ×
+              </button>
+            </div>
+          </div>
+          <button
+            type="button"
+            class="btn-ghost"
+            phx-click="add_direct_behavior"
+            data-testid="add-direct-behavior"
+            style="margin-top: 4px; font-size: 11px;"
+          >
+            + Add behavior
+          </button>
+        </div>
       <% end %>
 
       <div class="bp-field">
@@ -628,6 +690,16 @@ defmodule AgenticRealmsWeb.GameComponents.WizardAuthoring do
     </form>
     """
   end
+
+  # Feature 015 US4 — read the (single-action) shape the direct-behavior editor
+  # renders out of a feature-009 behavior map.
+  defp behavior_trigger(b), do: Map.get(b, "trigger", "player_entered")
+
+  defp behavior_type(b),
+    do: b |> Map.get("actions", []) |> List.first(%{}) |> Map.get("type", "say")
+
+  defp behavior_text(b),
+    do: b |> Map.get("actions", []) |> List.first(%{}) |> Map.get("text", "")
 
   # Slug field hint — distinguishes locked (edit mode), auto-derived
   # (slug == Slug.derive(name)), and manual (slug differs from what
