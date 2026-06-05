@@ -587,9 +587,9 @@ defmodule AgenticRealmsWeb.GameLive do
   def handle_event("update_object_draft", _, socket), do: {:noreply, socket}
 
   # Feature 014 US3 — commit the focused freeform-object draft.
-  # Spawns the Object into the wizard's current room via
-  # SpawnObjectFreeform — no Object Blueprint involvement, no
-  # registry change.
+  # Spawns the Object into the wizard's current room via the
+  # `spawn_object_freeform` wrapper (clone/move, feature 016) — no Object
+  # Blueprint involvement, no registry change.
   def handle_event(
         "commit_object_draft",
         _params,

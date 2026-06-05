@@ -13,15 +13,19 @@ defmodule AgenticRealms.World.UIEventBroadcaster do
   per FR-029 — the broadcaster fans out to all subscribers in the relevant
   room or player scope.
 
-  Handler clauses added so far:
-    * Phase 4 (US1): PlayerSpawned → RoomPlayerArrived(from_direction: nil)
-                                     + PlayerCurrentRoomChanged(from: nil)
-    * Phase 5 (US2): PlayerMoved   → RoomPlayerLeft + RoomPlayerArrived
-                                     + PlayerCurrentRoomChanged
-    * Phase 6 (US3): ObjectTakenFromRoom → RoomObjectTaken
-                                           + PlayerInventoryChanged(:added)
-                     ObjectDroppedInRoom → RoomObjectDropped
-                                           + PlayerInventoryChanged(:removed)
+  Handler clauses:
+    * `PlayerSpawned` / `PlayerMoved` → RoomPlayerArrived / RoomPlayerLeft
+      + PlayerCurrentRoomChanged.
+    * `EntityMoved` (feature 016) → one witness mapping keyed on
+      `(kind, cause, from→to)` that reproduces every prior convention:
+      object spawn → RoomObjectArrived; take → RoomObjectTaken +
+      PlayerInventoryChanged(:added); drop → RoomObjectDropped +
+      PlayerInventoryChanged(:removed); room→room relocation →
+      RoomObjectDeparted + RoomObjectArrived; NPC spawn → RoomNPCArrived;
+      seed/quest placement and moves into the void are silent.
+    * `EntityEdited` → RoomObjectEdited (quiet).
+    * `ObjectBlueprintCreated`/`Edited`, `QuestAccepted`/`Completed` → their
+      respective UI broadcasts.
   """
 
   # `:eventual` (issue #9). The earlier `:strong` declaration was added

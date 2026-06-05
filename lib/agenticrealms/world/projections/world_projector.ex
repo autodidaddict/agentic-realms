@@ -1,24 +1,20 @@
 defmodule AgenticRealms.World.Projections.WorldProjector do
   @moduledoc """
-  Projects every room / exit / object / NPC domain event into the
-  `world_rooms`, `world_exits`, `world_objects`, `npc_blueprints`, and
-  `npc_clones` Ecto-backed read models.
+  Projects room / exit / region / NPC-blueprint / quest domain events into
+  the `world_rooms`, `world_exits`, `npc_blueprints`, `regions`, and
+  `quest_instances` read models.
 
-  Event handler clauses added so far:
-    * Phase 3 (US5): RoomCreated, ExitAdded, ObjectPlacedInRoom
-    * Phase 6 (US3): ObjectTakenFromRoom, ObjectDroppedInRoom
-    * Feature 007: NPCSpawnedInRoom (REWRITTEN in 008 — see below)
-    * Feature 008: NPCBlueprintCreated, NPCClonedFromBlueprint
+  Current handlers: `RoomCreated`, `ExitAdded`, `RegionCreated`,
+  `NPCBlueprintCreated`, `PlayerDiscoveredRoom`, and `QuestAccepted` (which
+  also dispatches quest-item creation via the entity lifecycle).
+
+  **Feature 016 note**: object and NPC-clone row writes moved to
+  `EntityProjector` (from `EntityCloned`/`EntityMoved`/`EntityEdited`) when
+  spawning was unified onto clone/move. The object placement/take/drop and
+  NPC clone/legacy-replay handlers were removed from this projector.
 
   Every insert uses `on_conflict: :nothing` so the projector is safe to
   replay against a partially-populated read model.
-
-  **Feature 008 — legacy NPCSpawnedInRoom handling**: the feature 007 event
-  type is preserved in the event store; this projector handles it by
-  deriving a deterministic synthetic blueprint id, upserting a blueprint
-  row with `is_synthetic: true`, then inserting the clone with a serial
-  computed via a MAX query against the existing clones for that blueprint.
-  See `specs/008-npc-blueprints/contracts/projector.md`.
   """
 
   use Commanded.Event.Handler,
@@ -184,10 +180,9 @@ defmodule AgenticRealms.World.Projections.WorldProjector do
 
   # Feature 013 — Quests. On QuestAccepted: (1) insert the quest_instances
   # row with state="active", (2) for each criterion, for each spawn_room_id,
-  # dispatch a PlaceObject command stamped with quest_player_id +
-  # quest_instance_id. The PlaceObject flow lands the item via the normal
-  # Room aggregate + ObjectPlacedInRoom event path — the only special
-  # thing is the visibility fields it carries.
+  # clone a quest-scoped item into the spawn room via the entity lifecycle
+  # (feature 016), carrying the quest_player_id + quest_instance_id visibility
+  # fields in the cloned payload.
   def handle(
         %QuestAccepted{
           quest_id: qid,
@@ -232,12 +227,10 @@ defmodule AgenticRealms.World.Projections.WorldProjector do
     item_long = snapshot_get(criterion, "item_long_description") || item_short
     tag = snapshot_get(criterion, "quest_tag")
 
-    # Idempotency under replay: PlaceObject's aggregate guard rejects a
-    # duplicate object_id with :object_already_in_room, but since we
-    # generate a fresh UUID each replay we would actually re-spawn. To
-    # make replay safe, derive a deterministic object id from
-    # (quest_instance_id, room_id, criterion tag) so the same triple
-    # never produces a new id on a re-run of the same event.
+    # Idempotency under replay: derive a deterministic entity id from
+    # (quest_instance_id, room_id, criterion tag) so a re-run of the same
+    # event re-clones the same id (→ :already_exists) and re-moves into the
+    # same room (→ no-op) rather than spawning a duplicate.
     deterministic_oid =
       :crypto.hash(:sha, "#{quest_instance_id}|#{room_id}|#{tag}")
       |> Base.encode16(case: :lower)

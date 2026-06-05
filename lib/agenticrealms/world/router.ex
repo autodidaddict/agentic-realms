@@ -46,10 +46,8 @@ defmodule AgenticRealms.World.Router do
   # NPCBlueprint dispatches below are removed at that point.)
   identify(Entity, by: :entity_id, prefix: "entity-")
 
-  # Phase 3 (US5) + Phase 6 (US3): room commands routed to Room.
-  # Feature 014 US2: SpawnObjectFromBlueprint also routed to Room (the
-  # destination Room aggregate owns object presence, exactly like
-  # PlaceObject).
+  # Room authoring. Object/NPC placement and take/drop moved to the Entity
+  # aggregate in feature 016, so the Room aggregate owns only rooms + exits.
   dispatch([CreateRoom, AddExit], to: Room)
 
   # Phase 4 (US1) + Phase 5 (US2): player lifecycle + movement routed to Player.

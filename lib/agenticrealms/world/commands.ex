@@ -580,8 +580,9 @@ defmodule AgenticRealms.World.Commands do
   On success, generates a fresh `quest_id`, snapshots the catalog entry
   with instance-scoped quest tags, dispatches `AcceptQuest` to the Quest
   aggregate, and returns `{:ok, quest_id}`. The projector handler for
-  `QuestAccepted` then inserts the `quest_instances` row and dispatches
-  `PlaceObject` for each criterion's spawn rooms.
+  `QuestAccepted` then inserts the `quest_instances` row and clones a
+  quest-scoped item into each criterion's spawn rooms via the entity
+  lifecycle (feature 016).
   """
   @spec accept_quest(integer(), String.t(), String.t()) ::
           {:ok, String.t()}
@@ -883,8 +884,8 @@ defmodule AgenticRealms.World.Commands do
 
   @doc """
   Spawn a freeform Object into a room — no Object Blueprint involvement,
-  no synthetic blueprint, no registry change. The wizard's authored
-  payload goes straight onto an `ObjectSpawned` event (FR-011 / FR-012).
+  no registry change. The wizard's authored payload is cloned into the
+  room via the entity lifecycle (`clone_into(:object, …)`, feature 016).
 
   Returns `{:ok, object_id}` on success.
   Refusals:

@@ -1,12 +1,12 @@
 defmodule AgenticRealms.World.Schemas.NPCBlueprint do
   @moduledoc """
-  Authored template for a kind of NPC. The source of data at the moment a
-  clone is spawned; never consulted at render time.
+  Authored template for a kind of NPC. The source of data copied into an
+  NPC's `EntityCloned` payload at spawn time (feature 016); never consulted
+  at render time.
 
-  Blueprints with `is_synthetic: true` are created by the projector's
-  legacy-event replay path (feature 007 `NPCSpawnedInRoom` events). They
-  are functionally identical to authored blueprints; the flag exists so
-  future authoring tools can identify and optionally promote them.
+  The `is_synthetic` flag is a vestige of feature 007's legacy-event replay
+  path (removed in feature 016); it now defaults to `false` for every
+  blueprint and is retained only to avoid a read-model migration.
 
   See `specs/008-npc-blueprints/data-model.md` §1.
   """

@@ -1,7 +1,7 @@
 defmodule AgenticRealms.Application do
   # Feature 009 — pre-declare the atoms used as keys inside the
   # `behaviors` JSONB field of RoomCreated / NPCBlueprintCreated /
-  # NPCClonedFromBlueprint events. The eventstore's JsonSerializer
+  # EntityCloned events. The eventstore's JsonSerializer
   # deserializes event payloads with `Jason.decode!(..., keys: :atoms!)`,
   # which recursively atomizes ALL keys in the JSON — including the
   # nested behavior maps' keys. If these atoms aren't already known to
