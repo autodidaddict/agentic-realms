@@ -2686,6 +2686,17 @@ button { font: inherit; color: inherit; }
   background: var(--bg-elev);
 }
 
+.ar-nav-play {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.ar-nav-play-icon {
+  height: 18px;
+  width: auto;
+  display: block;
+}
+
 .ar-nav-link-primary {
   color: var(--player);
   border: 1px solid var(--player-dim);
@@ -2705,15 +2716,9 @@ button { font: inherit; color: inherit; }
 }
 
 .ar-nav-brand-mark {
-  width: 14px;
-  height: 14px;
-  display: grid;
-  place-items: center;
-  background: var(--ink);
-  color: var(--bg);
-  font-size: 9px;
-  font-weight: 700;
-  border-radius: 2px;
+  height: 20px;
+  width: auto;
+  display: block;
 }
 
 .ar-nav-dropdown {
@@ -2890,26 +2895,30 @@ button { font: inherit; color: inherit; }
 
 .ar-landing-hero {
   width: 100%;
-  max-width: 720px;
-  aspect-ratio: 16 / 7;
-  background: var(--bg-elev);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-lg);
   display: flex;
   align-items: center;
   justify-content: center;
   margin-bottom: 32px;
-  overflow: hidden;
-  position: relative;
 }
 
-.ar-landing-hero-text {
-  font-family: var(--serif);
-  font-size: 42px;
-  font-weight: 600;
-  color: var(--player);
-  text-align: center;
-  letter-spacing: -0.02em;
+.ar-landing-logo {
+  width: 100%;
+  max-width: 440px;
+  height: auto;
+  display: block;
+}
+
+/* Dark themes (phosphor/dusk) use the white-plate wordmark so the dark
+   text reads; the soft "paper" theme uses the transparent wordmark, which
+   reads on its own and avoids an awkward white chip. */
+.ar-landing-logo-flat {
+  display: none;
+}
+[data-theme="paper"] .ar-landing-logo-plate {
+  display: none;
+}
+[data-theme="paper"] .ar-landing-logo-flat {
+  display: block;
 }
 
 .ar-landing-desc {

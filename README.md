@@ -1,4 +1,6 @@
-# AgenticRealms
+<p align="center">
+  <img src="priv/static/images/logo-wordmark.png" alt="Agentic Realms" width="420" />
+</p>
 
 To start your Phoenix server:
 
