@@ -579,6 +579,69 @@ defmodule AgenticRealms.World.Queries do
   end
 
   @doc """
+  Feature 015 — list all NPC Blueprints, ordered by name. Mirrors
+  `list_object_blueprints/0`; backs the unified registry and US7 edit.
+  """
+  @spec list_npc_blueprints() :: [%NPCBlueprint{}]
+  def list_npc_blueprints do
+    Repo.all(from(b in NPCBlueprint, order_by: [asc: b.name, asc: b.id]))
+  end
+
+  @doc """
+  Feature 015 — fetch a single NPC Blueprint as a full schema struct (the
+  existing `get_npc_blueprint/1` returns only a tagged display subset).
+  Returns `nil` if no such row exists.
+  """
+  @spec get_npc_blueprint_row(String.t()) :: %NPCBlueprint{} | nil
+  def get_npc_blueprint_row(blueprint_id) when is_binary(blueprint_id) do
+    Repo.get(NPCBlueprint, blueprint_id)
+  end
+
+  @registry_kinds ~w(object npc)
+
+  @doc """
+  Feature 015 US8 — unified blueprint registry (FR-024/FR-025). Projects
+  the object + npc registries to a uniform display row
+  `%{id, kind, name, short_description, revision}`, ordered by name then id.
+  """
+  @spec list_blueprints() :: [map()]
+  def list_blueprints do
+    objects =
+      Repo.all(
+        from(b in ObjectBlueprint,
+          select: %{
+            id: b.id,
+            kind: b.kind,
+            name: b.name,
+            short_description: b.short_description,
+            revision: b.revision
+          }
+        )
+      )
+
+    npcs =
+      Repo.all(
+        from(b in NPCBlueprint,
+          select: %{
+            id: b.id,
+            kind: b.kind,
+            name: b.name,
+            short_description: b.short_description,
+            revision: b.revision
+          }
+        )
+      )
+
+    Enum.sort_by(objects ++ npcs, &{&1.name || "", &1.id})
+  end
+
+  @doc "Unified registry filtered to one kind (`\"object\"` | `\"npc\"`)."
+  @spec list_blueprints(String.t()) :: [map()]
+  def list_blueprints(kind) when kind in @registry_kinds do
+    Enum.filter(list_blueprints(), &(&1.kind == kind))
+  end
+
+  @doc """
   Fetch a single Object by id. Returns `nil` if no such row exists.
   """
   @spec get_object(String.t()) :: %Object{} | nil

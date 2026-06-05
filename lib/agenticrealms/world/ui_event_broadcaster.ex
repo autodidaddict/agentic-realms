@@ -57,6 +57,7 @@ defmodule AgenticRealms.World.UIEventBroadcaster do
     EntityEdited,
     ObjectBlueprintCreated,
     ObjectBlueprintEdited,
+    NPCBlueprintCreated,
     QuestAccepted,
     QuestCompleted
   }
@@ -229,6 +230,29 @@ defmodule AgenticRealms.World.UIEventBroadcaster do
         blueprint_id: bp_id,
         revision: revision,
         payload: fields_changed
+      }
+    )
+
+    :ok
+  end
+
+  # Feature 015 — an authored NPC blueprint joins the unified registry. Same
+  # topic + payload shape as the object branch; `kind: "npc"` is what the
+  # registry uses to render the kind badge + the NPC-spawn affordance.
+  def handle(%NPCBlueprintCreated{} = e, _meta) do
+    Phoenix.PubSub.broadcast(
+      @pubsub,
+      Topics.blueprints_topic(),
+      %WizardBlueprintRegistryChanged{
+        event: :created,
+        blueprint_id: e.blueprint_id,
+        revision: Map.get(e, :revision, 1),
+        payload: %{
+          name: e.name,
+          short_description: e.short_description,
+          fixed: Map.get(e, :fixed, false),
+          kind: Map.get(e, :kind) || "npc"
+        }
       }
     )
 

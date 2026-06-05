@@ -29,6 +29,7 @@ defmodule AgenticRealms.World.Commands do
     FinalizeQuest,
     CreateObjectBlueprint,
     EditObjectBlueprint,
+    CreateNPCBlueprint,
     CloneEntity,
     MoveEntity,
     EditEntity
@@ -42,6 +43,7 @@ defmodule AgenticRealms.World.Commands do
   alias AgenticRealms.World.Exits.Validator, as: ExitsValidator
   alias AgenticRealms.World.Queries
   alias AgenticRealms.World.Quests
+  alias AgenticRealms.World.Toolsets
   alias AgenticRealms.World.Schemas.{Exit, Room, Region, NPCBlueprint, QuestInstance, Object}
 
   @doc """
@@ -833,6 +835,73 @@ defmodule AgenticRealms.World.Commands do
     end
   end
 
+  # ──────────────────────────────────────────────────────────────────────
+  # Feature 015 — NPC Blueprint authoring
+  # ──────────────────────────────────────────────────────────────────────
+
+  @doc """
+  Author a new NPC Blueprint.
+
+  Mirrors `create_object_blueprint/2`: FR-WIZ-5 authorization, FR-004
+  slug-shape + cross-registry uniqueness pre-check, plus NPC-specific
+  validation — the direct `behaviors` against the feature-009 vocabulary
+  (FR-014) and every referenced `toolset` name against the registry
+  (FR-018). Behaviors here are the DIRECT behaviors; the effective set is
+  composed (union with toolsets) at spawn time.
+
+  Returns `{:ok, blueprint_id}` on success.
+  Refusals:
+    * `{:error, :not_a_wizard}` / `{:error, :unknown_player}`.
+    * `{:error, :invalid_slug}` / `{:error, :slug_already_exists}`.
+    * `{:error, :name_required}` / `:short_description_required` /
+      `:long_description_required` — content field missing.
+    * `{:error, {:unknown_toolset, name}}` — a referenced toolset is not
+      in the registry.
+    * `{:error, term()}` — a direct behavior fails feature-009 validation.
+  """
+  @spec create_npc_blueprint(
+          %{
+            required(:wizard_id) => integer(),
+            required(:blueprint_id) => String.t(),
+            required(:name) => String.t(),
+            required(:short_description) => String.t(),
+            required(:long_description) => String.t(),
+            optional(:lore) => String.t(),
+            optional(:fixed) => boolean(),
+            optional(:behaviors) => [map()],
+            optional(:toolsets) => [String.t()]
+          },
+          keyword()
+        ) :: {:ok, String.t()} | {:error, atom()} | {:error, {:unknown_toolset, String.t()}}
+  def create_npc_blueprint(attrs, _opts \\ []) when is_map(attrs) do
+    behaviors = Map.get(attrs, :behaviors, []) || []
+    toolsets = Map.get(attrs, :toolsets, []) || []
+
+    with :ok <- ensure_wizard(attrs[:wizard_id]),
+         :ok <- validate_slug(attrs[:blueprint_id]),
+         :ok <- ensure_slug_unused(attrs[:blueprint_id]),
+         :ok <- Toolsets.validate_behaviors(behaviors),
+         :ok <- Toolsets.all_exist?(toolsets) do
+      cmd = %CreateNPCBlueprint{
+        blueprint_id: attrs[:blueprint_id],
+        wizard_id: attrs[:wizard_id],
+        name: attrs[:name],
+        short_description: attrs[:short_description],
+        long_description: attrs[:long_description],
+        lore: Map.get(attrs, :lore, "") || "",
+        behaviors: behaviors,
+        kind: "npc",
+        fixed: Map.get(attrs, :fixed, false),
+        toolsets: toolsets
+      }
+
+      case WorldApp.dispatch(cmd, consistency: :strong) do
+        :ok -> {:ok, attrs[:blueprint_id]}
+        {:error, _} = err -> err
+      end
+    end
+  end
+
   @doc """
   Spawn a clone of an Object Blueprint into a room.
 
@@ -1158,11 +1227,14 @@ defmodule AgenticRealms.World.Commands do
     if Slug.valid?(slug), do: :ok, else: {:error, :invalid_slug}
   end
 
+  # FR-004 — a blueprint slug is unique across BOTH the object and NPC
+  # registries, so a wizard can never author an object and an NPC under the
+  # same id (the unified registry, US8, keys on it).
   defp ensure_slug_unused(slug) do
-    case Repo.get(AgenticRealms.World.Schemas.ObjectBlueprint, slug) do
-      nil -> :ok
-      _ -> {:error, :slug_already_exists}
-    end
+    object_taken? = not is_nil(Repo.get(AgenticRealms.World.Schemas.ObjectBlueprint, slug))
+    npc_taken? = not is_nil(Repo.get(NPCBlueprint, slug))
+
+    if object_taken? or npc_taken?, do: {:error, :slug_already_exists}, else: :ok
   end
 
   # Feature 014 — wizard authorization gate. Synchronous read of the

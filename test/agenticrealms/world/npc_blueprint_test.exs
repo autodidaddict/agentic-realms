@@ -140,4 +140,51 @@ defmodule AgenticRealms.World.NPCBlueprintTest do
                })
     end
   end
+
+  describe "authoring fields (feature 015)" do
+    test "create emits kind=npc, fixed, toolsets, revision: 1" do
+      assert %NPCBlueprintCreated{
+               kind: "npc",
+               fixed: true,
+               toolsets: ["orc", "shopkeeper"],
+               revision: 1
+             } =
+               NPCBlueprint.execute(%NPCBlueprint{}, %CreateNPCBlueprint{
+                 blueprint_id: @bp_id,
+                 name: "Cave Troll",
+                 short_description: "a hulking cave troll",
+                 long_description: "A mountain of grey muscle and warty hide.",
+                 fixed: true,
+                 toolsets: ["orc", "shopkeeper"]
+               })
+    end
+
+    test "defaults: kind=npc, fixed=false, toolsets=[], revision: 1" do
+      assert %NPCBlueprintCreated{kind: "npc", fixed: false, toolsets: [], revision: 1} =
+               NPCBlueprint.execute(%NPCBlueprint{}, %CreateNPCBlueprint{
+                 blueprint_id: @bp_id,
+                 name: "Garrick the Innkeeper",
+                 short_description: "a wiry innkeeper",
+                 long_description: "A wiry man in a stained apron."
+               })
+    end
+
+    test "apply/2 sets kind, fixed, toolsets, revision on the aggregate" do
+      state =
+        NPCBlueprint.apply(%NPCBlueprint{}, %NPCBlueprintCreated{
+          blueprint_id: @bp_id,
+          name: "Cave Troll",
+          short_description: "a hulking cave troll",
+          long_description: "A mountain of grey muscle and warty hide.",
+          fixed: true,
+          toolsets: ["orc"],
+          revision: 1
+        })
+
+      assert state.kind == "npc"
+      assert state.fixed == true
+      assert state.toolsets == ["orc"]
+      assert state.revision == 1
+    end
+  end
 end

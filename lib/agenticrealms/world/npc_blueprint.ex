@@ -24,7 +24,13 @@ defmodule AgenticRealms.World.NPCBlueprint do
             behaviors: [],
             lore: "",
             # Feature 013 — Quests. Per-NPC FetchQuest catalog.
-            quests: []
+            quests: [],
+            # Feature 015 — wizard authoring (mirror object blueprints). The
+            # monotonic `revision` secures optimistic-lock edits (US7).
+            kind: "npc",
+            fixed: false,
+            toolsets: [],
+            revision: 0
 
   alias AgenticRealms.World.Commands.CreateNPCBlueprint
   alias AgenticRealms.World.Events.NPCBlueprintCreated
@@ -40,7 +46,10 @@ defmodule AgenticRealms.World.NPCBlueprint do
         long_description: long,
         behaviors: behaviors,
         lore: lore,
-        quests: quests
+        quests: quests,
+        kind: kind,
+        fixed: fixed,
+        toolsets: toolsets
       }) do
     cond do
       name in [nil, ""] ->
@@ -62,7 +71,13 @@ defmodule AgenticRealms.World.NPCBlueprint do
           lore: lore || "",
           # Feature 013 — pass the catalog through verbatim; validation
           # of catalog shape lives in `Commands.create_npc_blueprint/*`.
-          quests: quests || []
+          quests: quests || [],
+          # Feature 015 — authoring fields. Behaviors here are the DIRECT
+          # behaviors; the union with `toolsets` is composed at spawn time.
+          kind: kind || "npc",
+          fixed: !!fixed,
+          toolsets: toolsets || [],
+          revision: 1
         }
     end
   end
@@ -94,7 +109,12 @@ defmodule AgenticRealms.World.NPCBlueprint do
         lore: lore || "",
         # Feature 013 — Map.get/3 defends against legacy events
         # serialized before this field existed.
-        quests: Map.get(event, :quests, []) || []
+        quests: Map.get(event, :quests, []) || [],
+        # Feature 015 — authoring fields; Map.get defends pre-015 replay.
+        kind: Map.get(event, :kind) || "npc",
+        fixed: Map.get(event, :fixed, false),
+        toolsets: Map.get(event, :toolsets, []) || [],
+        revision: Map.get(event, :revision, 1)
     }
   end
 end

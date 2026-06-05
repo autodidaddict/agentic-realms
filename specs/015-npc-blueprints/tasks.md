@@ -59,18 +59,18 @@ milestone is **pure NPC authoring** mirroring the feature-014 object-blueprint p
 **Goal**: author an NPC blueprint (name/short/long/lore/behaviors/toolsets) via trance prompt, commit at revision 1.
 **Independent Test**: promote→trance→describe a character→card populates (incl. lore + proposed toolsets)→Commit→`npc`-kind blueprint at `revision: 1`.
 
-- [ ] T014 [P] [US1] Alter `lib/agenticrealms/world/commands/create_npc_blueprint.ex` — add `wizard_id, kind, fixed, toolsets`.
-- [ ] T015 [P] [US1] Alter `lib/agenticrealms/world/events/npc_blueprint_created.ex` — add `kind, fixed, toolsets, revision`.
-- [ ] T016 [US1] `NPCBlueprint.execute/2` for `CreateNPCBlueprint` (`lib/agenticrealms/world/npc_blueprint.ex`): emit `NPCBlueprintCreated` with `kind: "npc"`, `fixed`, `toolsets`, `revision: 1`; `apply/2` sets them.
-- [ ] T017 [US1] `Commands.create_npc_blueprint/2` (`lib/agenticrealms/world/commands.ex`): `ensure_wizard`; slug regex + uniqueness **across object + npc** blueprints (FR-004); `Toolsets.validate_behaviors` + toolset-existence checks; dispatch `:strong`.
+- [X] T014 [P] [US1] Alter `lib/agenticrealms/world/commands/create_npc_blueprint.ex` — add `wizard_id, kind, fixed, toolsets`.
+- [X] T015 [P] [US1] Alter `lib/agenticrealms/world/events/npc_blueprint_created.ex` — add `kind, fixed, toolsets, revision`.
+- [X] T016 [US1] `NPCBlueprint.execute/2` for `CreateNPCBlueprint` (`lib/agenticrealms/world/npc_blueprint.ex`): emit `NPCBlueprintCreated` with `kind: "npc"`, `fixed`, `toolsets`, `revision: 1`; `apply/2` sets them.
+- [X] T017 [US1] `Commands.create_npc_blueprint/2` (`lib/agenticrealms/world/commands.ex`): `ensure_wizard`; slug regex + uniqueness **across object + npc** blueprints (FR-004); `Toolsets.validate_behaviors` + toolset-existence checks; dispatch `:strong`.
 - [ ] T018 [P] [US1] Add `draft_npc_blueprint` + `list_toolsets` tool schemas to `lib/agenticrealms/world/intent_resolver/wizard_tools.ex`; the LLM chooses npc-vs-object by whether the prompt describes a character.
 - [ ] T019 [US1] `IntentResolver` (`lib/agenticrealms/world/intent_resolver.ex`): extend `:blueprints`-mode resolve to return `{:ok, {:draft_npc_blueprint, fields}}` (name/short/long/lore/fixed/behaviors/toolsets); ground toolset proposals via `list_toolsets`.
 - [ ] T020 [US1] `GameLive` (`lib/agenticrealms_web/live/game_live.ex` + `game_live/wizard.ex`): draft assign gains `:kind`; `submit_wizard_prompt` npc path; `commit_blueprint_draft` branches `create_object_blueprint` vs `create_npc_blueprint`; auto-derive slug.
 - [ ] T021 [US1] `GameComponents` wizard view (`lib/agenticrealms_web/components/game/wizard_authoring.ex`): NPC draft form — lore textarea, direct-behaviors editor, **toolset picker** pre-selected from the LLM proposal, editable before commit (FR-020/FR-020a).
-- [ ] T022 [US1] `UIEventBroadcaster`: `NPCBlueprintCreated` → `WizardBlueprintRegistryChanged` on the `blueprints` topic (reuse feature 014).
-- [ ] T023 [P] [US1] Aggregate tests `test/agenticrealms/world/npc_blueprint_test.exs` — create emits `NPCBlueprintCreated` kind/fixed/toolsets/revision 1; already-exists refusal.
-- [ ] T024 [P] [US1] Projector tests — `NPCBlueprintCreated` row insert (kind/fixed/toolsets/revision), replay idempotent.
-- [ ] T025 [P] [US1] Wrapper tests — slug uniqueness **spans object + npc** tables; non-wizard refusal; unknown-toolset + bad-behavior refusal.
+- [X] T022 [US1] `UIEventBroadcaster`: `NPCBlueprintCreated` → `WizardBlueprintRegistryChanged` on the `blueprints` topic (reuse feature 014).
+- [X] T023 [P] [US1] Aggregate tests `test/agenticrealms/world/npc_blueprint_test.exs` — create emits `NPCBlueprintCreated` kind/fixed/toolsets/revision 1; already-exists refusal.
+- [X] T024 [P] [US1] Projector tests — `NPCBlueprintCreated` row insert (kind/fixed/toolsets/revision), replay idempotent.
+- [X] T025 [P] [US1] Wrapper tests — slug uniqueness **spans object + npc** tables; non-wizard refusal; unknown-toolset + bad-behavior refusal.
 - [ ] T026 [US1] LiveView test `test/agenticrealms_web/live/wizard_npc_authoring_test.exs` (mocked LLM) — draft populates incl. toolsets; commit → registry shows the npc blueprint.
 
 **Checkpoint**: MVP — a wizard can author an NPC blueprint.
@@ -155,7 +155,7 @@ milestone is **pure NPC authoring** mirroring the feature-014 object-blueprint p
 **Goal**: registry lists object + npc blueprints, kind-filterable; affordances per kind.
 **Independent Test**: with both kinds present, registry shows both with kind; filter `npc` shows only NPC; "Spawn here" on an npc row spawns an NPC.
 
-- [ ] T052 [US8] `Queries.list_blueprints/0` + `list_blueprints(kind)` (`queries.ex`): UNION over `object_blueprints` + `npc_blueprints` projecting `(id, kind, name, short_description, revision)` (FR-024/FR-025).
+- [X] T052 [US8] `Queries.list_blueprints/0` + `list_blueprints(kind)` (`queries.ex`): UNION over `object_blueprints` + `npc_blueprints` projecting `(id, kind, name, short_description, revision)` (FR-024/FR-025).
 - [ ] T053 [US8] `GameComponents` registry: show each row's kind, a kind filter, and kind-appropriate spawn/edit affordances (FR-026).
 - [ ] T054 [P] [US8] Tests — union lists both kinds; kind filter; npc row "Spawn here" yields an NPC clone (not an object).
 
