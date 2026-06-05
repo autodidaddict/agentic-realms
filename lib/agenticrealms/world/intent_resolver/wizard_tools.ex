@@ -30,7 +30,7 @@ defmodule AgenticRealms.World.IntentResolver.WizardTools do
 
   @doc "Set of recognized tool names in :world mode (wizard-only)."
   @spec names_world() :: MapSet.t(String.t())
-  def names_world, do: MapSet.new(~w(manifest_object_freeform refuse))
+  def names_world, do: MapSet.new(~w(manifest_object_freeform manifest_npc_freeform refuse))
 
   @doc "Tool definitions for :blueprints mode, in wire order."
   @spec list_blueprints() :: [map()]
@@ -156,8 +156,42 @@ defmodule AgenticRealms.World.IntentResolver.WizardTools do
           }
         }
       },
+      %{
+        "name" => "manifest_npc_freeform",
+        "description" =>
+          "Extract fields for a single one-off NPC the wizard is manifesting directly into their current room — NOT a reusable archetype. Use when the wizard describes a specific character/creature/person they want to exist in the world right now (e.g., 'a nervous courier catching his breath by the door'). The NPC lands in the wizard's current room with no Blueprint involvement.",
+        "input_schema" => %{
+          "type" => "object",
+          "required" => ["name", "short_description", "long_description"],
+          "properties" => %{
+            "name" => %{
+              "type" => "string",
+              "description" =>
+                "The NPC's name or short descriptor — a proper name keeps its capitalization, otherwise a lowercase noun phrase (e.g., 'a nervous courier')."
+            },
+            "short_description" => %{
+              "type" => "string",
+              "description" =>
+                "A short noun phrase WITH an indefinite article (or the bare proper name), NO trailing period, ≤ 60 chars. Shown in 'Also here:' room listings."
+            },
+            "long_description" => %{
+              "type" => "string",
+              "description" => "Multi-sentence prose shown when a player examines the NPC."
+            },
+            "lore" => %{
+              "type" => "string",
+              "description" =>
+                "Private backstory and personality grounding the NPC's conversation. Not shown verbatim to players."
+            },
+            "fixed" => %{
+              "type" => "boolean",
+              "description" => "True only if the NPC cannot be moved (rare). Default false."
+            }
+          }
+        }
+      },
       refuse_tool(
-        "Decline to manifest an Object because the wizard's prompt does not describe one. Use when: the prompt asks a question, describes a place or NPC, asks to edit something existing (edits happen via the form, not via prompts), or is otherwise off-task. `message` is the wizard-facing refusal."
+        "Decline to manifest anything because the wizard's prompt does not describe a concrete one-off object or NPC. Use when: the prompt asks a question, describes a place / room, asks to edit something existing (edits happen via the form, not via prompts), or is otherwise off-task. `message` is the wizard-facing refusal."
       )
     ]
   end

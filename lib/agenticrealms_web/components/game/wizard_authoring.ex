@@ -125,7 +125,7 @@ defmodule AgenticRealmsWeb.GameComponents.WizardAuthoring do
           <div class="w-input-wrap">
             <div class="w-prompt-label">
               <span class="hint">
-                Describe a one-off object to manifest into <strong>{@current_room_name || "your current room"}</strong>,
+                Describe a one-off object or character to manifest into <strong>{@current_room_name || "your current room"}</strong>,
                 or click <strong>Spawn here</strong> on any blueprint to drop a copy in.
               </span>
             </div>
@@ -231,7 +231,11 @@ defmodule AgenticRealmsWeb.GameComponents.WizardAuthoring do
         <%= if @authoring_mode == :world and @focused_object_draft do %>
           <section class="w-pane">
             <div class="w-pane-head">
-              <div class="lbl">Interpreted data · one-off Object</div>
+              <div class="lbl">
+                Interpreted data · one-off {if Map.get(@focused_object_draft, :kind) == "npc",
+                  do: "NPC",
+                  else: "Object"}
+              </div>
             </div>
             <div class="w-pane-body">
               <.object_draft_form
@@ -674,11 +678,29 @@ defmodule AgenticRealmsWeb.GameComponents.WizardAuthoring do
         >{@draft.long_description}</textarea>
       </div>
 
+      <%= if Map.get(@draft, :kind) == "npc" do %>
+        <div class="bp-field">
+          <label class="bp-field-label">
+            Lore <span class="bp-field-hint">private — grounds the NPC's conversation</span>
+          </label>
+          <textarea
+            name="draft[lore]"
+            rows="4"
+            class="bp-input bp-input--multiline"
+            data-testid="object-draft-lore"
+          >{Map.get(@draft, :lore, "")}</textarea>
+        </div>
+      <% end %>
+
       <div class="bp-field">
         <label class="bp-fixed-toggle">
           <input type="hidden" name="draft[fixed]" value="false" />
           <input type="checkbox" name="draft[fixed]" value="true" checked={@draft.fixed} />
-          Fixed (cannot be picked up)
+          <%= if Map.get(@draft, :kind) == "npc" do %>
+            Fixed (cannot be moved)
+          <% else %>
+            Fixed (cannot be picked up)
+          <% end %>
         </label>
       </div>
 

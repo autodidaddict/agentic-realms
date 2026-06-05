@@ -617,12 +617,26 @@ defmodule AgenticRealmsWeb.GameLive do
         %{assigns: %{is_wizard: true, focused_object_draft: draft}} = socket
       )
       when not is_nil(draft) do
-    updated = %{
-      name: Map.get(params, "name", draft.name) || "",
-      short_description: Map.get(params, "short_description", draft.short_description) || "",
-      long_description: Map.get(params, "long_description", draft.long_description) || "",
-      fixed: Map.get(params, "fixed") == "true"
-    }
+    updated =
+      draft
+      |> Map.put(:name, Map.get(params, "name", draft.name) || "")
+      |> Map.put(
+        :short_description,
+        Map.get(params, "short_description", draft.short_description) || ""
+      )
+      |> Map.put(
+        :long_description,
+        Map.get(params, "long_description", draft.long_description) || ""
+      )
+      |> Map.put(:fixed, Map.get(params, "fixed") == "true")
+
+    # Feature 015 US5 — a freeform NPC draft also carries lore.
+    updated =
+      if Map.get(draft, :kind) == "npc" do
+        Map.put(updated, :lore, Map.get(params, "lore", Map.get(draft, :lore, "")) || "")
+      else
+        updated
+      end
 
     {:noreply,
      socket
@@ -653,14 +667,20 @@ defmodule AgenticRealmsWeb.GameLive do
       name: Map.get(draft, :name, ""),
       short_description: Map.get(draft, :short_description, ""),
       long_description: Map.get(draft, :long_description, ""),
-      fixed: Map.get(draft, :fixed, false)
+      fixed: Map.get(draft, :fixed, false),
+      lore: Map.get(draft, :lore, "")
     }
 
-    case Commands.spawn_object_freeform(
-           socket.assigns.current_player.id,
-           socket.assigns.current_room_id,
-           attrs
-         ) do
+    player_id = socket.assigns.current_player.id
+    room_id = socket.assigns.current_room_id
+
+    spawn_result =
+      case Map.get(draft, :kind) do
+        "npc" -> Commands.spawn_npc_freeform(player_id, room_id, attrs)
+        _ -> Commands.spawn_object_freeform(player_id, room_id, attrs)
+      end
+
+    case spawn_result do
       {:ok, object_id} ->
         feedback = %{
           object_id: object_id,

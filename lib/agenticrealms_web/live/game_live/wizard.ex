@@ -175,10 +175,27 @@ defmodule AgenticRealmsWeb.GameLive.Wizard do
 
       {:ok, {:freeform_object, fields}} ->
         draft = %{
+          kind: "object",
           name: fields.name,
           short_description: fields.short_description,
           long_description: fields.long_description,
           fixed: fields.fixed
+        }
+
+        {:noreply,
+         socket
+         |> assign(:focused_object_draft, draft)
+         |> assign(:blueprint_commit_error, nil)
+         |> assign(:last_spawn, nil)}
+
+      {:ok, {:freeform_npc, fields}} ->
+        draft = %{
+          kind: "npc",
+          name: fields.name,
+          short_description: fields.short_description,
+          long_description: fields.long_description,
+          fixed: fields.fixed,
+          lore: Map.get(fields, :lore, "")
         }
 
         {:noreply,

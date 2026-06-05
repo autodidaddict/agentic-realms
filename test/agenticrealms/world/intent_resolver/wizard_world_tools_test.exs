@@ -102,5 +102,32 @@ defmodule AgenticRealms.World.IntentResolver.WizardWorldToolsTest do
 
       assert {:error, _} = IntentResolver.parse_wizard_world_response(response)
     end
+
+    test "extracts a freeform NPC draft (incl. lore) from manifest_npc_freeform (US5)" do
+      response = %{
+        "content" => [
+          %{
+            "type" => "tool_use",
+            "name" => "manifest_npc_freeform",
+            "input" => %{
+              "name" => "a nervous courier",
+              "short_description" => "a nervous courier",
+              "long_description" => "A wiry courier catching his breath by the door.",
+              "lore" => "Carries a sealed letter he must not lose."
+            }
+          }
+        ]
+      }
+
+      assert {:ok,
+              {:freeform_npc,
+               %{
+                 name: "a nervous courier",
+                 short_description: "a nervous courier",
+                 long_description: "A wiry courier catching his breath by the door.",
+                 lore: "Carries a sealed letter he must not lose.",
+                 fixed: false
+               }}} = IntentResolver.parse_wizard_world_response(response)
+    end
   end
 end

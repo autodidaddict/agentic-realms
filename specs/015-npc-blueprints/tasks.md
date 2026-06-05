@@ -169,10 +169,10 @@ spawn flows route through it. Drop the two old tables/aggregates (reseed). Keep 
 **Goal**: describe an NPC directly into the room with no blueprint.
 **Independent Test**: `:world`-mode freeform prompt → NPC in room; no blueprint row added.
 
-- [ ] T037 [P] [US5] Add `manifest_npc_freeform` tool to `wizard_tools.ex`; `:world` resolve returns `{:ok, {:freeform_npc, fields}}`.
-- [ ] T038 [US5] `Commands.spawn_npc_freeform/3` (`commands.ex`): `ensure_wizard`; `clone_into(:npc, attrs, room, :spawned)` (no `blueprint_id`).
-- [ ] T039 [US5] `GameLive` `:world` npc-freeform commit path.
-- [ ] T040 [P] [US5] Tests — freeform NPC appears in room; no `npc_blueprints` row added; observationally identical to a blueprint-spawned clone.
+- [X] T037 [P] [US5] Add `manifest_npc_freeform` tool to `wizard_tools.ex`; `:world` resolve returns `{:ok, {:freeform_npc, fields}}`.
+- [X] T038 [US5] `Commands.spawn_npc_freeform/3` (`commands.ex`): `ensure_wizard`; `clone_into(:npc, attrs, room, :spawned)` (no `blueprint_id`).
+- [X] T039 [US5] `GameLive` `:world` npc-freeform commit path.
+- [X] T040 [P] [US5] Tests — freeform NPC appears in room; no `npc_blueprints` row added; observationally identical to a blueprint-spawned clone.
 
 ---
 

@@ -971,6 +971,60 @@ defmodule AgenticRealms.World.Commands do
   end
 
   @doc """
+  Spawn a freeform one-off NPC into a room — no Blueprint, no registry change
+  (feature 015 US5). The wizard's authored payload (incl. `lore`) is cloned
+  into the room via `clone_into(:npc, …)` with a null `blueprint_id`/`serial`,
+  so the clone is observationally identical to a blueprint-spawned NPC but has
+  no template behind it.
+
+  Refusals: `:not_a_wizard` / `:unknown_player`, the `*_required` content
+  errors, `:room_not_found`, `:clone_name_taken_in_room`.
+  """
+  @spec spawn_npc_freeform(
+          wizard_id :: integer(),
+          room_id :: String.t(),
+          attrs :: %{
+            required(:name) => String.t(),
+            required(:short_description) => String.t(),
+            required(:long_description) => String.t(),
+            optional(:lore) => String.t(),
+            optional(:fixed) => boolean(),
+            optional(:behaviors) => [map()]
+          }
+        ) :: {:ok, String.t()} | {:error, atom()}
+  def spawn_npc_freeform(wizard_id, room_id, attrs)
+      when is_integer(wizard_id) and is_binary(room_id) and is_map(attrs) do
+    behaviors = Map.get(attrs, :behaviors, []) || []
+
+    with :ok <- ensure_wizard(wizard_id),
+         :ok <- validate_object_attrs(attrs),
+         :ok <- Toolsets.validate_behaviors(behaviors),
+         :ok <- check_room_exists(room_id),
+         :ok <- check_no_clone_name_collision(room_id, attrs[:name]) do
+      fields = %{
+        blueprint_id: nil,
+        # Freeform NPCs aren't the Nth instance of any blueprint, so they carry
+        # no serial (the column is nullable; the NULL blueprint_id keeps the
+        # (blueprint_id, serial) unique index distinct).
+        serial: nil,
+        name: attrs[:name],
+        short_description: attrs[:short_description],
+        long_description: attrs[:long_description],
+        behaviors: behaviors,
+        direct_behaviors: behaviors,
+        toolsets: [],
+        lore: Map.get(attrs, :lore, "") || "",
+        fixed: Map.get(attrs, :fixed, false)
+      }
+
+      case clone_into(:npc, Ecto.UUID.generate(), fields, ContainerRef.room(room_id), :spawned) do
+        {:ok, entity_id} -> {:ok, entity_id}
+        {:error, _} = err -> err
+      end
+    end
+  end
+
+  @doc """
   One-shot extract-essence — read a world Object's denormalized fields
   and persist a new Object Blueprint at `revision: 1` populated with a
   wholesale copy of those fields (FR-016 / FR-018). The source Object

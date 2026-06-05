@@ -442,10 +442,13 @@ defmodule AgenticRealms.World.IntentResolver do
   fields) or `refuse` — and never to produce free-form prose.
 
   The thing being manifested is a one-off, NOT a reusable archetype.
-  Use `manifest_object_freeform` for concrete particulars
-  ("the small clay pot leaning against the eastern wall, half-empty");
-  refuse if the prompt is a question, an edit request, or describes
-  a place / NPC / quest.
+  Use `manifest_object_freeform` for a concrete inanimate particular
+  ("the small clay pot leaning against the eastern wall, half-empty").
+  Use `manifest_npc_freeform` for a one-off character / creature / person
+  ("a nervous courier catching his breath by the door") — it also takes
+  `lore` (private personality grounding the NPC's conversation).
+  Refuse if the prompt is a question, an edit request, or describes a
+  place / room / quest.
 
   Field formatting rules:
   - `name`: short lowercase noun phrase (1–4 words), no leading article.
@@ -465,7 +468,9 @@ defmodule AgenticRealms.World.IntentResolver do
   set + system prompt.
   """
   @spec resolve_wizard_world(integer(), String.t()) ::
-          {:ok, {:freeform_object, map()}} | {:error, String.t()}
+          {:ok, {:freeform_object, map()}}
+          | {:ok, {:freeform_npc, map()}}
+          | {:error, String.t()}
   def resolve_wizard_world(player_id, raw_input)
       when is_integer(player_id) and is_binary(raw_input) do
     started_at = System.monotonic_time(:millisecond)
@@ -555,6 +560,24 @@ defmodule AgenticRealms.World.IntentResolver do
     end
   end
 
+  defp to_wizard_world_outcome("manifest_npc_freeform", input) do
+    with name when is_binary(name) and name != "" <- input["name"],
+         short when is_binary(short) and short != "" <- input["short_description"],
+         long when is_binary(long) and long != "" <- input["long_description"] do
+      {:ok,
+       {:freeform_npc,
+        %{
+          name: name,
+          short_description: short,
+          long_description: long,
+          lore: (is_binary(input["lore"]) && input["lore"]) || "",
+          fixed: input["fixed"] == true
+        }}}
+    else
+      _ -> {:error, @generic_refusal}
+    end
+  end
+
   defp to_wizard_world_outcome("refuse", %{"message" => m}) when is_binary(m) and m != "",
     do: {:error, m}
 
@@ -566,6 +589,7 @@ defmodule AgenticRealms.World.IntentResolver do
     {result, tool_name} =
       case outcome do
         {:ok, {:freeform_object, _}} -> {:object_chosen, "manifest_object_freeform"}
+        {:ok, {:freeform_npc, _}} -> {:npc_chosen, "manifest_npc_freeform"}
         {:error, _} -> {:refused, nil}
       end
 

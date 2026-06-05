@@ -106,7 +106,12 @@ defmodule AgenticRealms.World.NPCChat.Context do
       with this NPC. The LLM is told to react in-character to repeat
       requests without re-offering.
   """
-  @spec quest_context(integer(), String.t()) :: quest_context()
+  @spec quest_context(integer(), String.t() | nil) :: quest_context()
+  # Feature 015 US5 — a freeform NPC has no blueprint (and thus no quest
+  # catalog); the LLM's Quests section is simply omitted.
+  def quest_context(_player_id, nil),
+    do: %{offerable_quests: [], active_instances: [], completed_slugs: []}
+
   def quest_context(player_id, npc_blueprint_id)
       when is_integer(player_id) and is_binary(npc_blueprint_id) do
     blueprint = Repo.get(Blueprint, npc_blueprint_id)
