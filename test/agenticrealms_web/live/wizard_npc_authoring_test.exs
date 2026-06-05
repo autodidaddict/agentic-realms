@@ -291,6 +291,52 @@ defmodule AgenticRealmsWeb.WizardNpcAuthoringTest do
     assert Queries.get_npc_blueprint_row("garrick_the_innkeeper").long_description =~ "wiry man"
   end
 
+  test "unified registry shows both kinds with badges; kind filter narrows it (US8)",
+       %{wizard: wizard, wizard_conn: wzc, suffix: suffix} do
+    obj_slug = "chest_#{suffix}"
+    npc_slug = "ogre_reg_#{suffix}"
+
+    {:ok, ^obj_slug} =
+      Commands.create_object_blueprint(%{
+        wizard_id: wizard.id,
+        blueprint_id: obj_slug,
+        name: "Brass Chest #{suffix}",
+        short_description: "a brass chest",
+        long_description: "A brass-bound chest."
+      })
+
+    {:ok, ^npc_slug} =
+      Commands.create_npc_blueprint(%{
+        wizard_id: wizard.id,
+        blueprint_id: npc_slug,
+        name: "Registry Ogre #{suffix}",
+        short_description: "an ogre",
+        long_description: "An ogre."
+      })
+
+    {:ok, view, _} = live(wzc, ~p"/play")
+    render_hook(view, "switch_mode", %{"mode" => "wizard"})
+
+    # Default :all — both kinds present, each with a kind badge.
+    html = render(view)
+    assert html =~ "Brass Chest #{suffix}"
+    assert html =~ "Registry Ogre #{suffix}"
+    assert html =~ ~s(data-testid="blueprint-kind-#{obj_slug}")
+    assert html =~ ~s(data-testid="blueprint-kind-#{npc_slug}")
+
+    # Filter → NPCs only.
+    render_hook(view, "filter_blueprints", %{"kind" => "npc"})
+    html = render(view)
+    assert html =~ "Registry Ogre #{suffix}"
+    refute html =~ "Brass Chest #{suffix}"
+
+    # Filter → Objects only.
+    render_hook(view, "filter_blueprints", %{"kind" => "object"})
+    html = render(view)
+    assert html =~ "Brass Chest #{suffix}"
+    refute html =~ "Registry Ogre #{suffix}"
+  end
+
   # --- Helpers ------------------------------------------------------------
 
   defp conn_for(conn, player_id) do

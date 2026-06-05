@@ -150,6 +150,8 @@ defmodule AgenticRealmsWeb.GameLive do
        :object_blueprints,
        if(socket.assigns.current_player.is_wizard, do: Queries.list_blueprint_rows(), else: [])
      )
+     # Feature 015 US8 — unified registry kind filter (:all | :object | :npc).
+     |> assign(:blueprint_filter, :all)
      # Feature 015 — toolsets available to attach to an NPC blueprint draft.
      |> assign(
        :toolsets,
@@ -494,6 +496,24 @@ defmodule AgenticRealmsWeb.GameLive do
   end
 
   def handle_event("focus_blueprint", _, socket), do: {:noreply, socket}
+
+  # Feature 015 US8 — filter the unified registry by kind.
+  def handle_event(
+        "filter_blueprints",
+        %{"kind" => kind},
+        %{assigns: %{is_wizard: true}} = socket
+      ) do
+    filter =
+      case kind do
+        "object" -> :object
+        "npc" -> :npc
+        _ -> :all
+      end
+
+    {:noreply, assign(socket, :blueprint_filter, filter)}
+  end
+
+  def handle_event("filter_blueprints", _, socket), do: {:noreply, socket}
 
   # Feature 014 US5 — focus a world Object for in-place editing.
   def handle_event(

@@ -28,6 +28,7 @@ defmodule AgenticRealmsWeb.GameComponents.WizardAuthoring do
   attr :focused_object_edit, :map, default: nil
   attr :focused_npc_edit, :map, default: nil
   attr :object_blueprints, :list, required: true
+  attr :blueprint_filter, :atom, default: :all
   attr :toolsets, :list, default: []
   attr :room_objects, :list, default: []
   attr :room_npcs, :list, default: []
@@ -426,15 +427,31 @@ defmodule AgenticRealmsWeb.GameComponents.WizardAuthoring do
           </section>
         <% end %>
 
+        <% filtered_blueprints = filter_blueprints(@object_blueprints, @blueprint_filter) %>
         <section class="w-pane">
           <div class="w-pane-head">
             <div class="lbl">Blueprints</div>
-            <div style="font-size: 10px; color: var(--ink-faint); letter-spacing: 0.08em; text-transform: uppercase;">
-              {length(@object_blueprints)} authored
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <div data-testid="blueprint-filter" style="display: flex; gap: 4px;">
+                <button
+                  :for={{label, k} <- [{"All", :all}, {"Objects", :object}, {"NPCs", :npc}]}
+                  type="button"
+                  class={["btn-ghost", @blueprint_filter == k && "active"]}
+                  style={"font-size: 10px; padding: 1px 6px; #{if @blueprint_filter == k, do: "color: var(--ink);"}"}
+                  phx-click="filter_blueprints"
+                  phx-value-kind={k}
+                  data-testid={"filter-#{k}"}
+                >
+                  {label}
+                </button>
+              </div>
+              <div style="font-size: 10px; color: var(--ink-faint); letter-spacing: 0.08em; text-transform: uppercase;">
+                {length(filtered_blueprints)} shown
+              </div>
             </div>
           </div>
           <div class="w-pane-body" data-testid="blueprints-registry">
-            <%= if @object_blueprints == [] do %>
+            <%= if filtered_blueprints == [] do %>
               <div class="empty-preview">
                 <div>
                   <div class="title">Nothing in the registry yet</div>
@@ -446,7 +463,7 @@ defmodule AgenticRealmsWeb.GameComponents.WizardAuthoring do
             <% else %>
               <ul class="blueprint-list" style="list-style: none; padding: 0; margin: 0;">
                 <li
-                  :for={bp <- @object_blueprints}
+                  :for={bp <- filtered_blueprints}
                   class="blueprint-row"
                   data-blueprint-id={bp.id}
                   style="border-bottom: 1px solid var(--rule); padding: 8px 12px;"
@@ -855,6 +872,12 @@ defmodule AgenticRealmsWeb.GameComponents.WizardAuthoring do
     </form>
     """
   end
+
+  # Feature 015 US8 — unified registry kind filter.
+  defp filter_blueprints(blueprints, :all), do: blueprints
+
+  defp filter_blueprints(blueprints, kind) when kind in [:object, :npc],
+    do: Enum.filter(blueprints, &(&1.kind == Atom.to_string(kind)))
 
   # Feature 015 US4 — read the (single-action) shape the direct-behavior editor
   # renders out of a feature-009 behavior map.

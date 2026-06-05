@@ -209,8 +209,8 @@ spawn flows route through it. Drop the two old tables/aggregates (reseed). Keep 
 **Independent Test**: with both kinds present, registry shows both with kind; filter `npc` shows only NPC; "Spawn here" on an npc row spawns an NPC.
 
 - [X] T052 [US8] `Queries.list_blueprints/0` + `list_blueprints(kind)` (`queries.ex`): UNION over `object_blueprints` + `npc_blueprints` projecting `(id, kind, name, short_description, revision)` (FR-024/FR-025).
-- [ ] T053 [US8] `GameComponents` registry: show each row's kind, a kind filter, and kind-appropriate spawn/edit affordances (FR-026).
-- [ ] T054 [P] [US8] Tests — union lists both kinds; kind filter; npc row "Spawn here" yields an NPC clone (not an object).
+- [X] T053 [US8] `GameComponents` registry: show each row's kind, a kind filter, and kind-appropriate spawn/edit affordances (FR-026).
+- [X] T054 [P] [US8] Tests — union lists both kinds; kind filter; npc row "Spawn here" yields an NPC clone (not an object).
 
 ---
 
