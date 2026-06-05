@@ -39,7 +39,9 @@ model achieved. Reconciliation notes:
   concurrent-take test, and `entity_lifecycle_integration_test` (void / relocation / uniformity).
 - The Phase 3/4 cutover was a **clean swap** (destroyable log + reseed), not the expand/contract
   hedge the T017 note anticipated — the column change + all call sites landed together per phase.
-- **T050** (manual quickstart walkthrough) is the only open item — a browser/dev-seed check, pending.
+- **T050** (quickstart walkthrough) was run as a scripted `mix run` verification against a fresh
+  `mix world.reset` dev seed — 11/11 checks passed (substrate lifecycle + take/drop non-regression +
+  invariants). All tasks complete; only an optional browser-click UI confirmation remains un-automated.
 
 ---
 
@@ -197,7 +199,7 @@ but unwired.
 
 - [X] T048 One-model audit (SC-003): grep confirms zero references in non-test code to `ObjectSpawned`, `ObjectPlacedInRoom`, `ObjectTakenFromRoom`, `ObjectDroppedInRoom`, `NPCClonedFromBlueprint`, `NPCSpawnedInRoom`; placement flows exclusively through `EntityCloned`/`EntityMoved`.
 - [X] T049 Full non-regression gate (SC-002): `mix test` green including specs 006/007/008/009/010/013/014 + take/drop/inventory; `mix compile --warnings-as-errors` clean.
-- [ ] T050 Execute `specs/016-entity-containment/quickstart.md` (sections A–D) against a fresh `mix ecto.reset` dev seed; record results.
+- [X] T050 Execute `specs/016-entity-containment/quickstart.md` against a fresh `mix world.reset` dev seed. Ran a scripted walkthrough (`mix run`) exercising the real command/projector/query layer: seed sanity (objects + Garrick NPC), B (take/inventory/drop non-regression), A (clone_into, void state, room→room relocation, move-to-void), C (no-op move, stale-origin `:container_conflict` with object-not-stolen) — **11/11 passed**; D verified by the 650-test suite + SC-003 module audit. (Browser-click UI confirmation of the LiveView surfaces is the only sub-step not automated.)
 - [X] T051 [P] `mix format` and tidy any leftover references/comments to the removed spawn model.
 
 ---
