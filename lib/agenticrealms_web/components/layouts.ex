@@ -47,10 +47,14 @@ defmodule AgenticRealmsWeb.Layouts do
           <.link navigate={~p"/"} class="ar-nav-home" title="Home">
             <.icon name="hero-home-solid" class="ar-nav-icon" />
           </.link>
-          <.link navigate={~p"/play"} class="ar-nav-link">Play</.link>
+          <%= if is_nil(@game_mode) do %>
+            <.link navigate={~p"/play"} class="ar-nav-link ar-nav-play">
+              <img src={~p"/images/logo-mark.png"} alt="" class="ar-nav-play-icon" /> Play
+            </.link>
+          <% end %>
         <% else %>
           <span class="ar-nav-brand">
-            <span class="ar-nav-brand-mark">A</span>
+            <img src={~p"/images/logo-mark.png"} alt="" class="ar-nav-brand-mark" />
             <span>Agentic Realms</span>
           </span>
         <% end %>

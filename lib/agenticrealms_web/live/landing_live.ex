@@ -12,7 +12,16 @@ defmodule AgenticRealmsWeb.LandingLive do
     <Layouts.app flash={@flash} current_player={@current_player}>
       <div class="ar-landing">
         <div class="ar-landing-hero">
-          <span class="ar-landing-hero-text">Agentic Realms</span>
+          <img
+            src={~p"/images/logo-wordmark.png"}
+            alt="Agentic Realms"
+            class="ar-landing-logo ar-landing-logo-plate"
+          />
+          <img
+            src={~p"/images/logo-wordmark-flat.png"}
+            alt="Agentic Realms"
+            class="ar-landing-logo ar-landing-logo-flat"
+          />
         </div>
         <p class="ar-landing-desc">
           Enter a living world shaped by AI-driven agents. Explore dark taverns, craft spells,
