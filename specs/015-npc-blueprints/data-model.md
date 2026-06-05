@@ -8,9 +8,56 @@ and rides the merged clone/move substrate ([016 data-model](../016-entity-contai
 
 ---
 
+## 0. PIVOT (2026-06-05): one unified `Blueprint` model
+
+**Supersedes §1.1 below and research R1/R2.** Rather than mirror two parallel pipelines, this
+milestone **collapses `ObjectBlueprint` (014) + `NPCBlueprint` (008/013) into one `Blueprint`
+aggregate + one `blueprints` table keyed by slug**, with a `kind` (`"object" | "npc"`) discriminator.
+Rationale + decision record: memory `project_unified_blueprint`. The *instance* side is already one
+model (016 `Entity`); the template side now matches.
+
+**`blueprints` — new unified table** (`lib/agenticrealms/world/schemas/blueprint.ex`), replacing
+both `object_blueprints` and `npc_blueprints`:
+
+| Column | Notes |
+|---|---|
+| `id` | slug PK; CHECK `^[a-z][a-z0-9_]*$`, len 1–64 (FR-004 — one namespace across kinds) |
+| `kind` | string NOT NULL, CHECK ∈ {`object`,`npc`} |
+| `name`, `short_description`, `long_description` | required content |
+| `fixed` | boolean NOT NULL DEFAULT `false` |
+| `revision` | integer NOT NULL DEFAULT 1, CHECK `> 0` (optimistic lock) |
+| `behaviors` | `{:array,:map}` DEFAULT `[]` — **direct** behaviors (empty for objects in this milestone) |
+| `lore` | text DEFAULT `''` (empty for objects) |
+| `toolsets` | `{:array,:string}` DEFAULT `[]` — referenced toolset names (empty for objects) |
+| `quests` | `{:array,:map}` DEFAULT `[]` — feature-013 catalog (empty for objects) |
+
+Index on `kind`. The dead `is_synthetic` vestige is dropped.
+
+**Aggregate / commands / events** (one each, replacing the two):
+- `Blueprint` aggregate, stream prefix `blueprint-`.
+- `CreateBlueprint{slug, kind, wizard_id, name, short_description, long_description, fixed,
+  behaviors, lore, toolsets, quests}` → `BlueprintCreated` (revision 1).
+- `EditBlueprint{slug, expected_revision, fields_changed}` → `BlueprintEdited` (revision N+1;
+  optimistic lock; editable-field allowlist; no-op skip).
+- One `BlueprintProjector` (`:strong`) writing the `blueprints` row.
+
+**Downstream FK retarget (reseed, not data-migrate):** `npc_clones.blueprint_id` and
+`quest_instances.npc_blueprint_id` now reference `blueprints` (the slug is unchanged, so feature-010
+chat + 013 quest reads by id still resolve). The `quest_instance` `belongs_to` repoints to
+`Blueprint`. Drop both old tables; `mix world.reset` reseeds.
+
+**Resolver:** two LLM draft tools (`draft_object_blueprint` / `draft_npc_blueprint` + `list_toolsets`)
+remain — they extract different fields — but both produce one draft map carrying `:kind`, feeding one
+commit path. **UI:** one draft assign, one registry; the card shows lore/toolset/behavior fields only
+when `kind == "npc"` (objects stay 014-simple this milestone).
+
+§1.2 (`npc_clones`) and §1.3 (`toolsets`) below are UNCHANGED by this pivot.
+
+---
+
 ## 1. Read-model schema changes (Ecto migrations)
 
-### 1.1 `npc_blueprints` — altered (`lib/agenticrealms/world/schemas/npc_blueprint.ex`)
+### 1.1 `npc_blueprints` — ~~altered~~ SUPERSEDED by §0 (folded into `blueprints`)
 
 | Column | Change |
 |---|---|

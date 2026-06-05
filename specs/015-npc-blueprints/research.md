@@ -2,6 +2,13 @@
 
 **Feature**: 015-npc-blueprints | **Date**: 2026-06-05 | **Spec**: [spec.md](./spec.md)
 
+> **PIVOT (2026-06-05): R1/R2 superseded.** Instead of *mirroring* two parallel blueprint pipelines,
+> the milestone now **unifies them** — one `Blueprint` aggregate + one `blueprints` table with a
+> `kind` discriminator (object|npc). See [data-model §0](./data-model.md#0-pivot-2026-06-05-one-unified-blueprint-model)
+> and memory `project_unified_blueprint`. R3–R7 (toolsets, composition, freeform, extract, fixed-flag)
+> still hold; "mirror the object pipeline" (R1) becomes "fold both into one." Spawning still rides the
+> 016 substrate via `clone_into(kind, …)`.
+
 Resolves the design questions for NPC authoring, now that the **clone/move/containment substrate
 (spec 016) is merged**. The dominant constraints: **reuse the feature-014 object-blueprint pipeline**
 (mirror it for `kind: "npc"`) and **ride the merged substrate for spawning** (`clone_into(:npc, …)`),

@@ -11,8 +11,14 @@ description: "Task list for feature 015 — wizard-created NPC blueprints (miles
 of features 007–010 + 016, plus the new authoring behavior).
 
 **Built on the merged substrate**: spec 016 (clone/move/containment) is shipped — spawning an NPC is
-`clone_into(:npc, …)`, in-place clone edit is `EditEntity`, and the feature-008 fold-in is done. This
-milestone is **pure NPC authoring** mirroring the feature-014 object-blueprint pipeline.
+`clone_into(:npc, …)`, in-place clone edit is `EditEntity`, and the feature-008 fold-in is done.
+
+> **PIVOT (2026-06-05): unified Blueprint.** The milestone no longer *mirrors* two pipelines — it
+> **folds `ObjectBlueprint` (014) + `NPCBlueprint` (008/013) into one `Blueprint` aggregate + one
+> `blueprints` table** with a `kind` discriminator. See [data-model §0](./data-model.md#0-pivot-2026-06-05-one-unified-blueprint-model)
+> + memory `project_unified_blueprint`. **Phase U** (below) replaces the US1/US2 *backend* tasks
+> (T014–T017, T022–T028 — struck through). US3–US8 still apply but target `Blueprint`. The resolver
+> work (T018/T019) and toolset/clone foundationals (T003–T013) carry over unchanged.
 
 **Organization**: by user story (US1–US8 from spec.md). Setup/Foundational/Polish carry no story label.
 
@@ -51,6 +57,53 @@ milestone is **pure NPC authoring** mirroring the feature-014 object-blueprint p
 - [X] T013 [P] Confirm `mix world.reset` seeds cleanly (toolsets present, existing NPCs unaffected).
 
 **Checkpoint**: schema + toolset substrate ready; suite green.
+
+> **Note (pivot):** T002 (extend `npc_blueprints`) and T005 (`npc_blueprints` schema fields) are
+> **obsoleted** by Phase U — that table is dropped and folded into `blueprints`. T010 (the
+> `NPCBlueprintCreated` projector path, done by extending `WorldProjector`) is replaced by the
+> unified `BlueprintProjector` in T064. T003/T006 (`npc_clones` columns), T004/T007 (toolsets),
+> T008/T009 (Toolsets service+tests), T011 (`EntityProjector` clone insert), T012/T013 (seed
+> toolsets + reset) all carry over **unchanged**.
+
+---
+
+## Phase U: Unify the Blueprint model (replaces US1/US2 backend) 🎯 MVP core
+
+**Goal**: one `Blueprint` aggregate + `blueprints` table (kind ∈ {object,npc}); both authoring +
+spawn flows route through it. Drop the two old tables/aggregates (reseed). Keep the suite green.
+
+### U1 — Core aggregate + projection (drop the two old pipelines)
+
+- [ ] T060 Migration `create_blueprints.exs`: create `blueprints` (id slug PK + shape CHECK; `kind` CHECK ∈ {object,npc}; name/short_description/long_description; `fixed` bool; `revision` int CHECK > 0; `behaviors` jsonb DEFAULT `[]`; `lore` text DEFAULT `''`; `toolsets` text[] DEFAULT `{}`; `quests` jsonb DEFAULT `[]`; index on `kind`). **Drop** `object_blueprints` + `npc_blueprints`. **Retarget** `npc_clones.blueprint_id` + `quest_instances.npc_blueprint_id` FKs to `blueprints`. (data-model §0)
+- [ ] T061 Create `lib/agenticrealms/world/schemas/blueprint.ex` (one schema); delete `schemas/object_blueprint.ex` + `schemas/npc_blueprint.ex`.
+- [ ] T062 Create `lib/agenticrealms/world/blueprint.ex` aggregate — `CreateBlueprint` (validate name/short/long; emit `BlueprintCreated` rev 1) + `EditBlueprint` (optimistic lock `:stale_revision`, editable-field allowlist `:invalid_field`, no-op `:ok`, rev N+1). Delete `object_blueprint.ex` + `npc_blueprint.ex` aggregates. Move the `Slug` helper to `Blueprint.Slug` (keep `ObjectBlueprint.Slug` as a deprecated alias only if cheaper).
+- [ ] T063 Commands `commands/create_blueprint.ex` + `commands/edit_blueprint.ex`; events `events/blueprint_created.ex` + `events/blueprint_edited.ex`. Delete `create_object_blueprint.ex`, `edit_object_blueprint.ex`, `create_npc_blueprint.ex`, `object_blueprint_created.ex`, `object_blueprint_edited.ex`, `npc_blueprint_created.ex`.
+- [ ] T064 Create `projections/blueprint_projector.ex` (`:strong`) — `BlueprintCreated`/`BlueprintEdited` → `blueprints` row. Delete `object_blueprint_projector.ex`; remove the `NPCBlueprintCreated` handler from `world_projector.ex`. Supervise `BlueprintProjector` in `application.ex` + `data_case.ex` (drop `ObjectBlueprintProjector`).
+- [ ] T065 `router.ex`: one `identify(Blueprint, by: :slug, prefix: "blueprint-")` + `dispatch([CreateBlueprint, EditBlueprint], to: Blueprint)`. Remove the object/npc identify+dispatch.
+- [ ] T066 Repoint downstream reads to `Blueprint`: `npc_chat/context.ex` (`Repo.get(Blueprint, id)`), `commands.ex` quest-accept catalog (`find_catalog_entry` reads `Blueprint.quests`), `schemas/quest_instance.ex` `belongs_to :blueprint, Blueprint`. Update `seed.ex` to dispatch `%CreateBlueprint{kind: "npc", …}`.
+- [ ] T067 `mix world.reset` green (NPCs seed, clones spawn, quests resolve); `mix compile --warnings-as-errors` clean.
+
+### U2 — Wrappers, queries, broadcaster
+
+- [ ] T068 `Commands.create_blueprint/2` (kind attr; slug shape + single-table uniqueness; for npc: `Toolsets.validate_behaviors` + toolset-existence) and `edit_blueprint/3` (surfaces `:stale_revision`). Replace `create_npc_blueprint`/`create_object_blueprint` call sites.
+- [ ] T069 `Commands.spawn_from_blueprint/3` — read row, `Toolsets.compose(toolsets, behaviors)` → effective (npc) / `behaviors` (object), `clone_into(kind, …, :spawned)`; per-room name-collision pre-check. Fold `spawn_object_from_blueprint` + `spawn_npc_clone`; update both seed call sites.
+- [ ] T070 `Commands.extract_essence/3` — read the in-world entity, `create_blueprint` at rev 1; source untouched. Fold `extract_object_essence`.
+- [ ] T071 `Queries.get_blueprint/1`, `list_blueprints/0`, `list_blueprints/1`. Remove `get_object_blueprint`/`list_object_blueprints`/`get_npc_blueprint_row` (or thin-shim).
+- [ ] T072 `UIEventBroadcaster`: one `BlueprintCreated`/`BlueprintEdited` handler → `WizardBlueprintRegistryChanged` (kind in payload). Remove the three old handlers.
+
+### U3 — Resolver (carry-over from T018/T019)
+
+- [ ] T073 Confirm both draft tools feed one path: object draft carries `kind: "object"`, npc draft `kind: "npc"`; commit routes on `:kind`. (Mostly done — adjust object outcome to include kind.)
+
+### U4 — LiveView + components (one authoring path)
+
+- [ ] T074 `GameLive` + `game_live/wizard.ex`: one `:focused_blueprint_draft` (gains `:kind`); `commit_blueprint_draft` → `create_blueprint`/`edit_blueprint`; `spawn_here` → `spawn_from_blueprint` (kind from the row); `extract_essence`. Registry assign becomes unified `:blueprints` via `list_blueprints/0`; `patch_blueprint_registry` operates on it.
+- [ ] T075 `components/game/wizard_authoring.ex`: registry renders the unified list with a kind badge + kind-appropriate spawn/edit affordances; the draft card shows lore textarea + toolset picker + direct-behavior editor **only when `kind == "npc"`** (objects keep the 014 form).
+
+### U5 — Tests + green gate
+
+- [ ] T076 [P] Rework blueprint tests to the unified model: `blueprint_test.exs` (create/edit/lock — folds object+npc aggregate tests), `blueprint_projector_test.exs`, unified wrapper tests; delete the obsolete object/npc-specific aggregate+projector+wrapper tests.
+- [ ] T077 Full non-regression: `mix test` green incl. 008/009/010/013/014/016; `mix compile --warnings-as-errors` clean; `mix format`.
 
 ---
 
