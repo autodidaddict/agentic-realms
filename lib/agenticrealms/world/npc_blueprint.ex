@@ -1,19 +1,20 @@
 defmodule AgenticRealms.World.NPCBlueprint do
   @moduledoc """
   NPC Blueprint aggregate. Owns the authored template for a kind of NPC
-  (display name, descriptions) and the per-blueprint serial counter that
-  assigns sequential numbers to clones spawned from this blueprint.
+  (display name, descriptions, behaviors, lore, quest catalog).
 
   Identified by `:blueprint_id` (slug string) with prefix `"npc-blueprint-"`.
 
-  **Full-copy materialization**: when a `SpawnNPCClone` command arrives,
-  the aggregate stamps its CURRENT `name`, `short_description`, and
-  `long_description` into the emitted `NPCClonedFromBlueprint` event. The
-  clone row is built from the event payload; the blueprint table is never
-  consulted at render time. Subsequent blueprint edits (which are not
-  exposed in this feature — FR-005a) do NOT propagate to existing clones.
+  **Feature 016 note**: clone spawning (`SpawnNPCClone` → `NPCClonedFromBlueprint`)
+  and the per-blueprint `serial`/`clone_ids` tracking were removed when NPC
+  spawning moved onto the entity lifecycle. A clone is now cloned into
+  existence and moved into a room via `World.Entity` (see
+  `World.Commands.spawn_npc_clone/3`), with the blueprint's data copied into
+  the `EntityCloned` payload at dispatch time (full-copy). This aggregate now
+  owns blueprint authoring only.
 
-  See `specs/008-npc-blueprints/data-model.md` §3 and `contracts/commands.md`.
+  See `specs/008-npc-blueprints/data-model.md` §3 and
+  `specs/016-entity-containment/`.
   """
 
   defstruct id: nil,
@@ -23,17 +24,15 @@ defmodule AgenticRealms.World.NPCBlueprint do
             behaviors: [],
             lore: "",
             # Feature 013 — Quests. Per-NPC FetchQuest catalog.
-            quests: [],
-            next_serial: 1,
-            clone_ids: MapSet.new()
+            quests: []
 
-  alias AgenticRealms.World.Commands.{CreateNPCBlueprint, SpawnNPCClone}
-  alias AgenticRealms.World.Events.{NPCBlueprintCreated, NPCClonedFromBlueprint}
+  alias AgenticRealms.World.Commands.CreateNPCBlueprint
+  alias AgenticRealms.World.Events.NPCBlueprintCreated
 
   # --- CreateNPCBlueprint -------------------------------------------------
 
-  @spec execute(%__MODULE__{}, %CreateNPCBlueprint{} | %SpawnNPCClone{}) ::
-          %NPCBlueprintCreated{} | %NPCClonedFromBlueprint{} | {:error, atom()}
+  @spec execute(%__MODULE__{}, %CreateNPCBlueprint{}) ::
+          %NPCBlueprintCreated{} | {:error, atom()}
   def execute(%__MODULE__{id: nil}, %CreateNPCBlueprint{
         blueprint_id: bp_id,
         name: name,
@@ -71,46 +70,9 @@ defmodule AgenticRealms.World.NPCBlueprint do
   def execute(%__MODULE__{}, %CreateNPCBlueprint{}),
     do: {:error, :blueprint_already_exists}
 
-  # --- SpawnNPCClone ------------------------------------------------------
-  # Full-copy materialization point. The aggregate's CURRENT name / short /
-  # long are stamped into the emitted event payload.
-
-  def execute(%__MODULE__{id: nil}, %SpawnNPCClone{}),
-    do: {:error, :blueprint_not_found}
-
-  def execute(
-        %__MODULE__{
-          id: bp_id,
-          name: name,
-          short_description: short,
-          long_description: long,
-          behaviors: behaviors,
-          lore: lore,
-          next_serial: serial,
-          clone_ids: clones
-        },
-        %SpawnNPCClone{blueprint_id: bp_id, clone_id: cid, room_id: rid}
-      ) do
-    if MapSet.member?(clones, cid) do
-      {:error, :clone_id_already_used}
-    else
-      %NPCClonedFromBlueprint{
-        blueprint_id: bp_id,
-        clone_id: cid,
-        room_id: rid,
-        serial: serial,
-        name: name,
-        short_description: short,
-        long_description: long,
-        behaviors: behaviors,
-        lore: lore
-      }
-    end
-  end
-
   # --- apply/2 ------------------------------------------------------------
 
-  @spec apply(%__MODULE__{}, %NPCBlueprintCreated{} | %NPCClonedFromBlueprint{}) :: %__MODULE__{}
+  @spec apply(%__MODULE__{}, %NPCBlueprintCreated{}) :: %__MODULE__{}
   def apply(
         %__MODULE__{} = state,
         %NPCBlueprintCreated{
@@ -134,12 +96,5 @@ defmodule AgenticRealms.World.NPCBlueprint do
         # serialized before this field existed.
         quests: Map.get(event, :quests, []) || []
     }
-  end
-
-  def apply(
-        %__MODULE__{next_serial: s, clone_ids: c} = state,
-        %NPCClonedFromBlueprint{clone_id: cid}
-      ) do
-    %__MODULE__{state | next_serial: s + 1, clone_ids: MapSet.put(c, cid)}
   end
 end

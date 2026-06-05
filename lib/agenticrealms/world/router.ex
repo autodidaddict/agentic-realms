@@ -13,22 +13,15 @@ defmodule AgenticRealms.World.Router do
   alias AgenticRealms.World.Commands.{
     CreateRoom,
     AddExit,
-    PlaceObject,
     SpawnPlayer,
     MovePlayer,
-    TakeObject,
-    DropObject,
     CreateNPCBlueprint,
-    SpawnNPCClone,
     CreateRegion,
     RecordRoomDiscovery,
     AcceptQuest,
     FinalizeQuest,
     CreateObjectBlueprint,
     EditObjectBlueprint,
-    SpawnObjectFromBlueprint,
-    SpawnObjectFreeform,
-    EditObject,
     CloneEntity,
     MoveEntity,
     EditEntity
@@ -57,26 +50,15 @@ defmodule AgenticRealms.World.Router do
   # Feature 014 US2: SpawnObjectFromBlueprint also routed to Room (the
   # destination Room aggregate owns object presence, exactly like
   # PlaceObject).
-  dispatch(
-    [
-      CreateRoom,
-      AddExit,
-      PlaceObject,
-      TakeObject,
-      DropObject,
-      SpawnObjectFromBlueprint,
-      SpawnObjectFreeform,
-      EditObject
-    ],
-    to: Room
-  )
+  dispatch([CreateRoom, AddExit], to: Room)
 
   # Phase 4 (US1) + Phase 5 (US2): player lifecycle + movement routed to Player.
   # Feature 012: per-player room discovery also routed to Player.
   dispatch([SpawnPlayer, MovePlayer, RecordRoomDiscovery], to: Player)
 
-  # Feature 008: NPC blueprint authoring + cloning
-  dispatch([CreateNPCBlueprint, SpawnNPCClone], to: NPCBlueprint)
+  # Feature 008: NPC blueprint authoring (clone spawning moved to the entity
+  # lifecycle in feature 016).
+  dispatch([CreateNPCBlueprint], to: NPCBlueprint)
 
   # Feature 012: region authoring
   dispatch([CreateRegion], to: Region)

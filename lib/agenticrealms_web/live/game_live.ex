@@ -458,7 +458,7 @@ defmodule AgenticRealmsWeb.GameLive do
       nil ->
         {:noreply, assign(socket, :blueprint_commit_error, :unknown_object)}
 
-      %{room_id: ^room_id} = obj ->
+      %{container_type: "room", container_id: ^room_id} = obj ->
         edit = %{
           object_id: obj.id,
           name: obj.name || "",
@@ -672,7 +672,7 @@ defmodule AgenticRealmsWeb.GameLive do
       nil ->
         {:noreply, assign(socket, :blueprint_commit_error, :unknown_object)}
 
-      %{room_id: ^room_id} = object ->
+      %{container_type: "room", container_id: ^room_id} = object ->
         slug = AgenticRealms.World.ObjectBlueprint.Slug.derive(object.name || "")
 
         draft = %{

@@ -21,9 +21,6 @@ defmodule AgenticRealms.World.Commands do
   alias AgenticRealms.World.Commands.{
     SpawnPlayer,
     MovePlayer,
-    TakeObject,
-    DropObject,
-    SpawnNPCClone,
     CreateRegion,
     CreateRoom,
     AddExit,
@@ -32,10 +29,12 @@ defmodule AgenticRealms.World.Commands do
     FinalizeQuest,
     CreateObjectBlueprint,
     EditObjectBlueprint,
-    SpawnObjectFromBlueprint,
-    SpawnObjectFreeform,
-    EditObject
+    CloneEntity,
+    MoveEntity,
+    EditEntity
   }
+
+  alias AgenticRealms.World.ContainerRef
 
   alias AgenticRealms.World.ObjectBlueprint.Slug
 
@@ -100,6 +99,77 @@ defmodule AgenticRealms.World.Commands do
     end
   end
 
+  # ──────────────────────────────────────────────────────────────────────
+  # Feature 016 — entity lifecycle world service (clone / move / clone_into)
+  # ──────────────────────────────────────────────────────────────────────
+
+  @doc """
+  Clone a world entity into existence (in the void). Mints a fresh id, or
+  use the 3-arity form to supply a deterministic id (replay-safe; a re-clone
+  of an existing entity is treated as success).
+  """
+  @spec clone_entity(:object | :npc, map()) :: {:ok, String.t()} | {:error, atom()}
+  def clone_entity(kind, fields), do: clone_entity(kind, Ecto.UUID.generate(), fields)
+
+  @spec clone_entity(:object | :npc, String.t(), map()) :: {:ok, String.t()} | {:error, atom()}
+  def clone_entity(kind, entity_id, fields)
+      when is_binary(entity_id) and is_map(fields) do
+    case WorldApp.dispatch(
+           %CloneEntity{entity_id: entity_id, kind: kind, fields: fields},
+           consistency: :strong
+         ) do
+      :ok -> {:ok, entity_id}
+      {:error, :already_exists} -> {:ok, entity_id}
+      {:error, _} = err -> err
+    end
+  end
+
+  @doc """
+  Move an entity into `to`, asserting it is currently in `expected_from`.
+  A `:container_conflict` means the entity is no longer where the caller
+  resolved it (e.g. already taken).
+  """
+  @spec move_entity(String.t(), ContainerRef.t(), ContainerRef.t(), atom()) ::
+          :ok | {:error, atom()}
+  def move_entity(entity_id, %ContainerRef{} = expected_from, %ContainerRef{} = to, cause)
+      when is_binary(entity_id) do
+    with :ok <- ensure_container_exists(to) do
+      WorldApp.dispatch(
+        %MoveEntity{entity_id: entity_id, expected_from: expected_from, to: to, cause: cause},
+        consistency: :strong
+      )
+    end
+  end
+
+  @doc "Clone an entity and immediately move it into `to` (the void → target wrapper)."
+  @spec clone_into(:object | :npc, map(), ContainerRef.t(), atom()) ::
+          {:ok, String.t()} | {:error, atom()}
+  def clone_into(kind, fields, %ContainerRef{} = to, cause),
+    do: clone_into(kind, Ecto.UUID.generate(), fields, to, cause)
+
+  @spec clone_into(:object | :npc, String.t(), map(), ContainerRef.t(), atom()) ::
+          {:ok, String.t()} | {:error, atom()}
+  def clone_into(kind, entity_id, fields, %ContainerRef{} = to, cause) do
+    with {:ok, id} <- clone_entity(kind, entity_id, fields),
+         :ok <- move_entity(id, ContainerRef.void(), to, cause) do
+      {:ok, id}
+    end
+  end
+
+  defp ensure_container_exists(%ContainerRef{type: :void}), do: :ok
+
+  defp ensure_container_exists(%ContainerRef{type: :room, id: rid}) do
+    case Repo.get(Room, rid) do
+      %Room{} -> :ok
+      nil -> {:error, :room_not_found}
+    end
+  end
+
+  # Players exist by account FK; NPC-inventory is defined-but-dormant (R8) —
+  # accept both at the service boundary.
+  defp ensure_container_exists(%ContainerRef{type: :player}), do: :ok
+  defp ensure_container_exists(%ContainerRef{type: :npc}), do: :ok
+
   @doc """
   Take an object named `name` from the player's current room.
 
@@ -147,17 +217,18 @@ defmodule AgenticRealms.World.Commands do
     with {:ok, false} <- check_not_fixed(object_id),
          object_name <- name_of(object_id),
          :ok <-
-           WorldApp.dispatch(
-             %TakeObject{
-               room_id: room_id,
-               player_id: player_id,
-               object_id: object_id
-             },
-             consistency: :strong
+           move_entity(
+             object_id,
+             ContainerRef.room(room_id),
+             ContainerRef.player(player_id),
+             :taken
            ) do
       {:ok, %{object_id: object_id, object_name: object_name}}
     else
       {:ok, true} -> {:error, :object_is_fixed}
+      # The object moved out of the room between resolve and dispatch (e.g.
+      # another player took it first) — preserve the legacy race-loser error.
+      {:error, :container_conflict} -> {:error, :object_not_in_room}
       {:error, _} = err -> err
     end
   end
@@ -179,15 +250,16 @@ defmodule AgenticRealms.World.Commands do
          {:ok, object_id} <- resolve_in_inventory(player_id, name),
          object_name <- name_of(object_id),
          :ok <-
-           WorldApp.dispatch(
-             %DropObject{
-               room_id: room_id,
-               player_id: player_id,
-               object_id: object_id
-             },
-             consistency: :strong
+           move_entity(
+             object_id,
+             ContainerRef.player(player_id),
+             ContainerRef.room(room_id),
+             :dropped
            ) do
       {:ok, %{object_id: object_id, object_name: object_name}}
+    else
+      {:error, :container_conflict} -> {:error, :not_in_inventory}
+      {:error, _} = err -> err
     end
   end
 
@@ -240,11 +312,11 @@ defmodule AgenticRealms.World.Commands do
     * no other clone in this room shares the blueprint's display name
       (`:clone_name_taken_in_room` — preserves feature 007 FR-001a)
 
-  On success, dispatches `SpawnNPCClone` to the blueprint aggregate which
-  emits `NPCClonedFromBlueprint` with the aggregate's current data
-  materialized into the event (full-copy at dispatch time). Returns
-  `{:ok, %{clone_id, serial}}` after re-querying the freshly-projected
-  clone.
+  On success, clones the NPC into existence and moves it into the room via
+  the entity lifecycle (`clone_into(:npc, …)`), with the blueprint's current
+  data (incl. its `blueprint_id` reference, behaviors and lore) copied into
+  the `EntityCloned` payload (full-copy at dispatch time). Returns
+  `{:ok, %{clone_id, serial}}`.
 
   See `specs/008-npc-blueprints/contracts/commands.md`.
   """
@@ -258,25 +330,49 @@ defmodule AgenticRealms.World.Commands do
              | term()}
   def spawn_npc_clone(blueprint_id, room_id, clone_id)
       when is_binary(blueprint_id) and is_binary(room_id) and is_binary(clone_id) do
-    with {:ok, blueprint} <- Queries.get_npc_blueprint(blueprint_id) |> remap_blueprint_error(),
+    # Feature 016 — an NPC clone is cloned into existence (a full copy of the
+    # blueprint's current data, incl. its blueprint_id reference, serial,
+    # behaviors and lore) and moved into the room via the entity lifecycle.
+    with {:ok, blueprint} <- fetch_npc_blueprint(blueprint_id),
          :ok <- check_room_exists(room_id),
-         :ok <- check_no_clone_name_collision(room_id, blueprint.name),
-         :ok <-
-           WorldApp.dispatch(
-             %SpawnNPCClone{
-               blueprint_id: blueprint_id,
-               clone_id: clone_id,
-               room_id: room_id
-             },
-             consistency: :strong
-           ),
-         {:ok, clone} <- Queries.get_npc_clone(clone_id) do
-      {:ok, %{clone_id: clone_id, serial: clone.serial}}
+         :ok <- check_no_clone_name_collision(room_id, blueprint.name) do
+      serial = next_npc_serial(blueprint_id)
+
+      fields = %{
+        blueprint_id: blueprint_id,
+        serial: serial,
+        name: blueprint.name,
+        short_description: blueprint.short_description,
+        long_description: blueprint.long_description,
+        behaviors: blueprint.behaviors || [],
+        lore: blueprint.lore || ""
+      }
+
+      case clone_into(:npc, clone_id, fields, ContainerRef.room(room_id), :spawned) do
+        {:ok, _} -> {:ok, %{clone_id: clone_id, serial: serial}}
+        {:error, _} = err -> err
+      end
     end
   end
 
-  defp remap_blueprint_error({:ok, _} = ok), do: ok
-  defp remap_blueprint_error({:error, :no_such_blueprint}), do: {:error, :blueprint_not_found}
+  defp fetch_npc_blueprint(blueprint_id) do
+    case Repo.get(NPCBlueprint, blueprint_id) do
+      nil -> {:error, :blueprint_not_found}
+      bp -> {:ok, bp}
+    end
+  end
+
+  defp next_npc_serial(blueprint_id) do
+    from(c in AgenticRealms.World.Schemas.NPCClone,
+      where: c.blueprint_id == ^blueprint_id,
+      select: max(c.serial)
+    )
+    |> Repo.one()
+    |> case do
+      nil -> 1
+      n -> n + 1
+    end
+  end
 
   defp check_room_exists(room_id) do
     case Repo.get(Room, room_id) do
@@ -662,7 +758,7 @@ defmodule AgenticRealms.World.Commands do
 
     {in_inventory, elsewhere} =
       Enum.split_with(all_objects, fn o ->
-        o.player_id == pid and is_nil(o.room_id)
+        o.container_type == "player" and o.container_id == Integer.to_string(pid)
       end)
 
     criteria = snapshot["criteria"] || []
@@ -761,23 +857,20 @@ defmodule AgenticRealms.World.Commands do
       when is_integer(wizard_id) and is_binary(blueprint_id) and is_binary(room_id) do
     with :ok <- ensure_wizard(wizard_id),
          {:ok, blueprint} <- fetch_blueprint(blueprint_id) do
-      object_id = Ecto.UUID.generate()
-
-      cmd = %SpawnObjectFromBlueprint{
-        room_id: room_id,
-        object_id: object_id,
-        blueprint_id: blueprint_id,
-        wizard_id: wizard_id,
-        name: blueprint.name,
-        short_description: blueprint.short_description,
-        long_description: blueprint.long_description,
-        fixed: blueprint.fixed
-      }
-
-      case WorldApp.dispatch(cmd, consistency: :strong) do
-        :ok -> {:ok, object_id}
-        {:error, _} = err -> err
-      end
+      clone_into(
+        :object,
+        %{
+          name: blueprint.name,
+          short_description: blueprint.short_description,
+          long_description: blueprint.long_description,
+          fixed: blueprint.fixed,
+          behaviors: [],
+          quest_player_id: nil,
+          quest_instance_id: nil
+        },
+        ContainerRef.room(room_id),
+        :spawned
+      )
     end
   end
 
@@ -814,22 +907,20 @@ defmodule AgenticRealms.World.Commands do
       when is_integer(wizard_id) and is_binary(room_id) and is_map(attrs) do
     with :ok <- ensure_wizard(wizard_id),
          :ok <- validate_object_attrs(attrs) do
-      object_id = Ecto.UUID.generate()
-
-      cmd = %SpawnObjectFreeform{
-        room_id: room_id,
-        object_id: object_id,
-        wizard_id: wizard_id,
-        name: attrs[:name],
-        short_description: attrs[:short_description],
-        long_description: attrs[:long_description],
-        fixed: Map.get(attrs, :fixed, false)
-      }
-
-      case WorldApp.dispatch(cmd, consistency: :strong) do
-        :ok -> {:ok, object_id}
-        {:error, _} = err -> err
-      end
+      clone_into(
+        :object,
+        %{
+          name: attrs[:name],
+          short_description: attrs[:short_description],
+          long_description: attrs[:long_description],
+          fixed: Map.get(attrs, :fixed, false),
+          behaviors: [],
+          quest_player_id: nil,
+          quest_instance_id: nil
+        },
+        ContainerRef.room(room_id),
+        :spawned
+      )
     end
   end
 
@@ -1000,19 +1091,22 @@ defmodule AgenticRealms.World.Commands do
          :ok <- validate_edit_fields(fields_changed),
          {:ok, room_id} <- ensure_in_room(object),
          :ok <- ensure_wizard_co_located(wizard_id, room_id) do
-      cmd = %EditObject{
-        room_id: room_id,
-        object_id: object_id,
-        wizard_id: wizard_id,
-        fields_changed: only_actual_diff(object, fields_changed)
-      }
+      diff = only_actual_diff(object, fields_changed)
 
       cond do
-        map_size(cmd.fields_changed) == 0 ->
+        map_size(diff) == 0 ->
           {:ok, :no_change}
 
         true ->
-          case WorldApp.dispatch(cmd, consistency: :strong) do
+          # `room_id` was only used to route to the Room aggregate; entity
+          # edits route by entity_id. The co-location check above remains the
+          # security boundary (the object must be in the wizard's room).
+          _ = room_id
+
+          case WorldApp.dispatch(
+                 %EditEntity{entity_id: object_id, fields_changed: diff},
+                 consistency: :strong
+               ) do
             :ok -> {:ok, :updated}
             {:error, _} = err -> err
           end
@@ -1020,8 +1114,10 @@ defmodule AgenticRealms.World.Commands do
     end
   end
 
-  defp ensure_in_room(%{room_id: nil}), do: {:error, :object_not_editable_here}
-  defp ensure_in_room(%{room_id: rid}) when is_binary(rid), do: {:ok, rid}
+  defp ensure_in_room(%{container_type: "room", container_id: rid}) when is_binary(rid),
+    do: {:ok, rid}
+
+  defp ensure_in_room(_), do: {:error, :object_not_editable_here}
 
   # Feature 014 US5 — cross-room defense in depth. The LiveView's
   # `focus_object_for_edit` pattern matches `obj.room_id == ^room_id`

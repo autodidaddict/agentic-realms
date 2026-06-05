@@ -48,7 +48,7 @@ defmodule AgenticRealms.World.Entity do
 
   def execute(%__MODULE__{id: nil}, %MoveEntity{}), do: {:error, :not_found}
 
-  def execute(%__MODULE__{container: container}, %MoveEntity{
+  def execute(%__MODULE__{kind: kind, container: container}, %MoveEntity{
         entity_id: id,
         expected_from: expected_from,
         to: to,
@@ -69,7 +69,7 @@ defmodule AgenticRealms.World.Entity do
         {:error, :container_conflict}
 
       true ->
-        %EntityMoved{entity_id: id, from: container, to: to, cause: cause}
+        %EntityMoved{entity_id: id, from: container, to: to, cause: cause, kind: kind}
     end
   end
 
@@ -77,11 +77,11 @@ defmodule AgenticRealms.World.Entity do
 
   def execute(%__MODULE__{id: nil}, %EditEntity{}), do: {:error, :not_found}
 
-  def execute(%__MODULE__{}, %EditEntity{entity_id: id, fields_changed: changed}) do
+  def execute(%__MODULE__{kind: kind}, %EditEntity{entity_id: id, fields_changed: changed}) do
     if changed == %{} or map_size(changed) == 0 do
       :ok
     else
-      %EntityEdited{entity_id: id, fields_changed: changed}
+      %EntityEdited{entity_id: id, fields_changed: changed, kind: kind}
     end
   end
 

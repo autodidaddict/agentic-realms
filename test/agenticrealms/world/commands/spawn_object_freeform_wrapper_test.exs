@@ -46,7 +46,9 @@ defmodule AgenticRealms.World.Commands.SpawnObjectFreeformWrapperTest do
                long_description: "A small clay pot, half-empty of dry barley."
              })
 
-    assert %Object{room_id: ^room_id, name: name} = Repo.get(Object, object_id)
+    assert %Object{container_type: "room", container_id: ^room_id, name: name} =
+             Repo.get(Object, object_id)
+
     assert name == "freeform pot #{suffix}"
 
     # FR-011: no blueprint row added.
@@ -101,8 +103,8 @@ defmodule AgenticRealms.World.Commands.SpawnObjectFreeformWrapperTest do
     {:ok, id_b} = Commands.spawn_object_freeform(w.id, room_id, attrs)
 
     assert id_a != id_b
-    assert Repo.get(Object, id_a).room_id == room_id
-    assert Repo.get(Object, id_b).room_id == room_id
+    assert Repo.get(Object, id_a).container_id == room_id
+    assert Repo.get(Object, id_b).container_id == room_id
   end
 
   test "freeform Object is observationally indistinguishable from a blueprint-spawned one (FR-012)",
@@ -136,7 +138,8 @@ defmodule AgenticRealms.World.Commands.SpawnObjectFreeformWrapperTest do
     assert a.short_description == b.short_description
     assert a.long_description == b.long_description
     assert a.fixed == b.fixed
-    assert a.room_id == b.room_id
+    assert a.container_type == b.container_type
+    assert a.container_id == b.container_id
     assert Map.keys(Map.from_struct(a)) == Map.keys(Map.from_struct(b))
     refute Map.has_key?(Map.from_struct(a), :blueprint_id)
 

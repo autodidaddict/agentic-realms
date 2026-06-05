@@ -25,6 +25,9 @@ defmodule AgenticRealms.World.Projections.QuestProjector do
   import Ecto.Query
 
   alias AgenticRealms.Repo
+  alias AgenticRealms.World.Application, as: WorldApp
+  alias AgenticRealms.World.ContainerRef
+  alias AgenticRealms.World.Commands.{CloneEntity, MoveEntity}
   alias AgenticRealms.World.Schemas.{Object, QuestInstance}
 
   alias AgenticRealms.World.Events.{
@@ -53,22 +56,29 @@ defmodule AgenticRealms.World.Projections.QuestProjector do
         },
         _meta
       ) do
-    Repo.insert(
-      %Object{
-        id: oid,
+    # Feature 016 — the reward is cloned into existence then moved into the
+    # player's inventory, so it is a real entity they can drop. Deterministic
+    # id (the reward_object_id) keeps this replay-safe.
+    WorldApp.dispatch(%CloneEntity{
+      entity_id: oid,
+      kind: :object,
+      fields: %{
         name: name,
         short_description: description,
         long_description: description,
         fixed: false,
         behaviors: [],
-        room_id: nil,
-        player_id: pid,
         quest_player_id: nil,
         quest_instance_id: nil
-      },
-      on_conflict: :nothing,
-      conflict_target: :id
-    )
+      }
+    })
+
+    WorldApp.dispatch(%MoveEntity{
+      entity_id: oid,
+      expected_from: ContainerRef.void(),
+      to: ContainerRef.player(pid),
+      cause: :spawned
+    })
 
     # Back-reference the reward on the quest instance row so future
     # detail-rendering code (US3 Completed view) can show it without

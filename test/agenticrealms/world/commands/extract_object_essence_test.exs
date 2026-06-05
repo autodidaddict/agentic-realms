@@ -70,7 +70,8 @@ defmodule AgenticRealms.World.Commands.ExtractObjectEssenceTest do
     assert before.short_description == after_.short_description
     assert before.long_description == after_.long_description
     assert before.fixed == after_.fixed
-    assert before.room_id == after_.room_id
+    assert before.container_type == after_.container_type
+    assert before.container_id == after_.container_id
   end
 
   test "refuses non-wizard caller",

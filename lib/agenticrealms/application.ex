@@ -114,6 +114,9 @@ defmodule AgenticRealms.Application do
         # `object_blueprints` read-model; handles ObjectBlueprintCreated
         # (US1) and ObjectBlueprintEdited (US5).
         AgenticRealms.World.Projections.ObjectBlueprintProjector,
+        # Feature 016 — entity lifecycle. Owns every world_objects (and, from
+        # Phase 4, npc_clones) row write from EntityCloned/Moved/Edited.
+        AgenticRealms.World.Projections.EntityProjector,
         AgenticRealms.World.UIEventBroadcaster,
         AgenticRealms.World.Behaviors.Interpreter
       ]

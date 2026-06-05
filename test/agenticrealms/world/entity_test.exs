@@ -9,12 +9,17 @@ defmodule AgenticRealms.World.EntityTest do
   defp in_room(id \\ "e1", room \\ "r1") do
     %Entity{}
     |> Entity.apply(%EntityCloned{entity_id: id, kind: :object, fields: %{}})
-    |> Entity.apply(%EntityMoved{entity_id: id, from: ContainerRef.void(), to: ContainerRef.room(room)})
+    |> Entity.apply(%EntityMoved{
+      entity_id: id,
+      from: ContainerRef.void(),
+      to: ContainerRef.room(room)
+    })
   end
 
   describe "execute/2 — CloneEntity" do
     test "fresh aggregate emits EntityCloned with normalized kind" do
       cmd = %CloneEntity{entity_id: "e1", kind: :object, fields: %{"name" => "lantern"}}
+
       assert %EntityCloned{entity_id: "e1", kind: :object, fields: %{"name" => "lantern"}} =
                Entity.execute(%Entity{}, cmd)
     end
@@ -37,7 +42,12 @@ defmodule AgenticRealms.World.EntityTest do
 
   describe "execute/2 — MoveEntity" do
     test "uncreated entity → :not_found" do
-      cmd = %MoveEntity{entity_id: "e1", expected_from: ContainerRef.void(), to: ContainerRef.room("r1")}
+      cmd = %MoveEntity{
+        entity_id: "e1",
+        expected_from: ContainerRef.void(),
+        to: ContainerRef.room("r1")
+      }
+
       assert {:error, :not_found} = Entity.execute(%Entity{}, cmd)
     end
 
@@ -58,7 +68,12 @@ defmodule AgenticRealms.World.EntityTest do
     end
 
     test "no-op move (to == current container) → :ok, no event" do
-      cmd = %MoveEntity{entity_id: "e1", expected_from: ContainerRef.room("r1"), to: ContainerRef.room("r1")}
+      cmd = %MoveEntity{
+        entity_id: "e1",
+        expected_from: ContainerRef.room("r1"),
+        to: ContainerRef.room("r1")
+      }
+
       assert :ok = Entity.execute(in_room(), cmd)
     end
 
@@ -101,7 +116,10 @@ defmodule AgenticRealms.World.EntityTest do
   describe "execute/2 — EditEntity" do
     test "uncreated entity → :not_found" do
       assert {:error, :not_found} =
-               Entity.execute(%Entity{}, %EditEntity{entity_id: "e1", fields_changed: %{name: "x"}})
+               Entity.execute(%Entity{}, %EditEntity{
+                 entity_id: "e1",
+                 fields_changed: %{name: "x"}
+               })
     end
 
     test "no-op diff → :ok, no event" do
@@ -110,7 +128,10 @@ defmodule AgenticRealms.World.EntityTest do
 
     test "real diff emits EntityEdited" do
       assert %EntityEdited{entity_id: "e1", fields_changed: %{name: "brass lantern"}} =
-               Entity.execute(in_room(), %EditEntity{entity_id: "e1", fields_changed: %{name: "brass lantern"}})
+               Entity.execute(in_room(), %EditEntity{
+                 entity_id: "e1",
+                 fields_changed: %{name: "brass lantern"}
+               })
     end
   end
 
@@ -128,13 +149,21 @@ defmodule AgenticRealms.World.EntityTest do
       state =
         %Entity{}
         |> Entity.apply(%EntityCloned{entity_id: "e1", kind: :object, fields: %{}})
-        |> Entity.apply(%EntityMoved{entity_id: "e1", from: %{"type" => "void", "id" => nil}, to: %{"type" => "player", "id" => 7}})
+        |> Entity.apply(%EntityMoved{
+          entity_id: "e1",
+          from: %{"type" => "void", "id" => nil},
+          to: %{"type" => "player", "id" => 7}
+        })
 
       assert %Entity{container: %ContainerRef{type: :player, id: 7}} = state
     end
 
     test "EntityEdited leaves aggregate state unchanged" do
-      assert in_room() == Entity.apply(in_room(), %EntityEdited{entity_id: "e1", fields_changed: %{name: "x"}})
+      assert in_room() ==
+               Entity.apply(in_room(), %EntityEdited{
+                 entity_id: "e1",
+                 fields_changed: %{name: "x"}
+               })
     end
   end
 end

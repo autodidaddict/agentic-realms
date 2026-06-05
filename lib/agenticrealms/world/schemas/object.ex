@@ -9,8 +9,12 @@ defmodule AgenticRealms.World.Schemas.Object do
     field :fixed, :boolean, default: false
     field :behaviors, {:array, :map}, default: []
 
-    belongs_to :room, AgenticRealms.World.Schemas.Room, type: :binary_id
-    belongs_to :player, AgenticRealms.Accounts.Player
+    # Feature 016 — typed containment. `container_type` is one of
+    # "void" | "room" | "player" | "npc"; `container_id` holds the room
+    # UUID, the stringified player id, or NULL for the void. Replaces the
+    # old `room_id`/`player_id` + XOR model.
+    field :container_type, :string
+    field :container_id, :string
 
     # Feature 013 — Quests. Both NULL for non-quest items; both set
     # together for quest-scoped items spawned via accept_quest.

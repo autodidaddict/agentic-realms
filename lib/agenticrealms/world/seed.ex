@@ -290,45 +290,66 @@ defmodule AgenticRealms.World.Seed do
     # the cross-region affordance still shows on both sides).
     :ok = WorldCommands.add_exit(@outskirts_room_id, :west, @border_room_id)
 
-    # ---- Objects (existing) ----
-    alias AgenticRealms.World.Commands.PlaceObject
-    alias AgenticRealms.World.Application, as: WorldApp
+    # ---- Objects (existing) — feature 016: cloned into existence then
+    # moved into their rooms via the entity lifecycle. ----
+    alias AgenticRealms.World.ContainerRef
 
-    :ok =
-      WorldApp.dispatch(%PlaceObject{
-        room_id: @starting_room_id,
-        object_id: @brass_lantern_id,
-        name: "brass lantern",
-        short_description: "a dented brass lantern",
-        long_description:
-          "An old hand-lantern of dented brass. Its glass is smoked but unbroken, and a stub of candle still rests within.",
-        fixed: false,
-        behaviors: lantern_behaviors
-      })
+    {:ok, _} =
+      WorldCommands.clone_into(
+        :object,
+        @brass_lantern_id,
+        %{
+          name: "brass lantern",
+          short_description: "a dented brass lantern",
+          long_description:
+            "An old hand-lantern of dented brass. Its glass is smoked but unbroken, and a stub of candle still rests within.",
+          fixed: false,
+          behaviors: lantern_behaviors,
+          quest_player_id: nil,
+          quest_instance_id: nil
+        },
+        ContainerRef.room(@starting_room_id),
+        :placed
+      )
 
-    :ok =
-      WorldApp.dispatch(%PlaceObject{
-        room_id: @library_room_id,
-        object_id: @leather_journal_id,
-        name: "leather-bound journal",
-        short_description: "a slim leather-bound journal",
-        long_description:
-          "A slim journal bound in oxblood leather, its pages thick and uneven. Most are blank; a few near the front are densely written in a hand you do not recognize.",
-        fixed: false
-      })
+    {:ok, _} =
+      WorldCommands.clone_into(
+        :object,
+        @leather_journal_id,
+        %{
+          name: "leather-bound journal",
+          short_description: "a slim leather-bound journal",
+          long_description:
+            "A slim journal bound in oxblood leather, its pages thick and uneven. Most are blank; a few near the front are densely written in a hand you do not recognize.",
+          fixed: false,
+          behaviors: [],
+          quest_player_id: nil,
+          quest_instance_id: nil
+        },
+        ContainerRef.room(@library_room_id),
+        :placed
+      )
 
-    :ok =
-      WorldApp.dispatch(%PlaceObject{
-        room_id: @library_room_id,
-        object_id: @reading_lectern_id,
-        name: "reading lectern",
-        short_description: "a heavy reading lectern",
-        long_description:
-          "A heavy oak lectern, scratched and ink-stained from generations of use. It is bolted to the floor — there is no moving it.",
-        fixed: true
-      })
+    {:ok, _} =
+      WorldCommands.clone_into(
+        :object,
+        @reading_lectern_id,
+        %{
+          name: "reading lectern",
+          short_description: "a heavy reading lectern",
+          long_description:
+            "A heavy oak lectern, scratched and ink-stained from generations of use. It is bolted to the floor — there is no moving it.",
+          fixed: true,
+          behaviors: [],
+          quest_player_id: nil,
+          quest_instance_id: nil
+        },
+        ContainerRef.room(@library_room_id),
+        :placed
+      )
 
     # ---- NPC (existing) ----
+    alias AgenticRealms.World.Application, as: WorldApp
     alias AgenticRealms.World.Commands.CreateNPCBlueprint
 
     :ok =

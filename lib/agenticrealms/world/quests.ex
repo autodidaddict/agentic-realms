@@ -93,7 +93,9 @@ defmodule AgenticRealms.World.Quests do
   def progress_for(%QuestInstance{id: qid, player_id: pid, definition_snapshot: snapshot}) do
     inventory_items =
       from(o in Object,
-        where: o.quest_instance_id == ^qid and o.player_id == ^pid
+        where:
+          o.quest_instance_id == ^qid and
+            o.container_type == "player" and o.container_id == ^Integer.to_string(pid)
       )
       |> Repo.all()
 

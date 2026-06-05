@@ -5,5 +5,5 @@ defmodule AgenticRealms.World.Events.EntityEdited do
   """
   @derive Jason.Encoder
   @enforce_keys [:entity_id, :fields_changed]
-  defstruct [:entity_id, :fields_changed, version: 1]
+  defstruct [:entity_id, :fields_changed, :kind, version: 1]
 end

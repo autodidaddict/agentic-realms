@@ -38,8 +38,8 @@ defmodule AgenticRealms.World.ExamineTest do
       short_description: "a #{name}",
       long_description: long_description,
       fixed: Keyword.get(opts, :fixed, false),
-      room_id: room_id,
-      player_id: nil
+      container_type: "room",
+      container_id: room_id
     })
   end
 
@@ -50,8 +50,8 @@ defmodule AgenticRealms.World.ExamineTest do
       short_description: "a #{name}",
       long_description: long_description,
       fixed: false,
-      room_id: nil,
-      player_id: player_id
+      container_type: "player",
+      container_id: Integer.to_string(player_id)
     })
   end
 

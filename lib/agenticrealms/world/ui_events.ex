@@ -90,6 +90,17 @@ defmodule AgenticRealms.World.UIEvents do
     defstruct [:room_id, :object_id, :name, :short_description]
   end
 
+  defmodule RoomObjectDeparted do
+    @moduledoc """
+    Feature 016 — transient object-departure entry. Broadcast on
+    `room:<source>` when an object is moved out of a room into another room
+    (`:relocated`). NOT emitted for `:taken` (which has `RoomObjectTaken`) or
+    for moves into the void. Mirror of the dormant `RoomNPCLeft`.
+    """
+    @enforce_keys [:room_id, :object_id, :name]
+    defstruct [:room_id, :object_id, :name]
+  end
+
   defmodule RoomTranceEntered do
     @moduledoc """
     Feature 014 — transient trance-entry log entry. Broadcast on
