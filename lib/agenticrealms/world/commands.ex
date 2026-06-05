@@ -332,21 +332,33 @@ defmodule AgenticRealms.World.Commands do
   def spawn_npc_clone(blueprint_id, room_id, clone_id)
       when is_binary(blueprint_id) and is_binary(room_id) and is_binary(clone_id) do
     # Feature 016 — an NPC clone is cloned into existence (a full copy of the
-    # blueprint's current data, incl. its blueprint_id reference, serial,
-    # behaviors and lore) and moved into the room via the entity lifecycle.
-    with {:ok, blueprint} <- fetch_npc_blueprint(blueprint_id),
-         :ok <- check_room_exists(room_id),
-         :ok <- check_no_clone_name_collision(room_id, blueprint.name) do
-      serial = next_npc_serial(blueprint_id)
+    # blueprint's current data) and moved into the room via the entity
+    # lifecycle. This deterministic-clone-id form is used by the seed.
+    with {:ok, blueprint} <- fetch_npc_blueprint(blueprint_id) do
+      spawn_npc_clone_row(blueprint, room_id, clone_id)
+    end
+  end
+
+  # Shared NPC spawn: per-room name-collision check, toolset composition
+  # (FR-016 — effective = union(toolsets) ++ direct), and the full-copy clone
+  # into the room carrying the toolset/direct-behavior provenance.
+  defp spawn_npc_clone_row(%Blueprint{} = bp, room_id, clone_id) do
+    with :ok <- check_room_exists(room_id),
+         :ok <- check_no_clone_name_collision(room_id, bp.name),
+         {:ok, effective} <- Toolsets.compose(bp.toolsets || [], bp.behaviors || []) do
+      serial = next_npc_serial(bp.id)
 
       fields = %{
-        blueprint_id: blueprint_id,
+        blueprint_id: bp.id,
         serial: serial,
-        name: blueprint.name,
-        short_description: blueprint.short_description,
-        long_description: blueprint.long_description,
-        behaviors: blueprint.behaviors || [],
-        lore: blueprint.lore || ""
+        name: bp.name,
+        short_description: bp.short_description,
+        long_description: bp.long_description,
+        behaviors: effective,
+        direct_behaviors: bp.behaviors || [],
+        toolsets: bp.toolsets || [],
+        lore: bp.lore || "",
+        fixed: bp.fixed
       }
 
       case clone_into(:npc, clone_id, fields, ContainerRef.room(room_id), :spawned) do
@@ -785,108 +797,40 @@ defmodule AgenticRealms.World.Commands do
   end
 
   # ──────────────────────────────────────────────────────────────────────
-  # Feature 014 — Object Blueprint authoring
+  # Feature 015 — unified Blueprint authoring
   # ──────────────────────────────────────────────────────────────────────
 
   @doc """
-  Author a new Object Blueprint.
+  Author a new Blueprint of either kind (`"object"` | `"npc"`).
 
-  Wrapper performs the FR-WIZ-5 authorization check, FR-007a slug-shape
-  validation, and FR-007b slug-uniqueness pre-check before dispatching
-  to the `ObjectBlueprint` aggregate.
+  FR-WIZ-5 authorization, FR-004 slug-shape + one-namespace uniqueness, and —
+  for `kind: "npc"` — validates the direct `behaviors` against the feature-009
+  vocabulary (FR-014) and every referenced `toolset` against the registry
+  (FR-018). `behaviors` are the DIRECT behaviors; the effective set is composed
+  (union with toolsets) at spawn time.
 
-  Returns `{:ok, blueprint_id}` on success.
-  Refusals:
-    * `{:error, :not_a_wizard}` — caller's `is_wizard` is false.
-    * `{:error, :unknown_player}` — caller's player_id is unknown.
-    * `{:error, :invalid_slug}` — slug fails the regex / length rules.
-    * `{:error, :slug_already_exists}` — slug collides with an existing row.
-    * `{:error, :name_required}` / `:short_description_required` /
-      `:long_description_required` — content field missing.
+  Returns `{:ok, blueprint_id}`. Refusals: `:not_a_wizard` / `:unknown_player`,
+  `:invalid_slug` / `:slug_already_exists`, the `*_required` content errors,
+  `{:unknown_toolset, name}`, or a feature-009 behavior-validation error.
+
+  `create_object_blueprint/2` and `create_npc_blueprint/2` are thin wrappers
+  that fix `kind`.
   """
-  @spec create_object_blueprint(
-          %{
-            required(:wizard_id) => integer(),
-            required(:blueprint_id) => String.t(),
-            required(:name) => String.t(),
-            required(:short_description) => String.t(),
-            required(:long_description) => String.t(),
-            optional(:fixed) => boolean()
-          },
-          keyword()
-        ) :: {:ok, String.t()} | {:error, atom()}
-  def create_object_blueprint(attrs, _opts \\ []) when is_map(attrs) do
-    with :ok <- ensure_wizard(attrs[:wizard_id]),
-         :ok <- validate_slug(attrs[:blueprint_id]),
-         :ok <- ensure_slug_unused(attrs[:blueprint_id]) do
-      cmd = %CreateBlueprint{
-        blueprint_id: attrs[:blueprint_id],
-        wizard_id: attrs[:wizard_id],
-        kind: "object",
-        name: attrs[:name],
-        short_description: attrs[:short_description],
-        long_description: attrs[:long_description],
-        fixed: Map.get(attrs, :fixed, false)
-      }
-
-      case WorldApp.dispatch(cmd, consistency: :strong) do
-        :ok -> {:ok, attrs[:blueprint_id]}
-        {:error, _} = err -> err
-      end
-    end
-  end
-
-  # ──────────────────────────────────────────────────────────────────────
-  # Feature 015 — NPC Blueprint authoring
-  # ──────────────────────────────────────────────────────────────────────
-
-  @doc """
-  Author a new NPC Blueprint.
-
-  Mirrors `create_object_blueprint/2`: FR-WIZ-5 authorization, FR-004
-  slug-shape + cross-registry uniqueness pre-check, plus NPC-specific
-  validation — the direct `behaviors` against the feature-009 vocabulary
-  (FR-014) and every referenced `toolset` name against the registry
-  (FR-018). Behaviors here are the DIRECT behaviors; the effective set is
-  composed (union with toolsets) at spawn time.
-
-  Returns `{:ok, blueprint_id}` on success.
-  Refusals:
-    * `{:error, :not_a_wizard}` / `{:error, :unknown_player}`.
-    * `{:error, :invalid_slug}` / `{:error, :slug_already_exists}`.
-    * `{:error, :name_required}` / `:short_description_required` /
-      `:long_description_required` — content field missing.
-    * `{:error, {:unknown_toolset, name}}` — a referenced toolset is not
-      in the registry.
-    * `{:error, term()}` — a direct behavior fails feature-009 validation.
-  """
-  @spec create_npc_blueprint(
-          %{
-            required(:wizard_id) => integer(),
-            required(:blueprint_id) => String.t(),
-            required(:name) => String.t(),
-            required(:short_description) => String.t(),
-            required(:long_description) => String.t(),
-            optional(:lore) => String.t(),
-            optional(:fixed) => boolean(),
-            optional(:behaviors) => [map()],
-            optional(:toolsets) => [String.t()]
-          },
-          keyword()
-        ) :: {:ok, String.t()} | {:error, atom()} | {:error, {:unknown_toolset, String.t()}}
-  def create_npc_blueprint(attrs, _opts \\ []) when is_map(attrs) do
+  @spec create_blueprint(map(), keyword()) ::
+          {:ok, String.t()} | {:error, atom()} | {:error, {:unknown_toolset, String.t()}}
+  def create_blueprint(attrs, _opts \\ []) when is_map(attrs) do
+    kind = Map.get(attrs, :kind, "npc")
     behaviors = Map.get(attrs, :behaviors, []) || []
     toolsets = Map.get(attrs, :toolsets, []) || []
 
     with :ok <- ensure_wizard(attrs[:wizard_id]),
          :ok <- validate_slug(attrs[:blueprint_id]),
          :ok <- ensure_slug_unused(attrs[:blueprint_id]),
-         :ok <- Toolsets.validate_behaviors(behaviors),
-         :ok <- Toolsets.all_exist?(toolsets) do
+         :ok <- validate_kind_payload(kind, behaviors, toolsets) do
       cmd = %CreateBlueprint{
         blueprint_id: attrs[:blueprint_id],
         wizard_id: attrs[:wizard_id],
-        kind: "npc",
+        kind: kind,
         name: attrs[:name],
         short_description: attrs[:short_description],
         long_description: attrs[:long_description],
@@ -903,54 +847,83 @@ defmodule AgenticRealms.World.Commands do
     end
   end
 
-  @doc """
-  Spawn a clone of an Object Blueprint into a room.
-
-  Wrapper performs the FR-WIZ-5 authorization check, resolves the
-  blueprint payload from the read model (the aggregate cannot — by
-  design — see FR-013), stamps the denormalized fields into the
-  command, and dispatches.
-
-  Returns `{:ok, object_id}` on success.
-  Refusals:
-    * `{:error, :not_a_wizard}` — caller's `is_wizard` is false.
-    * `{:error, :unknown_player}` — caller's player_id is unknown.
-    * `{:error, :unknown_blueprint}` — `blueprint_id` does not exist.
-    * `{:error, :object_already_in_room}` — defensive; should not occur
-      for a freshly-generated UUID.
-  """
-  @spec spawn_object_from_blueprint(
-          wizard_id :: integer(),
-          blueprint_id :: String.t(),
-          room_id :: String.t()
-        ) :: {:ok, String.t()} | {:error, atom()}
-  def spawn_object_from_blueprint(wizard_id, blueprint_id, room_id)
-      when is_integer(wizard_id) and is_binary(blueprint_id) and is_binary(room_id) do
-    with :ok <- ensure_wizard(wizard_id),
-         {:ok, blueprint} <- fetch_blueprint(blueprint_id) do
-      clone_into(
-        :object,
-        %{
-          name: blueprint.name,
-          short_description: blueprint.short_description,
-          long_description: blueprint.long_description,
-          fixed: blueprint.fixed,
-          behaviors: [],
-          quest_player_id: nil,
-          quest_instance_id: nil
-        },
-        ContainerRef.room(room_id),
-        :spawned
-      )
+  # Objects carry no behaviors/toolsets surface in this milestone, so only
+  # npc blueprints validate them.
+  defp validate_kind_payload("npc", behaviors, toolsets) do
+    with :ok <- Toolsets.validate_behaviors(behaviors) do
+      Toolsets.all_exist?(toolsets)
     end
   end
 
-  defp fetch_blueprint(blueprint_id) do
+  defp validate_kind_payload(_kind, _behaviors, _toolsets), do: :ok
+
+  @doc "Author an object blueprint (thin wrapper over `create_blueprint/2`)."
+  @spec create_object_blueprint(map(), keyword()) :: {:ok, String.t()} | {:error, atom()}
+  def create_object_blueprint(attrs, opts \\ []) when is_map(attrs),
+    do: create_blueprint(Map.put(attrs, :kind, "object"), opts)
+
+  @doc "Author an npc blueprint (thin wrapper over `create_blueprint/2`)."
+  @spec create_npc_blueprint(map(), keyword()) ::
+          {:ok, String.t()} | {:error, atom()} | {:error, {:unknown_toolset, String.t()}}
+  def create_npc_blueprint(attrs, opts \\ []) when is_map(attrs),
+    do: create_blueprint(Map.put(attrs, :kind, "npc"), opts)
+
+  @doc """
+  Spawn a clone of a Blueprint (either kind) into a room — the unified UI
+  spawn path. FR-WIZ-5 authorization; resolves the blueprint from the read
+  model and stamps the denormalized fields into the clone (full-copy, FR-013):
+
+    * object → `clone_into(:object, …)`.
+    * npc → `Toolsets.compose(toolsets, behaviors)` → effective behaviors,
+      then `clone_into(:npc, …)` carrying the toolset/direct-behavior
+      provenance; with the per-room name-collision pre-check (FR-013).
+
+  Returns `{:ok, entity_id}`. Refusals: `:not_a_wizard` / `:unknown_player`,
+  `:unknown_blueprint`, `:room_not_found`, `:clone_name_taken_in_room`,
+  `{:unknown_toolset, name}`.
+  """
+  @spec spawn_from_blueprint(integer(), String.t(), String.t()) ::
+          {:ok, String.t()} | {:error, term()}
+  def spawn_from_blueprint(wizard_id, blueprint_id, room_id)
+      when is_integer(wizard_id) and is_binary(blueprint_id) and is_binary(room_id) do
+    with :ok <- ensure_wizard(wizard_id),
+         {:ok, bp} <- fetch_any_blueprint(blueprint_id) do
+      case bp.kind do
+        "object" ->
+          clone_into(
+            :object,
+            %{
+              name: bp.name,
+              short_description: bp.short_description,
+              long_description: bp.long_description,
+              fixed: bp.fixed,
+              behaviors: [],
+              quest_player_id: nil,
+              quest_instance_id: nil
+            },
+            ContainerRef.room(room_id),
+            :spawned
+          )
+
+        "npc" ->
+          case spawn_npc_clone_row(bp, room_id, Ecto.UUID.generate()) do
+            {:ok, %{clone_id: id}} -> {:ok, id}
+            {:error, _} = err -> err
+          end
+      end
+    end
+  end
+
+  @doc "Object-only spawn (thin wrapper over `spawn_from_blueprint/3`)."
+  @spec spawn_object_from_blueprint(integer(), String.t(), String.t()) ::
+          {:ok, String.t()} | {:error, atom()}
+  def spawn_object_from_blueprint(wizard_id, blueprint_id, room_id),
+    do: spawn_from_blueprint(wizard_id, blueprint_id, room_id)
+
+  defp fetch_any_blueprint(blueprint_id) do
     case Repo.get(Blueprint, blueprint_id) do
       nil -> {:error, :unknown_blueprint}
-      %Blueprint{kind: "object"} = bp -> {:ok, bp}
-      # A slug that resolves to an npc blueprint is not a valid object source.
-      %Blueprint{} -> {:error, :unknown_blueprint}
+      bp -> {:ok, bp}
     end
   end
 
@@ -1089,7 +1062,7 @@ defmodule AgenticRealms.World.Commands do
   def edit_object_blueprint(wizard_id, blueprint_id, params)
       when is_integer(wizard_id) and is_binary(blueprint_id) and is_map(params) do
     with :ok <- ensure_wizard(wizard_id),
-         {:ok, blueprint} <- fetch_blueprint(blueprint_id),
+         {:ok, blueprint} <- fetch_any_blueprint(blueprint_id),
          :ok <- validate_edit_fields(params[:fields_changed]) do
       cmd = %EditBlueprint{
         blueprint_id: blueprint_id,
