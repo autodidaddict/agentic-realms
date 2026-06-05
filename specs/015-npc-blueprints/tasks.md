@@ -44,7 +44,7 @@ milestone is **pure NPC authoring** mirroring the feature-014 object-blueprint p
 - [ ] T006 [P] Update `lib/agenticrealms/world/schemas/npc_clone.ex` — add `fixed`, `toolsets`, `direct_behaviors`.
 - [ ] T007 [P] Create `lib/agenticrealms/world/schemas/toolset.ex` Ecto schema (data-model §1.3).
 - [ ] T008 Create `lib/agenticrealms/world/toolsets.ex` service — `list/0`, `list_for/1`, `resolve/1` (`{:error, {:unknown_toolset, name}}` per FR-018), `compose/2` (additive, attachment-ordered, lossless — R4), `validate_behaviors/1` (feature-009 vocabulary, FR-014).
-- [ ] T009 [P] Unit tests `test/agenticrealms/world/toolsets_test.exs` — resolve unknown→error; compose union of two toolsets ++ direct in order, no dupes dropped; behavior-vocabulary rejection.
+- [ ] T009 [P] Unit tests `test/agenticrealms/world/toolsets_test.exs` — resolve unknown→error; compose union of two toolsets ++ direct in order, no dupes dropped; behavior-vocabulary rejection; `applies_to` accepts `item`/`room` values (cross-entity model, FR-019).
 - [ ] T010 Create `lib/agenticrealms/world/projections/npc_blueprint_projector.ex` (`:strong`) with the `NPCBlueprintCreated` handler (insert `npc_blueprints` incl. kind/fixed/toolsets/revision, `on_conflict: :nothing`); `NPCBlueprintEdited` handler added in US7. Supervise in `application.ex` + `data_case.ex`. (data-model §5)
 - [ ] T011 Extend `EntityProjector` `:npc` `EntityCloned` insert (`lib/agenticrealms/world/projections/entity_projector.ex`) to carry `fixed`, `toolsets`, `direct_behaviors` from the cloned `fields`.
 - [ ] T012 Seed ≥2 named toolsets (e.g. `orc`, `shopkeeper`) in `lib/agenticrealms/world/seed.ex` so US4 is demonstrable from a fresh world (FR-014a).
@@ -82,11 +82,11 @@ milestone is **pure NPC authoring** mirroring the feature-014 object-blueprint p
 **Goal**: spawn a clone from a blueprint via clone/move; co-present players witness arrival; behaviors/lore inherited.
 **Independent Test**: "Spawn here" on a registry row → clone in room; arrival witnessed; `look` shows long desc; greeting fires; `chat` replies in character.
 
-- [ ] T027 [US2] `Commands.spawn_npc_from_blueprint/3` (`commands.ex`): generalize the 016 `spawn_npc_clone/3` — read blueprint, `Toolsets.compose(toolsets, direct_behaviors)` → effective behaviors, `clone_into(:npc, %{… behaviors: effective, toolsets, direct_behaviors, lore, fixed, blueprint_id}, room, :spawned)`; pre-check room + per-room name collision (FR-013).
+- [ ] T027 [US2] `Commands.spawn_npc_from_blueprint/3` (`commands.ex`): generalize the 016 `spawn_npc_clone/3` — read blueprint, `Toolsets.compose(toolsets, direct_behaviors)` → effective behaviors, `clone_into(:npc, %{… behaviors: effective, toolsets, direct_behaviors, lore, fixed, blueprint_id}, room, :spawned)`; pre-check room + per-room name collision (FR-013). **Update the seed call site** (`seed.ex` calls `spawn_npc_clone/3`) — either rename to `spawn_npc_from_blueprint/3` (seeded NPCs have no toolsets, so `compose([], behaviors)` is unchanged) or keep `spawn_npc_clone/3` as a thin shim — so `mix world.reset` stays green.
 - [ ] T028 [US2] `GameLive`: "Spawn here" action on an NPC registry row → `spawn_npc_from_blueprint`.
 - [ ] T029 [P] [US2] Wrapper/integration tests — spawn places a clone in the room (effective behaviors = composed); per-room name-collision refusal.
 - [ ] T030 [US2] Integration test — co-present player sees `RoomNPCArrived`; `look <npc>` long description; greeting behavior fires (009); `chat <npc>` in-character reply grounded in lore (010).
-- [ ] T031 [P] [US2] Full-copy test — editing the blueprint after spawn (uses US7) leaves the spawned clone unchanged (FR-009/SC-003) — assert against a snapshot.
+- [ ] T031 [P] [US2] Full-copy test (standalone — does not depend on US7's edit command): spawn a clone, snapshot its fields, then mutate the source `npc_blueprints` row directly via Ecto, and assert the spawned clone's row is unchanged (FR-009/SC-003). (US7's T051 additionally exercises this through the real `EditNPCBlueprint` path.)
 
 ---
 
