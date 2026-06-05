@@ -87,7 +87,7 @@ spawn flows route through it. Drop the two old tables/aggregates (reseed). Keep 
 
 - [X] T068 `Commands.create_blueprint/2` (kind attr; slug shape + single-table uniqueness; for npc: `Toolsets.validate_behaviors` + toolset-existence) and `edit_blueprint/3` (surfaces `:stale_revision`). Replace `create_npc_blueprint`/`create_object_blueprint` call sites.
 - [X] T069 `Commands.spawn_from_blueprint/3` — read row, `Toolsets.compose(toolsets, behaviors)` → effective (npc) / `behaviors` (object), `clone_into(kind, …, :spawned)`; per-room name-collision pre-check. Fold `spawn_object_from_blueprint` + `spawn_npc_clone`; update both seed call sites.
-- [ ] T070 `Commands.extract_essence/3` — read the in-world entity, `create_blueprint` at rev 1; source untouched. Fold `extract_object_essence`.
+- [~] T070 `Commands.extract_essence/3` — read the in-world entity, `create_blueprint` at rev 1; source untouched. Fold `extract_object_essence`. (DONE functionally: extract_npc_essence + extract_object_essence both ship + tested; not folded into one fn — both work for their kind.)
 - [X] T071 `Queries.get_blueprint/1`, `list_blueprints/0`, `list_blueprints/1`. Remove `get_object_blueprint`/`list_object_blueprints`/`get_npc_blueprint_row` (or thin-shim).
 - [X] T072 `UIEventBroadcaster`: one `BlueprintCreated`/`BlueprintEdited` handler → `WizardBlueprintRegistryChanged` (kind in payload). Remove the three old handlers.
 
@@ -103,7 +103,7 @@ spawn flows route through it. Drop the two old tables/aggregates (reseed). Keep 
 ### U5 — Tests + green gate
 
 - [X] T076 [P] Rework blueprint tests to the unified model: `blueprint_test.exs` (create/edit/lock — folds object+npc aggregate tests), `blueprint_projector_test.exs`, unified wrapper tests; delete the obsolete object/npc-specific aggregate+projector+wrapper tests.
-- [ ] T077 Full non-regression: `mix test` green incl. 008/009/010/013/014/016; `mix compile --warnings-as-errors` clean; `mix format`.
+- [X] T077 Full non-regression: `mix test` green incl. 008/009/010/013/014/016; `mix compile --warnings-as-errors` clean; `mix format`.
 
 ---
 
@@ -137,9 +137,9 @@ spawn flows route through it. Drop the two old tables/aggregates (reseed). Keep 
 
 - [X] T027 [US2] `Commands.spawn_npc_from_blueprint/3` (`commands.ex`): generalize the 016 `spawn_npc_clone/3` — read blueprint, `Toolsets.compose(toolsets, direct_behaviors)` → effective behaviors, `clone_into(:npc, %{… behaviors: effective, toolsets, direct_behaviors, lore, fixed, blueprint_id}, room, :spawned)`; pre-check room + per-room name collision (FR-013). **Update the seed call site** (`seed.ex` calls `spawn_npc_clone/3`) — either rename to `spawn_npc_from_blueprint/3` (seeded NPCs have no toolsets, so `compose([], behaviors)` is unchanged) or keep `spawn_npc_clone/3` as a thin shim — so `mix world.reset` stays green.
 - [X] T028 [US2] `GameLive`: "Spawn here" action on an NPC registry row → `spawn_npc_from_blueprint`.
-- [ ] T029 [P] [US2] Wrapper/integration tests — spawn places a clone in the room (effective behaviors = composed); per-room name-collision refusal.
-- [ ] T030 [US2] Integration test — co-present player sees `RoomNPCArrived`; `look <npc>` long description; greeting behavior fires (009); `chat <npc>` in-character reply grounded in lore (010).
-- [ ] T031 [P] [US2] Full-copy test (standalone — does not depend on US7's edit command): spawn a clone, snapshot its fields, then mutate the source `npc_blueprints` row directly via Ecto, and assert the spawned clone's row is unchanged (FR-009/SC-003). (US7's T051 additionally exercises this through the real `EditNPCBlueprint` path.)
+- [X] T029 [P] [US2] Wrapper/integration tests — spawn places a clone in the room (effective behaviors = composed); per-room name-collision refusal.
+- [X] T030 [US2] Integration test — co-present player sees `RoomNPCArrived`; `look <npc>` long description; greeting behavior fires (009); `chat <npc>` in-character reply grounded in lore (010).
+- [X] T031 [P] [US2] Full-copy test (standalone — does not depend on US7's edit command): spawn a clone, snapshot its fields, then mutate the source `npc_blueprints` row directly via Ecto, and assert the spawned clone's row is unchanged (FR-009/SC-003). (US7's T051 additionally exercises this through the real `EditNPCBlueprint` path.)
 
 ---
 
@@ -148,8 +148,8 @@ spawn flows route through it. Drop the two old tables/aggregates (reseed). Keep 
 **Goal**: the 015 changes do not regress any feature-007–010 NPC behavior. (The fold-in itself shipped in spec 016.)
 **Independent Test**: fresh world — seeded NPCs render/examine/ungettable/greet/converse unchanged; 007–010 suites pass.
 
-- [ ] T032 [US3] Run features 007/008/009/010 suites + the 016 NPC tests after the Phase 2–4 changes; confirm green (mechanical updates only).
-- [ ] T033 [US3] Fresh-world `mix world.reset` walkthrough — Garrick appears, examines, is ungettable, greets on entry, and `chat` replies in character.
+- [X] T032 [US3] Run features 007/008/009/010 suites + the 016 NPC tests after the Phase 2–4 changes; confirm green (mechanical updates only).
+- [X] T033 [US3] Fresh-world `mix world.reset` walkthrough — Garrick appears, examines, is ungettable, greets on entry, and `chat` replies in character.
 
 ---
 
@@ -216,9 +216,9 @@ spawn flows route through it. Drop the two old tables/aggregates (reseed). Keep 
 
 ## Phase 11: Polish & Cross-Cutting
 
-- [ ] T055 Full non-regression gate: `mix test` green incl. 006/007/008/009/010/013/014/016 + the new 015 suites; `mix compile --warnings-as-errors` clean.
-- [ ] T056 Execute `specs/015-npc-blueprints/quickstart.md` (sections A–E) against a fresh `mix world.reset` dev seed; record results.
-- [ ] T057 [P] `mix format`; tidy any docstrings referencing pre-substrate NPC spawn.
+- [X] T055 Full non-regression gate: `mix test` green incl. 006/007/008/009/010/013/014/016 + the new 015 suites; `mix compile --warnings-as-errors` clean.
+- [X] T056 Execute `specs/015-npc-blueprints/quickstart.md` (sections A–E) against a fresh `mix world.reset` dev seed; record results.
+- [X] T057 [P] `mix format`; tidy any docstrings referencing pre-substrate NPC spawn.
 
 ---
 
