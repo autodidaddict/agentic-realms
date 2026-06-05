@@ -121,4 +121,68 @@ defmodule AgenticRealms.World.IntentResolver.WizardToolsTest do
       assert {:error, _} = IntentResolver.parse_wizard_blueprint_response(nil)
     end
   end
+
+  describe "parse_wizard_blueprint_response/1 — npc drafts (feature 015)" do
+    test "extracts an npc draft from draft_npc_blueprint (no toolsets)" do
+      response = %{
+        "content" => [
+          %{
+            "type" => "tool_use",
+            "name" => "draft_npc_blueprint",
+            "input" => %{
+              "name" => "Garrick",
+              "short_description" => "a gruff innkeeper",
+              "long_description" => "A wiry man in a stained apron, eyeing newcomers.",
+              "lore" => "Lost his brother to the mines; distrusts strangers.",
+              "fixed" => false
+            }
+          }
+        ]
+      }
+
+      assert {:ok,
+              {:draft_npc_blueprint,
+               %{
+                 name: "Garrick",
+                 short_description: "a gruff innkeeper",
+                 long_description: "A wiry man in a stained apron, eyeing newcomers.",
+                 lore: "Lost his brother to the mines; distrusts strangers.",
+                 fixed: false,
+                 toolsets: []
+               }}} = IntentResolver.parse_wizard_blueprint_response(response)
+    end
+
+    test "defaults lore to \"\" and toolsets to [] when omitted" do
+      response = %{
+        "content" => [
+          %{
+            "type" => "tool_use",
+            "name" => "draft_npc_blueprint",
+            "input" => %{
+              "name" => "cave troll",
+              "short_description" => "a hulking cave troll",
+              "long_description" => "A mountain of grey muscle and warty hide."
+            }
+          }
+        ]
+      }
+
+      assert {:ok, {:draft_npc_blueprint, %{lore: "", toolsets: [], fixed: false}}} =
+               IntentResolver.parse_wizard_blueprint_response(response)
+    end
+
+    test "rejects an npc draft missing a required field" do
+      response = %{
+        "content" => [
+          %{
+            "type" => "tool_use",
+            "name" => "draft_npc_blueprint",
+            "input" => %{"name" => "x", "short_description" => "y"}
+          }
+        ]
+      }
+
+      assert {:error, _} = IntentResolver.parse_wizard_blueprint_response(response)
+    end
+  end
 end

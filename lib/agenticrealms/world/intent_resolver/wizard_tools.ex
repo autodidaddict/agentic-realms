@@ -5,22 +5,28 @@ defmodule AgenticRealms.World.IntentResolver.WizardTools do
   intentionally narrow per FR-022 / FR-024 / FR-025 — creation verbs
   only, no edit verbs, mode-dependent.
 
-  Milestone 1 ships `:blueprints` mode tools only:
-    * `draft_object_blueprint` — produces a draft (NOT a dispatched
-      command). The LiveView populates the Interpreted Data card with
-      the result and the wizard refines + commits via form.
-    * `refuse` — the standard escape hatch when the prompt is not an
-      object-archetype description.
+  `:blueprints` mode (authoring archetypes) tools:
+    * `draft_object_blueprint` / `draft_npc_blueprint` — produce a draft
+      (NOT a dispatched command). The LiveView populates the Interpreted
+      Data card and the wizard refines + commits via form. The model picks
+      the npc tool for a character/creature, the object tool otherwise.
+    * `list_toolsets` (feature 015) — a read tool returning the named
+      behavior groups, so `draft_npc_blueprint` toolset proposals are
+      grounded in real registered names (FR-020a). Unknown names are
+      dropped before commit (FR-018).
+    * `refuse` — the escape hatch when the prompt is not an archetype.
 
-  World-mode tools (`manifest_object_freeform`, `spawn_object_from_blueprint`)
-  arrive in US2 / US3.
+  `:world` mode (manifesting one-offs) tools: `manifest_object_freeform`
+  (feature 014), `manifest_npc_freeform` (feature 015 US5), `refuse`.
 
-  See `specs/014-item-blueprints/contracts/intent_tools.md`.
+  See `specs/014-item-blueprints/contracts/intent_tools.md` and
+  `specs/015-npc-blueprints/`.
   """
 
   @doc "Set of recognized tool names in :blueprints mode."
   @spec names_blueprints() :: MapSet.t(String.t())
-  def names_blueprints, do: MapSet.new(~w(draft_object_blueprint refuse))
+  def names_blueprints,
+    do: MapSet.new(~w(draft_object_blueprint draft_npc_blueprint list_toolsets refuse))
 
   @doc "Set of recognized tool names in :world mode (wizard-only)."
   @spec names_world() :: MapSet.t(String.t())
@@ -61,8 +67,56 @@ defmodule AgenticRealms.World.IntentResolver.WizardTools do
           }
         }
       },
+      %{
+        "name" => "draft_npc_blueprint",
+        "description" =>
+          "Extract fields for a new reusable NPC archetype (blueprint) the wizard is authoring — a character, creature, or person meant to be spawned into the world later (e.g., 'Garrick, a gruff but kind innkeeper', 'a hulking cave troll that hates sunlight'). Use when the prompt describes a living / sentient / animate being. Do NOT use for inanimate objects — that's `draft_object_blueprint`. You MAY call `list_toolsets` first to ground any toolsets you propose.",
+        "input_schema" => %{
+          "type" => "object",
+          "required" => ["name", "short_description", "long_description"],
+          "properties" => %{
+            "name" => %{
+              "type" => "string",
+              "description" =>
+                "The NPC's name or short descriptor — a proper name keeps its capitalization, otherwise a lowercase noun phrase (e.g., 'Garrick', 'cave troll')."
+            },
+            "short_description" => %{
+              "type" => "string",
+              "description" =>
+                "A short noun phrase WITH an indefinite article (or the bare proper name), NO trailing period, ≤ 60 chars. Shown in 'Also here:' room listings (e.g., 'a gruff innkeeper', 'a hulking cave troll')."
+            },
+            "long_description" => %{
+              "type" => "string",
+              "description" =>
+                "Multi-sentence prose shown when a player examines the NPC — appearance, bearing, notable features."
+            },
+            "lore" => %{
+              "type" => "string",
+              "description" =>
+                "Private backstory and personality that grounds how the NPC converses. NOT shown verbatim to players; it informs in-character chat replies."
+            },
+            "fixed" => %{
+              "type" => "boolean",
+              "description" =>
+                "True only if the NPC cannot be moved or relocated (rare). Default false."
+            },
+            "toolsets" => %{
+              "type" => "array",
+              "items" => %{"type" => "string"},
+              "description" =>
+                "Names of behavior groups (\"toolsets\") to attach, chosen ONLY from the list returned by `list_toolsets`. Omit or leave empty if none fit. Never invent names."
+            }
+          }
+        }
+      },
+      %{
+        "name" => "list_toolsets",
+        "description" =>
+          "List the named behavior groups (\"toolsets\") available to attach to an NPC blueprint, with their descriptions. Call this BEFORE `draft_npc_blueprint` whenever you intend to propose toolsets, so your proposals reference real registered names.",
+        "input_schema" => %{"type" => "object", "properties" => %{}}
+      },
       refuse_tool(
-        "Decline to draft a blueprint because the wizard's prompt does not describe an object archetype. Use when: the prompt asks a question, describes a place or NPC, asks to edit something existing (edits happen via the form, not via prompts), or is otherwise off-task. `message` is the wizard-facing refusal."
+        "Decline to draft a blueprint because the wizard's prompt does not describe an object or NPC archetype. Use when: the prompt asks a question, describes a place / room, asks to edit something existing (edits happen via the form, not via prompts), or is otherwise off-task. `message` is the wizard-facing refusal."
       )
     ]
   end
