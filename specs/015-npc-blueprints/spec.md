@@ -5,16 +5,16 @@
 **Status**: Draft
 **Input**: User description: "Wizard-Created NPC Blueprints (Milestone 2 of the wizard-authoring arc). Extend the feature 014 wizard-authoring substrate to NPCs as a second blueprint kind. Reuse the wizard role/authz, trance/authoring-mode toggle, the Interpreted Data card, the registry, monotonic revision + optimistic-locking, the LLM extraction entry points, and the freeform-spawn / spawn-from-blueprint / in-place-edit / essence-extraction flows. NPC blueprints carry display name, short/long description, the fixed/ungettable flag, a dedicated lore field, the behaviors list, and one or more composable toolsets. Toolsets are named groups of behaviors that compose via union and can be applied to items, NPCs, or rooms. Fold in the feature 008 event/lineage design by renaming its NPC events to the simpler NPCSpawned shape and dropping the lineage FK. Out of scope: republish-to-clones, new behavior triggers/actions, room digging, blueprint deletion, conversation-system changes."
 
-> **⚠️ Dependency / sequencing note (added 2026-06-04):** This milestone now **depends on a
-> foundational clone/move/containment substrate milestone** that ships first. In that model,
-> entities are *created into "the void"* then *moved into a typed container* (room / player
-> inventory / NPC inventory); "spawn" = clone + move, with a uniform "arrived" handler — and
-> the spec-014 object spawn path is retrofitted onto it. Consequently the **spawn mechanics**
-> and the **feature-008 event fold-in** (FR-021–FR-023 below) move to the substrate milestone;
-> here, "spawn an NPC" becomes `clone_into(room)` over that substrate. The NPC-authoring scope
-> below (blueprint create/edit/extract, toolsets, lore, the wizard trance UX, unified registry)
-> is unchanged and rebases on the substrate. Planning artifacts (research/data-model/plan) will
-> be regenerated once the substrate spec exists. See the `clone/move/containment` design memory.
+> **✅ Substrate shipped (updated 2026-06-05):** The foundational clone/move/containment substrate
+> this milestone builds on is **implemented and merged** (spec 016, PR #36). Entities are cloned
+> into "the void" then moved into a typed container via the `Entity` aggregate; **spawning an NPC is
+> now `clone_into(room)`**, and the feature-008 event fold-in is done (NPC spawn flows through
+> `EntityCloned`/`EntityMoved`; the blueprint→clone lineage *coupling* — FK + per-blueprint serial
+> counter — was dropped, though the clone keeps a **denormalized `blueprint_id`** so feature-010
+> conversations and feature-013 NPC quests still resolve their catalog/lore). Consequently the
+> fold-in requirements **FR-021–FR-023 below are already delivered by spec 016** and are out of
+> scope here. This milestone is **pure NPC authoring**: blueprint create/edit/extract, composable
+> toolsets, lore, the wizard trance UX, and the unified registry — riding on the merged substrate.
 
 ## Overview
 
@@ -223,12 +223,15 @@ A wizard opens the registry and sees both Object blueprints and NPC blueprints, 
 - **FR-020**: Toolset attachment during authoring MUST follow an LLM-proposes / wizard-confirms flow: the LLM proposes likely toolsets inferred from the lore/description prose and pre-selects them on the Interpreted Data card, and the wizard MUST be able to add or remove toolsets via an explicit picker before commit. The committed toolset set is whatever the wizard confirms, not the raw LLM proposal.
 - **FR-020a**: The authoring LLM client MUST have a read-only `list_toolsets` tool that returns the currently-registered named toolsets, so its proposals (FR-020) are grounded in the real toolset registry rather than invented names. A toolset name the LLM proposes that is not in the registry MUST NOT be silently committed (consistent with the FR-018 refusal on unknown toolset references). The same registry list backs the wizard's explicit picker.
 
-### Functional Requirements — Feature 008 fold-in
+### Functional Requirements — Feature 008 fold-in (✅ delivered by spec 016)
 
-- **FR-021**: The NPC domain events from features 007/008 MUST be renamed/restructured to the simpler freestanding `NPCSpawned` shape established by milestone 1 for Objects (no blueprint_id/lineage foreign key embedded in the spawned-instance event), aligning the NPC substrate onto the milestone-1 pattern.
-- **FR-022**: After the fold-in, the existing seeded NPC(s) and all features 007–010 behaviors (examine, ungettable, arrival witness, greeting behaviors, conversations) MUST be non-regressed from the player's perspective.
-- **FR-023**: The fold-in MUST be a full migration: the old feature-007/008 NPC event names are renamed to the `NPCSpawned` shape and the lineage foreign key is dropped outright, relying on the pre-launch destroyable-log / wipe-and-replay approach. No compatibility shim projecting historical event names is required, and old event streams need not remain projectable after the rename.
-- **FR-024**: The blueprint read model MUST hold both `"object"` and `"npc"` kinds in a way that supports listing all blueprints and filtering by kind.
+> FR-021–FR-023 were satisfied by the merged clone/move substrate (spec 016) and are **not** in
+> scope for this milestone. Retained for traceability.
+
+- **FR-021** *(done in 016)*: NPC spawn no longer carries a blueprint lineage on the spawned-instance event — NPCs are cloned/moved via `EntityCloned`/`EntityMoved`, aligned to the object pattern. (The clone keeps a denormalized non-FK `blueprint_id` for conversation/quest catalog lookup.)
+- **FR-022** *(done in 016)*: features 007–010 behaviors (examine, ungettable, arrival witness, greeting behaviors, conversations) verified non-regressed.
+- **FR-023** *(done in 016)*: delivered as a full migration over the destroyable log (reseed); no compatibility shim.
+- **FR-024**: The blueprint read model MUST hold both `"object"` and `"npc"` kinds in a way that supports listing all blueprints and filtering by kind. *(In scope — the unified registry.)*
 
 ### Functional Requirements — Registry & UI
 
