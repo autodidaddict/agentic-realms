@@ -12,8 +12,8 @@ defmodule AgenticRealmsWeb.GameLive.Wizard do
   import Phoenix.Component, only: [assign: 3]
 
   alias AgenticRealms.World.{Commands, Queries}
-  alias AgenticRealms.World.ObjectBlueprint.Slug
-  alias AgenticRealms.World.Schemas.ObjectBlueprint, as: ObjectBlueprintRow
+  alias AgenticRealms.World.Blueprint.Slug
+  alias AgenticRealms.World.Schemas.Blueprint, as: BlueprintRow
 
   # ────────────────────────────────────────────────────────────
   # Blueprint commit pipeline (US1 / US5)
@@ -191,7 +191,7 @@ defmodule AgenticRealmsWeb.GameLive.Wizard do
       # values but within the same second.
       now = DateTime.utc_now() |> DateTime.truncate(:second)
 
-      row = %ObjectBlueprintRow{
+      row = %BlueprintRow{
         id: bp_id,
         kind: Map.get(payload, :kind, "object"),
         name: Map.get(payload, :name, ""),

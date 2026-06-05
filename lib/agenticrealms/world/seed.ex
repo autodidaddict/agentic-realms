@@ -353,12 +353,13 @@ defmodule AgenticRealms.World.Seed do
 
     # ---- NPC (existing) ----
     alias AgenticRealms.World.Application, as: WorldApp
-    alias AgenticRealms.World.Commands.CreateNPCBlueprint
+    alias AgenticRealms.World.Commands.CreateBlueprint
 
     :ok =
       WorldApp.dispatch(
-        %CreateNPCBlueprint{
+        %CreateBlueprint{
           blueprint_id: @innkeeper_garrick_blueprint_id,
+          kind: "npc",
           name: "Garrick the Innkeeper",
           short_description: "a wiry innkeeper in a stained apron",
           long_description:
@@ -466,7 +467,7 @@ defmodule AgenticRealms.World.Seed do
 
     # ---- Orchard Keeper NPC ----
     alias AgenticRealms.World.Application, as: WorldApp
-    alias AgenticRealms.World.Commands.CreateNPCBlueprint
+    alias AgenticRealms.World.Commands.CreateBlueprint
 
     orchard_keeper_behaviors = [
       %{
@@ -532,8 +533,9 @@ defmodule AgenticRealms.World.Seed do
 
     :ok =
       WorldApp.dispatch(
-        %CreateNPCBlueprint{
+        %CreateBlueprint{
           blueprint_id: @orchard_keeper_blueprint_id,
+          kind: "npc",
           name: "Amaranth the Orchard Keeper",
           short_description: "a weathered orchard keeper in a rough wool dress",
           long_description:

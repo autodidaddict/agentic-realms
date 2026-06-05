@@ -16,9 +16,8 @@ defmodule AgenticRealms.World.Queries do
     Room,
     Exit,
     Object,
-    ObjectBlueprint,
+    Blueprint,
     PlayerState,
-    NPCBlueprint,
     NPCClone,
     PlayerDiscoveredRoom
   }
@@ -130,11 +129,8 @@ defmodule AgenticRealms.World.Queries do
            }}
           | {:error, :no_such_blueprint}
   def get_npc_blueprint(blueprint_id) when is_binary(blueprint_id) do
-    case Repo.get(NPCBlueprint, blueprint_id) do
-      nil ->
-        {:error, :no_such_blueprint}
-
-      %NPCBlueprint{} = bp ->
+    case Repo.get(Blueprint, blueprint_id) do
+      %Blueprint{kind: "npc"} = bp ->
         {:ok,
          %{
            id: bp.id,
@@ -142,6 +138,9 @@ defmodule AgenticRealms.World.Queries do
            short_description: bp.short_description,
            long_description: bp.long_description
          }}
+
+      _ ->
+        {:error, :no_such_blueprint}
     end
   end
 
@@ -560,85 +559,80 @@ defmodule AgenticRealms.World.Queries do
   # ──────────────────────────────────────────────────────────────────────
 
   @doc """
-  List all Object Blueprints, ordered by name. Drives the wizard's
-  Blueprints registry tab (FR-026). Returns plain schema structs;
-  callers project to display rows as needed.
+  Fetch a single Blueprint (any kind) by its slug id, as a full schema
+  struct. Returns `nil` if no such row exists.
   """
-  @spec list_object_blueprints() :: [%ObjectBlueprint{}]
+  @spec get_blueprint(String.t()) :: %Blueprint{} | nil
+  def get_blueprint(blueprint_id) when is_binary(blueprint_id) do
+    Repo.get(Blueprint, blueprint_id)
+  end
+
+  @doc """
+  List all Object Blueprints, ordered by name (transitional helper —
+  callers migrate to `list_blueprints/0,1`).
+  """
+  @spec list_object_blueprints() :: [%Blueprint{}]
   def list_object_blueprints do
-    Repo.all(from(b in ObjectBlueprint, order_by: [asc: b.name, asc: b.id]))
+    Repo.all(from(b in Blueprint, where: b.kind == "object", order_by: [asc: b.name, asc: b.id]))
   end
 
-  @doc """
-  Fetch a single Object Blueprint by its slug id. Returns `nil` if no
-  such row exists.
-  """
-  @spec get_object_blueprint(String.t()) :: %ObjectBlueprint{} | nil
+  @doc "Fetch a single object-kind Blueprint by slug id, or `nil`."
+  @spec get_object_blueprint(String.t()) :: %Blueprint{} | nil
   def get_object_blueprint(blueprint_id) when is_binary(blueprint_id) do
-    Repo.get(ObjectBlueprint, blueprint_id)
+    Repo.get_by(Blueprint, id: blueprint_id, kind: "object")
   end
 
-  @doc """
-  Feature 015 — list all NPC Blueprints, ordered by name. Mirrors
-  `list_object_blueprints/0`; backs the unified registry and US7 edit.
-  """
-  @spec list_npc_blueprints() :: [%NPCBlueprint{}]
+  @doc "List all NPC Blueprints, ordered by name (transitional helper)."
+  @spec list_npc_blueprints() :: [%Blueprint{}]
   def list_npc_blueprints do
-    Repo.all(from(b in NPCBlueprint, order_by: [asc: b.name, asc: b.id]))
+    Repo.all(from(b in Blueprint, where: b.kind == "npc", order_by: [asc: b.name, asc: b.id]))
   end
 
-  @doc """
-  Feature 015 — fetch a single NPC Blueprint as a full schema struct (the
-  existing `get_npc_blueprint/1` returns only a tagged display subset).
-  Returns `nil` if no such row exists.
-  """
-  @spec get_npc_blueprint_row(String.t()) :: %NPCBlueprint{} | nil
+  @doc "Fetch a single npc-kind Blueprint as a full schema struct, or `nil`."
+  @spec get_npc_blueprint_row(String.t()) :: %Blueprint{} | nil
   def get_npc_blueprint_row(blueprint_id) when is_binary(blueprint_id) do
-    Repo.get(NPCBlueprint, blueprint_id)
+    Repo.get_by(Blueprint, id: blueprint_id, kind: "npc")
   end
 
   @registry_kinds ~w(object npc)
 
   @doc """
-  Feature 015 US8 — unified blueprint registry (FR-024/FR-025). Projects
-  the object + npc registries to a uniform display row
+  Feature 015 US8 — unified blueprint registry (FR-024/FR-025). Projects the
+  `blueprints` table to a uniform display row
   `%{id, kind, name, short_description, revision}`, ordered by name then id.
   """
   @spec list_blueprints() :: [map()]
   def list_blueprints do
-    objects =
-      Repo.all(
-        from(b in ObjectBlueprint,
-          select: %{
-            id: b.id,
-            kind: b.kind,
-            name: b.name,
-            short_description: b.short_description,
-            revision: b.revision
-          }
-        )
+    Repo.all(
+      from(b in Blueprint,
+        order_by: [asc: b.name, asc: b.id],
+        select: %{
+          id: b.id,
+          kind: b.kind,
+          name: b.name,
+          short_description: b.short_description,
+          revision: b.revision
+        }
       )
-
-    npcs =
-      Repo.all(
-        from(b in NPCBlueprint,
-          select: %{
-            id: b.id,
-            kind: b.kind,
-            name: b.name,
-            short_description: b.short_description,
-            revision: b.revision
-          }
-        )
-      )
-
-    Enum.sort_by(objects ++ npcs, &{&1.name || "", &1.id})
+    )
   end
 
   @doc "Unified registry filtered to one kind (`\"object\"` | `\"npc\"`)."
   @spec list_blueprints(String.t()) :: [map()]
   def list_blueprints(kind) when kind in @registry_kinds do
-    Enum.filter(list_blueprints(), &(&1.kind == kind))
+    Repo.all(
+      from(b in Blueprint,
+        where: b.kind == ^kind,
+        order_by: [asc: b.name, asc: b.id],
+        select: %{
+          id: b.id,
+          kind: b.kind,
+          name: b.name,
+          short_description: b.short_description,
+          revision: b.revision
+        }
+      )
+    )
   end
 
   @doc """

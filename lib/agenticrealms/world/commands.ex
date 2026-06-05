@@ -27,9 +27,8 @@ defmodule AgenticRealms.World.Commands do
     RecordRoomDiscovery,
     AcceptQuest,
     FinalizeQuest,
-    CreateObjectBlueprint,
-    EditObjectBlueprint,
-    CreateNPCBlueprint,
+    CreateBlueprint,
+    EditBlueprint,
     CloneEntity,
     MoveEntity,
     EditEntity
@@ -37,14 +36,14 @@ defmodule AgenticRealms.World.Commands do
 
   alias AgenticRealms.World.ContainerRef
 
-  alias AgenticRealms.World.ObjectBlueprint.Slug
+  alias AgenticRealms.World.Blueprint.Slug
 
   alias AgenticRealms.World.Direction
   alias AgenticRealms.World.Exits.Validator, as: ExitsValidator
   alias AgenticRealms.World.Queries
   alias AgenticRealms.World.Quests
   alias AgenticRealms.World.Toolsets
-  alias AgenticRealms.World.Schemas.{Exit, Room, Region, NPCBlueprint, QuestInstance, Object}
+  alias AgenticRealms.World.Schemas.{Exit, Room, Region, Blueprint, QuestInstance, Object}
 
   @doc """
   Spawn a player into the starting room if (and only if) they have no
@@ -358,9 +357,11 @@ defmodule AgenticRealms.World.Commands do
   end
 
   defp fetch_npc_blueprint(blueprint_id) do
-    case Repo.get(NPCBlueprint, blueprint_id) do
+    case Repo.get(Blueprint, blueprint_id) do
       nil -> {:error, :blueprint_not_found}
-      bp -> {:ok, bp}
+      %Blueprint{kind: "npc"} = bp -> {:ok, bp}
+      # A slug that resolves to an object blueprint is not a valid NPC source.
+      %Blueprint{} -> {:error, :blueprint_not_found}
     end
   end
 
@@ -616,11 +617,11 @@ defmodule AgenticRealms.World.Commands do
   end
 
   defp find_catalog_entry(npc_blueprint_id, slug) do
-    case Repo.get(NPCBlueprint, npc_blueprint_id) do
+    case Repo.get(Blueprint, npc_blueprint_id) do
       nil ->
         {:error, :unknown_npc}
 
-      %NPCBlueprint{quests: catalog} ->
+      %Blueprint{quests: catalog} ->
         case Enum.find(catalog || [], fn q -> q["slug"] == slug end) do
           nil -> {:error, :unknown_slug}
           entry -> {:ok, entry}
@@ -818,13 +819,13 @@ defmodule AgenticRealms.World.Commands do
     with :ok <- ensure_wizard(attrs[:wizard_id]),
          :ok <- validate_slug(attrs[:blueprint_id]),
          :ok <- ensure_slug_unused(attrs[:blueprint_id]) do
-      cmd = %CreateObjectBlueprint{
+      cmd = %CreateBlueprint{
         blueprint_id: attrs[:blueprint_id],
         wizard_id: attrs[:wizard_id],
+        kind: "object",
         name: attrs[:name],
         short_description: attrs[:short_description],
         long_description: attrs[:long_description],
-        kind: "object",
         fixed: Map.get(attrs, :fixed, false)
       }
 
@@ -882,15 +883,15 @@ defmodule AgenticRealms.World.Commands do
          :ok <- ensure_slug_unused(attrs[:blueprint_id]),
          :ok <- Toolsets.validate_behaviors(behaviors),
          :ok <- Toolsets.all_exist?(toolsets) do
-      cmd = %CreateNPCBlueprint{
+      cmd = %CreateBlueprint{
         blueprint_id: attrs[:blueprint_id],
         wizard_id: attrs[:wizard_id],
+        kind: "npc",
         name: attrs[:name],
         short_description: attrs[:short_description],
         long_description: attrs[:long_description],
         lore: Map.get(attrs, :lore, "") || "",
         behaviors: behaviors,
-        kind: "npc",
         fixed: Map.get(attrs, :fixed, false),
         toolsets: toolsets
       }
@@ -945,9 +946,11 @@ defmodule AgenticRealms.World.Commands do
   end
 
   defp fetch_blueprint(blueprint_id) do
-    case Repo.get(AgenticRealms.World.Schemas.ObjectBlueprint, blueprint_id) do
+    case Repo.get(Blueprint, blueprint_id) do
       nil -> {:error, :unknown_blueprint}
-      bp -> {:ok, bp}
+      %Blueprint{kind: "object"} = bp -> {:ok, bp}
+      # A slug that resolves to an npc blueprint is not a valid object source.
+      %Blueprint{} -> {:error, :unknown_blueprint}
     end
   end
 
@@ -1088,7 +1091,7 @@ defmodule AgenticRealms.World.Commands do
     with :ok <- ensure_wizard(wizard_id),
          {:ok, blueprint} <- fetch_blueprint(blueprint_id),
          :ok <- validate_edit_fields(params[:fields_changed]) do
-      cmd = %EditObjectBlueprint{
+      cmd = %EditBlueprint{
         blueprint_id: blueprint_id,
         wizard_id: wizard_id,
         expected_revision: params[:expected_revision],
@@ -1100,7 +1103,7 @@ defmodule AgenticRealms.World.Commands do
           # Aggregate accepted but emitted no event (no-op diff) OR
           # accepted and emitted the edit event. Re-read to determine
           # the actual new revision.
-          updated = Repo.get(AgenticRealms.World.Schemas.ObjectBlueprint, blueprint_id)
+          updated = Repo.get(Blueprint, blueprint_id)
 
           cond do
             updated.revision == blueprint.revision -> {:ok, :no_change}
@@ -1108,7 +1111,7 @@ defmodule AgenticRealms.World.Commands do
           end
 
         {:error, :stale_revision} ->
-          current = Repo.get(AgenticRealms.World.Schemas.ObjectBlueprint, blueprint_id)
+          current = Repo.get(Blueprint, blueprint_id)
           {:error, :stale_revision, current_revision: current.revision}
 
         {:error, _} = err ->
@@ -1230,11 +1233,14 @@ defmodule AgenticRealms.World.Commands do
   # FR-004 — a blueprint slug is unique across BOTH the object and NPC
   # registries, so a wizard can never author an object and an NPC under the
   # same id (the unified registry, US8, keys on it).
+  # FR-004 — one slug namespace across both kinds (the unified `blueprints`
+  # table keys on it), so a wizard can never author an object and an NPC under
+  # the same id.
   defp ensure_slug_unused(slug) do
-    object_taken? = not is_nil(Repo.get(AgenticRealms.World.Schemas.ObjectBlueprint, slug))
-    npc_taken? = not is_nil(Repo.get(NPCBlueprint, slug))
-
-    if object_taken? or npc_taken?, do: {:error, :slug_already_exists}, else: :ok
+    case Repo.get(Blueprint, slug) do
+      nil -> :ok
+      _ -> {:error, :slug_already_exists}
+    end
   end
 
   # Feature 014 — wizard authorization gate. Synchronous read of the

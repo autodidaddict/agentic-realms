@@ -1,14 +1,14 @@
-defmodule AgenticRealms.World.ObjectBlueprint.Slug do
+defmodule AgenticRealms.World.Blueprint.Slug do
   @moduledoc """
-  Object Blueprint slug helpers (FR-007a, FR-007b).
+  Blueprint slug helpers (FR-004). One namespace across both kinds.
 
   - `derive/1` produces the candidate slug a wizard sees pre-populated in
     the form when authoring a new blueprint: lowercase, non-alphanumeric
     runs collapsed to `_`, leading/trailing `_` trimmed.
   - `valid?/1` enforces the regex `^[a-z][a-z0-9_]*$` and length 1–64.
 
-  UUID-shaped strings are explicitly rejected by `valid?/1` — they fail
-  the leading-letter rule and the `-` character.
+  UUID-shaped strings are explicitly rejected by `valid?/1` — they fail the
+  leading-letter rule and the `-` character.
   """
 
   @max_length 64
@@ -31,9 +31,6 @@ defmodule AgenticRealms.World.ObjectBlueprint.Slug do
 
   def valid?(_), do: false
 
-  # If the cleaned candidate starts with a digit (e.g., "7_iron_chest"
-  # from a name like "7 iron chest"), prepend `b_` so the leading
-  # character is a letter. The shape regex requires `[a-z]` first.
   defp ensure_leading_letter(""), do: ""
 
   defp ensure_leading_letter(<<first, _::binary>> = candidate)

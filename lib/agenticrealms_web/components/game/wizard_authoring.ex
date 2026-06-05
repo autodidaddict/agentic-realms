@@ -20,7 +20,7 @@ defmodule AgenticRealmsWeb.GameComponents.WizardAuthoring do
 
   use AgenticRealmsWeb, :html
 
-  alias AgenticRealms.World.ObjectBlueprint.Slug
+  alias AgenticRealms.World.Blueprint.Slug
 
   attr :authoring_mode, :atom, required: true
   attr :focused_blueprint_draft, :map, default: nil

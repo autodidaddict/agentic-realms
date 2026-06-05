@@ -28,7 +28,6 @@ defmodule AgenticRealms.World.Projections.WorldProjector do
   alias AgenticRealms.World.Events.{
     RoomCreated,
     ExitAdded,
-    NPCBlueprintCreated,
     RegionCreated,
     QuestAccepted
   }
@@ -41,7 +40,6 @@ defmodule AgenticRealms.World.Projections.WorldProjector do
   alias AgenticRealms.World.Schemas.{
     Room,
     Exit,
-    NPCBlueprint,
     Region,
     QuestInstance
   }
@@ -115,43 +113,9 @@ defmodule AgenticRealms.World.Projections.WorldProjector do
   # entity lifecycle (`EntityProjector` handles EntityCloned/Moved/Edited).
   # The Room aggregate no longer emits object events.
 
-  # Feature 008: authored blueprints (from CreateNPCBlueprint command).
-  # Feature 009: extended with :behaviors field (defaults to [] for pre-009
-  # events via the event struct's default).
-  def handle(
-        %NPCBlueprintCreated{
-          blueprint_id: bp_id,
-          name: name,
-          short_description: short,
-          long_description: long,
-          behaviors: behaviors,
-          lore: lore
-        } = event,
-        _meta
-      ) do
-    Repo.insert!(
-      %NPCBlueprint{
-        id: bp_id,
-        name: name,
-        short_description: short,
-        long_description: long,
-        is_synthetic: false,
-        behaviors: behaviors,
-        lore: lore || "",
-        # Feature 013 — legacy events without :quests default to [].
-        quests: Map.get(event, :quests, []) || [],
-        # Feature 015 — authoring fields; Map.get defends replay of pre-015 events.
-        kind: Map.get(event, :kind) || "npc",
-        fixed: Map.get(event, :fixed, false),
-        toolsets: Map.get(event, :toolsets, []) || [],
-        revision: Map.get(event, :revision, 1)
-      },
-      on_conflict: :nothing,
-      conflict_target: :id
-    )
-
-    :ok
-  end
+  # Feature 015 — authored NPC blueprints now land in the unified
+  # `blueprints` table via `BlueprintProjector` (BlueprintCreated). The
+  # old `NPCBlueprintCreated` → `npc_blueprints` insert is removed here.
 
   # Feature 016 — NPC clone spawning moved to the entity lifecycle
   # (`EntityProjector` handles `EntityCloned`/`EntityMoved` for `:npc`). The

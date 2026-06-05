@@ -17,7 +17,7 @@ defmodule AgenticRealms.World.NPCChat.Context do
   alias AgenticRealms.World.NPCChat.{SystemPrompt, Tools}
   alias AgenticRealms.World.Queries
   alias AgenticRealms.World.Quests
-  alias AgenticRealms.World.Schemas.{NPCBlueprint, QuestInstance}
+  alias AgenticRealms.World.Schemas.{Blueprint, QuestInstance}
 
   import Ecto.Query, only: [from: 2]
 
@@ -109,7 +109,7 @@ defmodule AgenticRealms.World.NPCChat.Context do
   @spec quest_context(integer(), String.t()) :: quest_context()
   def quest_context(player_id, npc_blueprint_id)
       when is_integer(player_id) and is_binary(npc_blueprint_id) do
-    blueprint = Repo.get(NPCBlueprint, npc_blueprint_id)
+    blueprint = Repo.get(Blueprint, npc_blueprint_id)
     catalog = (blueprint && blueprint.quests) || []
 
     completed_slugs =

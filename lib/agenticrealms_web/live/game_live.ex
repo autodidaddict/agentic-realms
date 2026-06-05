@@ -343,7 +343,7 @@ defmodule AgenticRealmsWeb.GameLive do
     # renaming the blueprint correctly re-derives.
     proposed_slug =
       if slug_input == "" do
-        AgenticRealms.World.ObjectBlueprint.Slug.derive(new_name)
+        AgenticRealms.World.Blueprint.Slug.derive(new_name)
       else
         slug_input
       end
@@ -673,7 +673,7 @@ defmodule AgenticRealmsWeb.GameLive do
         {:noreply, assign(socket, :blueprint_commit_error, :unknown_object)}
 
       %{container_type: "room", container_id: ^room_id} = object ->
-        slug = AgenticRealms.World.ObjectBlueprint.Slug.derive(object.name || "")
+        slug = AgenticRealms.World.Blueprint.Slug.derive(object.name || "")
 
         draft = %{
           name: object.name || "",

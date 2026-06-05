@@ -28,7 +28,7 @@ defmodule AgenticRealms.World.Schemas.NPCClone do
     field :toolsets, {:array, :string}, default: []
     field :direct_behaviors, {:array, :map}, default: []
 
-    belongs_to :blueprint, AgenticRealms.World.Schemas.NPCBlueprint,
+    belongs_to :blueprint, AgenticRealms.World.Schemas.Blueprint,
       foreign_key: :blueprint_id,
       type: :string,
       references: :id
