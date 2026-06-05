@@ -33,7 +33,7 @@ labels map to spec.md user stories US1–US5.
 
 **Purpose**: Baseline confirmation. No new dependencies.
 
-- [ ] T001 Confirm clean baseline on branch `016-entity-containment`: `mix deps.get` reports nothing new, `mix compile --warnings-as-errors` succeeds, and `mix test` is green before any changes land.
+- [X] T001 Confirm clean baseline on branch `016-entity-containment`: `mix deps.get` reports nothing new, `mix compile --warnings-as-errors` succeeds, and `mix test` is green before any changes land.
 
 ---
 
@@ -47,22 +47,28 @@ suite stays green.
 
 ### Container value + commands + events
 
-- [ ] T002 [P] Create `lib/agenticrealms/world/container_ref.ex` — `%ContainerRef{type, id}` with `void/0`, `room/1`, `player/1`, `npc/1`, `valid_type?/1`, `to_map/1`, `from_map/1` per data-model.md §1.
-- [ ] T003 [P] Unit tests `test/agentic_realms/world/container_ref_test.exs` — helpers, `to_map`/`from_map` round-trip, void⇔nil-id pairing, invalid type rejection.
-- [ ] T004 [P] Create command `lib/agenticrealms/world/commands/clone_entity.ex` — `entity_id, kind, fields` per contracts/commands.md.
-- [ ] T005 [P] Create command `lib/agenticrealms/world/commands/move_entity.ex` — `entity_id, from, to, cause`.
-- [ ] T006 [P] Create command `lib/agenticrealms/world/commands/edit_entity.ex` — `entity_id, fields_changed`.
-- [ ] T007 [P] Create event `lib/agenticrealms/world/events/entity_cloned.ex` — `entity_id, kind, fields`, `version: 1`.
-- [ ] T008 [P] Create event `lib/agenticrealms/world/events/entity_moved.ex` — `entity_id, from, to, cause`, `version: 1`.
-- [ ] T009 [P] Create event `lib/agenticrealms/world/events/entity_edited.ex` — `entity_id, fields_changed`, `version: 1`.
+- [X] T002 [P] Create `lib/agenticrealms/world/container_ref.ex` — `%ContainerRef{type, id}` with `void/0`, `room/1`, `player/1`, `npc/1`, `valid_type?/1`, `to_map/1`, `from_map/1` per data-model.md §1.
+- [X] T003 [P] Unit tests `test/agenticrealms/world/container_ref_test.exs` — helpers, `to_map`/`from_map` round-trip, void⇔nil-id pairing, invalid type rejection.
+- [X] T004 [P] Create command `lib/agenticrealms/world/commands/clone_entity.ex` — `entity_id, kind, fields` per contracts/commands.md.
+- [X] T005 [P] Create command `lib/agenticrealms/world/commands/move_entity.ex` — `entity_id, expected_from, to, cause`.
+- [X] T006 [P] Create command `lib/agenticrealms/world/commands/edit_entity.ex` — `entity_id, fields_changed`.
+- [X] T007 [P] Create event `lib/agenticrealms/world/events/entity_cloned.ex` — `entity_id, kind, fields`, `version: 1`.
+- [X] T008 [P] Create event `lib/agenticrealms/world/events/entity_moved.ex` — `entity_id, from, to, cause`, `version: 1`.
+- [X] T009 [P] Create event `lib/agenticrealms/world/events/entity_edited.ex` — `entity_id, fields_changed`, `version: 1`.
 
 ### Entity aggregate + routing
 
-- [ ] T010 Create `lib/agenticrealms/world/entity.ex` aggregate (struct `id/kind/container`); `execute/2` for `CloneEntity` (nil→`EntityCloned` void, else `:already_exists`), `MoveEntity` (no-op→`:ok` no event; **`expected_from != current container` → `{:error, :container_conflict}`** so a stale/concurrent move is refused not silently applied — FR-005; unsupported type→`:unsupported_container`; else `EntityMoved`), `EditEntity` (no-op→`:ok`; else `EntityEdited`); `apply/2` clauses; `ContainerRef` JSON (de)serialization per contracts/events.md.
-- [ ] T011 Register in `lib/agenticrealms/world/router.ex`: `identify(Entity, by: :entity_id, prefix: "entity-")` and dispatch `[CloneEntity, MoveEntity, EditEntity] → Entity`. (Additive — leave existing dispatch intact.)
-- [ ] T012 [P] Aggregate unit tests `test/agentic_realms/world/entity_test.exs` — clone happy/already_exists; move no-op/real/unsupported-type; **`MoveEntity` with `expected_from` ≠ current container → `{:error, :container_conflict}` (no event)**; edit sparse/no-op; mid-stream replay reconstructs `container`.
+- [X] T010 Create `lib/agenticrealms/world/entity.ex` aggregate (struct `id/kind/container`); `execute/2` for `CloneEntity` (nil→`EntityCloned` void, else `:already_exists`), `MoveEntity` (no-op→`:ok` no event; **`expected_from != current container` → `{:error, :container_conflict}`** so a stale/concurrent move is refused not silently applied — FR-005; unsupported type→`:unsupported_container`; else `EntityMoved`), `EditEntity` (no-op→`:ok`; else `EntityEdited`); `apply/2` clauses; `ContainerRef` JSON (de)serialization per contracts/events.md.
+- [X] T011 Register in `lib/agenticrealms/world/router.ex`: `identify(Entity, by: :entity_id, prefix: "entity-")` and dispatch `[CloneEntity, MoveEntity, EditEntity] → Entity`. (Additive — leave existing dispatch intact.)
+- [X] T012 [P] Aggregate unit tests `test/agenticrealms/world/entity_test.exs` — clone happy/already_exists; move no-op/real/unsupported-type; **`MoveEntity` with `expected_from` ≠ current container → `{:error, :container_conflict}` (no event)**; edit sparse/no-op; mid-stream replay reconstructs `container`.
 
 ### Projector + service + witness (written, not yet active)
+
+> **Reorder note (impl):** T013–T016 reference `world_objects`/`npc_clones` **container columns**
+> that don't exist until the Phase 3/4 migrations, so they cannot compile against the current schema.
+> They are therefore implemented **together with the Phase 3 object cutover** (expand the schema with
+> the container columns first, keeping `room_id`/`player_id` until all call sites move, then contract).
+> The pure-additive Phase 2 core (T002–T012) is complete and green on its own.
 
 - [ ] T013 Create `lib/agenticrealms/world/projections/entity_projector.ex` (`:strong`) handling `EntityCloned` (insert `world_objects`|`npc_clones` by kind at `container_type='void'`, `on_conflict: :nothing`), `EntityMoved` (absolute container update), `EntityEdited` (apply sparse diff) per data-model.md §7. (Not yet supervised.)
 - [ ] T014 Add service wrappers to `lib/agenticrealms/world/commands.ex` — `clone_entity/2`, `move_entity/4` (`entity_id, expected_from, to, cause`), `clone_into/4` (mint id; destination-exists + room name-collision pre-checks; `move_entity` passes the resolved source as `expected_from` and maps `:container_conflict` to a caller-facing "no longer there"; clone-then-move uses `expected_from = void` and leaves the entity in void on move failure) per contracts/commands.md. (Not yet wired into existing call sites.)
