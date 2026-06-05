@@ -164,6 +164,14 @@ defmodule AgenticRealmsWeb.GameLive do
          else: []
        )
      )
+     # Feature 015 US6 — in-room NPCs the wizard can extract a blueprint from.
+     |> assign(
+       :room_npcs,
+       if(socket.assigns.current_player.is_wizard,
+         do: Queries.list_npcs_in_room(current_room_id),
+         else: []
+       )
+     )
      |> assign(:modal, nil)
      |> assign(:map_open, false)
      |> assign(:map_view, MapView.for_player(player_id))
@@ -774,6 +782,64 @@ defmodule AgenticRealmsWeb.GameLive do
   end
 
   def handle_event("extract_essence", _, socket), do: {:noreply, socket}
+
+  # Feature 015 US6 — extract essence from an in-world NPC clone. Flips into
+  # trance and pre-populates the focused npc blueprint draft with a wholesale
+  # copy of the clone's settable fields (lore + toolsets + direct behaviors)
+  # plus an auto-derived slug. The source clone is NOT modified — the blueprint
+  # is created later when the wizard clicks Commit.
+  def handle_event(
+        "extract_npc_essence",
+        %{"clone_id" => clone_id},
+        %{
+          assigns: %{
+            is_wizard: true,
+            mode: :wizard,
+            authoring_mode: :world,
+            current_room_id: room_id
+          }
+        } = socket
+      )
+      when is_binary(clone_id) do
+    case Queries.get_npc_clone_row(clone_id) do
+      nil ->
+        {:noreply, assign(socket, :blueprint_commit_error, :unknown_npc)}
+
+      %{room_id: ^room_id} = clone ->
+        draft = %{
+          kind: "npc",
+          name: clone.name || "",
+          short_description: clone.short_description || "",
+          long_description: clone.long_description || "",
+          fixed: clone.fixed == true,
+          lore: clone.lore || "",
+          behaviors: clone.direct_behaviors || [],
+          toolsets: clone.toolsets || [],
+          proposed_slug: AgenticRealms.World.Blueprint.Slug.derive(clone.name || "")
+        }
+
+        :ok =
+          AgenticRealms.World.WizardTrance.enter(
+            socket.assigns.current_player.id,
+            socket.assigns.current_player.username,
+            room_id
+          )
+
+        {:noreply,
+         socket
+         |> assign(:authoring_mode, :blueprints)
+         |> assign(:focused_blueprint_draft, draft)
+         |> assign(:focused_object_draft, nil)
+         |> assign(:focused_object_edit, nil)
+         |> assign(:blueprint_commit_error, nil)
+         |> assign(:last_spawn, nil)}
+
+      _other_room ->
+        {:noreply, assign(socket, :blueprint_commit_error, :unknown_npc)}
+    end
+  end
+
+  def handle_event("extract_npc_essence", _, socket), do: {:noreply, socket}
 
   # Feature 014 US2 — spawn a clone of a registry blueprint into the
   # wizard's current room. Only valid while in World mode (FR-027).

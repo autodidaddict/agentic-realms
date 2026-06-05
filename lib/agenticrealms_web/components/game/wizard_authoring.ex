@@ -29,6 +29,7 @@ defmodule AgenticRealmsWeb.GameComponents.WizardAuthoring do
   attr :object_blueprints, :list, required: true
   attr :toolsets, :list, default: []
   attr :room_objects, :list, default: []
+  attr :room_npcs, :list, default: []
   attr :wizard_prompt, :string, required: true
   attr :wizard_input_locked, :boolean, required: true
   attr :blueprint_commit_error, :any, default: nil
@@ -331,6 +332,54 @@ defmodule AgenticRealmsWeb.GameComponents.WizardAuthoring do
                     </div>
                     <div style="color: var(--ink-faint); font-size: 12px;">
                       {obj.short_description}
+                    </div>
+                  </li>
+                </ul>
+              <% end %>
+            </div>
+          </section>
+
+          <section class="w-pane">
+            <div class="w-pane-head">
+              <div class="lbl">NPCs in <b>{@current_room_name || "this room"}</b></div>
+              <div style="font-size: 10px; color: var(--ink-faint); letter-spacing: 0.08em; text-transform: uppercase;">
+                {length(@room_npcs)} present
+              </div>
+            </div>
+            <div class="w-pane-body" data-testid="room-npcs-panel">
+              <%= if @room_npcs == [] do %>
+                <div class="empty-preview">
+                  <div>
+                    <div class="title">No NPCs here yet</div>
+                    <div>
+                      Manifest a one-off with a prompt, or <strong>Spawn here</strong>
+                      an npc blueprint from the registry.
+                    </div>
+                  </div>
+                </div>
+              <% else %>
+                <ul class="blueprint-list" style="list-style: none; padding: 0; margin: 0;">
+                  <li
+                    :for={npc <- @room_npcs}
+                    class="blueprint-row"
+                    data-npc-id={npc.id}
+                    style="border-bottom: 1px solid var(--rule); padding: 8px 12px;"
+                  >
+                    <div style="display: flex; align-items: baseline; gap: 8px;">
+                      <strong>{npc.name}</strong>
+                      <button
+                        type="button"
+                        class="btn-ghost"
+                        style="margin-left: auto; font-size: 11px; padding: 2px 8px;"
+                        phx-click="extract_npc_essence"
+                        phx-value-clone_id={npc.id}
+                        data-testid={"extract-npc-#{npc.id}"}
+                      >
+                        Extract essence
+                      </button>
+                    </div>
+                    <div style="color: var(--ink-faint); font-size: 12px;">
+                      {npc.short_description}
                     </div>
                   </li>
                 </ul>
@@ -761,6 +810,7 @@ defmodule AgenticRealmsWeb.GameComponents.WizardAuthoring do
   defp format_commit_error(:long_description_required), do: "Long description is required."
   defp format_commit_error(:unknown_blueprint), do: "That blueprint no longer exists."
   defp format_commit_error(:unknown_object), do: "That object no longer exists."
+  defp format_commit_error(:unknown_npc), do: "That NPC isn't in this room anymore."
 
   defp format_commit_error(:object_not_in_room),
     do: "That object isn't in this room anymore."

@@ -43,7 +43,16 @@ defmodule AgenticRealms.World.Commands do
   alias AgenticRealms.World.Queries
   alias AgenticRealms.World.Quests
   alias AgenticRealms.World.Toolsets
-  alias AgenticRealms.World.Schemas.{Exit, Room, Region, Blueprint, QuestInstance, Object}
+
+  alias AgenticRealms.World.Schemas.{
+    Exit,
+    Room,
+    Region,
+    Blueprint,
+    QuestInstance,
+    Object,
+    NPCClone
+  }
 
   @doc """
   Spawn a player into the starting room if (and only if) they have no
@@ -1041,6 +1050,47 @@ defmodule AgenticRealms.World.Commands do
         long_description: object.long_description,
         fixed: object.fixed
       })
+    end
+  end
+
+  @doc """
+  Feature 015 US6 — one-shot extract-essence from an in-world NPC clone:
+  read its denormalized `name/short/long/lore/fixed/toolsets/direct_behaviors`
+  and persist a new NPC Blueprint at `revision: 1` (FR-012). The source clone
+  is NOT modified. The clone's DIRECT behaviors + toolset names carry over (so
+  the new blueprint recomposes the same effective set), not its frozen union.
+
+  Returns `{:ok, blueprint_id}`. Refusals mirror `create_npc_blueprint/2`
+  plus `{:error, :unknown_npc}` when the clone id is unknown.
+
+  Intended for `iex` / test setup; the LiveView path
+  (`handle_event("extract_npc_essence", ...)`) instead pre-populates the trance
+  card and lets the wizard refine before committing.
+  """
+  @spec extract_npc_essence(integer(), String.t(), String.t()) ::
+          {:ok, String.t()} | {:error, atom()} | {:error, {:unknown_toolset, String.t()}}
+  def extract_npc_essence(wizard_id, source_clone_id, proposed_slug)
+      when is_integer(wizard_id) and is_binary(source_clone_id) and is_binary(proposed_slug) do
+    with :ok <- ensure_wizard(wizard_id),
+         {:ok, clone} <- fetch_npc_clone_row(source_clone_id) do
+      create_npc_blueprint(%{
+        wizard_id: wizard_id,
+        blueprint_id: proposed_slug,
+        name: clone.name,
+        short_description: clone.short_description,
+        long_description: clone.long_description,
+        lore: clone.lore || "",
+        fixed: clone.fixed,
+        behaviors: clone.direct_behaviors || [],
+        toolsets: clone.toolsets || []
+      })
+    end
+  end
+
+  defp fetch_npc_clone_row(clone_id) do
+    case Repo.get(NPCClone, clone_id) do
+      nil -> {:error, :unknown_npc}
+      clone -> {:ok, clone}
     end
   end
 

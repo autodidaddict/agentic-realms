@@ -203,6 +203,38 @@ defmodule AgenticRealmsWeb.WizardNpcAuthoringTest do
            ]
   end
 
+  test "extract essence from an in-world NPC → trance + pre-filled npc draft → commit (US6)",
+       %{wizard_conn: wzc, suffix: suffix} do
+    {:ok, view, _} = live(wzc, ~p"/play")
+    render_hook(view, "switch_mode", %{"mode" => "wizard"})
+
+    # World mode: the NPCs-in-this-room panel lists the seeded Garrick.
+    html = render(view)
+    assert html =~ "NPCs in"
+    assert html =~ "Garrick the Innkeeper"
+
+    garrick = Repo.get_by(NPCClone, blueprint_id: "garrick_the_innkeeper")
+    render_hook(view, "extract_npc_essence", %{"clone_id" => garrick.id})
+
+    # Flipped into the sanctum with a pre-filled npc draft (lore field present).
+    html = render(view)
+    assert html =~ "sanctum"
+    assert html =~ "Garrick the Innkeeper"
+    assert html =~ "Lore"
+
+    # The auto-derived slug collides with the seeded blueprint; rename it.
+    new_slug = "garrick_copy_#{suffix}"
+    render_hook(view, "update_blueprint_draft", %{"draft" => %{"proposed_slug" => new_slug}})
+    render_hook(view, "commit_blueprint_draft", %{})
+
+    bp = Queries.get_npc_blueprint_row(new_slug)
+    assert bp.kind == "npc"
+    assert bp.revision == 1
+    assert bp.name == "Garrick the Innkeeper"
+    # The source clone is unchanged (still references its own blueprint).
+    assert Repo.get(NPCClone, garrick.id).blueprint_id == "garrick_the_innkeeper"
+  end
+
   # --- Helpers ------------------------------------------------------------
 
   defp conn_for(conn, player_id) do

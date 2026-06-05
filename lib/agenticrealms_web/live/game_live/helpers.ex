@@ -53,13 +53,15 @@ defmodule AgenticRealmsWeb.GameLive.Helpers do
   end
 
   @doc """
-  Feature 014 US4 — wizards see a Things-in-this-room panel with an
-  Extract essence button on each object. Re-query the read model on
-  any event that mutates the current room's object set.
+  Feature 014 US4 / feature 015 US6 — wizards see Things-in-this-room and
+  NPCs-in-this-room panels, each with an Extract essence button. Re-query the
+  read model on any event that mutates the current room's object / NPC set.
   """
   def refresh_room_objects(%{assigns: %{is_wizard: true, current_room_id: rid}} = socket)
       when is_binary(rid) do
-    assign(socket, :room_objects, Queries.list_objects_in_room_for_wizard(rid))
+    socket
+    |> assign(:room_objects, Queries.list_objects_in_room_for_wizard(rid))
+    |> assign(:room_npcs, Queries.list_npcs_in_room(rid))
   end
 
   def refresh_room_objects(socket), do: socket

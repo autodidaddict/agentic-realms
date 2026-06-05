@@ -173,6 +173,15 @@ defmodule AgenticRealms.World.Queries do
   end
 
   @doc """
+  Feature 015 US6 — fetch a full NPC clone row by id (for extract-essence,
+  which reads its lore/toolsets/direct_behaviors). Returns `nil` if unknown.
+  """
+  @spec get_npc_clone_row(String.t()) :: %NPCClone{} | nil
+  def get_npc_clone_row(clone_id) when is_binary(clone_id) do
+    Repo.get(NPCClone, clone_id)
+  end
+
+  @doc """
   Find a clone in a given room by its display name (case-insensitive,
   whitespace-normalized). Used by the pre-dispatch per-room name-collision
   check (preserves feature 007 FR-001a at the clone level).

@@ -181,9 +181,9 @@ spawn flows route through it. Drop the two old tables/aggregates (reseed). Keep 
 **Goal**: distill a new NPC blueprint from a world clone; source untouched.
 **Independent Test**: "Extract essence" on a clone → trance card pre-fills (incl. toolsets/behaviors/lore) → commit → new blueprint at revision 1; source clone unchanged.
 
-- [ ] T041 [US6] `Commands.extract_npc_essence/3` (`commands.ex`): `ensure_wizard`; read clone (`name/short/long/lore/fixed/toolsets/direct_behaviors`); `create_npc_blueprint` at revision 1; source clone untouched.
-- [ ] T042 [US6] `GameLive` "Extract essence" action on an in-world NPC → flip to trance, pre-populate the npc draft.
-- [ ] T043 [P] [US6] Tests — extracted draft fields == source clone (incl. toolset composition); commit → new blueprint revision 1; source clone byte-for-byte unchanged (FR-012/SC-005).
+- [X] T041 [US6] `Commands.extract_npc_essence/3` (`commands.ex`): `ensure_wizard`; read clone (`name/short/long/lore/fixed/toolsets/direct_behaviors`); `create_npc_blueprint` at revision 1; source clone untouched.
+- [X] T042 [US6] `GameLive` "Extract essence" action on an in-world NPC → flip to trance, pre-populate the npc draft.
+- [X] T043 [P] [US6] Tests — extracted draft fields == source clone (incl. toolset composition); commit → new blueprint revision 1; source clone byte-for-byte unchanged (FR-012/SC-005).
 
 ---
 

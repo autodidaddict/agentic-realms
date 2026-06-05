@@ -170,7 +170,10 @@ defmodule AgenticRealmsWeb.GameLive.UIEvents do
   # "Also here" section.
 
   def npc_arrived(socket, %RoomNPCArrived{npc_name: name}) do
-    {:noreply, append_log(socket, %{kind: :system, text: "#{name} arrives."})}
+    {:noreply,
+     socket
+     |> append_log(%{kind: :system, text: "#{name} arrives."})
+     |> refresh_room_objects()}
   end
 
   # ────────────────────────────────────────────────────────────
