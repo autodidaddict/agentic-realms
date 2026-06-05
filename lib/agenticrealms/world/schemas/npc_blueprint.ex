@@ -19,6 +19,13 @@ defmodule AgenticRealms.World.Schemas.NPCBlueprint do
     field :short_description, :string
     field :long_description, :string
     field :is_synthetic, :boolean, default: false
+    # Feature 015 — wizard authoring (mirror object blueprints).
+    field :kind, :string, default: "npc"
+    field :fixed, :boolean, default: false
+    # Referenced toolset names; effective behaviors = union(toolsets) ++ behaviors.
+    field :toolsets, {:array, :string}, default: []
+    field :revision, :integer, default: 1
+    # Direct behaviors (the union with toolsets is composed at spawn time).
     field :behaviors, {:array, :map}, default: []
     field :lore, :string, default: ""
 

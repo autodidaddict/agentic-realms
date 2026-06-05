@@ -29,7 +29,7 @@ milestone is **pure NPC authoring** mirroring the feature-014 object-blueprint p
 
 ## Phase 1: Setup
 
-- [ ] T001 Confirm clean baseline on `015-npc-blueprints` (rebased on merged 016): `mix deps.get`, `mix compile --warnings-as-errors`, `mix test` all green before changes.
+- [X] T001 Confirm clean baseline on `015-npc-blueprints` (rebased on merged 016): `mix deps.get`, `mix compile --warnings-as-errors`, `mix test` all green before changes.
 
 ---
 
@@ -37,18 +37,18 @@ milestone is **pure NPC authoring** mirroring the feature-014 object-blueprint p
 
 **Purpose**: schema + toolset substrate that every story needs. ⚠️ No user story starts until done.
 
-- [ ] T002 [P] Migration `priv/repo/migrations/<ts>_extend_npc_blueprints_authoring.exs`: add `kind` (string NOT NULL DEFAULT `'npc'`, CHECK `= 'npc'`), `fixed` (bool NOT NULL DEFAULT false), `toolsets` (`{:array,:string}` NOT NULL DEFAULT `[]`), `revision` (int NOT NULL DEFAULT 1, CHECK `> 0`); slug-shape CHECK on `id`; index on `kind`. (data-model §1.1)
-- [ ] T003 [P] Migration `priv/repo/migrations/<ts>_extend_npc_clones_authoring.exs`: add `fixed` (bool NOT NULL DEFAULT false), `toolsets` (`{:array,:string}` DEFAULT `[]`), `direct_behaviors` (`{:array,:map}` DEFAULT `[]`). (data-model §1.2)
-- [ ] T004 [P] Migration `priv/repo/migrations/<ts>_create_toolsets.exs`: `toolsets` table — `name` (string PK, slug CHECK), `description` (string NULL), `behaviors` (`{:array,:map}` NOT NULL DEFAULT `[]`), `applies_to` (`{:array,:string}` NOT NULL DEFAULT `['npc']`, CHECK each ∈ {item,npc,room}), timestamps. (data-model §1.3)
-- [ ] T005 [P] Update `lib/agenticrealms/world/schemas/npc_blueprint.ex` — add `kind`, `fixed`, `toolsets`, `revision`.
-- [ ] T006 [P] Update `lib/agenticrealms/world/schemas/npc_clone.ex` — add `fixed`, `toolsets`, `direct_behaviors`.
-- [ ] T007 [P] Create `lib/agenticrealms/world/schemas/toolset.ex` Ecto schema (data-model §1.3).
-- [ ] T008 Create `lib/agenticrealms/world/toolsets.ex` service — `list/0`, `list_for/1`, `resolve/1` (`{:error, {:unknown_toolset, name}}` per FR-018), `compose/2` (additive, attachment-ordered, lossless — R4), `validate_behaviors/1` (feature-009 vocabulary, FR-014).
-- [ ] T009 [P] Unit tests `test/agenticrealms/world/toolsets_test.exs` — resolve unknown→error; compose union of two toolsets ++ direct in order, no dupes dropped; behavior-vocabulary rejection; `applies_to` accepts `item`/`room` values (cross-entity model, FR-019).
-- [ ] T010 Create `lib/agenticrealms/world/projections/npc_blueprint_projector.ex` (`:strong`) with the `NPCBlueprintCreated` handler (insert `npc_blueprints` incl. kind/fixed/toolsets/revision, `on_conflict: :nothing`); `NPCBlueprintEdited` handler added in US7. Supervise in `application.ex` + `data_case.ex`. (data-model §5)
-- [ ] T011 Extend `EntityProjector` `:npc` `EntityCloned` insert (`lib/agenticrealms/world/projections/entity_projector.ex`) to carry `fixed`, `toolsets`, `direct_behaviors` from the cloned `fields`.
-- [ ] T012 Seed ≥2 named toolsets (e.g. `orc`, `shopkeeper`) in `lib/agenticrealms/world/seed.ex` so US4 is demonstrable from a fresh world (FR-014a).
-- [ ] T013 [P] Confirm `mix world.reset` seeds cleanly (toolsets present, existing NPCs unaffected).
+- [X] T002 [P] Migration `priv/repo/migrations/<ts>_extend_npc_blueprints_authoring.exs`: add `kind` (string NOT NULL DEFAULT `'npc'`, CHECK `= 'npc'`), `fixed` (bool NOT NULL DEFAULT false), `toolsets` (`{:array,:string}` NOT NULL DEFAULT `[]`), `revision` (int NOT NULL DEFAULT 1, CHECK `> 0`); slug-shape CHECK on `id`; index on `kind`. (data-model §1.1)
+- [X] T003 [P] Migration `priv/repo/migrations/<ts>_extend_npc_clones_authoring.exs`: add `fixed` (bool NOT NULL DEFAULT false), `toolsets` (`{:array,:string}` DEFAULT `[]`), `direct_behaviors` (`{:array,:map}` DEFAULT `[]`). (data-model §1.2)
+- [X] T004 [P] Migration `priv/repo/migrations/<ts>_create_toolsets.exs`: `toolsets` table — `name` (string PK, slug CHECK), `description` (string NULL), `behaviors` (`{:array,:map}` NOT NULL DEFAULT `[]`), `applies_to` (`{:array,:string}` NOT NULL DEFAULT `['npc']`, CHECK each ∈ {item,npc,room}), timestamps. (data-model §1.3)
+- [X] T005 [P] Update `lib/agenticrealms/world/schemas/npc_blueprint.ex` — add `kind`, `fixed`, `toolsets`, `revision`.
+- [X] T006 [P] Update `lib/agenticrealms/world/schemas/npc_clone.ex` — add `fixed`, `toolsets`, `direct_behaviors`.
+- [X] T007 [P] Create `lib/agenticrealms/world/schemas/toolset.ex` Ecto schema (data-model §1.3).
+- [X] T008 Create `lib/agenticrealms/world/toolsets.ex` service — `list/0`, `list_for/1`, `resolve/1` (`{:error, {:unknown_toolset, name}}` per FR-018), `compose/2` (additive, attachment-ordered, lossless — R4), `validate_behaviors/1` (feature-009 vocabulary, FR-014).
+- [X] T009 [P] Unit tests `test/agenticrealms/world/toolsets_test.exs` — resolve unknown→error; compose union of two toolsets ++ direct in order, no dupes dropped; behavior-vocabulary rejection; `applies_to` accepts `item`/`room` values (cross-entity model, FR-019).
+- [X] T010 Create `lib/agenticrealms/world/projections/npc_blueprint_projector.ex` (`:strong`) with the `NPCBlueprintCreated` handler (insert `npc_blueprints` incl. kind/fixed/toolsets/revision, `on_conflict: :nothing`); `NPCBlueprintEdited` handler added in US7. Supervise in `application.ex` + `data_case.ex`. (data-model §5)
+- [X] T011 Extend `EntityProjector` `:npc` `EntityCloned` insert (`lib/agenticrealms/world/projections/entity_projector.ex`) to carry `fixed`, `toolsets`, `direct_behaviors` from the cloned `fields`.
+- [X] T012 Seed ≥2 named toolsets (e.g. `orc`, `shopkeeper`) in `lib/agenticrealms/world/seed.ex` so US4 is demonstrable from a fresh world (FR-014a).
+- [X] T013 [P] Confirm `mix world.reset` seeds cleanly (toolsets present, existing NPCs unaffected).
 
 **Checkpoint**: schema + toolset substrate ready; suite green.
 

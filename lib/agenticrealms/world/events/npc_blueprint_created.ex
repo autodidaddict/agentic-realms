@@ -12,6 +12,12 @@ defmodule AgenticRealms.World.Events.NPCBlueprintCreated do
     # feature replay cleanly. The aggregate apply/2 also defends via
     # Map.get/3 for legacy events that have NO :quests field at all.
     quests: [],
+    # Feature 015 — wizard authoring (mirror object blueprints). Defaults keep
+    # pre-015 events replaying cleanly.
+    kind: "npc",
+    fixed: false,
+    toolsets: [],
+    revision: 1,
     version: 1
   ]
 end

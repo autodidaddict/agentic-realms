@@ -106,6 +106,9 @@ defmodule AgenticRealms.World.Seed do
     :ok = ensure_region(@blackmire_region_id, "Blackmire")
     :ok = ensure_region(@hollowvale_region_id, "Hollowvale")
 
+    # ---- toolsets (feature 015) ----
+    :ok = seed_toolsets()
+
     # ---- behaviors (carried over from feature 011) ----
     atrium_behaviors = [
       %{
@@ -569,5 +572,43 @@ defmodule AgenticRealms.World.Seed do
       {:error, :region_name_taken} -> :ok
       {:error, reason} -> raise "Seed: failed to ensure region #{name}: #{inspect(reason)}"
     end
+  end
+
+  # Feature 015 — seed-only toolsets (no wizard authoring surface yet). At
+  # least two distinct named toolsets so composition (US4) is demonstrable
+  # from a fresh world. Plain Repo upserts — toolsets are not event-sourced.
+  defp seed_toolsets do
+    now = DateTime.utc_now() |> DateTime.truncate(:second)
+
+    toolsets = [
+      %{
+        name: "greeter",
+        description: "Greets arrivals and bids farewell to those who leave.",
+        applies_to: ["npc"],
+        behaviors: [
+          %{"trigger" => "player_entered", "actions" => [%{"type" => "say", "text" => "Welcome, traveler."}]},
+          %{"trigger" => "player_left", "actions" => [%{"type" => "say", "text" => "Safe roads."}]}
+        ]
+      },
+      %{
+        name: "shopkeeper",
+        description: "Tends a stall and notices customers.",
+        applies_to: ["npc"],
+        behaviors: [
+          %{
+            "trigger" => "player_entered",
+            "actions" => [%{"type" => "emote", "text" => "looks up from the ledger, sizing you up."}]
+          }
+        ]
+      }
+    ]
+
+    for ts <- toolsets do
+      AgenticRealms.World.Schemas.Toolset
+      |> struct(Map.merge(ts, %{inserted_at: now, updated_at: now}))
+      |> AgenticRealms.Repo.insert!(on_conflict: :nothing, conflict_target: :name)
+    end
+
+    :ok
   end
 end

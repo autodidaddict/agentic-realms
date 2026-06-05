@@ -139,7 +139,12 @@ defmodule AgenticRealms.World.Projections.WorldProjector do
         behaviors: behaviors,
         lore: lore || "",
         # Feature 013 — legacy events without :quests default to [].
-        quests: Map.get(event, :quests, []) || []
+        quests: Map.get(event, :quests, []) || [],
+        # Feature 015 — authoring fields; Map.get defends replay of pre-015 events.
+        kind: Map.get(event, :kind) || "npc",
+        fixed: Map.get(event, :fixed, false),
+        toolsets: Map.get(event, :toolsets, []) || [],
+        revision: Map.get(event, :revision, 1)
       },
       on_conflict: :nothing,
       conflict_target: :id

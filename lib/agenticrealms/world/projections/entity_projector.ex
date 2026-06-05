@@ -119,6 +119,10 @@ defmodule AgenticRealms.World.Projections.EntityProjector do
         long_description: fval(fields, :long_description),
         behaviors: fval(fields, :behaviors) || [],
         lore: fval(fields, :lore) || "",
+        # Feature 015 — authoring/extract provenance (default for freeform NPCs).
+        fixed: fval(fields, :fixed) || false,
+        toolsets: fval(fields, :toolsets) || [],
+        direct_behaviors: fval(fields, :direct_behaviors) || [],
         # Born in the void; the subsequent EntityMoved sets the room.
         room_id: nil
       },
