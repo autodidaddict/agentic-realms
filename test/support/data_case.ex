@@ -107,6 +107,8 @@ defmodule AgenticRealms.DataCase do
     # dispatches `CreateObjectBlueprint`, because the wrapper uses
     # `:strong` consistency and waits for this projector to acknowledge.
     ExUnit.Callbacks.start_supervised!(AgenticRealms.World.Projections.ObjectBlueprintProjector)
+    # Feature 016 — entity lifecycle projector (world_objects writes).
+    ExUnit.Callbacks.start_supervised!(AgenticRealms.World.Projections.EntityProjector)
     ExUnit.Callbacks.start_supervised!(AgenticRealms.World.UIEventBroadcaster)
     ExUnit.Callbacks.start_supervised!(AgenticRealms.World.Behaviors.Interpreter)
     :ok

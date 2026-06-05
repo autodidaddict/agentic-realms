@@ -69,7 +69,8 @@ defmodule AgenticRealms.World.Ticks.SchedulerTest do
       short_description: "a lantern",
       long_description: "A brass lantern.",
       fixed: false,
-      room_id: room.id,
+      container_type: "room",
+      container_id: room.id,
       behaviors: behaviors
     })
   end
@@ -324,8 +325,8 @@ defmodule AgenticRealms.World.Ticks.SchedulerTest do
           short_description: "a carried lantern",
           long_description: "Long.",
           fixed: false,
-          room_id: nil,
-          player_id: player.id,
+          container_type: "player",
+          container_id: Integer.to_string(player.id),
           behaviors: [tick("carried beat", base)]
         })
 

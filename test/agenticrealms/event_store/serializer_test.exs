@@ -26,7 +26,6 @@ defmodule AgenticRealms.EventStore.SerializerTest do
         name: "Atrium",
         description: "A bright atrium.",
         exits: %{"north" => "room-2"},
-        object_ids: MapSet.new(["obj-a", "obj-b", "obj-c"]),
         behaviors: [],
         region_id: "region-1",
         map_visible: true,
@@ -38,20 +37,19 @@ defmodule AgenticRealms.EventStore.SerializerTest do
       %{room: room}
     end
 
-    test "AgenticRealms.EventStore.Serializer preserves MapSet and string-keyed exits",
+    test "AgenticRealms.EventStore.Serializer preserves string-keyed exits",
          %{room: room} do
       binary = Serializer.serialize(room)
       decoded = Serializer.deserialize(binary, type: "Elixir.AgenticRealms.World.Room")
 
       assert %Room{} = decoded
-      assert decoded.object_ids == room.object_ids
       assert decoded.exits == room.exits
       assert Map.has_key?(decoded.exits, "north")
       assert decoded.name == room.name
       assert decoded.region_id == room.region_id
     end
 
-    test "Commanded.Serialization.JsonSerializer preserves the MapSet", %{room: room} do
+    test "Commanded.Serialization.JsonSerializer preserves string-keyed exits", %{room: room} do
       binary = Commanded.Serialization.JsonSerializer.serialize(room)
 
       decoded =
@@ -60,19 +58,8 @@ defmodule AgenticRealms.EventStore.SerializerTest do
         )
 
       assert %Room{} = decoded
-      assert decoded.object_ids == room.object_ids
-    end
-
-    test "empty MapSet roundtrips" do
-      room = %Room{id: "room-empty", name: "Empty", description: "."}
-
-      decoded =
-        room
-        |> Serializer.serialize()
-        |> Serializer.deserialize(type: "Elixir.AgenticRealms.World.Room")
-
-      assert decoded.object_ids == MapSet.new()
-      assert MapSet.size(decoded.object_ids) == 0
+      assert decoded.exits == room.exits
+      assert Map.has_key?(decoded.exits, "north")
     end
   end
 

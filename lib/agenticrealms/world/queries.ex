@@ -207,7 +207,7 @@ defmodule AgenticRealms.World.Queries do
         ]
   def list_inventory(player_id) when is_integer(player_id) do
     from(o in Object,
-      where: o.player_id == ^player_id,
+      where: o.container_type == "player" and o.container_id == ^Integer.to_string(player_id),
       order_by: o.name,
       select: %{id: o.id, name: o.name, short_description: o.short_description}
     )
@@ -231,7 +231,7 @@ defmodule AgenticRealms.World.Queries do
     rows =
       from(o in Object,
         where:
-          o.room_id == ^room_id and
+          o.container_type == "room" and o.container_id == ^room_id and
             (is_nil(o.quest_player_id) or o.quest_player_id == ^viewer_player_id),
         select: %{id: o.id, name: o.name}
       )
@@ -255,7 +255,7 @@ defmodule AgenticRealms.World.Queries do
 
     rows =
       from(o in Object,
-        where: o.player_id == ^player_id,
+        where: o.container_type == "player" and o.container_id == ^Integer.to_string(player_id),
         select: %{id: o.id, name: o.name}
       )
       |> Repo.all()
@@ -330,7 +330,7 @@ defmodule AgenticRealms.World.Queries do
         ]
   def list_objects_in_room(room_id) when is_binary(room_id) do
     from(o in Object,
-      where: o.room_id == ^room_id,
+      where: o.container_type == "room" and o.container_id == ^room_id,
       order_by: o.name,
       select: %{id: o.id, name: o.name, short_description: o.short_description}
     )
@@ -352,7 +352,7 @@ defmodule AgenticRealms.World.Queries do
       when is_binary(room_id) and is_integer(viewer_player_id) do
     from(o in Object,
       where:
-        o.room_id == ^room_id and
+        o.container_type == "room" and o.container_id == ^room_id and
           (is_nil(o.quest_player_id) or o.quest_player_id == ^viewer_player_id),
       order_by: o.name,
       select: %{id: o.id, name: o.name, short_description: o.short_description}
@@ -407,8 +407,8 @@ defmodule AgenticRealms.World.Queries do
   def list_carried_objects_in_room(room_id) when is_binary(room_id) do
     from(o in Object,
       join: ps in PlayerState,
-      on: ps.player_id == o.player_id,
-      where: ps.current_room_id == ^room_id and not is_nil(o.player_id),
+      on: fragment("?::text", ps.player_id) == o.container_id,
+      where: ps.current_room_id == ^room_id and o.container_type == "player",
       select: o
     )
     |> Repo.all()
@@ -624,7 +624,8 @@ defmodule AgenticRealms.World.Queries do
         ]
   def list_objects_in_room_for_wizard(room_id) when is_binary(room_id) do
     from(o in Object,
-      where: o.room_id == ^room_id and is_nil(o.quest_player_id),
+      where:
+        o.container_type == "room" and o.container_id == ^room_id and is_nil(o.quest_player_id),
       order_by: o.name,
       select: %{
         id: o.id,

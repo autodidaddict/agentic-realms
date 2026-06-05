@@ -44,31 +44,16 @@ defmodule AgenticRealms.World.SnapshotTest do
     data
   end
 
+  # Feature 016 — the Room aggregate no longer carries an `object_ids`
+  # MapSet (objects are freestanding entities). Only the string-keyed `exits`
+  # map needs to survive the JSON snapshot roundtrip now.
   describe "Room snapshot" do
-    test "object_ids roundtrips as a MapSet" do
-      object_ids = MapSet.new(["obj-a", "obj-b", "obj-c"])
-
-      room = %Room{
-        id: "room-1",
-        name: "Snapshot Room",
-        description: "A room snapshotted for issue #6.",
-        exits: %{},
-        object_ids: object_ids,
-        behaviors: []
-      }
-
-      reloaded = record_and_read(room)
-      assert reloaded.object_ids == object_ids
-      assert MapSet.size(reloaded.object_ids) == 3
-    end
-
     test "exits string keys survive (do not get atomized)" do
       room = %Room{
         id: "room-1",
         name: "Snapshot Room",
         description: "A room with exits.",
         exits: %{"north" => "room-2", "east" => "room-3"},
-        object_ids: MapSet.new(),
         behaviors: []
       }
 
@@ -78,12 +63,6 @@ defmodule AgenticRealms.World.SnapshotTest do
 
       assert Map.has_key?(reloaded.exits, "north"),
              "exits map must keep string keys so Map.has_key?(exits, direction) still works after rehydrate"
-    end
-
-    test "empty MapSet roundtrips" do
-      room = %Room{id: "room-empty", name: "Empty", description: "."}
-      reloaded = record_and_read(room)
-      assert reloaded.object_ids == MapSet.new()
     end
   end
 

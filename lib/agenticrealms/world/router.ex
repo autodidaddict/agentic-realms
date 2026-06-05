@@ -8,27 +8,23 @@ defmodule AgenticRealms.World.Router do
 
   use Commanded.Commands.Router
 
-  alias AgenticRealms.World.{Room, Player, NPCBlueprint, Region, Quest, ObjectBlueprint}
+  alias AgenticRealms.World.{Room, Player, NPCBlueprint, Region, Quest, ObjectBlueprint, Entity}
 
   alias AgenticRealms.World.Commands.{
     CreateRoom,
     AddExit,
-    PlaceObject,
     SpawnPlayer,
     MovePlayer,
-    TakeObject,
-    DropObject,
     CreateNPCBlueprint,
-    SpawnNPCClone,
     CreateRegion,
     RecordRoomDiscovery,
     AcceptQuest,
     FinalizeQuest,
     CreateObjectBlueprint,
     EditObjectBlueprint,
-    SpawnObjectFromBlueprint,
-    SpawnObjectFreeform,
-    EditObject
+    CloneEntity,
+    MoveEntity,
+    EditEntity
   }
 
   identify(Room, by: :room_id, prefix: "room-")
@@ -43,30 +39,24 @@ defmodule AgenticRealms.World.Router do
   # store can resolve the stream prefix.
   identify(ObjectBlueprint, by: :blueprint_id, prefix: "object-blueprint-")
 
-  # Phase 3 (US5) + Phase 6 (US3): room commands routed to Room.
-  # Feature 014 US2: SpawnObjectFromBlueprint also routed to Room (the
-  # destination Room aggregate owns object presence, exactly like
-  # PlaceObject).
-  dispatch(
-    [
-      CreateRoom,
-      AddExit,
-      PlaceObject,
-      TakeObject,
-      DropObject,
-      SpawnObjectFromBlueprint,
-      SpawnObjectFreeform,
-      EditObject
-    ],
-    to: Room
-  )
+  # Feature 016 — Entity lifecycle. Every movable world entity (object or
+  # NPC) is its own aggregate stream, owning its existence + current
+  # container. clone/move/edit route here. (Object/NPC spawn, take/drop, and
+  # placement are retrofitted onto these in Phases 3–4; the old Room/
+  # NPCBlueprint dispatches below are removed at that point.)
+  identify(Entity, by: :entity_id, prefix: "entity-")
+
+  # Room authoring. Object/NPC placement and take/drop moved to the Entity
+  # aggregate in feature 016, so the Room aggregate owns only rooms + exits.
+  dispatch([CreateRoom, AddExit], to: Room)
 
   # Phase 4 (US1) + Phase 5 (US2): player lifecycle + movement routed to Player.
   # Feature 012: per-player room discovery also routed to Player.
   dispatch([SpawnPlayer, MovePlayer, RecordRoomDiscovery], to: Player)
 
-  # Feature 008: NPC blueprint authoring + cloning
-  dispatch([CreateNPCBlueprint, SpawnNPCClone], to: NPCBlueprint)
+  # Feature 008: NPC blueprint authoring (clone spawning moved to the entity
+  # lifecycle in feature 016).
+  dispatch([CreateNPCBlueprint], to: NPCBlueprint)
 
   # Feature 012: region authoring
   dispatch([CreateRegion], to: Region)
@@ -77,4 +67,7 @@ defmodule AgenticRealms.World.Router do
 
   # Feature 014 US1 + US5: Object Blueprint authoring + editing.
   dispatch([CreateObjectBlueprint, EditObjectBlueprint], to: ObjectBlueprint)
+
+  # Feature 016: entity clone / move / edit — the one uniform lifecycle.
+  dispatch([CloneEntity, MoveEntity, EditEntity], to: Entity)
 end

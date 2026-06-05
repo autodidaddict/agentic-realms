@@ -137,19 +137,20 @@ defmodule AgenticRealms.Accounts do
   end
 
   defp drop_carried_objects(player_id, target_room_id) do
-    alias AgenticRealms.World.Application, as: WorldApp
-    alias AgenticRealms.World.Commands.DropObject
+    alias AgenticRealms.World.Commands, as: WorldCommands
+    alias AgenticRealms.World.ContainerRef
     alias AgenticRealms.World.Queries
 
+    # Feature 016 — relocate each carried object from the player's inventory
+    # into the target room via the entity move pathway, so a deleted player
+    # leaves no objects orphaned in a now-gone container.
     Queries.list_inventory(player_id)
     |> Enum.reduce_while(:ok, fn item, _acc ->
-      case WorldApp.dispatch(
-             %DropObject{
-               room_id: target_room_id,
-               player_id: player_id,
-               object_id: item.id
-             },
-             consistency: :strong
+      case WorldCommands.move_entity(
+             item.id,
+             ContainerRef.player(player_id),
+             ContainerRef.room(target_room_id),
+             :dropped
            ) do
         :ok -> {:cont, :ok}
         {:error, reason} -> {:halt, {:error, {:drop_object_failed, item.id, reason}}}

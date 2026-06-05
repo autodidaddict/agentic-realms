@@ -13,15 +13,19 @@ defmodule AgenticRealms.World.UIEventBroadcaster do
   per FR-029 — the broadcaster fans out to all subscribers in the relevant
   room or player scope.
 
-  Handler clauses added so far:
-    * Phase 4 (US1): PlayerSpawned → RoomPlayerArrived(from_direction: nil)
-                                     + PlayerCurrentRoomChanged(from: nil)
-    * Phase 5 (US2): PlayerMoved   → RoomPlayerLeft + RoomPlayerArrived
-                                     + PlayerCurrentRoomChanged
-    * Phase 6 (US3): ObjectTakenFromRoom → RoomObjectTaken
-                                           + PlayerInventoryChanged(:added)
-                     ObjectDroppedInRoom → RoomObjectDropped
-                                           + PlayerInventoryChanged(:removed)
+  Handler clauses:
+    * `PlayerSpawned` / `PlayerMoved` → RoomPlayerArrived / RoomPlayerLeft
+      + PlayerCurrentRoomChanged.
+    * `EntityMoved` (feature 016) → one witness mapping keyed on
+      `(kind, cause, from→to)` that reproduces every prior convention:
+      object spawn → RoomObjectArrived; take → RoomObjectTaken +
+      PlayerInventoryChanged(:added); drop → RoomObjectDropped +
+      PlayerInventoryChanged(:removed); room→room relocation →
+      RoomObjectDeparted + RoomObjectArrived; NPC spawn → RoomNPCArrived;
+      seed/quest placement and moves into the void are silent.
+    * `EntityEdited` → RoomObjectEdited (quiet).
+    * `ObjectBlueprintCreated`/`Edited`, `QuestAccepted`/`Completed` → their
+      respective UI broadcasts.
   """
 
   # `:eventual` (issue #9). The earlier `:strong` declaration was added
@@ -49,19 +53,16 @@ defmodule AgenticRealms.World.UIEventBroadcaster do
   alias AgenticRealms.World.Events.{
     PlayerSpawned,
     PlayerMoved,
-    ObjectTakenFromRoom,
-    ObjectDroppedInRoom,
-    ObjectSpawned,
-    ObjectEdited,
+    EntityMoved,
+    EntityEdited,
     ObjectBlueprintCreated,
     ObjectBlueprintEdited,
-    NPCSpawnedInRoom,
-    NPCClonedFromBlueprint,
     QuestAccepted,
     QuestCompleted
   }
 
-  alias AgenticRealms.World.Schemas.Object
+  alias AgenticRealms.World.ContainerRef
+  alias AgenticRealms.World.Schemas.{Object, NPCClone}
 
   alias AgenticRealms.World.UIEvents.{
     RoomPlayerArrived,
@@ -69,6 +70,7 @@ defmodule AgenticRealms.World.UIEventBroadcaster do
     RoomObjectTaken,
     RoomObjectDropped,
     RoomObjectArrived,
+    RoomObjectDeparted,
     RoomObjectEdited,
     RoomNPCArrived,
     WizardBlueprintRegistryChanged,
@@ -152,65 +154,34 @@ defmodule AgenticRealms.World.UIEventBroadcaster do
     :ok
   end
 
-  def handle(%ObjectTakenFromRoom{room_id: rid, player_id: pid, object_id: oid}, _meta) do
-    actor_username = lookup_username(pid)
-    {name, short} = lookup_object(oid)
-
-    Phoenix.PubSub.broadcast(@pubsub, Topics.room_topic(rid), %RoomObjectTaken{
-      room_id: rid,
-      actor_id: pid,
-      actor_username: actor_username,
-      object_id: oid,
-      object_name: name
-    })
-
-    Phoenix.PubSub.broadcast(
-      @pubsub,
-      Topics.player_topic(pid),
-      %PlayerInventoryChanged{
-        player_id: pid,
-        change: :added,
-        object_id: oid,
-        object_name: name,
-        object_short_description: short
-      }
+  # Feature 016 — one witness handler for every object relocation. Maps
+  # (cause, from→to) to the legacy UI structs so observable behavior is
+  # unchanged: wizard spawn announces arrival; seed/quest placement and
+  # moves into the void are silent; take/drop keep their room broadcasts plus
+  # the inventory + quest-progress side-broadcasts.
+  def handle(%EntityMoved{kind: kind, entity_id: oid, from: from, to: to, cause: cause}, _meta) do
+    witness_object_move(
+      norm_kind(kind),
+      cause_atom(cause),
+      ContainerRef.from_map(from),
+      ContainerRef.from_map(to),
+      oid
     )
-
-    # Feature 013 — if the taken object's quest_tag matches any of the
-    # player's active quest criteria, recompute progress and broadcast
-    # PlayerQuestProgress so the HUD card updates live.
-    broadcast_quest_progress(pid, oid)
 
     :ok
   end
 
-  def handle(%ObjectDroppedInRoom{room_id: rid, player_id: pid, object_id: oid}, _meta) do
-    actor_username = lookup_username(pid)
-    {name, short} = lookup_object(oid)
-
-    Phoenix.PubSub.broadcast(@pubsub, Topics.room_topic(rid), %RoomObjectDropped{
-      room_id: rid,
-      actor_id: pid,
-      actor_username: actor_username,
-      object_id: oid,
-      object_name: name
-    })
-
-    Phoenix.PubSub.broadcast(
-      @pubsub,
-      Topics.player_topic(pid),
-      %PlayerInventoryChanged{
-        player_id: pid,
-        change: :removed,
-        object_id: oid,
-        object_name: name,
-        object_short_description: short
-      }
-    )
-
-    # Feature 013 — symmetric to take: dropping a tagged quest item
-    # decrements the player's progress.
-    broadcast_quest_progress(pid, oid)
+  # Feature 016 — in-place entity edit; broadcast a quiet RoomObjectEdited to
+  # the object's room (if it is in one) so co-located views refresh.
+  def handle(%EntityEdited{kind: kind, entity_id: oid, fields_changed: fields_changed}, _meta) do
+    with :object <- norm_kind(kind),
+         %Object{container_type: "room", container_id: rid} <- Repo.get(Object, oid) do
+      Phoenix.PubSub.broadcast(
+        @pubsub,
+        Topics.room_topic(rid),
+        %RoomObjectEdited{room_id: rid, object_id: oid, fields_changed: fields_changed}
+      )
+    end
 
     :ok
   end
@@ -264,73 +235,9 @@ defmodule AgenticRealms.World.UIEventBroadcaster do
     :ok
   end
 
-  # Feature 014 US2 — wizard-driven object spawn. Broadcast a
-  # `RoomObjectArrived` UI event to every subscriber of the destination
-  # room topic so co-present players' narrative logs gain a system entry.
-  def handle(
-        %ObjectSpawned{
-          room_id: rid,
-          object_id: oid,
-          name: name,
-          short_description: short
-        },
-        _meta
-      ) do
-    Phoenix.PubSub.broadcast(
-      @pubsub,
-      Topics.room_topic(rid),
-      %RoomObjectArrived{
-        room_id: rid,
-        object_id: oid,
-        name: name,
-        short_description: short
-      }
-    )
-
-    :ok
-  end
-
-  # Feature 014 US5 — wizard-driven in-place edit. Broadcast a
-  # `RoomObjectEdited` on the room topic so co-located subscribers can
-  # refresh their cached views.
-  def handle(
-        %ObjectEdited{room_id: rid, object_id: oid, fields_changed: fields_changed},
-        _meta
-      ) do
-    Phoenix.PubSub.broadcast(
-      @pubsub,
-      Topics.room_topic(rid),
-      %RoomObjectEdited{room_id: rid, object_id: oid, fields_changed: fields_changed}
-    )
-
-    :ok
-  end
-
-  def handle(%NPCSpawnedInRoom{room_id: rid, npc_id: nid, name: name}, _meta) do
-    Phoenix.PubSub.broadcast(
-      @pubsub,
-      Topics.room_topic(rid),
-      %RoomNPCArrived{room_id: rid, npc_id: nid, npc_name: name}
-    )
-
-    :ok
-  end
-
-  # Feature 008: new event type emitted by the NPCBlueprint aggregate. Same
-  # downstream UI event as the legacy NPCSpawnedInRoom path so GameLive's
-  # handler is one clause covering both.
-  def handle(
-        %NPCClonedFromBlueprint{room_id: rid, clone_id: cid, name: name},
-        _meta
-      ) do
-    Phoenix.PubSub.broadcast(
-      @pubsub,
-      Topics.room_topic(rid),
-      %RoomNPCArrived{room_id: rid, npc_id: cid, npc_name: name}
-    )
-
-    :ok
-  end
+  # Feature 016 — NPC arrival is now witnessed via the unified EntityMoved
+  # handler (kind :npc, cause :spawned, void → room → RoomNPCArrived); see
+  # witness_object_move/5 below.
 
   # Feature 013 — Quests. Broadcast PlayerQuestAccepted on the player's
   # topic so GameLive can append the new active quest to its log without
@@ -405,6 +312,133 @@ defmodule AgenticRealms.World.UIEventBroadcaster do
   # quests whose criteria reference the touched object's quest_tag, and
   # broadcast PlayerQuestProgress per quest. Untouched quests trigger no
   # broadcasts. Items without a quest_tag short-circuit to a no-op.
+  # --- Feature 016 entity-move witness mapping ---------------------------
+
+  # Wizard spawn → arrival announced in the destination room.
+  defp witness_object_move(:object, :spawned, _from, %ContainerRef{type: :room, id: rid}, oid) do
+    {name, short} = lookup_object(oid)
+
+    Phoenix.PubSub.broadcast(@pubsub, Topics.room_topic(rid), %RoomObjectArrived{
+      room_id: rid,
+      object_id: oid,
+      name: name,
+      short_description: short
+    })
+  end
+
+  # take: room → player inventory.
+  defp witness_object_move(
+         :object,
+         :taken,
+         %ContainerRef{type: :room, id: rid},
+         %ContainerRef{type: :player, id: pid},
+         oid
+       ) do
+    actor_username = lookup_username(pid)
+    {name, short} = lookup_object(oid)
+
+    Phoenix.PubSub.broadcast(@pubsub, Topics.room_topic(rid), %RoomObjectTaken{
+      room_id: rid,
+      actor_id: pid,
+      actor_username: actor_username,
+      object_id: oid,
+      object_name: name
+    })
+
+    Phoenix.PubSub.broadcast(@pubsub, Topics.player_topic(pid), %PlayerInventoryChanged{
+      player_id: pid,
+      change: :added,
+      object_id: oid,
+      object_name: name,
+      object_short_description: short
+    })
+
+    broadcast_quest_progress(pid, oid)
+  end
+
+  # drop: player inventory → room.
+  defp witness_object_move(
+         :object,
+         :dropped,
+         %ContainerRef{type: :player, id: pid},
+         %ContainerRef{type: :room, id: rid},
+         oid
+       ) do
+    actor_username = lookup_username(pid)
+    {name, short} = lookup_object(oid)
+
+    Phoenix.PubSub.broadcast(@pubsub, Topics.room_topic(rid), %RoomObjectDropped{
+      room_id: rid,
+      actor_id: pid,
+      actor_username: actor_username,
+      object_id: oid,
+      object_name: name
+    })
+
+    Phoenix.PubSub.broadcast(@pubsub, Topics.player_topic(pid), %PlayerInventoryChanged{
+      player_id: pid,
+      change: :removed,
+      object_id: oid,
+      object_name: name,
+      object_short_description: short
+    })
+
+    broadcast_quest_progress(pid, oid)
+  end
+
+  # Object relocation room → room: departure in the source, arrival in the
+  # destination (feature 016, US3). No prior convention existed for this case.
+  defp witness_object_move(
+         :object,
+         :relocated,
+         %ContainerRef{type: :room, id: from_rid},
+         %ContainerRef{type: :room, id: to_rid},
+         oid
+       ) do
+    {name, short} = lookup_object(oid)
+
+    Phoenix.PubSub.broadcast(@pubsub, Topics.room_topic(from_rid), %RoomObjectDeparted{
+      room_id: from_rid,
+      object_id: oid,
+      name: name
+    })
+
+    Phoenix.PubSub.broadcast(@pubsub, Topics.room_topic(to_rid), %RoomObjectArrived{
+      room_id: to_rid,
+      object_id: oid,
+      name: name,
+      short_description: short
+    })
+  end
+
+  # NPC spawn → arrival announced in the destination room (feature 016).
+  defp witness_object_move(:npc, :spawned, _from, %ContainerRef{type: :room, id: rid}, npc_id) do
+    Phoenix.PubSub.broadcast(@pubsub, Topics.room_topic(rid), %RoomNPCArrived{
+      room_id: rid,
+      npc_id: npc_id,
+      npc_name: lookup_npc_name(npc_id)
+    })
+  end
+
+  # Seed/quest placement (:placed), moves into the void, NPC-inventory, and
+  # any not-yet-wired relocation are silent — no existing witness convention.
+  defp witness_object_move(_kind, _cause, _from, _to, _oid), do: :ok
+
+  defp lookup_npc_name(npc_id) do
+    case Repo.get(NPCClone, npc_id) do
+      %NPCClone{name: name} -> name
+      _ -> "someone"
+    end
+  end
+
+  defp norm_kind(k) when k in [:object, :npc], do: k
+  defp norm_kind("object"), do: :object
+  defp norm_kind("npc"), do: :npc
+  defp norm_kind(_), do: nil
+
+  defp cause_atom(c) when is_atom(c), do: c
+  defp cause_atom(c) when is_binary(c), do: String.to_existing_atom(c)
+
   defp broadcast_quest_progress(player_id, object_id) do
     for quest <- Quests.active_quests_referencing_object(player_id, object_id) do
       criteria = Quests.progress_for(quest)
@@ -462,7 +496,10 @@ defmodule AgenticRealms.World.UIEventBroadcaster do
   defp lookup_carried_object_ids(player_id) do
     import Ecto.Query
 
-    from(o in Object, where: o.player_id == ^player_id, select: o.id)
+    from(o in Object,
+      where: o.container_type == "player" and o.container_id == ^Integer.to_string(player_id),
+      select: o.id
+    )
     |> Repo.all()
   end
 end

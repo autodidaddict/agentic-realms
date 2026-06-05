@@ -21,7 +21,8 @@ defmodule AgenticRealms.World.Schemas.Room do
       define_field: false
 
     has_many :exits, AgenticRealms.World.Schemas.Exit, foreign_key: :source_room_id
-    has_many :objects, AgenticRealms.World.Schemas.Object, foreign_key: :room_id
+    # Feature 016 — objects are no longer joined by room_id; an object's room
+    # is its container (container_type "room" / container_id). Query directly.
 
     timestamps(type: :utc_datetime)
   end

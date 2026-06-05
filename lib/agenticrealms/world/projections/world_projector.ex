@@ -1,24 +1,20 @@
 defmodule AgenticRealms.World.Projections.WorldProjector do
   @moduledoc """
-  Projects every room / exit / object / NPC domain event into the
-  `world_rooms`, `world_exits`, `world_objects`, `npc_blueprints`, and
-  `npc_clones` Ecto-backed read models.
+  Projects room / exit / region / NPC-blueprint / quest domain events into
+  the `world_rooms`, `world_exits`, `npc_blueprints`, `regions`, and
+  `quest_instances` read models.
 
-  Event handler clauses added so far:
-    * Phase 3 (US5): RoomCreated, ExitAdded, ObjectPlacedInRoom
-    * Phase 6 (US3): ObjectTakenFromRoom, ObjectDroppedInRoom
-    * Feature 007: NPCSpawnedInRoom (REWRITTEN in 008 — see below)
-    * Feature 008: NPCBlueprintCreated, NPCClonedFromBlueprint
+  Current handlers: `RoomCreated`, `ExitAdded`, `RegionCreated`,
+  `NPCBlueprintCreated`, `PlayerDiscoveredRoom`, and `QuestAccepted` (which
+  also dispatches quest-item creation via the entity lifecycle).
+
+  **Feature 016 note**: object and NPC-clone row writes moved to
+  `EntityProjector` (from `EntityCloned`/`EntityMoved`/`EntityEdited`) when
+  spawning was unified onto clone/move. The object placement/take/drop and
+  NPC clone/legacy-replay handlers were removed from this projector.
 
   Every insert uses `on_conflict: :nothing` so the projector is safe to
   replay against a partially-populated read model.
-
-  **Feature 008 — legacy NPCSpawnedInRoom handling**: the feature 007 event
-  type is preserved in the event store; this projector handles it by
-  deriving a deterministic synthetic blueprint id, upserting a blueprint
-  row with `is_synthetic: true`, then inserting the clone with a serial
-  computed via a MAX query against the existing clones for that blueprint.
-  See `specs/008-npc-blueprints/contracts/projector.md`.
   """
 
   use Commanded.Event.Handler,
@@ -26,37 +22,26 @@ defmodule AgenticRealms.World.Projections.WorldProjector do
     name: __MODULE__,
     consistency: :strong
 
-  import Ecto.Query
-
   alias AgenticRealms.Repo
   alias AgenticRealms.World.Direction
-  alias AgenticRealms.World.Projections.SyntheticBlueprintId
 
   alias AgenticRealms.World.Events.{
     RoomCreated,
     ExitAdded,
-    ObjectPlacedInRoom,
-    ObjectSpawned,
-    ObjectEdited,
-    ObjectTakenFromRoom,
-    ObjectDroppedInRoom,
-    NPCSpawnedInRoom,
     NPCBlueprintCreated,
-    NPCClonedFromBlueprint,
     RegionCreated,
     QuestAccepted
   }
 
   alias AgenticRealms.World.Events.PlayerDiscoveredRoom, as: PlayerDiscoveredRoomEvent
   alias AgenticRealms.World.Application, as: WorldApp
-  alias AgenticRealms.World.Commands.PlaceObject
+  alias AgenticRealms.World.ContainerRef
+  alias AgenticRealms.World.Commands.{CloneEntity, MoveEntity}
 
   alias AgenticRealms.World.Schemas.{
     Room,
     Exit,
-    Object,
     NPCBlueprint,
-    NPCClone,
     Region,
     QuestInstance
   }
@@ -126,112 +111,9 @@ defmodule AgenticRealms.World.Projections.WorldProjector do
     :ok
   end
 
-  # Feature 014 US5 — wizard-driven in-place Object edit. Applies the
-  # sparse diff to the matching `world_objects` row.
-  def handle(%ObjectEdited{object_id: oid, fields_changed: fields_changed}, _meta) do
-    now = DateTime.utc_now() |> DateTime.truncate(:second)
-
-    updates =
-      fields_changed
-      |> Map.put(:updated_at, now)
-      |> Map.to_list()
-
-    import Ecto.Query
-
-    from(o in AgenticRealms.World.Schemas.Object, where: o.id == ^oid)
-    |> Repo.update_all(set: updates)
-
-    :ok
-  end
-
-  # Feature 014 US2 — wizard-driven spawn. Identical row insert to the
-  # ObjectPlacedInRoom path; the event simply carries no behaviors and
-  # no quest scoping. Idempotent replay via on_conflict: :nothing.
-  def handle(
-        %ObjectSpawned{
-          object_id: oid,
-          room_id: room_id,
-          name: name,
-          short_description: short,
-          long_description: long,
-          fixed: fixed
-        },
-        _meta
-      ) do
-    Repo.insert!(
-      %Object{
-        id: oid,
-        name: name,
-        short_description: short,
-        long_description: long,
-        fixed: fixed,
-        room_id: room_id,
-        player_id: nil,
-        behaviors: [],
-        quest_player_id: nil,
-        quest_instance_id: nil
-      },
-      on_conflict: :nothing,
-      conflict_target: :id
-    )
-
-    :ok
-  end
-
-  def handle(
-        %ObjectPlacedInRoom{
-          room_id: room_id,
-          object_id: oid,
-          name: name,
-          short_description: short,
-          long_description: long,
-          fixed: fixed,
-          behaviors: behaviors
-        } = event,
-        _meta
-      ) do
-    Repo.insert!(
-      %Object{
-        id: oid,
-        name: name,
-        short_description: short,
-        long_description: long,
-        fixed: fixed,
-        room_id: room_id,
-        player_id: nil,
-        behaviors: behaviors || [],
-        # Feature 013 — both nil for non-quest placements and for legacy
-        # events that pre-date this feature. Map.get/3 with default nil
-        # makes replay safe.
-        quest_player_id: Map.get(event, :quest_player_id),
-        quest_instance_id: Map.get(event, :quest_instance_id)
-      },
-      on_conflict: :nothing,
-      conflict_target: :id
-    )
-
-    :ok
-  end
-
-  def handle(%ObjectTakenFromRoom{player_id: pid, object_id: oid}, _meta) do
-    {1, _} =
-      Repo.update_all(
-        from(o in Object, where: o.id == ^oid),
-        set: [room_id: nil, player_id: pid, updated_at: utc_now()]
-      )
-
-    :ok
-  end
-
-  def handle(%ObjectDroppedInRoom{room_id: rid, object_id: oid}, _meta) do
-    {1, _} =
-      Repo.update_all(
-        from(o in Object, where: o.id == ^oid),
-        set: [room_id: rid, player_id: nil, updated_at: utc_now()]
-      )
-
-    :ok
-  end
+  # Feature 016 — object spawn / place / take / drop / edit moved to the
+  # entity lifecycle (`EntityProjector` handles EntityCloned/Moved/Edited).
+  # The Room aggregate no longer emits object events.
 
   # Feature 008: authored blueprints (from CreateNPCBlueprint command).
   # Feature 009: extended with :behaviors field (defaults to [] for pre-009
@@ -266,87 +148,10 @@ defmodule AgenticRealms.World.Projections.WorldProjector do
     :ok
   end
 
-  # Feature 008: clone insertion from the event's denormalized payload.
-  # The blueprint table is NOT consulted here — the event already contains
-  # the full-copy snapshot of the blueprint's data as of clone time.
-  def handle(
-        %NPCClonedFromBlueprint{
-          blueprint_id: bp_id,
-          clone_id: cid,
-          room_id: rid,
-          serial: serial,
-          name: name,
-          short_description: short,
-          long_description: long,
-          behaviors: behaviors,
-          lore: lore
-        },
-        _meta
-      ) do
-    Repo.insert!(
-      %NPCClone{
-        id: cid,
-        blueprint_id: bp_id,
-        serial: serial,
-        name: name,
-        short_description: short,
-        long_description: long,
-        room_id: rid,
-        behaviors: behaviors,
-        lore: lore || ""
-      },
-      on_conflict: :nothing,
-      conflict_target: :id
-    )
-
-    :ok
-  end
-
-  # Feature 008 — legacy event from feature 007. Synthesizes a blueprint
-  # id from the payload, upserts it, computes the next serial via MAX,
-  # then inserts the clone. Deterministic + idempotent under replay.
-  def handle(
-        %NPCSpawnedInRoom{
-          room_id: rid,
-          npc_id: nid,
-          name: name,
-          short_description: short,
-          long_description: long
-        },
-        _meta
-      ) do
-    bp_id = SyntheticBlueprintId.derive(name, short, long)
-
-    Repo.insert!(
-      %NPCBlueprint{
-        id: bp_id,
-        name: name,
-        short_description: short,
-        long_description: long,
-        is_synthetic: true
-      },
-      on_conflict: :nothing,
-      conflict_target: :id
-    )
-
-    serial = next_serial_for_blueprint(bp_id)
-
-    Repo.insert!(
-      %NPCClone{
-        id: nid,
-        blueprint_id: bp_id,
-        serial: serial,
-        name: name,
-        short_description: short,
-        long_description: long,
-        room_id: rid
-      },
-      on_conflict: :nothing,
-      conflict_target: :id
-    )
-
-    :ok
-  end
+  # Feature 016 — NPC clone spawning moved to the entity lifecycle
+  # (`EntityProjector` handles `EntityCloned`/`EntityMoved` for `:npc`). The
+  # legacy feature-007 `NPCSpawnedInRoom` replay path + synthetic blueprints
+  # are dropped (destroyable log; reseed produces clean clone/move streams).
 
   # Feature 012 — Maps. Per-player room discovery projection. Inserts with
   # `on_conflict: :nothing` so the composite-PK guarantee is leaned on for
@@ -375,10 +180,9 @@ defmodule AgenticRealms.World.Projections.WorldProjector do
 
   # Feature 013 — Quests. On QuestAccepted: (1) insert the quest_instances
   # row with state="active", (2) for each criterion, for each spawn_room_id,
-  # dispatch a PlaceObject command stamped with quest_player_id +
-  # quest_instance_id. The PlaceObject flow lands the item via the normal
-  # Room aggregate + ObjectPlacedInRoom event path — the only special
-  # thing is the visibility fields it carries.
+  # clone a quest-scoped item into the spawn room via the entity lifecycle
+  # (feature 016), carrying the quest_player_id + quest_instance_id visibility
+  # fields in the cloned payload.
   def handle(
         %QuestAccepted{
           quest_id: qid,
@@ -423,28 +227,39 @@ defmodule AgenticRealms.World.Projections.WorldProjector do
     item_long = snapshot_get(criterion, "item_long_description") || item_short
     tag = snapshot_get(criterion, "quest_tag")
 
-    # Idempotency under replay: PlaceObject's aggregate guard rejects a
-    # duplicate object_id with :object_already_in_room, but since we
-    # generate a fresh UUID each replay we would actually re-spawn. To
-    # make replay safe, derive a deterministic object id from
-    # (quest_instance_id, room_id, criterion tag) so the same triple
-    # never produces a new id on a re-run of the same event.
+    # Idempotency under replay: derive a deterministic entity id from
+    # (quest_instance_id, room_id, criterion tag) so a re-run of the same
+    # event re-clones the same id (→ :already_exists) and re-moves into the
+    # same room (→ no-op) rather than spawning a duplicate.
     deterministic_oid =
       :crypto.hash(:sha, "#{quest_instance_id}|#{room_id}|#{tag}")
       |> Base.encode16(case: :lower)
       |> binary_part(0, 32)
       |> uuid_format()
 
-    WorldApp.dispatch(%PlaceObject{
-      room_id: room_id,
-      object_id: deterministic_oid,
-      name: item_name,
-      short_description: item_short,
-      long_description: item_long,
-      fixed: false,
-      behaviors: [%{"type" => "quest_tag", "tag" => tag}],
-      quest_player_id: player_id,
-      quest_instance_id: quest_instance_id
+    # Feature 016 — quest items are cloned into existence (with quest scope
+    # frozen into the fields) then moved into the spawn room, so they are
+    # real entities the player can take. The deterministic id keeps this
+    # replay-safe (re-clone → :already_exists, re-move → no-op).
+    WorldApp.dispatch(%CloneEntity{
+      entity_id: deterministic_oid,
+      kind: :object,
+      fields: %{
+        name: item_name,
+        short_description: item_short,
+        long_description: item_long,
+        fixed: false,
+        behaviors: [%{"type" => "quest_tag", "tag" => tag}],
+        quest_player_id: player_id,
+        quest_instance_id: quest_instance_id
+      }
+    })
+
+    WorldApp.dispatch(%MoveEntity{
+      entity_id: deterministic_oid,
+      expected_from: ContainerRef.void(),
+      to: ContainerRef.room(room_id),
+      cause: :placed
     })
 
     :ok
@@ -492,15 +307,4 @@ defmodule AgenticRealms.World.Projections.WorldProjector do
     {:ok, dt, _offset} = DateTime.from_iso8601(s)
     DateTime.truncate(dt, :second)
   end
-
-  defp next_serial_for_blueprint(bp_id) do
-    from(c in NPCClone, where: c.blueprint_id == ^bp_id, select: max(c.serial))
-    |> Repo.one()
-    |> case do
-      nil -> 1
-      n -> n + 1
-    end
-  end
-
-  defp utc_now, do: DateTime.utc_now() |> DateTime.truncate(:second)
 end

@@ -63,7 +63,8 @@ defmodule AgenticRealms.World.UIEvents do
   defmodule RoomObjectEdited do
     @moduledoc """
     Feature 014 US5 — transient object-edit notice. Broadcast on
-    `room:<room_id>` when an `ObjectEdited` event fires. Quiet (no
+    `room:<room_id>` when an `EntityEdited` event fires for an object in a
+    room (feature 016). Quiet (no
     narrative log entry by default — wizard edits don't generate an
     in-fiction "the chest was modified" entry). Subscribers refresh
     their room-view caches so a subsequent `look <object>` reflects
@@ -76,7 +77,8 @@ defmodule AgenticRealms.World.UIEvents do
   defmodule RoomObjectArrived do
     @moduledoc """
     Feature 014 US2 — transient object-arrival entry. Broadcast on
-    `room:<destination>` when an `ObjectSpawned` domain event fires
+    `room:<destination>` when an object is moved into the room (an
+    `EntityMoved` with cause `:spawned` or `:relocated`, feature 016)
     while live sessions are present. Mirror of `RoomNPCArrived` from
     feature 007. Co-located players' narrative logs gain a system entry
     `<object short description> appears.`
@@ -88,6 +90,17 @@ defmodule AgenticRealms.World.UIEvents do
     """
     @enforce_keys [:room_id, :object_id, :name, :short_description]
     defstruct [:room_id, :object_id, :name, :short_description]
+  end
+
+  defmodule RoomObjectDeparted do
+    @moduledoc """
+    Feature 016 — transient object-departure entry. Broadcast on
+    `room:<source>` when an object is moved out of a room into another room
+    (`:relocated`). NOT emitted for `:taken` (which has `RoomObjectTaken`) or
+    for moves into the void. Mirror of the dormant `RoomNPCLeft`.
+    """
+    @enforce_keys [:room_id, :object_id, :name]
+    defstruct [:room_id, :object_id, :name]
   end
 
   defmodule RoomTranceEntered do
@@ -124,8 +137,9 @@ defmodule AgenticRealms.World.UIEvents do
   defmodule RoomNPCArrived do
     @moduledoc """
     Transient NPC-arrival event. Broadcast on `room:<destination>` when an
-    `NPCSpawnedInRoom` domain event fires while live sessions are present
-    in the destination room. Feature 007 FR-011 / FR-012.
+    NPC is moved into the room (an `EntityMoved` with kind `:npc`, cause
+    `:spawned`, feature 016) while live sessions are present in the
+    destination room. Feature 007 FR-011 / FR-012.
 
     Always directionless — NPCs in feature 007 do not move and have no
     source room (FR-012).

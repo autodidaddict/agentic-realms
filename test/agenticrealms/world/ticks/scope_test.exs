@@ -59,7 +59,8 @@ defmodule AgenticRealms.World.Ticks.ScopeTest do
       short_description: "a brass lantern",
       long_description: "A flickering brass lantern.",
       fixed: false,
-      room_id: room.id,
+      container_type: "room",
+      container_id: room.id,
       behaviors: behaviors
     })
   end
@@ -87,8 +88,8 @@ defmodule AgenticRealms.World.Ticks.ScopeTest do
       short_description: "a small satchel",
       long_description: "A small leather satchel.",
       fixed: false,
-      room_id: nil,
-      player_id: player.id,
+      container_type: "player",
+      container_id: Integer.to_string(player.id),
       behaviors: behaviors
     })
   end

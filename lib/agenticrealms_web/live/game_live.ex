@@ -458,7 +458,7 @@ defmodule AgenticRealmsWeb.GameLive do
       nil ->
         {:noreply, assign(socket, :blueprint_commit_error, :unknown_object)}
 
-      %{room_id: ^room_id} = obj ->
+      %{container_type: "room", container_id: ^room_id} = obj ->
         edit = %{
           object_id: obj.id,
           name: obj.name || "",
@@ -587,9 +587,9 @@ defmodule AgenticRealmsWeb.GameLive do
   def handle_event("update_object_draft", _, socket), do: {:noreply, socket}
 
   # Feature 014 US3 — commit the focused freeform-object draft.
-  # Spawns the Object into the wizard's current room via
-  # SpawnObjectFreeform — no Object Blueprint involvement, no
-  # registry change.
+  # Spawns the Object into the wizard's current room via the
+  # `spawn_object_freeform` wrapper (clone/move, feature 016) — no Object
+  # Blueprint involvement, no registry change.
   def handle_event(
         "commit_object_draft",
         _params,
@@ -672,7 +672,7 @@ defmodule AgenticRealmsWeb.GameLive do
       nil ->
         {:noreply, assign(socket, :blueprint_commit_error, :unknown_object)}
 
-      %{room_id: ^room_id} = object ->
+      %{container_type: "room", container_id: ^room_id} = object ->
         slug = AgenticRealms.World.ObjectBlueprint.Slug.derive(object.name || "")
 
         draft = %{

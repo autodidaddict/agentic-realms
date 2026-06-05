@@ -53,7 +53,8 @@ defmodule AgenticRealms.World.Commands.SpawnObjectFromBlueprintWrapperTest do
 
     assert %Object{
              id: ^object_id,
-             room_id: ^room_id,
+             container_type: "room",
+             container_id: ^room_id,
              name: "test chest",
              short_description: "a brass-bound test chest",
              fixed: false
@@ -80,8 +81,8 @@ defmodule AgenticRealms.World.Commands.SpawnObjectFromBlueprintWrapperTest do
     {:ok, id_b} = Commands.spawn_object_from_blueprint(w.id, slug, room_id)
 
     assert id_a != id_b
-    assert Repo.get(Object, id_a).room_id == room_id
-    assert Repo.get(Object, id_b).room_id == room_id
+    assert Repo.get(Object, id_a).container_id == room_id
+    assert Repo.get(Object, id_b).container_id == room_id
   end
 
   test "spawned object reflects the blueprint's CURRENT denormalized payload",
