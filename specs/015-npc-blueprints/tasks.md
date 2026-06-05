@@ -85,20 +85,20 @@ spawn flows route through it. Drop the two old tables/aggregates (reseed). Keep 
 
 ### U2 — Wrappers, queries, broadcaster
 
-- [ ] T068 `Commands.create_blueprint/2` (kind attr; slug shape + single-table uniqueness; for npc: `Toolsets.validate_behaviors` + toolset-existence) and `edit_blueprint/3` (surfaces `:stale_revision`). Replace `create_npc_blueprint`/`create_object_blueprint` call sites.
-- [ ] T069 `Commands.spawn_from_blueprint/3` — read row, `Toolsets.compose(toolsets, behaviors)` → effective (npc) / `behaviors` (object), `clone_into(kind, …, :spawned)`; per-room name-collision pre-check. Fold `spawn_object_from_blueprint` + `spawn_npc_clone`; update both seed call sites.
+- [X] T068 `Commands.create_blueprint/2` (kind attr; slug shape + single-table uniqueness; for npc: `Toolsets.validate_behaviors` + toolset-existence) and `edit_blueprint/3` (surfaces `:stale_revision`). Replace `create_npc_blueprint`/`create_object_blueprint` call sites.
+- [X] T069 `Commands.spawn_from_blueprint/3` — read row, `Toolsets.compose(toolsets, behaviors)` → effective (npc) / `behaviors` (object), `clone_into(kind, …, :spawned)`; per-room name-collision pre-check. Fold `spawn_object_from_blueprint` + `spawn_npc_clone`; update both seed call sites.
 - [ ] T070 `Commands.extract_essence/3` — read the in-world entity, `create_blueprint` at rev 1; source untouched. Fold `extract_object_essence`.
-- [ ] T071 `Queries.get_blueprint/1`, `list_blueprints/0`, `list_blueprints/1`. Remove `get_object_blueprint`/`list_object_blueprints`/`get_npc_blueprint_row` (or thin-shim).
-- [ ] T072 `UIEventBroadcaster`: one `BlueprintCreated`/`BlueprintEdited` handler → `WizardBlueprintRegistryChanged` (kind in payload). Remove the three old handlers.
+- [X] T071 `Queries.get_blueprint/1`, `list_blueprints/0`, `list_blueprints/1`. Remove `get_object_blueprint`/`list_object_blueprints`/`get_npc_blueprint_row` (or thin-shim).
+- [X] T072 `UIEventBroadcaster`: one `BlueprintCreated`/`BlueprintEdited` handler → `WizardBlueprintRegistryChanged` (kind in payload). Remove the three old handlers.
 
 ### U3 — Resolver (carry-over from T018/T019)
 
-- [ ] T073 Confirm both draft tools feed one path: object draft carries `kind: "object"`, npc draft `kind: "npc"`; commit routes on `:kind`. (Mostly done — adjust object outcome to include kind.)
+- [X] T073 Confirm both draft tools feed one path: object draft carries `kind: "object"`, npc draft `kind: "npc"`; commit routes on `:kind`. (Mostly done — adjust object outcome to include kind.)
 
 ### U4 — LiveView + components (one authoring path)
 
-- [ ] T074 `GameLive` + `game_live/wizard.ex`: one `:focused_blueprint_draft` (gains `:kind`); `commit_blueprint_draft` → `create_blueprint`/`edit_blueprint`; `spawn_here` → `spawn_from_blueprint` (kind from the row); `extract_essence`. Registry assign becomes unified `:blueprints` via `list_blueprints/0`; `patch_blueprint_registry` operates on it.
-- [ ] T075 `components/game/wizard_authoring.ex`: registry renders the unified list with a kind badge + kind-appropriate spawn/edit affordances; the draft card shows lore textarea + toolset picker + direct-behavior editor **only when `kind == "npc"`** (objects keep the 014 form).
+- [X] T074 `GameLive` + `game_live/wizard.ex`: one `:focused_blueprint_draft` (gains `:kind`); `commit_blueprint_draft` → `create_blueprint`/`edit_blueprint`; `spawn_here` → `spawn_from_blueprint` (kind from the row); `extract_essence`. Registry assign becomes unified `:blueprints` via `list_blueprints/0`; `patch_blueprint_registry` operates on it.
+- [X] T075 `components/game/wizard_authoring.ex`: registry renders the unified list with a kind badge + kind-appropriate spawn/edit affordances; the draft card shows lore textarea + toolset picker + direct-behavior editor **only when `kind == "npc"`** (objects keep the 014 form).
 
 ### U5 — Tests + green gate
 
@@ -118,13 +118,13 @@ spawn flows route through it. Drop the two old tables/aggregates (reseed). Keep 
 - [X] T017 [US1] `Commands.create_npc_blueprint/2` (`lib/agenticrealms/world/commands.ex`): `ensure_wizard`; slug regex + uniqueness **across object + npc** blueprints (FR-004); `Toolsets.validate_behaviors` + toolset-existence checks; dispatch `:strong`.
 - [X] T018 [P] [US1] Add `draft_npc_blueprint` + `list_toolsets` tool schemas to `lib/agenticrealms/world/intent_resolver/wizard_tools.ex`; the LLM chooses npc-vs-object by whether the prompt describes a character.
 - [X] T019 [US1] `IntentResolver` (`lib/agenticrealms/world/intent_resolver.ex`): extend `:blueprints`-mode resolve to return `{:ok, {:draft_npc_blueprint, fields}}` (name/short/long/lore/fixed/behaviors/toolsets); ground toolset proposals via `list_toolsets`.
-- [ ] T020 [US1] `GameLive` (`lib/agenticrealms_web/live/game_live.ex` + `game_live/wizard.ex`): draft assign gains `:kind`; `submit_wizard_prompt` npc path; `commit_blueprint_draft` branches `create_object_blueprint` vs `create_npc_blueprint`; auto-derive slug.
-- [ ] T021 [US1] `GameComponents` wizard view (`lib/agenticrealms_web/components/game/wizard_authoring.ex`): NPC draft form — lore textarea, direct-behaviors editor, **toolset picker** pre-selected from the LLM proposal, editable before commit (FR-020/FR-020a).
+- [X] T020 [US1] `GameLive` (`lib/agenticrealms_web/live/game_live.ex` + `game_live/wizard.ex`): draft assign gains `:kind`; `submit_wizard_prompt` npc path; `commit_blueprint_draft` branches `create_object_blueprint` vs `create_npc_blueprint`; auto-derive slug.
+- [X] T021 [US1] `GameComponents` wizard view (`lib/agenticrealms_web/components/game/wizard_authoring.ex`): NPC draft form — lore textarea, direct-behaviors editor, **toolset picker** pre-selected from the LLM proposal, editable before commit (FR-020/FR-020a).
 - [X] T022 [US1] `UIEventBroadcaster`: `NPCBlueprintCreated` → `WizardBlueprintRegistryChanged` on the `blueprints` topic (reuse feature 014).
 - [X] T023 [P] [US1] Aggregate tests `test/agenticrealms/world/npc_blueprint_test.exs` — create emits `NPCBlueprintCreated` kind/fixed/toolsets/revision 1; already-exists refusal.
 - [X] T024 [P] [US1] Projector tests — `NPCBlueprintCreated` row insert (kind/fixed/toolsets/revision), replay idempotent.
 - [X] T025 [P] [US1] Wrapper tests — slug uniqueness **spans object + npc** tables; non-wizard refusal; unknown-toolset + bad-behavior refusal.
-- [ ] T026 [US1] LiveView test `test/agenticrealms_web/live/wizard_npc_authoring_test.exs` (mocked LLM) — draft populates incl. toolsets; commit → registry shows the npc blueprint.
+- [X] T026 [US1] LiveView test `test/agenticrealms_web/live/wizard_npc_authoring_test.exs` (mocked LLM) — draft populates incl. toolsets; commit → registry shows the npc blueprint.
 
 **Checkpoint**: MVP — a wizard can author an NPC blueprint.
 
@@ -135,8 +135,8 @@ spawn flows route through it. Drop the two old tables/aggregates (reseed). Keep 
 **Goal**: spawn a clone from a blueprint via clone/move; co-present players witness arrival; behaviors/lore inherited.
 **Independent Test**: "Spawn here" on a registry row → clone in room; arrival witnessed; `look` shows long desc; greeting fires; `chat` replies in character.
 
-- [ ] T027 [US2] `Commands.spawn_npc_from_blueprint/3` (`commands.ex`): generalize the 016 `spawn_npc_clone/3` — read blueprint, `Toolsets.compose(toolsets, direct_behaviors)` → effective behaviors, `clone_into(:npc, %{… behaviors: effective, toolsets, direct_behaviors, lore, fixed, blueprint_id}, room, :spawned)`; pre-check room + per-room name collision (FR-013). **Update the seed call site** (`seed.ex` calls `spawn_npc_clone/3`) — either rename to `spawn_npc_from_blueprint/3` (seeded NPCs have no toolsets, so `compose([], behaviors)` is unchanged) or keep `spawn_npc_clone/3` as a thin shim — so `mix world.reset` stays green.
-- [ ] T028 [US2] `GameLive`: "Spawn here" action on an NPC registry row → `spawn_npc_from_blueprint`.
+- [X] T027 [US2] `Commands.spawn_npc_from_blueprint/3` (`commands.ex`): generalize the 016 `spawn_npc_clone/3` — read blueprint, `Toolsets.compose(toolsets, direct_behaviors)` → effective behaviors, `clone_into(:npc, %{… behaviors: effective, toolsets, direct_behaviors, lore, fixed, blueprint_id}, room, :spawned)`; pre-check room + per-room name collision (FR-013). **Update the seed call site** (`seed.ex` calls `spawn_npc_clone/3`) — either rename to `spawn_npc_from_blueprint/3` (seeded NPCs have no toolsets, so `compose([], behaviors)` is unchanged) or keep `spawn_npc_clone/3` as a thin shim — so `mix world.reset` stays green.
+- [X] T028 [US2] `GameLive`: "Spawn here" action on an NPC registry row → `spawn_npc_from_blueprint`.
 - [ ] T029 [P] [US2] Wrapper/integration tests — spawn places a clone in the room (effective behaviors = composed); per-room name-collision refusal.
 - [ ] T030 [US2] Integration test — co-present player sees `RoomNPCArrived`; `look <npc>` long description; greeting behavior fires (009); `chat <npc>` in-character reply grounded in lore (010).
 - [ ] T031 [P] [US2] Full-copy test (standalone — does not depend on US7's edit command): spawn a clone, snapshot its fields, then mutate the source `npc_blueprints` row directly via Ecto, and assert the spawned clone's row is unchanged (FR-009/SC-003). (US7's T051 additionally exercises this through the real `EditNPCBlueprint` path.)

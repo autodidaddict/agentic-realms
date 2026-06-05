@@ -147,7 +147,15 @@ defmodule AgenticRealmsWeb.GameLive do
      |> assign(:current_room_name, Map.get(room_view, :name))
      |> assign(
        :object_blueprints,
-       if(socket.assigns.current_player.is_wizard, do: Queries.list_object_blueprints(), else: [])
+       if(socket.assigns.current_player.is_wizard, do: Queries.list_blueprint_rows(), else: [])
+     )
+     # Feature 015 — toolsets available to attach to an NPC blueprint draft.
+     |> assign(
+       :toolsets,
+       if(socket.assigns.current_player.is_wizard,
+         do: AgenticRealms.World.Toolsets.list_for(:npc),
+         else: []
+       )
      )
      |> assign(
        :room_objects,
@@ -361,6 +369,7 @@ defmodule AgenticRealmsWeb.GameLive do
       )
       |> Map.put(:fixed, Map.get(params, "fixed") == "true")
       |> Map.put(:proposed_slug, proposed_slug)
+      |> put_npc_draft_fields(params)
 
     {:noreply,
      socket
@@ -397,17 +406,21 @@ defmodule AgenticRealmsWeb.GameLive do
         %{assigns: %{is_wizard: true, mode: :wizard}} = socket
       )
       when is_binary(blueprint_id) do
-    case Queries.get_object_blueprint(blueprint_id) do
+    case Queries.get_blueprint(blueprint_id) do
       nil ->
         {:noreply, assign(socket, :blueprint_commit_error, :unknown_blueprint)}
 
       bp ->
         draft = %{
           blueprint_id: bp.id,
+          kind: bp.kind,
           name: bp.name,
           short_description: bp.short_description,
           long_description: bp.long_description,
           fixed: bp.fixed,
+          lore: bp.lore || "",
+          behaviors: bp.behaviors || [],
+          toolsets: bp.toolsets || [],
           proposed_slug: bp.id,
           expected_revision: bp.revision
         }
@@ -722,16 +735,16 @@ defmodule AgenticRealmsWeb.GameLive do
         %{assigns: %{is_wizard: true, mode: :wizard, authoring_mode: :world}} = socket
       )
       when is_binary(blueprint_id) do
-    case Commands.spawn_object_from_blueprint(
+    case Commands.spawn_from_blueprint(
            socket.assigns.current_player.id,
            blueprint_id,
            socket.assigns.current_room_id
          ) do
-      {:ok, object_id} ->
-        bp = Queries.get_object_blueprint(blueprint_id)
+      {:ok, entity_id} ->
+        bp = Queries.get_blueprint(blueprint_id)
 
         feedback = %{
-          object_id: object_id,
+          object_id: entity_id,
           blueprint_id: blueprint_id,
           name: bp && bp.name,
           room_name: socket.assigns.current_room_name,
@@ -970,4 +983,15 @@ defmodule AgenticRealmsWeb.GameLive do
       show_hud: true
     }
   end
+
+  # Feature 015 — npc drafts carry lore + a toolset multi-select. Checkboxes
+  # only submit when checked, so an absent `toolsets` means "none selected".
+  # Object drafts have no such fields and are left untouched.
+  defp put_npc_draft_fields(%{kind: "npc"} = draft, params) do
+    draft
+    |> Map.put(:lore, Map.get(params, "lore", Map.get(draft, :lore, "")) || "")
+    |> Map.put(:toolsets, params |> Map.get("toolsets", []) |> List.wrap())
+  end
+
+  defp put_npc_draft_fields(draft, _params), do: draft
 end

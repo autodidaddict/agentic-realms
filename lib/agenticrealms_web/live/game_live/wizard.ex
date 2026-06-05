@@ -24,28 +24,40 @@ defmodule AgenticRealmsWeb.GameLive.Wizard do
   refreshes the registry on success, surfaces the error otherwise.
   """
   def commit_blueprint_create(socket, draft) do
-    attrs = %{
-      wizard_id: socket.assigns.current_player.id,
-      blueprint_id: Map.get(draft, :proposed_slug, ""),
-      name: Map.get(draft, :name, ""),
-      short_description: Map.get(draft, :short_description, ""),
-      long_description: Map.get(draft, :long_description, ""),
-      fixed: Map.get(draft, :fixed, false)
-    }
+    kind = Map.get(draft, :kind, "object")
 
-    case Commands.create_object_blueprint(attrs) do
+    attrs =
+      %{
+        wizard_id: socket.assigns.current_player.id,
+        blueprint_id: Map.get(draft, :proposed_slug, ""),
+        kind: kind,
+        name: Map.get(draft, :name, ""),
+        short_description: Map.get(draft, :short_description, ""),
+        long_description: Map.get(draft, :long_description, ""),
+        fixed: Map.get(draft, :fixed, false),
+        lore: Map.get(draft, :lore, ""),
+        behaviors: Map.get(draft, :behaviors, []),
+        toolsets: Map.get(draft, :toolsets, [])
+      }
+
+    case Commands.create_blueprint(attrs) do
       {:ok, _slug} ->
         {:noreply,
          socket
          |> assign(:focused_blueprint_draft, nil)
          |> assign(:blueprint_commit_error, nil)
          |> assign(:wizard_prompt, "")
-         |> assign(:object_blueprints, Queries.list_object_blueprints())}
+         |> assign(:object_blueprints, Queries.list_blueprint_rows())}
 
       {:error, reason} ->
-        {:noreply, assign(socket, :blueprint_commit_error, reason)}
+        {:noreply, assign(socket, :blueprint_commit_error, normalize_error(reason))}
     end
   end
+
+  # `create_blueprint` can return `{:error, {:unknown_toolset, name}}`; surface
+  # a flat atom the component's `format_commit_error/1` already understands.
+  defp normalize_error({:unknown_toolset, _name}), do: :unknown_toolset
+  defp normalize_error(reason), do: reason
 
   @doc """
   Feature 014 US5 commit-edit. Stale-revision response reloads the
@@ -71,17 +83,21 @@ defmodule AgenticRealmsWeb.GameLive.Wizard do
          socket
          |> assign(:focused_blueprint_draft, nil)
          |> assign(:blueprint_commit_error, nil)
-         |> assign(:object_blueprints, Queries.list_object_blueprints())}
+         |> assign(:object_blueprints, Queries.list_blueprint_rows())}
 
       {:error, :stale_revision, current_revision: current} ->
-        bp = Queries.get_object_blueprint(blueprint_id)
+        bp = Queries.get_blueprint(blueprint_id)
 
         fresh_draft = %{
           blueprint_id: bp.id,
+          kind: bp.kind,
           name: bp.name,
           short_description: bp.short_description,
           long_description: bp.long_description,
           fixed: bp.fixed,
+          lore: bp.lore || "",
+          behaviors: bp.behaviors || [],
+          toolsets: bp.toolsets || [],
           proposed_slug: bp.id,
           expected_revision: current
         }
@@ -110,14 +126,31 @@ defmodule AgenticRealmsWeb.GameLive.Wizard do
   def apply_resolver_outcome(socket, result) do
     case result do
       {:ok, {:draft_blueprint, fields}} ->
-        slug = Slug.derive(fields.name)
-
         draft = %{
+          kind: "object",
           name: fields.name,
           short_description: fields.short_description,
           long_description: fields.long_description,
           fixed: fields.fixed,
-          proposed_slug: slug
+          proposed_slug: Slug.derive(fields.name)
+        }
+
+        {:noreply,
+         socket
+         |> assign(:focused_blueprint_draft, draft)
+         |> assign(:blueprint_commit_error, nil)}
+
+      {:ok, {:draft_npc_blueprint, fields}} ->
+        draft = %{
+          kind: "npc",
+          name: fields.name,
+          short_description: fields.short_description,
+          long_description: fields.long_description,
+          fixed: fields.fixed,
+          lore: Map.get(fields, :lore, ""),
+          behaviors: Map.get(fields, :behaviors, []),
+          toolsets: Map.get(fields, :toolsets, []),
+          proposed_slug: Slug.derive(fields.name)
         }
 
         {:noreply,

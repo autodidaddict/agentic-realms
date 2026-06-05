@@ -85,7 +85,11 @@ defmodule AgenticRealmsWeb.WizardSpawnTest do
     # The object exists in world_objects, located in the starting room,
     # carrying the blueprint's denormalized payload — and no blueprint_id.
     row =
-      Repo.get_by(Object, name: "spawn chest", room_id: Seed.starting_room_id())
+      Repo.get_by(Object,
+        name: "spawn chest",
+        container_type: "room",
+        container_id: Seed.starting_room_id()
+      )
 
     refute is_nil(row)
     refute Map.has_key?(Map.from_struct(row), :blueprint_id)

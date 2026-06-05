@@ -27,6 +27,7 @@ defmodule AgenticRealmsWeb.GameComponents.WizardAuthoring do
   attr :focused_object_draft, :map, default: nil
   attr :focused_object_edit, :map, default: nil
   attr :object_blueprints, :list, required: true
+  attr :toolsets, :list, default: []
   attr :room_objects, :list, default: []
   attr :wizard_prompt, :string, required: true
   attr :wizard_input_locked, :boolean, required: true
@@ -69,7 +70,7 @@ defmodule AgenticRealmsWeb.GameComponents.WizardAuthoring do
           <div class="w-input-wrap">
             <div class="w-prompt-label">
               <span class="hint">
-                Describe an object archetype — the model extracts its name, descriptions, and fixed flag onto the form. Refine and commit.
+                Describe an object archetype or a character — the model extracts its fields (an NPC also gets lore + proposed toolsets) onto the form. Refine and commit.
               </span>
             </div>
             <form phx-submit="submit_wizard_prompt" phx-change="update_wizard_prompt">
@@ -220,6 +221,7 @@ defmodule AgenticRealmsWeb.GameComponents.WizardAuthoring do
             <div class="w-pane-body">
               <.blueprint_draft_form
                 draft={@focused_blueprint_draft}
+                toolsets={@toolsets}
                 commit_error={@blueprint_commit_error}
               />
             </div>
@@ -368,6 +370,13 @@ defmodule AgenticRealmsWeb.GameComponents.WizardAuthoring do
                       title="Edit this blueprint"
                     >
                       <strong>{bp.name}</strong>
+                      <span
+                        class="bp-kind-badge"
+                        data-testid={"blueprint-kind-#{bp.id}"}
+                        style={"font-size: 9px; text-transform: uppercase; letter-spacing: 0.06em; padding: 1px 5px; border-radius: 3px; border: 1px solid var(--rule); color: var(--ink-faint); #{if bp.kind == "npc", do: "border-color: var(--accent, #8a6d3b);"}"}
+                      >
+                        {bp.kind}
+                      </span>
                       <span style="color: var(--ink-faint); font-size: 11px;">
                         {bp.id} · rev {bp.revision}
                       </span>
@@ -399,6 +408,7 @@ defmodule AgenticRealmsWeb.GameComponents.WizardAuthoring do
   end
 
   attr :draft, :map, required: true
+  attr :toolsets, :list, default: []
   attr :commit_error, :any, default: nil
 
   defp blueprint_draft_form(assigns) do
@@ -452,6 +462,49 @@ defmodule AgenticRealmsWeb.GameComponents.WizardAuthoring do
         >{@draft.long_description}</textarea>
       </div>
 
+      <%= if Map.get(@draft, :kind) == "npc" do %>
+        <div class="bp-field">
+          <label class="bp-field-label">
+            Lore <span class="bp-field-hint">private — grounds the NPC's conversation</span>
+          </label>
+          <textarea
+            name="draft[lore]"
+            rows="4"
+            class="bp-input bp-input--multiline"
+            data-testid="blueprint-lore"
+          >{Map.get(@draft, :lore, "")}</textarea>
+        </div>
+
+        <div class="bp-field">
+          <label class="bp-field-label">
+            Toolsets <span class="bp-field-hint">behavior groups to attach</span>
+          </label>
+          <%= if @toolsets == [] do %>
+            <div class="bp-field-hint">No toolsets registered.</div>
+          <% else %>
+            <div
+              data-testid="blueprint-toolsets"
+              style="display: flex; flex-direction: column; gap: 4px;"
+            >
+              <label :for={ts <- @toolsets} class="bp-fixed-toggle">
+                <input
+                  type="checkbox"
+                  name="draft[toolsets][]"
+                  value={ts.name}
+                  checked={ts.name in (Map.get(@draft, :toolsets, []) || [])}
+                />
+                <strong>{ts.name}</strong>
+                <%= if ts.description do %>
+                  <span style="color: var(--ink-faint); font-size: 11px;">
+                    — {ts.description}
+                  </span>
+                <% end %>
+              </label>
+            </div>
+          <% end %>
+        </div>
+      <% end %>
+
       <div class="bp-field">
         <label class="bp-fixed-toggle">
           <input
@@ -464,7 +517,12 @@ defmodule AgenticRealmsWeb.GameComponents.WizardAuthoring do
             name="draft[fixed]"
             value="true"
             checked={@draft.fixed}
-          /> Fixed (cannot be picked up)
+          />
+          <%= if Map.get(@draft, :kind) == "npc" do %>
+            Fixed (cannot be moved)
+          <% else %>
+            Fixed (cannot be picked up)
+          <% end %>
         </label>
       </div>
 
@@ -600,6 +658,9 @@ defmodule AgenticRealmsWeb.GameComponents.WizardAuthoring do
 
   defp format_commit_error(:slug_already_exists),
     do: "A blueprint with that slug already exists. Choose a different slug."
+
+  defp format_commit_error(:unknown_toolset),
+    do: "One of the selected toolsets no longer exists. Reload and try again."
 
   defp format_commit_error(:name_required), do: "Name is required."
   defp format_commit_error(:short_description_required), do: "Short description is required."

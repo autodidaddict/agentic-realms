@@ -122,7 +122,8 @@ defmodule AgenticRealmsWeb.WizardExtractTest do
     assert before_row.short_description == after_row.short_description
     assert before_row.long_description == after_row.long_description
     assert before_row.fixed == after_row.fixed
-    assert before_row.room_id == after_row.room_id
+    assert before_row.container_type == after_row.container_type
+    assert before_row.container_id == after_row.container_id
   end
 
   test "extract while in :blueprints mode is refused (only available in :world mode)",

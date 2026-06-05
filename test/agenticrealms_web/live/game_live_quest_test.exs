@@ -36,6 +36,7 @@ defmodule AgenticRealmsWeb.GameLiveQuestTest do
   @old_grove_room_id "00000000-0000-4000-8000-000000000009"
   @wild_apple_room_id "00000000-0000-4000-8000-00000000000a"
   @forgotten_corner_room_id "00000000-0000-4000-8000-00000000000b"
+  @alice_spawn_rooms [@old_grove_room_id, @wild_apple_room_id, @forgotten_corner_room_id]
 
   setup %{conn: conn} do
     try do
@@ -110,6 +111,11 @@ defmodule AgenticRealmsWeb.GameLiveQuestTest do
 
     assert alice_pid_db == alice.id
 
+    # Quest-item spawns are projected asynchronously (EntityProjector reacts to
+    # the clone/move events the QuestAccepted handler dispatches); under
+    # full-suite load that lags, so wait for all three before reading.
+    wait_for_quest_items(@alice_spawn_rooms, alice_qid, 1)
+
     # Three apples spawned, one per spawn room, scoped to Alice.
     [alice_apple_old] = quest_objects_in_room(@old_grove_room_id, alice_qid)
     [alice_apple_wild] = quest_objects_in_room(@wild_apple_room_id, alice_qid)
@@ -125,9 +131,17 @@ defmodule AgenticRealmsWeb.GameLiveQuestTest do
 
     assert bob_qid != alice_qid
 
+    wait_for_quest_items(@alice_spawn_rooms, bob_qid, 1)
+
     # Each spawn room now contains TWO apples (one per quest instance);
     # the per-viewer query filters them per player.
-    assert 2 == Repo.aggregate(from(o in Object, where: o.room_id == ^@old_grove_room_id), :count)
+    assert 2 ==
+             Repo.aggregate(
+               from(o in Object,
+                 where: o.container_type == "room" and o.container_id == ^@old_grove_room_id
+               ),
+               :count
+             )
 
     # Per-viewer rendering filters correctly:
     alice_visible = Queries.list_objects_in_room_for_viewer(@old_grove_room_id, alice.id)
@@ -209,7 +223,11 @@ defmodule AgenticRealmsWeb.GameLiveQuestTest do
 
     bob_apples_count =
       Repo.aggregate(
-        from(o in Object, where: o.quest_instance_id == ^bob_qid and o.player_id == ^bob.id),
+        from(o in Object,
+          where:
+            o.quest_instance_id == ^bob_qid and o.container_type == "player" and
+              o.container_id == ^Integer.to_string(bob.id)
+        ),
         :count
       )
 
@@ -218,7 +236,9 @@ defmodule AgenticRealmsWeb.GameLiveQuestTest do
 
     bob_room_apples =
       Repo.aggregate(
-        from(o in Object, where: o.quest_instance_id == ^bob_qid and not is_nil(o.room_id)),
+        from(o in Object,
+          where: o.quest_instance_id == ^bob_qid and o.container_type == "room"
+        ),
         :count
       )
 
@@ -229,13 +249,39 @@ defmodule AgenticRealmsWeb.GameLiveQuestTest do
   # ── helpers ────────────────────────────────────────────────────────
 
   defp objects_in_room(room_id) do
-    Repo.all(from(o in Object, where: o.room_id == ^room_id))
+    Repo.all(from(o in Object, where: o.container_type == "room" and o.container_id == ^room_id))
+  end
+
+  # Quest items spawn via async EntityProjector writes; poll until each room
+  # holds the expected count so the reads below don't race the projection.
+  defp wait_for_quest_items(room_ids, quest_id, per_room, timeout_ms \\ 3_000) do
+    deadline = System.monotonic_time(:millisecond) + timeout_ms
+    do_wait_for_quest_items(room_ids, quest_id, per_room, deadline)
+  end
+
+  defp do_wait_for_quest_items(room_ids, quest_id, per_room, deadline) do
+    ready? =
+      Enum.all?(room_ids, fn r -> length(quest_objects_in_room(r, quest_id)) >= per_room end)
+
+    cond do
+      ready? ->
+        :ok
+
+      System.monotonic_time(:millisecond) > deadline ->
+        :ok
+
+      true ->
+        Process.sleep(20)
+        do_wait_for_quest_items(room_ids, quest_id, per_room, deadline)
+    end
   end
 
   defp quest_objects_in_room(room_id, quest_id) do
     Repo.all(
       from(o in Object,
-        where: o.room_id == ^room_id and o.quest_instance_id == ^quest_id
+        where:
+          o.container_type == "room" and o.container_id == ^room_id and
+            o.quest_instance_id == ^quest_id
       )
     )
   end

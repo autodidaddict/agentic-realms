@@ -568,6 +568,15 @@ defmodule AgenticRealms.World.Queries do
   end
 
   @doc """
+  Feature 015 — all Blueprint rows (both kinds) as full schema structs,
+  ordered by name then id. Backs the wizard's unified registry pane.
+  """
+  @spec list_blueprint_rows() :: [%Blueprint{}]
+  def list_blueprint_rows do
+    Repo.all(from(b in Blueprint, order_by: [asc: b.name, asc: b.id]))
+  end
+
+  @doc """
   List all Object Blueprints, ordered by name (transitional helper —
   callers migrate to `list_blueprints/0,1`).
   """
