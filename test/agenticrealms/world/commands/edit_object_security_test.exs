@@ -134,8 +134,9 @@ defmodule AgenticRealms.World.Commands.EditObjectSecurityTest do
 
       slug = "quest_extract_attempt_#{suffix}"
 
-      assert {:error, :unknown_object} =
-               Commands.extract_object_essence(w.id, object_id, slug)
+      # A quest-scoped object is not extractable (filtered out → unknown entity).
+      assert {:error, :unknown_entity} =
+               Commands.extract_essence(w.id, object_id, slug)
 
       # No blueprint persisted.
       assert is_nil(Repo.get(Blueprint, slug))

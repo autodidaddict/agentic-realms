@@ -86,7 +86,7 @@ defmodule AgenticRealms.World.Commands.ExtractNpcEssenceTest do
     before = Repo.get(NPCClone, clone_id)
     new_slug = "extracted_#{suffix}"
 
-    assert {:ok, ^new_slug} = Commands.extract_npc_essence(wizard.id, clone_id, new_slug)
+    assert {:ok, ^new_slug} = Commands.extract_essence(wizard.id, clone_id, new_slug)
 
     bp = Queries.get_npc_blueprint_row(new_slug)
     assert bp.kind == "npc"
@@ -112,11 +112,11 @@ defmodule AgenticRealms.World.Commands.ExtractNpcEssenceTest do
 
   test "refuses a non-wizard caller", %{non_wizard: nw, clone_id: clone_id, suffix: suffix} do
     assert {:error, :not_a_wizard} =
-             Commands.extract_npc_essence(nw.id, clone_id, "nope_#{suffix}")
+             Commands.extract_essence(nw.id, clone_id, "nope_#{suffix}")
   end
 
-  test "refuses an unknown clone id", %{wizard: wizard, suffix: suffix} do
-    assert {:error, :unknown_npc} =
-             Commands.extract_npc_essence(wizard.id, Ecto.UUID.generate(), "ghost_#{suffix}")
+  test "refuses an unknown entity id", %{wizard: wizard, suffix: suffix} do
+    assert {:error, :unknown_entity} =
+             Commands.extract_essence(wizard.id, Ecto.UUID.generate(), "ghost_#{suffix}")
   end
 end

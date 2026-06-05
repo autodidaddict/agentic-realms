@@ -1016,74 +1016,70 @@ defmodule AgenticRealms.World.Commands do
   end
 
   @doc """
-  One-shot extract-essence — read a world Object's denormalized fields
-  and persist a new Object Blueprint at `revision: 1` populated with a
-  wholesale copy of those fields (FR-016 / FR-018). The source Object
-  is NOT modified.
+  One-shot extract-essence — read an in-world entity's denormalized fields and
+  persist a new Blueprint at `revision: 1` (FR-012 / FR-016 / FR-018). The
+  source entity is NOT modified. The entity kind is detected from its id: a
+  world Object yields an object blueprint; an NPC clone yields an npc blueprint
+  (copying its lore + DIRECT behaviors + toolset names, so the new blueprint
+  recomposes the same effective set — not the frozen union).
 
-  Returns `{:ok, blueprint_id}` on success.
-  Refusals:
+  Returns `{:ok, blueprint_id}`. Refusals:
     * `{:error, :not_a_wizard}` / `{:error, :unknown_player}`.
-    * `{:error, :unknown_object}` — `source_object_id` not in `world_objects`.
-    * `{:error, :invalid_slug}` / `{:error, :slug_already_exists}` —
-      same as `create_object_blueprint/2`.
+    * `{:error, :unknown_entity}` — `entity_id` is not an extractable object or
+      NPC clone (incl. a quest-scoped object, which wizards do not extract).
+    * `{:error, :invalid_slug}` / `{:error, :slug_already_exists}`.
+    * (npc) `{:error, {:unknown_toolset, name}}` / a feature-009 behavior error.
 
-  Intended for use from `iex` or test setup; the LiveView path
-  (`handle_event("extract_essence", ...)`) instead populates the
-  Interpreted Data card and lets the wizard refine the draft before
-  dispatching via the normal `commit_blueprint_draft` flow.
+  Intended for `iex` / test setup; the LiveView paths (`extract_essence` /
+  `extract_npc_essence` events) instead pre-populate the trance card and let the
+  wizard refine the draft before the normal `commit_blueprint_draft` flow.
   """
-  @spec extract_object_essence(
-          wizard_id :: integer(),
-          source_object_id :: String.t(),
-          proposed_slug :: String.t()
-        ) :: {:ok, String.t()} | {:error, atom()}
-  def extract_object_essence(wizard_id, source_object_id, proposed_slug)
-      when is_integer(wizard_id) and is_binary(source_object_id) and is_binary(proposed_slug) do
+  @spec extract_essence(integer(), String.t(), String.t()) ::
+          {:ok, String.t()} | {:error, term()}
+  def extract_essence(wizard_id, entity_id, proposed_slug)
+      when is_integer(wizard_id) and is_binary(entity_id) and is_binary(proposed_slug) do
     with :ok <- ensure_wizard(wizard_id),
-         {:ok, object} <- fetch_object(source_object_id) do
-      create_object_blueprint(%{
-        wizard_id: wizard_id,
-        blueprint_id: proposed_slug,
-        name: object.name,
-        short_description: object.short_description,
-        long_description: object.long_description,
-        fixed: object.fixed
-      })
+         {:ok, source} <- fetch_extractable_entity(entity_id) do
+      case source do
+        {:object, object} ->
+          create_object_blueprint(%{
+            wizard_id: wizard_id,
+            blueprint_id: proposed_slug,
+            name: object.name,
+            short_description: object.short_description,
+            long_description: object.long_description,
+            fixed: object.fixed
+          })
+
+        {:npc, clone} ->
+          create_npc_blueprint(%{
+            wizard_id: wizard_id,
+            blueprint_id: proposed_slug,
+            name: clone.name,
+            short_description: clone.short_description,
+            long_description: clone.long_description,
+            lore: clone.lore || "",
+            fixed: clone.fixed,
+            behaviors: clone.direct_behaviors || [],
+            toolsets: clone.toolsets || []
+          })
+      end
     end
   end
 
-  @doc """
-  Feature 015 US6 — one-shot extract-essence from an in-world NPC clone:
-  read its denormalized `name/short/long/lore/fixed/toolsets/direct_behaviors`
-  and persist a new NPC Blueprint at `revision: 1` (FR-012). The source clone
-  is NOT modified. The clone's DIRECT behaviors + toolset names carry over (so
-  the new blueprint recomposes the same effective set), not its frozen union.
+  # Resolve an entity id to an extractable world Object or NPC clone. A
+  # quest-scoped object is filtered out by `fetch_object/1`, so it falls
+  # through to `:unknown_entity`.
+  defp fetch_extractable_entity(entity_id) do
+    case fetch_object(entity_id) do
+      {:ok, object} ->
+        {:ok, {:object, object}}
 
-  Returns `{:ok, blueprint_id}`. Refusals mirror `create_npc_blueprint/2`
-  plus `{:error, :unknown_npc}` when the clone id is unknown.
-
-  Intended for `iex` / test setup; the LiveView path
-  (`handle_event("extract_npc_essence", ...)`) instead pre-populates the trance
-  card and lets the wizard refine before committing.
-  """
-  @spec extract_npc_essence(integer(), String.t(), String.t()) ::
-          {:ok, String.t()} | {:error, atom()} | {:error, {:unknown_toolset, String.t()}}
-  def extract_npc_essence(wizard_id, source_clone_id, proposed_slug)
-      when is_integer(wizard_id) and is_binary(source_clone_id) and is_binary(proposed_slug) do
-    with :ok <- ensure_wizard(wizard_id),
-         {:ok, clone} <- fetch_npc_clone_row(source_clone_id) do
-      create_npc_blueprint(%{
-        wizard_id: wizard_id,
-        blueprint_id: proposed_slug,
-        name: clone.name,
-        short_description: clone.short_description,
-        long_description: clone.long_description,
-        lore: clone.lore || "",
-        fixed: clone.fixed,
-        behaviors: clone.direct_behaviors || [],
-        toolsets: clone.toolsets || []
-      })
+      {:error, _} ->
+        case fetch_npc_clone_row(entity_id) do
+          {:ok, clone} -> {:ok, {:npc, clone}}
+          {:error, _} -> {:error, :unknown_entity}
+        end
     end
   end
 

@@ -87,7 +87,7 @@ spawn flows route through it. Drop the two old tables/aggregates (reseed). Keep 
 
 - [X] T068 `Commands.create_blueprint/2` (kind attr; slug shape + single-table uniqueness; for npc: `Toolsets.validate_behaviors` + toolset-existence) and `edit_blueprint/3` (surfaces `:stale_revision`). Replace `create_npc_blueprint`/`create_object_blueprint` call sites.
 - [X] T069 `Commands.spawn_from_blueprint/3` — read row, `Toolsets.compose(toolsets, behaviors)` → effective (npc) / `behaviors` (object), `clone_into(kind, …, :spawned)`; per-room name-collision pre-check. Fold `spawn_object_from_blueprint` + `spawn_npc_clone`; update both seed call sites.
-- [~] T070 `Commands.extract_essence/3` — read the in-world entity, `create_blueprint` at rev 1; source untouched. Fold `extract_object_essence`. (DONE functionally: extract_npc_essence + extract_object_essence both ship + tested; not folded into one fn — both work for their kind.)
+- [X] T070 `Commands.extract_essence/3` — read the in-world entity, `create_blueprint` at rev 1; source untouched. Fold `extract_object_essence`.
 - [X] T071 `Queries.get_blueprint/1`, `list_blueprints/0`, `list_blueprints/1`. Remove `get_object_blueprint`/`list_object_blueprints`/`get_npc_blueprint_row` (or thin-shim).
 - [X] T072 `UIEventBroadcaster`: one `BlueprintCreated`/`BlueprintEdited` handler → `WizardBlueprintRegistryChanged` (kind in payload). Remove the three old handlers.
 
