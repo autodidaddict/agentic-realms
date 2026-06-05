@@ -192,14 +192,14 @@ spawn flows route through it. Drop the two old tables/aggregates (reseed). Keep 
 **Goal**: revision-tracked, optimistically-locked blueprint edits; in-place clone edits; no retro-propagation.
 **Independent Test**: edit blueprint lore → revision N→N+1; concurrent stale edit refused; edit a clone field → only that clone changes.
 
-- [ ] T044 [P] [US7] Create `lib/agenticrealms/world/commands/edit_npc_blueprint.ex` (`blueprint_id, wizard_id, expected_revision, fields_changed`) + event `events/npc_blueprint_edited.ex`.
-- [ ] T045 [US7] `NPCBlueprint.execute/2` `EditNPCBlueprint` clause — optimistic lock (`:stale_revision`), editable-field allowlist (`:invalid_field`), no-op skip, `revision: N+1`; `apply/2` merge. (mirror `ObjectBlueprint`)
-- [ ] T046 [US7] `NPCBlueprintProjector` `NPCBlueprintEdited` handler — sparse merge + revision, replay-guard.
-- [ ] T047 [US7] `Commands.edit_npc_blueprint/3` wrapper (authz; surfaces stale revision).
-- [ ] T048 [US7] Wire `EntityProjector` `:npc` `EntityEdited` branch (currently no-op) to apply the sparse diff to `npc_clones`; add `Commands.edit_npc/3` (`ensure_wizard` + co-location → `EditEntity`).
-- [ ] T049 [US7] `GameLive`: focus/edit an NPC blueprint (form) + edit an in-world NPC clone in place.
-- [ ] T050 [P] [US7] Aggregate edit tests `test/agenticrealms/world/npc_blueprint_edit_test.exs` — revision bump on change, no-op `:ok`, `:stale_revision`, `:invalid_field`.
-- [ ] T051 [P] [US7] Integration tests — concurrent blueprint edit (second gets stale-revision); in-place clone edit changes only that clone; blueprint edit does not alter previously-spawned clones (FR-009/FR-017).
+- [X] T044 [P] [US7] Create `lib/agenticrealms/world/commands/edit_npc_blueprint.ex` (`blueprint_id, wizard_id, expected_revision, fields_changed`) + event `events/npc_blueprint_edited.ex`.
+- [X] T045 [US7] `NPCBlueprint.execute/2` `EditNPCBlueprint` clause — optimistic lock (`:stale_revision`), editable-field allowlist (`:invalid_field`), no-op skip, `revision: N+1`; `apply/2` merge. (mirror `ObjectBlueprint`)
+- [X] T046 [US7] `NPCBlueprintProjector` `NPCBlueprintEdited` handler — sparse merge + revision, replay-guard.
+- [X] T047 [US7] `Commands.edit_npc_blueprint/3` wrapper (authz; surfaces stale revision).
+- [X] T048 [US7] Wire `EntityProjector` `:npc` `EntityEdited` branch (currently no-op) to apply the sparse diff to `npc_clones`; add `Commands.edit_npc/3` (`ensure_wizard` + co-location → `EditEntity`).
+- [X] T049 [US7] `GameLive`: focus/edit an NPC blueprint (form) + edit an in-world NPC clone in place.
+- [X] T050 [P] [US7] Aggregate edit tests `test/agenticrealms/world/npc_blueprint_edit_test.exs` — revision bump on change, no-op `:ok`, `:stale_revision`, `:invalid_field`.
+- [X] T051 [P] [US7] Integration tests — concurrent blueprint edit (second gets stale-revision); in-place clone edit changes only that clone; blueprint edit does not alter previously-spawned clones (FR-009/FR-017).
 
 ---
 

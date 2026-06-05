@@ -81,12 +81,24 @@ defmodule AgenticRealmsWeb.GameLive.Wizard do
   def commit_blueprint_edit(socket, draft, expected_revision) do
     blueprint_id = Map.get(draft, :blueprint_id) || Map.get(draft, :proposed_slug)
 
-    fields_changed = %{
+    base = %{
       name: Map.get(draft, :name, ""),
       short_description: Map.get(draft, :short_description, ""),
       long_description: Map.get(draft, :long_description, ""),
       fixed: Map.get(draft, :fixed, false)
     }
+
+    # NPC blueprints also edit lore + toolsets + direct behaviors.
+    fields_changed =
+      if Map.get(draft, :kind) == "npc" do
+        Map.merge(base, %{
+          lore: Map.get(draft, :lore, ""),
+          toolsets: Map.get(draft, :toolsets, []),
+          behaviors: draft |> Map.get(:behaviors, []) |> drop_blank_behaviors()
+        })
+      else
+        base
+      end
 
     case Commands.edit_object_blueprint(
            socket.assigns.current_player.id,

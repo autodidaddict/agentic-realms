@@ -26,6 +26,7 @@ defmodule AgenticRealmsWeb.GameComponents.WizardAuthoring do
   attr :focused_blueprint_draft, :map, default: nil
   attr :focused_object_draft, :map, default: nil
   attr :focused_object_edit, :map, default: nil
+  attr :focused_npc_edit, :map, default: nil
   attr :object_blueprints, :list, required: true
   attr :toolsets, :list, default: []
   attr :room_objects, :list, default: []
@@ -277,6 +278,33 @@ defmodule AgenticRealmsWeb.GameComponents.WizardAuthoring do
           </section>
         <% end %>
 
+        <%= if @authoring_mode == :world and @focused_npc_edit do %>
+          <section class="w-pane">
+            <div class="w-pane-head">
+              <div class="lbl">Edit NPC · in this room</div>
+              <div style="font-size: 10px; color: var(--ink-faint); letter-spacing: 0.08em; text-transform: uppercase;">
+                in-place
+              </div>
+            </div>
+            <div class="w-pane-body">
+              <.npc_edit_form edit={@focused_npc_edit} commit_error={@blueprint_commit_error} />
+              <div class="w-footer" style="margin-top: 12px;">
+                <div class="meta">
+                  <span>{@focused_npc_edit.clone_id}</span>
+                </div>
+                <div class="actions">
+                  <button type="button" class="btn-ghost" phx-click="discard_npc_edit">
+                    Discard
+                  </button>
+                  <button type="button" class="btn-primary" phx-click="commit_npc_edit">
+                    Commit
+                  </button>
+                </div>
+              </div>
+            </div>
+          </section>
+        <% end %>
+
         <%= if @authoring_mode == :world do %>
           <section class="w-pane">
             <div class="w-pane-head">
@@ -371,6 +399,16 @@ defmodule AgenticRealmsWeb.GameComponents.WizardAuthoring do
                         type="button"
                         class="btn-ghost"
                         style="margin-left: auto; font-size: 11px; padding: 2px 8px;"
+                        phx-click="focus_npc_for_edit"
+                        phx-value-clone_id={npc.id}
+                        data-testid={"edit-npc-#{npc.id}"}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        class="btn-ghost"
+                        style="font-size: 11px; padding: 2px 8px;"
                         phx-click="extract_npc_essence"
                         phx-value-clone_id={npc.id}
                         data-testid={"extract-npc-#{npc.id}"}
@@ -688,6 +726,62 @@ defmodule AgenticRealmsWeb.GameComponents.WizardAuthoring do
       </div>
       <%= if @commit_error do %>
         <div class="bp-error" data-testid="object-edit-commit-error">
+          {format_commit_error(@commit_error)}
+        </div>
+      <% end %>
+    </form>
+    """
+  end
+
+  attr :edit, :map, required: true
+  attr :commit_error, :any, default: nil
+
+  defp npc_edit_form(assigns) do
+    ~H"""
+    <form phx-change="update_npc_edit">
+      <div class="bp-field">
+        <label class="bp-field-label">
+          Name <span class="bp-field-hint">click any field to edit</span>
+        </label>
+        <input type="text" name="edit[name]" value={@edit.name} class="bp-input" />
+      </div>
+      <div class="bp-field">
+        <label class="bp-field-label">Short description</label>
+        <input
+          type="text"
+          name="edit[short_description]"
+          value={@edit.short_description}
+          class="bp-input"
+        />
+      </div>
+      <div class="bp-field">
+        <label class="bp-field-label">Long description</label>
+        <textarea
+          name="edit[long_description]"
+          rows="5"
+          class="bp-input bp-input--multiline"
+        >{@edit.long_description}</textarea>
+      </div>
+      <div class="bp-field">
+        <label class="bp-field-label">
+          Lore <span class="bp-field-hint">private — grounds the NPC's conversation</span>
+        </label>
+        <textarea
+          name="edit[lore]"
+          rows="4"
+          class="bp-input bp-input--multiline"
+          data-testid="npc-edit-lore"
+        >{@edit.lore}</textarea>
+      </div>
+      <div class="bp-field">
+        <label class="bp-fixed-toggle">
+          <input type="hidden" name="edit[fixed]" value="false" />
+          <input type="checkbox" name="edit[fixed]" value="true" checked={@edit.fixed} />
+          Fixed (cannot be moved)
+        </label>
+      </div>
+      <%= if @commit_error do %>
+        <div class="bp-error" data-testid="npc-edit-commit-error">
           {format_commit_error(@commit_error)}
         </div>
       <% end %>

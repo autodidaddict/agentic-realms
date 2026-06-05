@@ -1113,7 +1113,10 @@ defmodule AgenticRealms.World.Commands do
     end
   end
 
-  @edit_object_blueprint_fields ~w(name short_description long_description fixed)a
+  # In-place world-Object edit (feature 014) — narrow field set.
+  @object_only_edit_fields ~w(name short_description long_description fixed)a
+  # Blueprint + npc-clone edits also reach lore/toolsets/behaviors.
+  @edit_blueprint_fields ~w(name short_description long_description fixed lore toolsets behaviors)a
 
   @doc """
   Edit an existing Object Blueprint. `expected_revision` MUST equal the
@@ -1149,7 +1152,8 @@ defmodule AgenticRealms.World.Commands do
       when is_integer(wizard_id) and is_binary(blueprint_id) and is_map(params) do
     with :ok <- ensure_wizard(wizard_id),
          {:ok, blueprint} <- fetch_any_blueprint(blueprint_id),
-         :ok <- validate_edit_fields(params[:fields_changed]) do
+         :ok <- validate_edit_fields(params[:fields_changed], @edit_blueprint_fields),
+         :ok <- validate_edit_payload(params[:fields_changed]) do
       cmd = %EditBlueprint{
         blueprint_id: blueprint_id,
         wizard_id: wizard_id,
@@ -1179,15 +1183,31 @@ defmodule AgenticRealms.World.Commands do
     end
   end
 
-  defp validate_edit_fields(fields) when is_map(fields) do
-    if Enum.all?(Map.keys(fields), &(&1 in @edit_object_blueprint_fields)) do
+  defp validate_edit_fields(fields, allowed) when is_map(fields) do
+    if Enum.all?(Map.keys(fields), &(&1 in allowed)) do
       :ok
     else
       {:error, :invalid_field}
     end
   end
 
-  defp validate_edit_fields(_), do: {:error, :invalid_field}
+  defp validate_edit_fields(_, _), do: {:error, :invalid_field}
+
+  # When an edit touches the npc-flavored fields, validate them the same way
+  # create does (feature-009 behavior vocabulary + toolset existence).
+  defp validate_edit_payload(fields) do
+    with :ok <- maybe_validate_behaviors(fields) do
+      maybe_validate_toolsets(fields)
+    end
+  end
+
+  defp maybe_validate_behaviors(%{behaviors: behaviors}),
+    do: Toolsets.validate_behaviors(behaviors || [])
+
+  defp maybe_validate_behaviors(_), do: :ok
+
+  defp maybe_validate_toolsets(%{toolsets: toolsets}), do: Toolsets.all_exist?(toolsets || [])
+  defp maybe_validate_toolsets(_), do: :ok
 
   @doc """
   Edit a world Object in place. Routes through the Room aggregate that
@@ -1220,7 +1240,7 @@ defmodule AgenticRealms.World.Commands do
       when is_integer(wizard_id) and is_binary(object_id) and is_map(fields_changed) do
     with :ok <- ensure_wizard(wizard_id),
          {:ok, object} <- fetch_object(object_id),
-         :ok <- validate_edit_fields(fields_changed),
+         :ok <- validate_edit_fields(fields_changed, @object_only_edit_fields),
          {:ok, room_id} <- ensure_in_room(object),
          :ok <- ensure_wizard_co_located(wizard_id, room_id) do
       diff = only_actual_diff(object, fields_changed)
@@ -1245,6 +1265,46 @@ defmodule AgenticRealms.World.Commands do
       end
     end
   end
+
+  @doc """
+  Feature 015 US7 — edit an in-world NPC clone in place. Co-located security
+  boundary: the clone must be in the wizard's current room. The clone is
+  freestanding, so the edit applies only to it (no propagation to the
+  blueprint or sibling clones).
+
+  Returns `{:ok, :updated | :no_change}`. Refusals: `:not_a_wizard` /
+  `:unknown_player`, `:unknown_npc`, `:invalid_field`, a behavior/toolset
+  validation error, or `:object_not_editable_here` (clone not co-located).
+  """
+  @spec edit_npc(integer(), String.t(), map()) :: {:ok, :updated | :no_change} | {:error, term()}
+  def edit_npc(wizard_id, clone_id, fields_changed)
+      when is_integer(wizard_id) and is_binary(clone_id) and is_map(fields_changed) do
+    with :ok <- ensure_wizard(wizard_id),
+         {:ok, clone} <- fetch_npc_clone_row(clone_id),
+         :ok <- validate_edit_fields(fields_changed, @edit_blueprint_fields),
+         :ok <- validate_edit_payload(fields_changed),
+         :ok <- ensure_npc_co_located(wizard_id, clone.room_id) do
+      diff = only_actual_diff(clone, fields_changed)
+
+      if map_size(diff) == 0 do
+        {:ok, :no_change}
+      else
+        case WorldApp.dispatch(
+               %EditEntity{entity_id: clone_id, fields_changed: diff},
+               consistency: :strong
+             ) do
+          :ok -> {:ok, :updated}
+          {:error, _} = err -> err
+        end
+      end
+    end
+  end
+
+  defp ensure_npc_co_located(wizard_id, room_id) when is_binary(room_id) do
+    ensure_wizard_co_located(wizard_id, room_id)
+  end
+
+  defp ensure_npc_co_located(_wizard_id, _room_id), do: {:error, :object_not_editable_here}
 
   defp ensure_in_room(%{container_type: "room", container_id: rid}) when is_binary(rid),
     do: {:ok, rid}

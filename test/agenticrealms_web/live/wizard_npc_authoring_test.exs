@@ -235,6 +235,62 @@ defmodule AgenticRealmsWeb.WizardNpcAuthoringTest do
     assert Repo.get(NPCClone, garrick.id).blueprint_id == "garrick_the_innkeeper"
   end
 
+  test "edit an npc blueprint's lore via the form → revision bump (US7)",
+       %{wizard_conn: wzc, suffix: suffix} do
+    {:ok, view, _} = live(wzc, ~p"/play")
+    render_hook(view, "switch_mode", %{"mode" => "wizard"})
+    render_hook(view, "toggle_authoring_mode", %{})
+
+    name = "sage #{suffix}"
+
+    stub_tool_use("draft_npc_blueprint", %{
+      "name" => name,
+      "short_description" => "a wise sage",
+      "long_description" => "An old sage by the fire.",
+      "lore" => "v1 lore",
+      "toolsets" => []
+    })
+
+    view
+    |> form("form[phx-submit='submit_wizard_prompt']", %{"text" => "a sage"})
+    |> render_submit()
+
+    await_wizard_unlock(view)
+    render_hook(view, "commit_blueprint_draft", %{})
+
+    slug = name |> String.replace(~r/[^a-z0-9]+/, "_") |> String.trim("_")
+    assert Queries.get_npc_blueprint_row(slug).revision == 1
+
+    # Focus the blueprint from the registry → edit form (expected_revision 1).
+    render_hook(view, "focus_blueprint", %{"blueprint_id" => slug})
+    render_hook(view, "update_blueprint_draft", %{"draft" => %{"lore" => "v2 lore, much wiser"}})
+    render_hook(view, "commit_blueprint_draft", %{})
+
+    bp = Queries.get_npc_blueprint_row(slug)
+    assert bp.revision == 2
+    assert bp.lore == "v2 lore, much wiser"
+  end
+
+  test "edit an in-world NPC clone in place; the blueprint is untouched (US7)",
+       %{wizard_conn: wzc} do
+    {:ok, view, _} = live(wzc, ~p"/play")
+    render_hook(view, "switch_mode", %{"mode" => "wizard"})
+
+    garrick = Repo.get_by(NPCClone, blueprint_id: "garrick_the_innkeeper")
+    render_hook(view, "focus_npc_for_edit", %{"clone_id" => garrick.id})
+    assert render(view) =~ "Edit NPC"
+
+    render_hook(view, "update_npc_edit", %{
+      "edit" => %{"long_description" => "Now wearing a fresh apron."}
+    })
+
+    render_hook(view, "commit_npc_edit", %{})
+
+    assert Repo.get(NPCClone, garrick.id).long_description == "Now wearing a fresh apron."
+    # The source blueprint is unchanged (no reverse propagation).
+    assert Queries.get_npc_blueprint_row("garrick_the_innkeeper").long_description =~ "wiry man"
+  end
+
   # --- Helpers ------------------------------------------------------------
 
   defp conn_for(conn, player_id) do

@@ -139,6 +139,7 @@ defmodule AgenticRealmsWeb.GameLive do
      |> assign(:focused_blueprint_draft, nil)
      |> assign(:focused_object_draft, nil)
      |> assign(:focused_object_edit, nil)
+     |> assign(:focused_npc_edit, nil)
      |> assign(:wizard_prompt, "")
      |> assign(:wizard_resolver_task, nil)
      |> assign(:wizard_input_locked, false)
@@ -603,6 +604,111 @@ defmodule AgenticRealmsWeb.GameLive do
     {:noreply,
      socket
      |> assign(:focused_object_edit, nil)
+     |> assign(:blueprint_commit_error, nil)}
+  end
+
+  # Feature 015 US7 — focus an in-world NPC clone for in-place editing.
+  def handle_event(
+        "focus_npc_for_edit",
+        %{"clone_id" => clone_id},
+        %{
+          assigns: %{
+            is_wizard: true,
+            mode: :wizard,
+            authoring_mode: :world,
+            current_room_id: room_id
+          }
+        } = socket
+      )
+      when is_binary(clone_id) do
+    case Queries.get_npc_clone_row(clone_id) do
+      %{room_id: ^room_id} = clone ->
+        edit = %{
+          clone_id: clone.id,
+          name: clone.name || "",
+          short_description: clone.short_description || "",
+          long_description: clone.long_description || "",
+          lore: clone.lore || "",
+          fixed: clone.fixed == true
+        }
+
+        {:noreply,
+         socket
+         |> assign(:focused_npc_edit, edit)
+         |> assign(:focused_object_edit, nil)
+         |> assign(:focused_object_draft, nil)
+         |> assign(:blueprint_commit_error, nil)}
+
+      _ ->
+        {:noreply, assign(socket, :blueprint_commit_error, :unknown_npc)}
+    end
+  end
+
+  def handle_event("focus_npc_for_edit", _, socket), do: {:noreply, socket}
+
+  def handle_event(
+        "update_npc_edit",
+        %{"edit" => params},
+        %{assigns: %{is_wizard: true, focused_npc_edit: edit}} = socket
+      )
+      when not is_nil(edit) do
+    updated = %{
+      clone_id: edit.clone_id,
+      name: Map.get(params, "name", edit.name) || "",
+      short_description: Map.get(params, "short_description", edit.short_description) || "",
+      long_description: Map.get(params, "long_description", edit.long_description) || "",
+      lore: Map.get(params, "lore", edit.lore) || "",
+      fixed: Map.get(params, "fixed") == "true"
+    }
+
+    {:noreply,
+     socket
+     |> assign(:focused_npc_edit, updated)
+     |> assign(:blueprint_commit_error, nil)}
+  end
+
+  def handle_event("update_npc_edit", _, socket), do: {:noreply, socket}
+
+  def handle_event(
+        "commit_npc_edit",
+        _params,
+        %{
+          assigns: %{
+            is_wizard: true,
+            mode: :wizard,
+            authoring_mode: :world,
+            focused_npc_edit: edit
+          }
+        } = socket
+      )
+      when not is_nil(edit) do
+    fields_changed = %{
+      name: edit.name,
+      short_description: edit.short_description,
+      long_description: edit.long_description,
+      lore: edit.lore,
+      fixed: edit.fixed
+    }
+
+    case Commands.edit_npc(socket.assigns.current_player.id, edit.clone_id, fields_changed) do
+      {:ok, _} ->
+        {:noreply,
+         socket
+         |> assign(:focused_npc_edit, nil)
+         |> assign(:blueprint_commit_error, nil)
+         |> Helpers.refresh_room_objects()}
+
+      {:error, reason} ->
+        {:noreply, assign(socket, :blueprint_commit_error, reason)}
+    end
+  end
+
+  def handle_event("commit_npc_edit", _, socket), do: {:noreply, socket}
+
+  def handle_event("discard_npc_edit", _, socket) do
+    {:noreply,
+     socket
+     |> assign(:focused_npc_edit, nil)
      |> assign(:blueprint_commit_error, nil)}
   end
 
