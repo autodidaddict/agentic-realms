@@ -23,7 +23,7 @@ defmodule AgenticRealms.World.Schemas.QuestInstance do
     field :reward_object_id, :binary_id
 
     belongs_to :player, AgenticRealms.Accounts.Player
-    belongs_to :npc_blueprint, AgenticRealms.World.Schemas.NPCBlueprint, type: :string
+    belongs_to :npc_blueprint, AgenticRealms.World.Schemas.Blueprint, type: :string
 
     has_many :scoped_objects, AgenticRealms.World.Schemas.Object, foreign_key: :quest_instance_id
 

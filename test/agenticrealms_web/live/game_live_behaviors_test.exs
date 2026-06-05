@@ -81,8 +81,8 @@ defmodule AgenticRealmsWeb.GameLiveBehaviorsTest do
            "Garrick's greeting text should appear in Alice's log"
 
     # FR-011: the LPMud-style debug identity MUST NOT appear in player-facing HTML.
-    refute alice_html =~ ~r/Garrick the Innkeeper#\d+/,
-           "FR-011: player-facing HTML must not contain the <name>#<serial> debug identity"
+    refute alice_html =~ ~r/Garrick the Innkeeper#[0-9a-f]/,
+           "FR-011: player-facing HTML must not contain the <name>#<id> debug identity"
 
     # ── US3: Room narration on arrival (atmospheric line, no attribution) ─
     assert alice_html =~ ~s(class="log-entry narrate narrate-room"),

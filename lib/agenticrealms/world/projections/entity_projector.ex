@@ -23,6 +23,9 @@ defmodule AgenticRealms.World.Projections.EntityProjector do
   alias AgenticRealms.World.Schemas.{Object, NPCClone}
 
   @object_edit_fields ~w(name short_description long_description fixed behaviors)a
+  # Feature 015 US7 — in-place NPC clone edit. The clone is freestanding, so
+  # its behaviors are edited directly (the effective set).
+  @npc_edit_fields ~w(name short_description long_description fixed lore behaviors toolsets direct_behaviors)a
 
   # --- EntityCloned: insert the read row in the void ----------------------
 
@@ -71,7 +74,7 @@ defmodule AgenticRealms.World.Projections.EntityProjector do
       :object ->
         updates =
           changed
-          |> atomize_object_fields()
+          |> atomize_fields(@object_edit_fields)
           |> Map.put(:updated_at, utc_now())
           |> Map.to_list()
 
@@ -81,6 +84,15 @@ defmodule AgenticRealms.World.Projections.EntityProjector do
         :ok
 
       :npc ->
+        updates =
+          changed
+          |> atomize_fields(@npc_edit_fields)
+          |> Map.put(:updated_at, utc_now())
+          |> Map.to_list()
+
+        from(c in NPCClone, where: c.id == ^id)
+        |> Repo.update_all(set: updates)
+
         :ok
     end
   end
@@ -113,12 +125,15 @@ defmodule AgenticRealms.World.Projections.EntityProjector do
       %NPCClone{
         id: id,
         blueprint_id: fval(fields, :blueprint_id),
-        serial: fval(fields, :serial),
         name: fval(fields, :name),
         short_description: fval(fields, :short_description),
         long_description: fval(fields, :long_description),
         behaviors: fval(fields, :behaviors) || [],
         lore: fval(fields, :lore) || "",
+        # Feature 015 — authoring/extract provenance (default for freeform NPCs).
+        fixed: fval(fields, :fixed) || false,
+        toolsets: fval(fields, :toolsets) || [],
+        direct_behaviors: fval(fields, :direct_behaviors) || [],
         # Born in the void; the subsequent EntityMoved sets the room.
         room_id: nil
       },
@@ -142,8 +157,8 @@ defmodule AgenticRealms.World.Projections.EntityProjector do
   end
 
   # Keep only the editable object fields, normalizing string keys to atoms.
-  defp atomize_object_fields(changed) do
-    Enum.reduce(@object_edit_fields, %{}, fn field, acc ->
+  defp atomize_fields(changed, allowed) do
+    Enum.reduce(allowed, %{}, fn field, acc ->
       cond do
         Map.has_key?(changed, field) ->
           Map.put(acc, field, Map.get(changed, field))

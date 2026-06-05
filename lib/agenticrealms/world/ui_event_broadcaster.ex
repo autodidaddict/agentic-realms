@@ -55,8 +55,8 @@ defmodule AgenticRealms.World.UIEventBroadcaster do
     PlayerMoved,
     EntityMoved,
     EntityEdited,
-    ObjectBlueprintCreated,
-    ObjectBlueprintEdited,
+    BlueprintCreated,
+    BlueprintEdited,
     QuestAccepted,
     QuestCompleted
   }
@@ -186,26 +186,27 @@ defmodule AgenticRealms.World.UIEventBroadcaster do
     :ok
   end
 
-  # Feature 014 US6 — live-updating Blueprint registry. Broadcast on
-  # the global `blueprints` topic so every wizard LiveView session
-  # with the registry open patches in place. Both branches read every
-  # field they need directly off the domain event — NO DB re-read —
-  # because the broadcaster's GenServer doesn't share the calling
-  # process's Ecto sandbox connection in tests, and a fresh DB read
-  # under :eventual consistency can race the projector anyway.
-  def handle(%ObjectBlueprintCreated{} = e, _meta) do
+  # Feature 015 — live-updating unified Blueprint registry. Broadcast on the
+  # global `blueprints` topic so every wizard LiveView session with the
+  # registry open patches in place. Both branches read every field they need
+  # directly off the domain event — NO DB re-read — because the broadcaster's
+  # GenServer doesn't share the calling process's Ecto sandbox connection in
+  # tests, and a fresh DB read under :eventual consistency can race the
+  # projector anyway. `kind` in the payload drives the registry's kind badge +
+  # spawn affordance.
+  def handle(%BlueprintCreated{} = e, _meta) do
     Phoenix.PubSub.broadcast(
       @pubsub,
       Topics.blueprints_topic(),
       %WizardBlueprintRegistryChanged{
         event: :created,
         blueprint_id: e.blueprint_id,
-        revision: e.revision,
+        revision: Map.get(e, :revision, 1),
         payload: %{
           name: e.name,
           short_description: e.short_description,
-          fixed: e.fixed,
-          kind: e.kind
+          fixed: Map.get(e, :fixed, false),
+          kind: Map.get(e, :kind) || "npc"
         }
       }
     )
@@ -214,7 +215,7 @@ defmodule AgenticRealms.World.UIEventBroadcaster do
   end
 
   def handle(
-        %ObjectBlueprintEdited{
+        %BlueprintEdited{
           blueprint_id: bp_id,
           fields_changed: fields_changed,
           revision: revision

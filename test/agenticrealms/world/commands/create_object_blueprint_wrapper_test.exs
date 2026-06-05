@@ -7,7 +7,7 @@ defmodule AgenticRealms.World.Commands.CreateObjectBlueprintWrapperTest do
   alias AgenticRealms.Repo
   alias AgenticRealms.World.Commands
   alias AgenticRealms.World.Queries
-  alias AgenticRealms.World.Schemas.ObjectBlueprint
+  alias AgenticRealms.World.Schemas.Blueprint
 
   setup do
     suffix = System.unique_integer([:positive])
@@ -37,7 +37,7 @@ defmodule AgenticRealms.World.Commands.CreateObjectBlueprintWrapperTest do
                fixed: true
              })
 
-    assert %ObjectBlueprint{
+    assert %Blueprint{
              id: ^slug,
              kind: "object",
              revision: 1,
@@ -59,7 +59,7 @@ defmodule AgenticRealms.World.Commands.CreateObjectBlueprintWrapperTest do
                long_description: "z"
              })
 
-    assert is_nil(Repo.get(ObjectBlueprint, slug))
+    assert is_nil(Repo.get(Blueprint, slug))
   end
 
   test "refuses unknown wizard_id",
@@ -75,7 +75,7 @@ defmodule AgenticRealms.World.Commands.CreateObjectBlueprintWrapperTest do
                long_description: "z"
              })
 
-    assert is_nil(Repo.get(ObjectBlueprint, slug))
+    assert is_nil(Repo.get(Blueprint, slug))
   end
 
   test "refuses invalid slug shape",

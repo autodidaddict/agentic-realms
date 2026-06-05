@@ -27,8 +27,8 @@ defmodule AgenticRealms.World.Commands do
     RecordRoomDiscovery,
     AcceptQuest,
     FinalizeQuest,
-    CreateObjectBlueprint,
-    EditObjectBlueprint,
+    CreateBlueprint,
+    EditBlueprint,
     CloneEntity,
     MoveEntity,
     EditEntity
@@ -36,13 +36,23 @@ defmodule AgenticRealms.World.Commands do
 
   alias AgenticRealms.World.ContainerRef
 
-  alias AgenticRealms.World.ObjectBlueprint.Slug
+  alias AgenticRealms.World.Blueprint.Slug
 
   alias AgenticRealms.World.Direction
   alias AgenticRealms.World.Exits.Validator, as: ExitsValidator
   alias AgenticRealms.World.Queries
   alias AgenticRealms.World.Quests
-  alias AgenticRealms.World.Schemas.{Exit, Room, Region, NPCBlueprint, QuestInstance, Object}
+  alias AgenticRealms.World.Toolsets
+
+  alias AgenticRealms.World.Schemas.{
+    Exit,
+    Room,
+    Region,
+    Blueprint,
+    QuestInstance,
+    Object,
+    NPCClone
+  }
 
   @doc """
   Spawn a player into the starting room if (and only if) they have no
@@ -316,12 +326,12 @@ defmodule AgenticRealms.World.Commands do
   the entity lifecycle (`clone_into(:npc, …)`), with the blueprint's current
   data (incl. its `blueprint_id` reference, behaviors and lore) copied into
   the `EntityCloned` payload (full-copy at dispatch time). Returns
-  `{:ok, %{clone_id, serial}}`.
+  `{:ok, %{clone_id: clone_id}}`.
 
   See `specs/008-npc-blueprints/contracts/commands.md`.
   """
   @spec spawn_npc_clone(String.t(), String.t(), String.t()) ::
-          {:ok, %{clone_id: String.t(), serial: integer()}}
+          {:ok, %{clone_id: String.t()}}
           | {:error,
              :blueprint_not_found
              | :room_not_found
@@ -331,46 +341,45 @@ defmodule AgenticRealms.World.Commands do
   def spawn_npc_clone(blueprint_id, room_id, clone_id)
       when is_binary(blueprint_id) and is_binary(room_id) and is_binary(clone_id) do
     # Feature 016 — an NPC clone is cloned into existence (a full copy of the
-    # blueprint's current data, incl. its blueprint_id reference, serial,
-    # behaviors and lore) and moved into the room via the entity lifecycle.
-    with {:ok, blueprint} <- fetch_npc_blueprint(blueprint_id),
-         :ok <- check_room_exists(room_id),
-         :ok <- check_no_clone_name_collision(room_id, blueprint.name) do
-      serial = next_npc_serial(blueprint_id)
+    # blueprint's current data) and moved into the room via the entity
+    # lifecycle. This deterministic-clone-id form is used by the seed.
+    with {:ok, blueprint} <- fetch_npc_blueprint(blueprint_id) do
+      spawn_npc_clone_row(blueprint, room_id, clone_id)
+    end
+  end
 
+  # Shared NPC spawn: per-room name-collision check, toolset composition
+  # (FR-016 — effective = union(toolsets) ++ direct), and the full-copy clone
+  # into the room carrying the toolset/direct-behavior provenance.
+  defp spawn_npc_clone_row(%Blueprint{} = bp, room_id, clone_id) do
+    with :ok <- check_room_exists(room_id),
+         :ok <- check_no_clone_name_collision(room_id, bp.name),
+         {:ok, effective} <- Toolsets.compose(bp.toolsets || [], bp.behaviors || []) do
       fields = %{
-        blueprint_id: blueprint_id,
-        serial: serial,
-        name: blueprint.name,
-        short_description: blueprint.short_description,
-        long_description: blueprint.long_description,
-        behaviors: blueprint.behaviors || [],
-        lore: blueprint.lore || ""
+        blueprint_id: bp.id,
+        name: bp.name,
+        short_description: bp.short_description,
+        long_description: bp.long_description,
+        behaviors: effective,
+        direct_behaviors: bp.behaviors || [],
+        toolsets: bp.toolsets || [],
+        lore: bp.lore || "",
+        fixed: bp.fixed
       }
 
       case clone_into(:npc, clone_id, fields, ContainerRef.room(room_id), :spawned) do
-        {:ok, _} -> {:ok, %{clone_id: clone_id, serial: serial}}
+        {:ok, _} -> {:ok, %{clone_id: clone_id}}
         {:error, _} = err -> err
       end
     end
   end
 
   defp fetch_npc_blueprint(blueprint_id) do
-    case Repo.get(NPCBlueprint, blueprint_id) do
+    case Repo.get(Blueprint, blueprint_id) do
       nil -> {:error, :blueprint_not_found}
-      bp -> {:ok, bp}
-    end
-  end
-
-  defp next_npc_serial(blueprint_id) do
-    from(c in AgenticRealms.World.Schemas.NPCClone,
-      where: c.blueprint_id == ^blueprint_id,
-      select: max(c.serial)
-    )
-    |> Repo.one()
-    |> case do
-      nil -> 1
-      n -> n + 1
+      %Blueprint{kind: "npc"} = bp -> {:ok, bp}
+      # A slug that resolves to an object blueprint is not a valid NPC source.
+      %Blueprint{} -> {:error, :blueprint_not_found}
     end
   end
 
@@ -614,11 +623,11 @@ defmodule AgenticRealms.World.Commands do
   end
 
   defp find_catalog_entry(npc_blueprint_id, slug) do
-    case Repo.get(NPCBlueprint, npc_blueprint_id) do
+    case Repo.get(Blueprint, npc_blueprint_id) do
       nil ->
         {:error, :unknown_npc}
 
-      %NPCBlueprint{quests: catalog} ->
+      %Blueprint{quests: catalog} ->
         case Enum.find(catalog || [], fn q -> q["slug"] == slug end) do
           nil -> {:error, :unknown_slug}
           entry -> {:ok, entry}
@@ -782,48 +791,47 @@ defmodule AgenticRealms.World.Commands do
   end
 
   # ──────────────────────────────────────────────────────────────────────
-  # Feature 014 — Object Blueprint authoring
+  # Feature 015 — unified Blueprint authoring
   # ──────────────────────────────────────────────────────────────────────
 
   @doc """
-  Author a new Object Blueprint.
+  Author a new Blueprint of either kind (`"object"` | `"npc"`).
 
-  Wrapper performs the FR-WIZ-5 authorization check, FR-007a slug-shape
-  validation, and FR-007b slug-uniqueness pre-check before dispatching
-  to the `ObjectBlueprint` aggregate.
+  FR-WIZ-5 authorization, FR-004 slug-shape + one-namespace uniqueness, and —
+  for `kind: "npc"` — validates the direct `behaviors` against the feature-009
+  vocabulary (FR-014) and every referenced `toolset` against the registry
+  (FR-018). `behaviors` are the DIRECT behaviors; the effective set is composed
+  (union with toolsets) at spawn time.
 
-  Returns `{:ok, blueprint_id}` on success.
-  Refusals:
-    * `{:error, :not_a_wizard}` — caller's `is_wizard` is false.
-    * `{:error, :unknown_player}` — caller's player_id is unknown.
-    * `{:error, :invalid_slug}` — slug fails the regex / length rules.
-    * `{:error, :slug_already_exists}` — slug collides with an existing row.
-    * `{:error, :name_required}` / `:short_description_required` /
-      `:long_description_required` — content field missing.
+  Returns `{:ok, blueprint_id}`. Refusals: `:not_a_wizard` / `:unknown_player`,
+  `:invalid_slug` / `:slug_already_exists`, the `*_required` content errors,
+  `{:unknown_toolset, name}`, or a feature-009 behavior-validation error.
+
+  `create_object_blueprint/2` and `create_npc_blueprint/2` are thin wrappers
+  that fix `kind`.
   """
-  @spec create_object_blueprint(
-          %{
-            required(:wizard_id) => integer(),
-            required(:blueprint_id) => String.t(),
-            required(:name) => String.t(),
-            required(:short_description) => String.t(),
-            required(:long_description) => String.t(),
-            optional(:fixed) => boolean()
-          },
-          keyword()
-        ) :: {:ok, String.t()} | {:error, atom()}
-  def create_object_blueprint(attrs, _opts \\ []) when is_map(attrs) do
+  @spec create_blueprint(map(), keyword()) ::
+          {:ok, String.t()} | {:error, atom()} | {:error, {:unknown_toolset, String.t()}}
+  def create_blueprint(attrs, _opts \\ []) when is_map(attrs) do
+    kind = Map.get(attrs, :kind, "npc")
+    behaviors = Map.get(attrs, :behaviors, []) || []
+    toolsets = Map.get(attrs, :toolsets, []) || []
+
     with :ok <- ensure_wizard(attrs[:wizard_id]),
          :ok <- validate_slug(attrs[:blueprint_id]),
-         :ok <- ensure_slug_unused(attrs[:blueprint_id]) do
-      cmd = %CreateObjectBlueprint{
+         :ok <- ensure_slug_unused(attrs[:blueprint_id]),
+         :ok <- validate_kind_payload(kind, behaviors, toolsets) do
+      cmd = %CreateBlueprint{
         blueprint_id: attrs[:blueprint_id],
         wizard_id: attrs[:wizard_id],
+        kind: kind,
         name: attrs[:name],
         short_description: attrs[:short_description],
         long_description: attrs[:long_description],
-        kind: "object",
-        fixed: Map.get(attrs, :fixed, false)
+        lore: Map.get(attrs, :lore, "") || "",
+        behaviors: behaviors,
+        fixed: Map.get(attrs, :fixed, false),
+        toolsets: toolsets
       }
 
       case WorldApp.dispatch(cmd, consistency: :strong) do
@@ -833,50 +841,81 @@ defmodule AgenticRealms.World.Commands do
     end
   end
 
-  @doc """
-  Spawn a clone of an Object Blueprint into a room.
-
-  Wrapper performs the FR-WIZ-5 authorization check, resolves the
-  blueprint payload from the read model (the aggregate cannot — by
-  design — see FR-013), stamps the denormalized fields into the
-  command, and dispatches.
-
-  Returns `{:ok, object_id}` on success.
-  Refusals:
-    * `{:error, :not_a_wizard}` — caller's `is_wizard` is false.
-    * `{:error, :unknown_player}` — caller's player_id is unknown.
-    * `{:error, :unknown_blueprint}` — `blueprint_id` does not exist.
-    * `{:error, :object_already_in_room}` — defensive; should not occur
-      for a freshly-generated UUID.
-  """
-  @spec spawn_object_from_blueprint(
-          wizard_id :: integer(),
-          blueprint_id :: String.t(),
-          room_id :: String.t()
-        ) :: {:ok, String.t()} | {:error, atom()}
-  def spawn_object_from_blueprint(wizard_id, blueprint_id, room_id)
-      when is_integer(wizard_id) and is_binary(blueprint_id) and is_binary(room_id) do
-    with :ok <- ensure_wizard(wizard_id),
-         {:ok, blueprint} <- fetch_blueprint(blueprint_id) do
-      clone_into(
-        :object,
-        %{
-          name: blueprint.name,
-          short_description: blueprint.short_description,
-          long_description: blueprint.long_description,
-          fixed: blueprint.fixed,
-          behaviors: [],
-          quest_player_id: nil,
-          quest_instance_id: nil
-        },
-        ContainerRef.room(room_id),
-        :spawned
-      )
+  # Objects carry no behaviors/toolsets surface in this milestone, so only
+  # npc blueprints validate them.
+  defp validate_kind_payload("npc", behaviors, toolsets) do
+    with :ok <- Toolsets.validate_behaviors(behaviors) do
+      Toolsets.all_exist?(toolsets)
     end
   end
 
-  defp fetch_blueprint(blueprint_id) do
-    case Repo.get(AgenticRealms.World.Schemas.ObjectBlueprint, blueprint_id) do
+  defp validate_kind_payload(_kind, _behaviors, _toolsets), do: :ok
+
+  @doc "Author an object blueprint (thin wrapper over `create_blueprint/2`)."
+  @spec create_object_blueprint(map(), keyword()) :: {:ok, String.t()} | {:error, atom()}
+  def create_object_blueprint(attrs, opts \\ []) when is_map(attrs),
+    do: create_blueprint(Map.put(attrs, :kind, "object"), opts)
+
+  @doc "Author an npc blueprint (thin wrapper over `create_blueprint/2`)."
+  @spec create_npc_blueprint(map(), keyword()) ::
+          {:ok, String.t()} | {:error, atom()} | {:error, {:unknown_toolset, String.t()}}
+  def create_npc_blueprint(attrs, opts \\ []) when is_map(attrs),
+    do: create_blueprint(Map.put(attrs, :kind, "npc"), opts)
+
+  @doc """
+  Spawn a clone of a Blueprint (either kind) into a room — the unified UI
+  spawn path. FR-WIZ-5 authorization; resolves the blueprint from the read
+  model and stamps the denormalized fields into the clone (full-copy, FR-013):
+
+    * object → `clone_into(:object, …)`.
+    * npc → `Toolsets.compose(toolsets, behaviors)` → effective behaviors,
+      then `clone_into(:npc, …)` carrying the toolset/direct-behavior
+      provenance; with the per-room name-collision pre-check (FR-013).
+
+  Returns `{:ok, entity_id}`. Refusals: `:not_a_wizard` / `:unknown_player`,
+  `:unknown_blueprint`, `:room_not_found`, `:clone_name_taken_in_room`,
+  `{:unknown_toolset, name}`.
+  """
+  @spec spawn_from_blueprint(integer(), String.t(), String.t()) ::
+          {:ok, String.t()} | {:error, term()}
+  def spawn_from_blueprint(wizard_id, blueprint_id, room_id)
+      when is_integer(wizard_id) and is_binary(blueprint_id) and is_binary(room_id) do
+    with :ok <- ensure_wizard(wizard_id),
+         {:ok, bp} <- fetch_any_blueprint(blueprint_id) do
+      case bp.kind do
+        "object" ->
+          clone_into(
+            :object,
+            %{
+              name: bp.name,
+              short_description: bp.short_description,
+              long_description: bp.long_description,
+              fixed: bp.fixed,
+              behaviors: [],
+              quest_player_id: nil,
+              quest_instance_id: nil
+            },
+            ContainerRef.room(room_id),
+            :spawned
+          )
+
+        "npc" ->
+          case spawn_npc_clone_row(bp, room_id, Ecto.UUID.generate()) do
+            {:ok, %{clone_id: id}} -> {:ok, id}
+            {:error, _} = err -> err
+          end
+      end
+    end
+  end
+
+  @doc "Object-only spawn (thin wrapper over `spawn_from_blueprint/3`)."
+  @spec spawn_object_from_blueprint(integer(), String.t(), String.t()) ::
+          {:ok, String.t()} | {:error, atom()}
+  def spawn_object_from_blueprint(wizard_id, blueprint_id, room_id),
+    do: spawn_from_blueprint(wizard_id, blueprint_id, room_id)
+
+  defp fetch_any_blueprint(blueprint_id) do
+    case Repo.get(Blueprint, blueprint_id) do
       nil -> {:error, :unknown_blueprint}
       bp -> {:ok, bp}
     end
@@ -926,40 +965,128 @@ defmodule AgenticRealms.World.Commands do
   end
 
   @doc """
-  One-shot extract-essence — read a world Object's denormalized fields
-  and persist a new Object Blueprint at `revision: 1` populated with a
-  wholesale copy of those fields (FR-016 / FR-018). The source Object
-  is NOT modified.
+  Spawn a freeform one-off NPC into a room — no Blueprint, no registry change
+  (feature 015 US5). The wizard's authored payload (incl. `lore`) is cloned
+  into the room via `clone_into(:npc, …)` with a null `blueprint_id`/`serial`,
+  so the clone is observationally identical to a blueprint-spawned NPC but has
+  no template behind it.
 
-  Returns `{:ok, blueprint_id}` on success.
-  Refusals:
-    * `{:error, :not_a_wizard}` / `{:error, :unknown_player}`.
-    * `{:error, :unknown_object}` — `source_object_id` not in `world_objects`.
-    * `{:error, :invalid_slug}` / `{:error, :slug_already_exists}` —
-      same as `create_object_blueprint/2`.
-
-  Intended for use from `iex` or test setup; the LiveView path
-  (`handle_event("extract_essence", ...)`) instead populates the
-  Interpreted Data card and lets the wizard refine the draft before
-  dispatching via the normal `commit_blueprint_draft` flow.
+  Refusals: `:not_a_wizard` / `:unknown_player`, the `*_required` content
+  errors, `:room_not_found`, `:clone_name_taken_in_room`.
   """
-  @spec extract_object_essence(
+  @spec spawn_npc_freeform(
           wizard_id :: integer(),
-          source_object_id :: String.t(),
-          proposed_slug :: String.t()
+          room_id :: String.t(),
+          attrs :: %{
+            required(:name) => String.t(),
+            required(:short_description) => String.t(),
+            required(:long_description) => String.t(),
+            optional(:lore) => String.t(),
+            optional(:fixed) => boolean(),
+            optional(:behaviors) => [map()]
+          }
         ) :: {:ok, String.t()} | {:error, atom()}
-  def extract_object_essence(wizard_id, source_object_id, proposed_slug)
-      when is_integer(wizard_id) and is_binary(source_object_id) and is_binary(proposed_slug) do
+  def spawn_npc_freeform(wizard_id, room_id, attrs)
+      when is_integer(wizard_id) and is_binary(room_id) and is_map(attrs) do
+    behaviors = Map.get(attrs, :behaviors, []) || []
+
     with :ok <- ensure_wizard(wizard_id),
-         {:ok, object} <- fetch_object(source_object_id) do
-      create_object_blueprint(%{
-        wizard_id: wizard_id,
-        blueprint_id: proposed_slug,
-        name: object.name,
-        short_description: object.short_description,
-        long_description: object.long_description,
-        fixed: object.fixed
-      })
+         :ok <- validate_object_attrs(attrs),
+         :ok <- Toolsets.validate_behaviors(behaviors),
+         :ok <- check_room_exists(room_id),
+         :ok <- check_no_clone_name_collision(room_id, attrs[:name]) do
+      fields = %{
+        # Freeform NPCs have no blueprint behind them.
+        blueprint_id: nil,
+        name: attrs[:name],
+        short_description: attrs[:short_description],
+        long_description: attrs[:long_description],
+        behaviors: behaviors,
+        direct_behaviors: behaviors,
+        toolsets: [],
+        lore: Map.get(attrs, :lore, "") || "",
+        fixed: Map.get(attrs, :fixed, false)
+      }
+
+      case clone_into(:npc, Ecto.UUID.generate(), fields, ContainerRef.room(room_id), :spawned) do
+        {:ok, entity_id} -> {:ok, entity_id}
+        {:error, _} = err -> err
+      end
+    end
+  end
+
+  @doc """
+  One-shot extract-essence — read an in-world entity's denormalized fields and
+  persist a new Blueprint at `revision: 1` (FR-012 / FR-016 / FR-018). The
+  source entity is NOT modified. The entity kind is detected from its id: a
+  world Object yields an object blueprint; an NPC clone yields an npc blueprint
+  (copying its lore + DIRECT behaviors + toolset names, so the new blueprint
+  recomposes the same effective set — not the frozen union).
+
+  Returns `{:ok, blueprint_id}`. Refusals:
+    * `{:error, :not_a_wizard}` / `{:error, :unknown_player}`.
+    * `{:error, :unknown_entity}` — `entity_id` is not an extractable object or
+      NPC clone (incl. a quest-scoped object, which wizards do not extract).
+    * `{:error, :invalid_slug}` / `{:error, :slug_already_exists}`.
+    * (npc) `{:error, {:unknown_toolset, name}}` / a feature-009 behavior error.
+
+  Intended for `iex` / test setup; the LiveView paths (`extract_essence` /
+  `extract_npc_essence` events) instead pre-populate the trance card and let the
+  wizard refine the draft before the normal `commit_blueprint_draft` flow.
+  """
+  @spec extract_essence(integer(), String.t(), String.t()) ::
+          {:ok, String.t()} | {:error, term()}
+  def extract_essence(wizard_id, entity_id, proposed_slug)
+      when is_integer(wizard_id) and is_binary(entity_id) and is_binary(proposed_slug) do
+    with :ok <- ensure_wizard(wizard_id),
+         {:ok, source} <- fetch_extractable_entity(entity_id) do
+      case source do
+        {:object, object} ->
+          create_object_blueprint(%{
+            wizard_id: wizard_id,
+            blueprint_id: proposed_slug,
+            name: object.name,
+            short_description: object.short_description,
+            long_description: object.long_description,
+            fixed: object.fixed
+          })
+
+        {:npc, clone} ->
+          create_npc_blueprint(%{
+            wizard_id: wizard_id,
+            blueprint_id: proposed_slug,
+            name: clone.name,
+            short_description: clone.short_description,
+            long_description: clone.long_description,
+            lore: clone.lore || "",
+            fixed: clone.fixed,
+            behaviors: clone.direct_behaviors || [],
+            toolsets: clone.toolsets || []
+          })
+      end
+    end
+  end
+
+  # Resolve an entity id to an extractable world Object or NPC clone. A
+  # quest-scoped object is filtered out by `fetch_object/1`, so it falls
+  # through to `:unknown_entity`.
+  defp fetch_extractable_entity(entity_id) do
+    case fetch_object(entity_id) do
+      {:ok, object} ->
+        {:ok, {:object, object}}
+
+      {:error, _} ->
+        case fetch_npc_clone_row(entity_id) do
+          {:ok, clone} -> {:ok, {:npc, clone}}
+          {:error, _} -> {:error, :unknown_entity}
+        end
+    end
+  end
+
+  defp fetch_npc_clone_row(clone_id) do
+    case Repo.get(NPCClone, clone_id) do
+      nil -> {:error, :unknown_npc}
+      clone -> {:ok, clone}
     end
   end
 
@@ -982,7 +1109,10 @@ defmodule AgenticRealms.World.Commands do
     end
   end
 
-  @edit_object_blueprint_fields ~w(name short_description long_description fixed)a
+  # In-place world-Object edit (feature 014) — narrow field set.
+  @object_only_edit_fields ~w(name short_description long_description fixed)a
+  # Blueprint + npc-clone edits also reach lore/toolsets/behaviors.
+  @edit_blueprint_fields ~w(name short_description long_description fixed lore toolsets behaviors)a
 
   @doc """
   Edit an existing Object Blueprint. `expected_revision` MUST equal the
@@ -1017,9 +1147,10 @@ defmodule AgenticRealms.World.Commands do
   def edit_object_blueprint(wizard_id, blueprint_id, params)
       when is_integer(wizard_id) and is_binary(blueprint_id) and is_map(params) do
     with :ok <- ensure_wizard(wizard_id),
-         {:ok, blueprint} <- fetch_blueprint(blueprint_id),
-         :ok <- validate_edit_fields(params[:fields_changed]) do
-      cmd = %EditObjectBlueprint{
+         {:ok, blueprint} <- fetch_any_blueprint(blueprint_id),
+         :ok <- validate_edit_fields(params[:fields_changed], @edit_blueprint_fields),
+         :ok <- validate_edit_payload(params[:fields_changed]) do
+      cmd = %EditBlueprint{
         blueprint_id: blueprint_id,
         wizard_id: wizard_id,
         expected_revision: params[:expected_revision],
@@ -1031,7 +1162,7 @@ defmodule AgenticRealms.World.Commands do
           # Aggregate accepted but emitted no event (no-op diff) OR
           # accepted and emitted the edit event. Re-read to determine
           # the actual new revision.
-          updated = Repo.get(AgenticRealms.World.Schemas.ObjectBlueprint, blueprint_id)
+          updated = Repo.get(Blueprint, blueprint_id)
 
           cond do
             updated.revision == blueprint.revision -> {:ok, :no_change}
@@ -1039,7 +1170,7 @@ defmodule AgenticRealms.World.Commands do
           end
 
         {:error, :stale_revision} ->
-          current = Repo.get(AgenticRealms.World.Schemas.ObjectBlueprint, blueprint_id)
+          current = Repo.get(Blueprint, blueprint_id)
           {:error, :stale_revision, current_revision: current.revision}
 
         {:error, _} = err ->
@@ -1048,15 +1179,31 @@ defmodule AgenticRealms.World.Commands do
     end
   end
 
-  defp validate_edit_fields(fields) when is_map(fields) do
-    if Enum.all?(Map.keys(fields), &(&1 in @edit_object_blueprint_fields)) do
+  defp validate_edit_fields(fields, allowed) when is_map(fields) do
+    if Enum.all?(Map.keys(fields), &(&1 in allowed)) do
       :ok
     else
       {:error, :invalid_field}
     end
   end
 
-  defp validate_edit_fields(_), do: {:error, :invalid_field}
+  defp validate_edit_fields(_, _), do: {:error, :invalid_field}
+
+  # When an edit touches the npc-flavored fields, validate them the same way
+  # create does (feature-009 behavior vocabulary + toolset existence).
+  defp validate_edit_payload(fields) do
+    with :ok <- maybe_validate_behaviors(fields) do
+      maybe_validate_toolsets(fields)
+    end
+  end
+
+  defp maybe_validate_behaviors(%{behaviors: behaviors}),
+    do: Toolsets.validate_behaviors(behaviors || [])
+
+  defp maybe_validate_behaviors(_), do: :ok
+
+  defp maybe_validate_toolsets(%{toolsets: toolsets}), do: Toolsets.all_exist?(toolsets || [])
+  defp maybe_validate_toolsets(_), do: :ok
 
   @doc """
   Edit a world Object in place. Routes through the Room aggregate that
@@ -1089,7 +1236,7 @@ defmodule AgenticRealms.World.Commands do
       when is_integer(wizard_id) and is_binary(object_id) and is_map(fields_changed) do
     with :ok <- ensure_wizard(wizard_id),
          {:ok, object} <- fetch_object(object_id),
-         :ok <- validate_edit_fields(fields_changed),
+         :ok <- validate_edit_fields(fields_changed, @object_only_edit_fields),
          {:ok, room_id} <- ensure_in_room(object),
          :ok <- ensure_wizard_co_located(wizard_id, room_id) do
       diff = only_actual_diff(object, fields_changed)
@@ -1114,6 +1261,46 @@ defmodule AgenticRealms.World.Commands do
       end
     end
   end
+
+  @doc """
+  Feature 015 US7 — edit an in-world NPC clone in place. Co-located security
+  boundary: the clone must be in the wizard's current room. The clone is
+  freestanding, so the edit applies only to it (no propagation to the
+  blueprint or sibling clones).
+
+  Returns `{:ok, :updated | :no_change}`. Refusals: `:not_a_wizard` /
+  `:unknown_player`, `:unknown_npc`, `:invalid_field`, a behavior/toolset
+  validation error, or `:object_not_editable_here` (clone not co-located).
+  """
+  @spec edit_npc(integer(), String.t(), map()) :: {:ok, :updated | :no_change} | {:error, term()}
+  def edit_npc(wizard_id, clone_id, fields_changed)
+      when is_integer(wizard_id) and is_binary(clone_id) and is_map(fields_changed) do
+    with :ok <- ensure_wizard(wizard_id),
+         {:ok, clone} <- fetch_npc_clone_row(clone_id),
+         :ok <- validate_edit_fields(fields_changed, @edit_blueprint_fields),
+         :ok <- validate_edit_payload(fields_changed),
+         :ok <- ensure_npc_co_located(wizard_id, clone.room_id) do
+      diff = only_actual_diff(clone, fields_changed)
+
+      if map_size(diff) == 0 do
+        {:ok, :no_change}
+      else
+        case WorldApp.dispatch(
+               %EditEntity{entity_id: clone_id, fields_changed: diff},
+               consistency: :strong
+             ) do
+          :ok -> {:ok, :updated}
+          {:error, _} = err -> err
+        end
+      end
+    end
+  end
+
+  defp ensure_npc_co_located(wizard_id, room_id) when is_binary(room_id) do
+    ensure_wizard_co_located(wizard_id, room_id)
+  end
+
+  defp ensure_npc_co_located(_wizard_id, _room_id), do: {:error, :object_not_editable_here}
 
   defp ensure_in_room(%{container_type: "room", container_id: rid}) when is_binary(rid),
     do: {:ok, rid}
@@ -1158,8 +1345,14 @@ defmodule AgenticRealms.World.Commands do
     if Slug.valid?(slug), do: :ok, else: {:error, :invalid_slug}
   end
 
+  # FR-004 — a blueprint slug is unique across BOTH the object and NPC
+  # registries, so a wizard can never author an object and an NPC under the
+  # same id (the unified registry, US8, keys on it).
+  # FR-004 — one slug namespace across both kinds (the unified `blueprints`
+  # table keys on it), so a wizard can never author an object and an NPC under
+  # the same id.
   defp ensure_slug_unused(slug) do
-    case Repo.get(AgenticRealms.World.Schemas.ObjectBlueprint, slug) do
+    case Repo.get(Blueprint, slug) do
       nil -> :ok
       _ -> {:error, :slug_already_exists}
     end

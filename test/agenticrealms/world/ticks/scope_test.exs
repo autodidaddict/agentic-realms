@@ -5,7 +5,7 @@ defmodule AgenticRealms.World.Ticks.ScopeTest do
 
   use AgenticRealms.DataCase, async: false
 
-  alias AgenticRealms.World.Schemas.{NPCBlueprint, NPCClone, Object, PlayerState, Room}
+  alias AgenticRealms.World.Schemas.{Blueprint, NPCClone, Object, PlayerState, Room}
   alias AgenticRealms.World.Ticks.Scope
 
   defp tick(text, interval_ms) do
@@ -31,7 +31,7 @@ defmodule AgenticRealms.World.Ticks.ScopeTest do
   end
 
   defp insert_blueprint do
-    Repo.insert!(%NPCBlueprint{
+    Repo.insert!(%Blueprint{
       id: "test_bp_#{System.unique_integer([:positive])}",
       name: "BP",
       short_description: "s",
@@ -43,7 +43,6 @@ defmodule AgenticRealms.World.Ticks.ScopeTest do
     Repo.insert!(%NPCClone{
       id: Ecto.UUID.generate(),
       blueprint_id: bp.id,
-      serial: Keyword.get(opts, :serial, 1),
       name: Keyword.get(opts, :name, "Guard"),
       short_description: "s",
       long_description: "l",
@@ -153,7 +152,7 @@ defmodule AgenticRealms.World.Ticks.ScopeTest do
       assert Scope.compute(room_a.id) == []
     end
 
-    test "sorts entries: room → NPC → object; NPCs by serial; within-target by behavior_index" do
+    test "sorts entries: room → NPC → object; within a target by behavior_index" do
       room =
         insert_room([
           tick("room-first", 1000),
@@ -162,11 +161,8 @@ defmodule AgenticRealms.World.Ticks.ScopeTest do
 
       bp = insert_blueprint()
 
-      _clone1 =
-        insert_clone(bp, room, name: "First NPC", serial: 1, behaviors: [tick("npc1", 1000)])
-
-      _clone2 =
-        insert_clone(bp, room, name: "Second NPC", serial: 2, behaviors: [tick("npc2", 1000)])
+      _clone1 = insert_clone(bp, room, name: "First NPC", behaviors: [tick("npc1", 1000)])
+      _clone2 = insert_clone(bp, room, name: "Second NPC", behaviors: [tick("npc2", 1000)])
 
       _obj = insert_object_in_room(room, [tick("obj", 1000)])
 
@@ -177,13 +173,13 @@ defmodule AgenticRealms.World.Ticks.ScopeTest do
           {e.target_kind, hd(e.actions)["text"]}
         end)
 
-      assert kinds_and_texts == [
-               {:room, "room-first"},
-               {:room, "room-second"},
-               {:npc, "npc1"},
-               {:npc, "npc2"},
-               {:object, "obj"}
-             ]
+      # Room behaviors come first (authored order), the object last. The two
+      # NPCs sit between, in a stable (entity-id) order — serial is gone, so we
+      # don't pin their relative order, only that both are present in the band.
+      assert Enum.take(kinds_and_texts, 2) == [{:room, "room-first"}, {:room, "room-second"}]
+      assert List.last(kinds_and_texts) == {:object, "obj"}
+      npc_texts = for {:npc, t} <- kinds_and_texts, do: t
+      assert Enum.sort(npc_texts) == ["npc1", "npc2"]
     end
   end
 

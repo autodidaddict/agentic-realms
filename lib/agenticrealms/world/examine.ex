@@ -208,8 +208,12 @@ defmodule AgenticRealms.World.Examine do
   end
 
   defp npc_match(%{id: id, name: name}) do
-    {long_description, serial} = npc_clone_extras(id)
-    %Match{target_kind: :npc, name: name, long_description: long_description, serial: serial}
+    %Match{
+      target_kind: :npc,
+      name: name,
+      long_description: npc_long_description(id),
+      id: id
+    }
   end
 
   # The :objects list from RoomView and the inventory list don't carry
@@ -222,15 +226,12 @@ defmodule AgenticRealms.World.Examine do
     end
   end
 
-  # NPC clones follow the same pattern — RoomView.npcs omits long_description
-  # AND serial; look them up together when we materialize the Match.
-  defp npc_clone_extras(id) do
+  # NPC clones follow the same pattern — RoomView.npcs omits long_description;
+  # look it up by id when we materialize the Match.
+  defp npc_long_description(id) do
     case AgenticRealms.Repo.get(AgenticRealms.World.Schemas.NPCClone, id) do
-      %AgenticRealms.World.Schemas.NPCClone{long_description: ld, serial: serial} ->
-        {ld, serial}
-
-      _ ->
-        {nil, nil}
+      %AgenticRealms.World.Schemas.NPCClone{long_description: ld} -> ld
+      _ -> nil
     end
   end
 
@@ -239,9 +240,8 @@ defmodule AgenticRealms.World.Examine do
   defp emit_telemetry(player_id, outcome) do
     {result, target_kind, clone_debug_id} =
       case outcome do
-        {:ok, %Match{target_kind: :npc, name: name, serial: serial}}
-        when not is_nil(serial) ->
-          {:npc, :npc, "#{name}##{serial}"}
+        {:ok, %Match{target_kind: :npc, name: name, id: id}} when not is_nil(id) ->
+          {:npc, :npc, "#{name}##{id}"}
 
         {:ok, %Match{target_kind: kind}} ->
           {kind, kind, nil}

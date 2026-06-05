@@ -110,10 +110,9 @@ defmodule AgenticRealms.Application do
         # events; separate from WorldProjector to keep concerns focused
         # and isolate replay positions.
         AgenticRealms.World.Projections.QuestProjector,
-        # Feature 014 — Object Blueprints. Separate projector for the
-        # `object_blueprints` read-model; handles ObjectBlueprintCreated
-        # (US1) and ObjectBlueprintEdited (US5).
-        AgenticRealms.World.Projections.ObjectBlueprintProjector,
+        # Feature 015 — unified Blueprint read-model (`blueprints`); handles
+        # BlueprintCreated/BlueprintEdited for both object + npc kinds.
+        AgenticRealms.World.Projections.BlueprintProjector,
         # Feature 016 — entity lifecycle. Owns every world_objects (and, from
         # Phase 4, npc_clones) row write from EntityCloned/Moved/Edited.
         AgenticRealms.World.Projections.EntityProjector,

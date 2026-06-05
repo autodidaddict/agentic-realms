@@ -20,14 +20,18 @@ defmodule AgenticRealmsWeb.GameComponents.WizardAuthoring do
 
   use AgenticRealmsWeb, :html
 
-  alias AgenticRealms.World.ObjectBlueprint.Slug
+  alias AgenticRealms.World.Blueprint.Slug
 
   attr :authoring_mode, :atom, required: true
   attr :focused_blueprint_draft, :map, default: nil
   attr :focused_object_draft, :map, default: nil
   attr :focused_object_edit, :map, default: nil
+  attr :focused_npc_edit, :map, default: nil
   attr :object_blueprints, :list, required: true
+  attr :blueprint_filter, :atom, default: :all
+  attr :toolsets, :list, default: []
   attr :room_objects, :list, default: []
+  attr :room_npcs, :list, default: []
   attr :wizard_prompt, :string, required: true
   attr :wizard_input_locked, :boolean, required: true
   attr :blueprint_commit_error, :any, default: nil
@@ -69,7 +73,7 @@ defmodule AgenticRealmsWeb.GameComponents.WizardAuthoring do
           <div class="w-input-wrap">
             <div class="w-prompt-label">
               <span class="hint">
-                Describe an object archetype — the model extracts its name, descriptions, and fixed flag onto the form. Refine and commit.
+                Describe an object archetype or a character — the model extracts its fields (an NPC also gets lore + proposed toolsets) onto the form. Refine and commit.
               </span>
             </div>
             <form phx-submit="submit_wizard_prompt" phx-change="update_wizard_prompt">
@@ -124,7 +128,7 @@ defmodule AgenticRealmsWeb.GameComponents.WizardAuthoring do
           <div class="w-input-wrap">
             <div class="w-prompt-label">
               <span class="hint">
-                Describe a one-off object to manifest into <strong>{@current_room_name || "your current room"}</strong>,
+                Describe a one-off object or character to manifest into <strong>{@current_room_name || "your current room"}</strong>,
                 or click <strong>Spawn here</strong> on any blueprint to drop a copy in.
               </span>
             </div>
@@ -220,6 +224,7 @@ defmodule AgenticRealmsWeb.GameComponents.WizardAuthoring do
             <div class="w-pane-body">
               <.blueprint_draft_form
                 draft={@focused_blueprint_draft}
+                toolsets={@toolsets}
                 commit_error={@blueprint_commit_error}
               />
             </div>
@@ -229,7 +234,11 @@ defmodule AgenticRealmsWeb.GameComponents.WizardAuthoring do
         <%= if @authoring_mode == :world and @focused_object_draft do %>
           <section class="w-pane">
             <div class="w-pane-head">
-              <div class="lbl">Interpreted data · one-off Object</div>
+              <div class="lbl">
+                Interpreted data · one-off {if Map.get(@focused_object_draft, :kind) == "npc",
+                  do: "NPC",
+                  else: "Object"}
+              </div>
             </div>
             <div class="w-pane-body">
               <.object_draft_form
@@ -262,6 +271,33 @@ defmodule AgenticRealmsWeb.GameComponents.WizardAuthoring do
                     Discard
                   </button>
                   <button type="button" class="btn-primary" phx-click="commit_object_edit">
+                    Commit
+                  </button>
+                </div>
+              </div>
+            </div>
+          </section>
+        <% end %>
+
+        <%= if @authoring_mode == :world and @focused_npc_edit do %>
+          <section class="w-pane">
+            <div class="w-pane-head">
+              <div class="lbl">Edit NPC · in this room</div>
+              <div style="font-size: 10px; color: var(--ink-faint); letter-spacing: 0.08em; text-transform: uppercase;">
+                in-place
+              </div>
+            </div>
+            <div class="w-pane-body">
+              <.npc_edit_form edit={@focused_npc_edit} commit_error={@blueprint_commit_error} />
+              <div class="w-footer" style="margin-top: 12px;">
+                <div class="meta">
+                  <span>{@focused_npc_edit.clone_id}</span>
+                </div>
+                <div class="actions">
+                  <button type="button" class="btn-ghost" phx-click="discard_npc_edit">
+                    Discard
+                  </button>
+                  <button type="button" class="btn-primary" phx-click="commit_npc_edit">
                     Commit
                   </button>
                 </div>
@@ -331,17 +367,91 @@ defmodule AgenticRealmsWeb.GameComponents.WizardAuthoring do
               <% end %>
             </div>
           </section>
+
+          <section class="w-pane">
+            <div class="w-pane-head">
+              <div class="lbl">NPCs in <b>{@current_room_name || "this room"}</b></div>
+              <div style="font-size: 10px; color: var(--ink-faint); letter-spacing: 0.08em; text-transform: uppercase;">
+                {length(@room_npcs)} present
+              </div>
+            </div>
+            <div class="w-pane-body" data-testid="room-npcs-panel">
+              <%= if @room_npcs == [] do %>
+                <div class="empty-preview">
+                  <div>
+                    <div class="title">No NPCs here yet</div>
+                    <div>
+                      Manifest a one-off with a prompt, or <strong>Spawn here</strong>
+                      an npc blueprint from the registry.
+                    </div>
+                  </div>
+                </div>
+              <% else %>
+                <ul class="blueprint-list" style="list-style: none; padding: 0; margin: 0;">
+                  <li
+                    :for={npc <- @room_npcs}
+                    class="blueprint-row"
+                    data-npc-id={npc.id}
+                    style="border-bottom: 1px solid var(--rule); padding: 8px 12px;"
+                  >
+                    <div style="display: flex; align-items: baseline; gap: 8px;">
+                      <strong>{npc.name}</strong>
+                      <button
+                        type="button"
+                        class="btn-ghost"
+                        style="margin-left: auto; font-size: 11px; padding: 2px 8px;"
+                        phx-click="focus_npc_for_edit"
+                        phx-value-clone_id={npc.id}
+                        data-testid={"edit-npc-#{npc.id}"}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        class="btn-ghost"
+                        style="font-size: 11px; padding: 2px 8px;"
+                        phx-click="extract_npc_essence"
+                        phx-value-clone_id={npc.id}
+                        data-testid={"extract-npc-#{npc.id}"}
+                      >
+                        Extract essence
+                      </button>
+                    </div>
+                    <div style="color: var(--ink-faint); font-size: 12px;">
+                      {npc.short_description}
+                    </div>
+                  </li>
+                </ul>
+              <% end %>
+            </div>
+          </section>
         <% end %>
 
+        <% filtered_blueprints = filter_blueprints(@object_blueprints, @blueprint_filter) %>
         <section class="w-pane">
           <div class="w-pane-head">
             <div class="lbl">Blueprints</div>
-            <div style="font-size: 10px; color: var(--ink-faint); letter-spacing: 0.08em; text-transform: uppercase;">
-              {length(@object_blueprints)} authored
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <div data-testid="blueprint-filter" style="display: flex; gap: 4px;">
+                <button
+                  :for={{label, k} <- [{"All", :all}, {"Objects", :object}, {"NPCs", :npc}]}
+                  type="button"
+                  class={["btn-ghost", @blueprint_filter == k && "active"]}
+                  style={"font-size: 10px; padding: 1px 6px; #{if @blueprint_filter == k, do: "color: var(--ink);"}"}
+                  phx-click="filter_blueprints"
+                  phx-value-kind={k}
+                  data-testid={"filter-#{k}"}
+                >
+                  {label}
+                </button>
+              </div>
+              <div style="font-size: 10px; color: var(--ink-faint); letter-spacing: 0.08em; text-transform: uppercase;">
+                {length(filtered_blueprints)} shown
+              </div>
             </div>
           </div>
           <div class="w-pane-body" data-testid="blueprints-registry">
-            <%= if @object_blueprints == [] do %>
+            <%= if filtered_blueprints == [] do %>
               <div class="empty-preview">
                 <div>
                   <div class="title">Nothing in the registry yet</div>
@@ -353,7 +463,7 @@ defmodule AgenticRealmsWeb.GameComponents.WizardAuthoring do
             <% else %>
               <ul class="blueprint-list" style="list-style: none; padding: 0; margin: 0;">
                 <li
-                  :for={bp <- @object_blueprints}
+                  :for={bp <- filtered_blueprints}
                   class="blueprint-row"
                   data-blueprint-id={bp.id}
                   style="border-bottom: 1px solid var(--rule); padding: 8px 12px;"
@@ -368,6 +478,13 @@ defmodule AgenticRealmsWeb.GameComponents.WizardAuthoring do
                       title="Edit this blueprint"
                     >
                       <strong>{bp.name}</strong>
+                      <span
+                        class="bp-kind-badge"
+                        data-testid={"blueprint-kind-#{bp.id}"}
+                        style={"font-size: 9px; text-transform: uppercase; letter-spacing: 0.06em; padding: 1px 5px; border-radius: 3px; border: 1px solid var(--rule); color: var(--ink-faint); #{if bp.kind == "npc", do: "border-color: var(--accent, #8a6d3b);"}"}
+                      >
+                        {bp.kind}
+                      </span>
                       <span style="color: var(--ink-faint); font-size: 11px;">
                         {bp.id} · rev {bp.revision}
                       </span>
@@ -399,6 +516,7 @@ defmodule AgenticRealmsWeb.GameComponents.WizardAuthoring do
   end
 
   attr :draft, :map, required: true
+  attr :toolsets, :list, default: []
   attr :commit_error, :any, default: nil
 
   defp blueprint_draft_form(assigns) do
@@ -452,6 +570,111 @@ defmodule AgenticRealmsWeb.GameComponents.WizardAuthoring do
         >{@draft.long_description}</textarea>
       </div>
 
+      <%= if Map.get(@draft, :kind) == "npc" do %>
+        <div class="bp-field">
+          <label class="bp-field-label">
+            Lore <span class="bp-field-hint">private — grounds the NPC's conversation</span>
+          </label>
+          <textarea
+            name="draft[lore]"
+            rows="4"
+            class="bp-input bp-input--multiline"
+            data-testid="blueprint-lore"
+          >{Map.get(@draft, :lore, "")}</textarea>
+        </div>
+
+        <div class="bp-field">
+          <label class="bp-field-label">
+            Toolsets <span class="bp-field-hint">behavior groups to attach</span>
+          </label>
+          <%= if @toolsets == [] do %>
+            <div class="bp-field-hint">No toolsets registered.</div>
+          <% else %>
+            <div
+              data-testid="blueprint-toolsets"
+              style="display: flex; flex-direction: column; gap: 4px;"
+            >
+              <label :for={ts <- @toolsets} class="bp-fixed-toggle">
+                <input
+                  type="checkbox"
+                  name="draft[toolsets][]"
+                  value={ts.name}
+                  checked={ts.name in (Map.get(@draft, :toolsets, []) || [])}
+                />
+                <strong>{ts.name}</strong>
+                <%= if ts.description do %>
+                  <span style="color: var(--ink-faint); font-size: 11px;">
+                    — {ts.description}
+                  </span>
+                <% end %>
+              </label>
+            </div>
+          <% end %>
+        </div>
+
+        <div class="bp-field">
+          <label class="bp-field-label">
+            Direct behaviors
+            <span class="bp-field-hint">individual triggers, on top of any toolsets (FR-015a)</span>
+          </label>
+          <div
+            data-testid="blueprint-direct-behaviors"
+            style="display: flex; flex-direction: column; gap: 6px;"
+          >
+            <div
+              :for={{b, i} <- Enum.with_index(Map.get(@draft, :behaviors, []) || [])}
+              class="bp-behavior-row"
+              data-testid={"direct-behavior-#{i}"}
+              style="display: flex; gap: 6px; align-items: center;"
+            >
+              <select
+                name={"draft[behaviors][#{i}][trigger]"}
+                class="bp-input"
+                style="flex: 0 0 auto;"
+              >
+                <option value="player_entered" selected={behavior_trigger(b) == "player_entered"}>
+                  on enter
+                </option>
+                <option value="player_left" selected={behavior_trigger(b) == "player_left"}>
+                  on leave
+                </option>
+              </select>
+              <select name={"draft[behaviors][#{i}][type]"} class="bp-input" style="flex: 0 0 auto;">
+                <option value="say" selected={behavior_type(b) == "say"}>say</option>
+                <option value="emote" selected={behavior_type(b) == "emote"}>emote</option>
+              </select>
+              <input
+                type="text"
+                name={"draft[behaviors][#{i}][text]"}
+                value={behavior_text(b)}
+                class="bp-input"
+                placeholder="text the NPC says / emotes…"
+                style="flex: 1 1 auto;"
+              />
+              <button
+                type="button"
+                class="btn-ghost"
+                phx-click="remove_direct_behavior"
+                phx-value-index={i}
+                title="Remove this behavior"
+                style="flex: 0 0 auto;"
+              >
+                ×
+              </button>
+            </div>
+          </div>
+          <button
+            type="button"
+            class="btn-ghost"
+            phx-click="add_direct_behavior"
+            data-testid="add-direct-behavior"
+            style="margin-top: 4px; font-size: 11px;"
+          >
+            + Add behavior
+          </button>
+        </div>
+      <% end %>
+
       <div class="bp-field">
         <label class="bp-fixed-toggle">
           <input
@@ -464,7 +687,12 @@ defmodule AgenticRealmsWeb.GameComponents.WizardAuthoring do
             name="draft[fixed]"
             value="true"
             checked={@draft.fixed}
-          /> Fixed (cannot be picked up)
+          />
+          <%= if Map.get(@draft, :kind) == "npc" do %>
+            Fixed (cannot be moved)
+          <% else %>
+            Fixed (cannot be picked up)
+          <% end %>
         </label>
       </div>
 
@@ -522,6 +750,62 @@ defmodule AgenticRealmsWeb.GameComponents.WizardAuthoring do
     """
   end
 
+  attr :edit, :map, required: true
+  attr :commit_error, :any, default: nil
+
+  defp npc_edit_form(assigns) do
+    ~H"""
+    <form phx-change="update_npc_edit">
+      <div class="bp-field">
+        <label class="bp-field-label">
+          Name <span class="bp-field-hint">click any field to edit</span>
+        </label>
+        <input type="text" name="edit[name]" value={@edit.name} class="bp-input" />
+      </div>
+      <div class="bp-field">
+        <label class="bp-field-label">Short description</label>
+        <input
+          type="text"
+          name="edit[short_description]"
+          value={@edit.short_description}
+          class="bp-input"
+        />
+      </div>
+      <div class="bp-field">
+        <label class="bp-field-label">Long description</label>
+        <textarea
+          name="edit[long_description]"
+          rows="5"
+          class="bp-input bp-input--multiline"
+        >{@edit.long_description}</textarea>
+      </div>
+      <div class="bp-field">
+        <label class="bp-field-label">
+          Lore <span class="bp-field-hint">private — grounds the NPC's conversation</span>
+        </label>
+        <textarea
+          name="edit[lore]"
+          rows="4"
+          class="bp-input bp-input--multiline"
+          data-testid="npc-edit-lore"
+        >{@edit.lore}</textarea>
+      </div>
+      <div class="bp-field">
+        <label class="bp-fixed-toggle">
+          <input type="hidden" name="edit[fixed]" value="false" />
+          <input type="checkbox" name="edit[fixed]" value="true" checked={@edit.fixed} />
+          Fixed (cannot be moved)
+        </label>
+      </div>
+      <%= if @commit_error do %>
+        <div class="bp-error" data-testid="npc-edit-commit-error">
+          {format_commit_error(@commit_error)}
+        </div>
+      <% end %>
+    </form>
+    """
+  end
+
   attr :draft, :map, required: true
   attr :commit_error, :any, default: nil
 
@@ -554,11 +838,29 @@ defmodule AgenticRealmsWeb.GameComponents.WizardAuthoring do
         >{@draft.long_description}</textarea>
       </div>
 
+      <%= if Map.get(@draft, :kind) == "npc" do %>
+        <div class="bp-field">
+          <label class="bp-field-label">
+            Lore <span class="bp-field-hint">private — grounds the NPC's conversation</span>
+          </label>
+          <textarea
+            name="draft[lore]"
+            rows="4"
+            class="bp-input bp-input--multiline"
+            data-testid="object-draft-lore"
+          >{Map.get(@draft, :lore, "")}</textarea>
+        </div>
+      <% end %>
+
       <div class="bp-field">
         <label class="bp-fixed-toggle">
           <input type="hidden" name="draft[fixed]" value="false" />
           <input type="checkbox" name="draft[fixed]" value="true" checked={@draft.fixed} />
-          Fixed (cannot be picked up)
+          <%= if Map.get(@draft, :kind) == "npc" do %>
+            Fixed (cannot be moved)
+          <% else %>
+            Fixed (cannot be picked up)
+          <% end %>
         </label>
       </div>
 
@@ -570,6 +872,22 @@ defmodule AgenticRealmsWeb.GameComponents.WizardAuthoring do
     </form>
     """
   end
+
+  # Feature 015 US8 — unified registry kind filter.
+  defp filter_blueprints(blueprints, :all), do: blueprints
+
+  defp filter_blueprints(blueprints, kind) when kind in [:object, :npc],
+    do: Enum.filter(blueprints, &(&1.kind == Atom.to_string(kind)))
+
+  # Feature 015 US4 — read the (single-action) shape the direct-behavior editor
+  # renders out of a feature-009 behavior map.
+  defp behavior_trigger(b), do: Map.get(b, "trigger", "player_entered")
+
+  defp behavior_type(b),
+    do: b |> Map.get("actions", []) |> List.first(%{}) |> Map.get("type", "say")
+
+  defp behavior_text(b),
+    do: b |> Map.get("actions", []) |> List.first(%{}) |> Map.get("text", "")
 
   # Slug field hint — distinguishes locked (edit mode), auto-derived
   # (slug == Slug.derive(name)), and manual (slug differs from what
@@ -601,11 +919,15 @@ defmodule AgenticRealmsWeb.GameComponents.WizardAuthoring do
   defp format_commit_error(:slug_already_exists),
     do: "A blueprint with that slug already exists. Choose a different slug."
 
+  defp format_commit_error(:unknown_toolset),
+    do: "One of the selected toolsets no longer exists. Reload and try again."
+
   defp format_commit_error(:name_required), do: "Name is required."
   defp format_commit_error(:short_description_required), do: "Short description is required."
   defp format_commit_error(:long_description_required), do: "Long description is required."
   defp format_commit_error(:unknown_blueprint), do: "That blueprint no longer exists."
   defp format_commit_error(:unknown_object), do: "That object no longer exists."
+  defp format_commit_error(:unknown_npc), do: "That NPC isn't in this room anymore."
 
   defp format_commit_error(:object_not_in_room),
     do: "That object isn't in this room anymore."

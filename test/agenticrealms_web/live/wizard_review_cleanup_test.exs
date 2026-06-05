@@ -7,7 +7,7 @@ defmodule AgenticRealmsWeb.WizardReviewCleanupTest do
     * bug_006 — slug auto-derive recovers after customize→clear→rename.
     * bug_007 — orphan draft from mode-toggled resolver task is dropped.
     * bug_009 — `:object_blueprints` assign stays homogeneous (all
-      `%ObjectBlueprint{}` structs) after a cross-wizard broadcast.
+      `%Blueprint{}` structs) after a cross-wizard broadcast.
   """
 
   use AgenticRealmsWeb.ConnCase, async: false
@@ -19,7 +19,7 @@ defmodule AgenticRealmsWeb.WizardReviewCleanupTest do
 
   alias AgenticRealms.Accounts
   alias AgenticRealms.World.{Commands, Seed}
-  alias AgenticRealms.World.Schemas.ObjectBlueprint, as: ObjectBlueprintSchema
+  alias AgenticRealms.World.Schemas.Blueprint, as: ObjectBlueprintSchema
 
   setup %{conn: conn} do
     try do
@@ -198,7 +198,7 @@ defmodule AgenticRealmsWeb.WizardReviewCleanupTest do
     initial = :sys.get_state(bob_view.pid).socket.assigns.object_blueprints
 
     assert Enum.all?(initial, &is_struct(&1, ObjectBlueprintSchema)),
-           "expected initial :object_blueprints to be all ObjectBlueprint structs"
+           "expected initial :object_blueprints to be all Blueprint structs"
 
     # Alice authors a blueprint; Bob's broadcast handler patches.
     slug = "homogeneous_chest_#{suffix}"

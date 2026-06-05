@@ -90,7 +90,13 @@ defmodule AgenticRealmsWeb.WizardFreeformTest do
     assert witness_html =~ "A #{name} appears."
 
     # An Object row exists in the wizard's current room.
-    row = Repo.get_by(Object, name: name, room_id: Seed.starting_room_id())
+    row =
+      Repo.get_by(Object,
+        name: name,
+        container_type: "room",
+        container_id: Seed.starting_room_id()
+      )
+
     refute is_nil(row)
     refute Map.has_key?(Map.from_struct(row), :blueprint_id)
     assert row.short_description == "a small clay pot"

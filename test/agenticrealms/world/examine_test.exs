@@ -11,7 +11,7 @@ defmodule AgenticRealms.World.ExamineTest do
   alias AgenticRealms.Accounts
   alias AgenticRealms.World.Examine
   alias AgenticRealms.World.Examine.Match
-  alias AgenticRealms.World.Schemas.{Object, PlayerState, Room, NPCBlueprint, NPCClone}
+  alias AgenticRealms.World.Schemas.{Object, PlayerState, Room, Blueprint, NPCClone}
   alias AgenticRealmsWeb.Presence
 
   defp register_player(name) do
@@ -283,18 +283,17 @@ defmodule AgenticRealms.World.ExamineTest do
   defp insert_npc(room_id, name, long_description) do
     blueprint_id = "test_blueprint_#{System.unique_integer([:positive])}"
 
-    Repo.insert!(%NPCBlueprint{
+    Repo.insert!(%Blueprint{
       id: blueprint_id,
+      kind: "npc",
       name: name,
       short_description: "a #{name}",
-      long_description: long_description,
-      is_synthetic: false
+      long_description: long_description
     })
 
     Repo.insert!(%NPCClone{
       id: Ecto.UUID.generate(),
       blueprint_id: blueprint_id,
-      serial: 1,
       name: name,
       short_description: "a #{name}",
       long_description: long_description,
@@ -417,7 +416,7 @@ defmodule AgenticRealms.World.ExamineTest do
 
         assert_receive {^ref, metadata}, 200
 
-        expected_debug = "#{garrick.name}##{garrick.serial}"
+        expected_debug = "#{garrick.name}##{garrick.id}"
         assert metadata.clone_debug_id == expected_debug
         assert metadata.target_kind == :npc
       after

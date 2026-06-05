@@ -11,7 +11,7 @@ defmodule AgenticRealms.World.NPCChatTest do
   alias AgenticRealms.Accounts
   alias AgenticRealmsWeb.Topics
   alias AgenticRealms.World.NPCChat
-  alias AgenticRealms.World.Schemas.{NPCBlueprint, NPCClone, PlayerState, Room}
+  alias AgenticRealms.World.Schemas.{Blueprint, NPCClone, PlayerState, Room}
   alias AgenticRealms.World.UIEvents.{ChatSystemMessage, ChatUtterance}
 
   @pubsub AgenticRealms.PubSub
@@ -26,7 +26,7 @@ defmodule AgenticRealms.World.NPCChatTest do
   end
 
   defp insert_blueprint(opts \\ []) do
-    Repo.insert!(%NPCBlueprint{
+    Repo.insert!(%Blueprint{
       id: "test_bp_#{System.unique_integer([:positive])}",
       name: Keyword.get(opts, :name, "Test Blueprint"),
       short_description: "short",
@@ -39,7 +39,6 @@ defmodule AgenticRealms.World.NPCChatTest do
     Repo.insert!(%NPCClone{
       id: Ecto.UUID.generate(),
       blueprint_id: blueprint.id,
-      serial: Keyword.get(opts, :serial, 1),
       name: Keyword.get(opts, :name, "Garrick"),
       short_description: "short",
       long_description: "long",
@@ -116,8 +115,8 @@ defmodule AgenticRealms.World.NPCChatTest do
     test "ambiguous partial match → :ambiguous_npc", %{room: room} do
       # Two NPCs with overlapping substrings.
       bp = insert_blueprint(name: "Guards", lore: "")
-      _g1 = insert_clone(bp, room, name: "Town Guard", serial: 1)
-      _g2 = insert_clone(bp, room, name: "Guard Captain", serial: 2)
+      _g1 = insert_clone(bp, room, name: "Town Guard")
+      _g2 = insert_clone(bp, room, name: "Guard Captain")
 
       {:ok, player} =
         Accounts.register_player(%{

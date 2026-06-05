@@ -139,6 +139,7 @@ defmodule AgenticRealmsWeb.GameLive do
      |> assign(:focused_blueprint_draft, nil)
      |> assign(:focused_object_draft, nil)
      |> assign(:focused_object_edit, nil)
+     |> assign(:focused_npc_edit, nil)
      |> assign(:wizard_prompt, "")
      |> assign(:wizard_resolver_task, nil)
      |> assign(:wizard_input_locked, false)
@@ -147,12 +148,30 @@ defmodule AgenticRealmsWeb.GameLive do
      |> assign(:current_room_name, Map.get(room_view, :name))
      |> assign(
        :object_blueprints,
-       if(socket.assigns.current_player.is_wizard, do: Queries.list_object_blueprints(), else: [])
+       if(socket.assigns.current_player.is_wizard, do: Queries.list_blueprint_rows(), else: [])
+     )
+     # Feature 015 US8 — unified registry kind filter (:all | :object | :npc).
+     |> assign(:blueprint_filter, :all)
+     # Feature 015 — toolsets available to attach to an NPC blueprint draft.
+     |> assign(
+       :toolsets,
+       if(socket.assigns.current_player.is_wizard,
+         do: AgenticRealms.World.Toolsets.list_for(:npc),
+         else: []
+       )
      )
      |> assign(
        :room_objects,
        if(socket.assigns.current_player.is_wizard,
          do: Queries.list_objects_in_room_for_wizard(current_room_id),
+         else: []
+       )
+     )
+     # Feature 015 US6 — in-room NPCs the wizard can extract a blueprint from.
+     |> assign(
+       :room_npcs,
+       if(socket.assigns.current_player.is_wizard,
+         do: Queries.list_npcs_in_room(current_room_id),
          else: []
        )
      )
@@ -343,7 +362,7 @@ defmodule AgenticRealmsWeb.GameLive do
     # renaming the blueprint correctly re-derives.
     proposed_slug =
       if slug_input == "" do
-        AgenticRealms.World.ObjectBlueprint.Slug.derive(new_name)
+        AgenticRealms.World.Blueprint.Slug.derive(new_name)
       else
         slug_input
       end
@@ -361,6 +380,7 @@ defmodule AgenticRealmsWeb.GameLive do
       )
       |> Map.put(:fixed, Map.get(params, "fixed") == "true")
       |> Map.put(:proposed_slug, proposed_slug)
+      |> put_npc_draft_fields(params)
 
     {:noreply,
      socket
@@ -369,6 +389,39 @@ defmodule AgenticRealmsWeb.GameLive do
   end
 
   def handle_event("update_blueprint_draft", _, socket), do: {:noreply, socket}
+
+  # Feature 015 US4 — direct-behavior editor add/remove (FR-015a). The rows
+  # themselves are edited through the form's phx-change; add/remove mutate the
+  # draft's behavior list directly and re-render.
+  def handle_event(
+        "add_direct_behavior",
+        _params,
+        %{assigns: %{is_wizard: true, focused_blueprint_draft: draft}} = socket
+      )
+      when not is_nil(draft) do
+    blank = %{"trigger" => "player_entered", "actions" => [%{"type" => "say", "text" => ""}]}
+    behaviors = (Map.get(draft, :behaviors) || []) ++ [blank]
+    {:noreply, assign(socket, :focused_blueprint_draft, Map.put(draft, :behaviors, behaviors))}
+  end
+
+  def handle_event("add_direct_behavior", _, socket), do: {:noreply, socket}
+
+  def handle_event(
+        "remove_direct_behavior",
+        %{"index" => index},
+        %{assigns: %{is_wizard: true, focused_blueprint_draft: draft}} = socket
+      )
+      when not is_nil(draft) do
+    behaviors =
+      case Integer.parse(index) do
+        {i, _} -> (Map.get(draft, :behaviors) || []) |> List.delete_at(i)
+        :error -> Map.get(draft, :behaviors) || []
+      end
+
+    {:noreply, assign(socket, :focused_blueprint_draft, Map.put(draft, :behaviors, behaviors))}
+  end
+
+  def handle_event("remove_direct_behavior", _, socket), do: {:noreply, socket}
 
   # Feature 014 US1 + US5 — commit the focused blueprint draft.
   # Branches on whether the draft carries `:expected_revision`:
@@ -397,17 +450,21 @@ defmodule AgenticRealmsWeb.GameLive do
         %{assigns: %{is_wizard: true, mode: :wizard}} = socket
       )
       when is_binary(blueprint_id) do
-    case Queries.get_object_blueprint(blueprint_id) do
+    case Queries.get_blueprint(blueprint_id) do
       nil ->
         {:noreply, assign(socket, :blueprint_commit_error, :unknown_blueprint)}
 
       bp ->
         draft = %{
           blueprint_id: bp.id,
+          kind: bp.kind,
           name: bp.name,
           short_description: bp.short_description,
           long_description: bp.long_description,
           fixed: bp.fixed,
+          lore: bp.lore || "",
+          behaviors: bp.behaviors || [],
+          toolsets: bp.toolsets || [],
           proposed_slug: bp.id,
           expected_revision: bp.revision
         }
@@ -439,6 +496,24 @@ defmodule AgenticRealmsWeb.GameLive do
   end
 
   def handle_event("focus_blueprint", _, socket), do: {:noreply, socket}
+
+  # Feature 015 US8 — filter the unified registry by kind.
+  def handle_event(
+        "filter_blueprints",
+        %{"kind" => kind},
+        %{assigns: %{is_wizard: true}} = socket
+      ) do
+    filter =
+      case kind do
+        "object" -> :object
+        "npc" -> :npc
+        _ -> :all
+      end
+
+    {:noreply, assign(socket, :blueprint_filter, filter)}
+  end
+
+  def handle_event("filter_blueprints", _, socket), do: {:noreply, socket}
 
   # Feature 014 US5 — focus a world Object for in-place editing.
   def handle_event(
@@ -552,6 +627,111 @@ defmodule AgenticRealmsWeb.GameLive do
      |> assign(:blueprint_commit_error, nil)}
   end
 
+  # Feature 015 US7 — focus an in-world NPC clone for in-place editing.
+  def handle_event(
+        "focus_npc_for_edit",
+        %{"clone_id" => clone_id},
+        %{
+          assigns: %{
+            is_wizard: true,
+            mode: :wizard,
+            authoring_mode: :world,
+            current_room_id: room_id
+          }
+        } = socket
+      )
+      when is_binary(clone_id) do
+    case Queries.get_npc_clone_row(clone_id) do
+      %{room_id: ^room_id} = clone ->
+        edit = %{
+          clone_id: clone.id,
+          name: clone.name || "",
+          short_description: clone.short_description || "",
+          long_description: clone.long_description || "",
+          lore: clone.lore || "",
+          fixed: clone.fixed == true
+        }
+
+        {:noreply,
+         socket
+         |> assign(:focused_npc_edit, edit)
+         |> assign(:focused_object_edit, nil)
+         |> assign(:focused_object_draft, nil)
+         |> assign(:blueprint_commit_error, nil)}
+
+      _ ->
+        {:noreply, assign(socket, :blueprint_commit_error, :unknown_npc)}
+    end
+  end
+
+  def handle_event("focus_npc_for_edit", _, socket), do: {:noreply, socket}
+
+  def handle_event(
+        "update_npc_edit",
+        %{"edit" => params},
+        %{assigns: %{is_wizard: true, focused_npc_edit: edit}} = socket
+      )
+      when not is_nil(edit) do
+    updated = %{
+      clone_id: edit.clone_id,
+      name: Map.get(params, "name", edit.name) || "",
+      short_description: Map.get(params, "short_description", edit.short_description) || "",
+      long_description: Map.get(params, "long_description", edit.long_description) || "",
+      lore: Map.get(params, "lore", edit.lore) || "",
+      fixed: Map.get(params, "fixed") == "true"
+    }
+
+    {:noreply,
+     socket
+     |> assign(:focused_npc_edit, updated)
+     |> assign(:blueprint_commit_error, nil)}
+  end
+
+  def handle_event("update_npc_edit", _, socket), do: {:noreply, socket}
+
+  def handle_event(
+        "commit_npc_edit",
+        _params,
+        %{
+          assigns: %{
+            is_wizard: true,
+            mode: :wizard,
+            authoring_mode: :world,
+            focused_npc_edit: edit
+          }
+        } = socket
+      )
+      when not is_nil(edit) do
+    fields_changed = %{
+      name: edit.name,
+      short_description: edit.short_description,
+      long_description: edit.long_description,
+      lore: edit.lore,
+      fixed: edit.fixed
+    }
+
+    case Commands.edit_npc(socket.assigns.current_player.id, edit.clone_id, fields_changed) do
+      {:ok, _} ->
+        {:noreply,
+         socket
+         |> assign(:focused_npc_edit, nil)
+         |> assign(:blueprint_commit_error, nil)
+         |> Helpers.refresh_room_objects()}
+
+      {:error, reason} ->
+        {:noreply, assign(socket, :blueprint_commit_error, reason)}
+    end
+  end
+
+  def handle_event("commit_npc_edit", _, socket), do: {:noreply, socket}
+
+  def handle_event("discard_npc_edit", _, socket) do
+    {:noreply,
+     socket
+     |> assign(:focused_npc_edit, nil)
+     |> assign(:blueprint_commit_error, nil)}
+  end
+
   # Feature 014 US1 — discard the in-flight blueprint draft. Wizard
   # stays in :blueprints mode (the trance does not auto-end).
   def handle_event("discard_blueprint_draft", _, socket) do
@@ -571,12 +751,26 @@ defmodule AgenticRealmsWeb.GameLive do
         %{assigns: %{is_wizard: true, focused_object_draft: draft}} = socket
       )
       when not is_nil(draft) do
-    updated = %{
-      name: Map.get(params, "name", draft.name) || "",
-      short_description: Map.get(params, "short_description", draft.short_description) || "",
-      long_description: Map.get(params, "long_description", draft.long_description) || "",
-      fixed: Map.get(params, "fixed") == "true"
-    }
+    updated =
+      draft
+      |> Map.put(:name, Map.get(params, "name", draft.name) || "")
+      |> Map.put(
+        :short_description,
+        Map.get(params, "short_description", draft.short_description) || ""
+      )
+      |> Map.put(
+        :long_description,
+        Map.get(params, "long_description", draft.long_description) || ""
+      )
+      |> Map.put(:fixed, Map.get(params, "fixed") == "true")
+
+    # Feature 015 US5 — a freeform NPC draft also carries lore.
+    updated =
+      if Map.get(draft, :kind) == "npc" do
+        Map.put(updated, :lore, Map.get(params, "lore", Map.get(draft, :lore, "")) || "")
+      else
+        updated
+      end
 
     {:noreply,
      socket
@@ -607,14 +801,20 @@ defmodule AgenticRealmsWeb.GameLive do
       name: Map.get(draft, :name, ""),
       short_description: Map.get(draft, :short_description, ""),
       long_description: Map.get(draft, :long_description, ""),
-      fixed: Map.get(draft, :fixed, false)
+      fixed: Map.get(draft, :fixed, false),
+      lore: Map.get(draft, :lore, "")
     }
 
-    case Commands.spawn_object_freeform(
-           socket.assigns.current_player.id,
-           socket.assigns.current_room_id,
-           attrs
-         ) do
+    player_id = socket.assigns.current_player.id
+    room_id = socket.assigns.current_room_id
+
+    spawn_result =
+      case Map.get(draft, :kind) do
+        "npc" -> Commands.spawn_npc_freeform(player_id, room_id, attrs)
+        _ -> Commands.spawn_object_freeform(player_id, room_id, attrs)
+      end
+
+    case spawn_result do
       {:ok, object_id} ->
         feedback = %{
           object_id: object_id,
@@ -673,7 +873,7 @@ defmodule AgenticRealmsWeb.GameLive do
         {:noreply, assign(socket, :blueprint_commit_error, :unknown_object)}
 
       %{container_type: "room", container_id: ^room_id} = object ->
-        slug = AgenticRealms.World.ObjectBlueprint.Slug.derive(object.name || "")
+        slug = AgenticRealms.World.Blueprint.Slug.derive(object.name || "")
 
         draft = %{
           name: object.name || "",
@@ -709,6 +909,64 @@ defmodule AgenticRealmsWeb.GameLive do
 
   def handle_event("extract_essence", _, socket), do: {:noreply, socket}
 
+  # Feature 015 US6 — extract essence from an in-world NPC clone. Flips into
+  # trance and pre-populates the focused npc blueprint draft with a wholesale
+  # copy of the clone's settable fields (lore + toolsets + direct behaviors)
+  # plus an auto-derived slug. The source clone is NOT modified — the blueprint
+  # is created later when the wizard clicks Commit.
+  def handle_event(
+        "extract_npc_essence",
+        %{"clone_id" => clone_id},
+        %{
+          assigns: %{
+            is_wizard: true,
+            mode: :wizard,
+            authoring_mode: :world,
+            current_room_id: room_id
+          }
+        } = socket
+      )
+      when is_binary(clone_id) do
+    case Queries.get_npc_clone_row(clone_id) do
+      nil ->
+        {:noreply, assign(socket, :blueprint_commit_error, :unknown_npc)}
+
+      %{room_id: ^room_id} = clone ->
+        draft = %{
+          kind: "npc",
+          name: clone.name || "",
+          short_description: clone.short_description || "",
+          long_description: clone.long_description || "",
+          fixed: clone.fixed == true,
+          lore: clone.lore || "",
+          behaviors: clone.direct_behaviors || [],
+          toolsets: clone.toolsets || [],
+          proposed_slug: AgenticRealms.World.Blueprint.Slug.derive(clone.name || "")
+        }
+
+        :ok =
+          AgenticRealms.World.WizardTrance.enter(
+            socket.assigns.current_player.id,
+            socket.assigns.current_player.username,
+            room_id
+          )
+
+        {:noreply,
+         socket
+         |> assign(:authoring_mode, :blueprints)
+         |> assign(:focused_blueprint_draft, draft)
+         |> assign(:focused_object_draft, nil)
+         |> assign(:focused_object_edit, nil)
+         |> assign(:blueprint_commit_error, nil)
+         |> assign(:last_spawn, nil)}
+
+      _other_room ->
+        {:noreply, assign(socket, :blueprint_commit_error, :unknown_npc)}
+    end
+  end
+
+  def handle_event("extract_npc_essence", _, socket), do: {:noreply, socket}
+
   # Feature 014 US2 — spawn a clone of a registry blueprint into the
   # wizard's current room. Only valid while in World mode (FR-027).
   # The arrival broadcast comes back through PubSub as a
@@ -722,16 +980,16 @@ defmodule AgenticRealmsWeb.GameLive do
         %{assigns: %{is_wizard: true, mode: :wizard, authoring_mode: :world}} = socket
       )
       when is_binary(blueprint_id) do
-    case Commands.spawn_object_from_blueprint(
+    case Commands.spawn_from_blueprint(
            socket.assigns.current_player.id,
            blueprint_id,
            socket.assigns.current_room_id
          ) do
-      {:ok, object_id} ->
-        bp = Queries.get_object_blueprint(blueprint_id)
+      {:ok, entity_id} ->
+        bp = Queries.get_blueprint(blueprint_id)
 
         feedback = %{
-          object_id: object_id,
+          object_id: entity_id,
           blueprint_id: blueprint_id,
           name: bp && bp.name,
           room_name: socket.assigns.current_room_name,
@@ -970,4 +1228,35 @@ defmodule AgenticRealmsWeb.GameLive do
       show_hud: true
     }
   end
+
+  # Feature 015 — npc drafts carry lore + a toolset multi-select. Checkboxes
+  # only submit when checked, so an absent `toolsets` means "none selected".
+  # Object drafts have no such fields and are left untouched.
+  defp put_npc_draft_fields(%{kind: "npc"} = draft, params) do
+    draft
+    |> Map.put(:lore, Map.get(params, "lore", Map.get(draft, :lore, "")) || "")
+    |> Map.put(:toolsets, params |> Map.get("toolsets", []) |> List.wrap())
+    |> Map.put(:behaviors, parse_direct_behaviors(params, draft))
+  end
+
+  defp put_npc_draft_fields(draft, _params), do: draft
+
+  # Rebuild the direct-behavior list from the form's nested params. Rows are
+  # kept even when blank so a freshly-added row stays editable; blank rows are
+  # dropped at commit time. When the form rendered no rows the key is absent —
+  # keep whatever the draft already held.
+  defp parse_direct_behaviors(%{"behaviors" => rows}, _draft) when is_map(rows) do
+    rows
+    |> Enum.sort_by(fn {k, _v} -> String.to_integer(k) end)
+    |> Enum.map(fn {_k, row} ->
+      %{
+        "trigger" => Map.get(row, "trigger", "player_entered"),
+        "actions" => [
+          %{"type" => Map.get(row, "type", "say"), "text" => Map.get(row, "text", "")}
+        ]
+      }
+    end)
+  end
+
+  defp parse_direct_behaviors(_params, draft), do: Map.get(draft, :behaviors, []) || []
 end

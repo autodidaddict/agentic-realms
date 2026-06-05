@@ -10,7 +10,7 @@ defmodule AgenticRealms.World.Ticks.SchedulerTest do
   use AgenticRealms.DataCase, async: false
 
   alias AgenticRealmsWeb.Topics
-  alias AgenticRealms.World.Schemas.{NPCBlueprint, NPCClone, Object, PlayerState, Room}
+  alias AgenticRealms.World.Schemas.{Blueprint, NPCClone, Object, PlayerState, Room}
   alias AgenticRealms.World.Ticks.{Registry, Scheduler, Supervisor}
 
   alias AgenticRealms.World.UIEvents.{
@@ -41,7 +41,7 @@ defmodule AgenticRealms.World.Ticks.SchedulerTest do
   end
 
   defp insert_blueprint do
-    Repo.insert!(%NPCBlueprint{
+    Repo.insert!(%Blueprint{
       id: "bp_#{System.unique_integer([:positive])}",
       name: "BP",
       short_description: "s",
@@ -53,7 +53,6 @@ defmodule AgenticRealms.World.Ticks.SchedulerTest do
     Repo.insert!(%NPCClone{
       id: Ecto.UUID.generate(),
       blueprint_id: bp.id,
-      serial: Keyword.get(opts, :serial, 1),
       name: Keyword.get(opts, :name, "Guard"),
       short_description: "s",
       long_description: "l",

@@ -48,7 +48,7 @@ defmodule AgenticRealms.World.Commands.ExtractObjectEssenceTest do
        %{wizard: w, object_id: oid, suffix: suffix} do
     slug = "extracted_pot_#{suffix}"
 
-    assert {:ok, ^slug} = Commands.extract_object_essence(w.id, oid, slug)
+    assert {:ok, ^slug} = Commands.extract_essence(w.id, oid, slug)
 
     bp = Queries.get_object_blueprint(slug)
 
@@ -63,7 +63,7 @@ defmodule AgenticRealms.World.Commands.ExtractObjectEssenceTest do
        %{wizard: w, object_id: oid, suffix: suffix} do
     before = Repo.get(Object, oid)
 
-    {:ok, _} = Commands.extract_object_essence(w.id, oid, "intact_check_#{suffix}")
+    {:ok, _} = Commands.extract_essence(w.id, oid, "intact_check_#{suffix}")
 
     after_ = Repo.get(Object, oid)
     assert before.name == after_.name
@@ -77,30 +77,30 @@ defmodule AgenticRealms.World.Commands.ExtractObjectEssenceTest do
   test "refuses non-wizard caller",
        %{non_wizard: nw, object_id: oid, suffix: suffix} do
     assert {:error, :not_a_wizard} =
-             Commands.extract_object_essence(nw.id, oid, "ban_#{suffix}")
+             Commands.extract_essence(nw.id, oid, "ban_#{suffix}")
   end
 
-  test "refuses unknown source object",
+  test "refuses an unknown source entity",
        %{wizard: w, suffix: suffix} do
     bogus_uuid = Ecto.UUID.generate()
 
-    assert {:error, :unknown_object} =
-             Commands.extract_object_essence(w.id, bogus_uuid, "unk_#{suffix}")
+    assert {:error, :unknown_entity} =
+             Commands.extract_essence(w.id, bogus_uuid, "unk_#{suffix}")
   end
 
   test "refuses invalid slug",
        %{wizard: w, object_id: oid} do
     assert {:error, :invalid_slug} =
-             Commands.extract_object_essence(w.id, oid, "Has-Hyphens-And-Caps")
+             Commands.extract_essence(w.id, oid, "Has-Hyphens-And-Caps")
   end
 
   test "refuses slug collision with an existing Blueprint",
        %{wizard: w, object_id: oid, suffix: suffix} do
     slug = "collide_check_#{suffix}"
 
-    {:ok, ^slug} = Commands.extract_object_essence(w.id, oid, slug)
+    {:ok, ^slug} = Commands.extract_essence(w.id, oid, slug)
 
     assert {:error, :slug_already_exists} =
-             Commands.extract_object_essence(w.id, oid, slug)
+             Commands.extract_essence(w.id, oid, slug)
   end
 end

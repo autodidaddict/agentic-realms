@@ -12,8 +12,8 @@ defmodule AgenticRealmsWeb.GameLive.Wizard do
   import Phoenix.Component, only: [assign: 3]
 
   alias AgenticRealms.World.{Commands, Queries}
-  alias AgenticRealms.World.ObjectBlueprint.Slug
-  alias AgenticRealms.World.Schemas.ObjectBlueprint, as: ObjectBlueprintRow
+  alias AgenticRealms.World.Blueprint.Slug
+  alias AgenticRealms.World.Schemas.Blueprint, as: BlueprintRow
 
   # ────────────────────────────────────────────────────────────
   # Blueprint commit pipeline (US1 / US5)
@@ -24,28 +24,55 @@ defmodule AgenticRealmsWeb.GameLive.Wizard do
   refreshes the registry on success, surfaces the error otherwise.
   """
   def commit_blueprint_create(socket, draft) do
-    attrs = %{
-      wizard_id: socket.assigns.current_player.id,
-      blueprint_id: Map.get(draft, :proposed_slug, ""),
-      name: Map.get(draft, :name, ""),
-      short_description: Map.get(draft, :short_description, ""),
-      long_description: Map.get(draft, :long_description, ""),
-      fixed: Map.get(draft, :fixed, false)
-    }
+    kind = Map.get(draft, :kind, "object")
 
-    case Commands.create_object_blueprint(attrs) do
+    attrs =
+      %{
+        wizard_id: socket.assigns.current_player.id,
+        blueprint_id: Map.get(draft, :proposed_slug, ""),
+        kind: kind,
+        name: Map.get(draft, :name, ""),
+        short_description: Map.get(draft, :short_description, ""),
+        long_description: Map.get(draft, :long_description, ""),
+        fixed: Map.get(draft, :fixed, false),
+        lore: Map.get(draft, :lore, ""),
+        behaviors: draft |> Map.get(:behaviors, []) |> drop_blank_behaviors(),
+        toolsets: Map.get(draft, :toolsets, [])
+      }
+
+    case Commands.create_blueprint(attrs) do
       {:ok, _slug} ->
         {:noreply,
          socket
          |> assign(:focused_blueprint_draft, nil)
          |> assign(:blueprint_commit_error, nil)
          |> assign(:wizard_prompt, "")
-         |> assign(:object_blueprints, Queries.list_object_blueprints())}
+         |> assign(:object_blueprints, Queries.list_blueprint_rows())}
 
       {:error, reason} ->
-        {:noreply, assign(socket, :blueprint_commit_error, reason)}
+        {:noreply, assign(socket, :blueprint_commit_error, normalize_error(reason))}
     end
   end
+
+  # `create_blueprint` can return `{:error, {:unknown_toolset, name}}`; surface
+  # a flat atom the component's `format_commit_error/1` already understands.
+  defp normalize_error({:unknown_toolset, _name}), do: :unknown_toolset
+  defp normalize_error(reason), do: reason
+
+  # US4 — a freshly-added editor row with no text is incomplete; drop it before
+  # the command's feature-009 validation rejects the empty say/emote text.
+  defp drop_blank_behaviors(behaviors) when is_list(behaviors) do
+    Enum.reject(behaviors, fn b ->
+      b
+      |> Map.get("actions", [])
+      |> List.first(%{})
+      |> Map.get("text", "")
+      |> to_string()
+      |> String.trim() == ""
+    end)
+  end
+
+  defp drop_blank_behaviors(_), do: []
 
   @doc """
   Feature 014 US5 commit-edit. Stale-revision response reloads the
@@ -54,12 +81,24 @@ defmodule AgenticRealmsWeb.GameLive.Wizard do
   def commit_blueprint_edit(socket, draft, expected_revision) do
     blueprint_id = Map.get(draft, :blueprint_id) || Map.get(draft, :proposed_slug)
 
-    fields_changed = %{
+    base = %{
       name: Map.get(draft, :name, ""),
       short_description: Map.get(draft, :short_description, ""),
       long_description: Map.get(draft, :long_description, ""),
       fixed: Map.get(draft, :fixed, false)
     }
+
+    # NPC blueprints also edit lore + toolsets + direct behaviors.
+    fields_changed =
+      if Map.get(draft, :kind) == "npc" do
+        Map.merge(base, %{
+          lore: Map.get(draft, :lore, ""),
+          toolsets: Map.get(draft, :toolsets, []),
+          behaviors: draft |> Map.get(:behaviors, []) |> drop_blank_behaviors()
+        })
+      else
+        base
+      end
 
     case Commands.edit_object_blueprint(
            socket.assigns.current_player.id,
@@ -71,17 +110,21 @@ defmodule AgenticRealmsWeb.GameLive.Wizard do
          socket
          |> assign(:focused_blueprint_draft, nil)
          |> assign(:blueprint_commit_error, nil)
-         |> assign(:object_blueprints, Queries.list_object_blueprints())}
+         |> assign(:object_blueprints, Queries.list_blueprint_rows())}
 
       {:error, :stale_revision, current_revision: current} ->
-        bp = Queries.get_object_blueprint(blueprint_id)
+        bp = Queries.get_blueprint(blueprint_id)
 
         fresh_draft = %{
           blueprint_id: bp.id,
+          kind: bp.kind,
           name: bp.name,
           short_description: bp.short_description,
           long_description: bp.long_description,
           fixed: bp.fixed,
+          lore: bp.lore || "",
+          behaviors: bp.behaviors || [],
+          toolsets: bp.toolsets || [],
           proposed_slug: bp.id,
           expected_revision: current
         }
@@ -110,14 +153,31 @@ defmodule AgenticRealmsWeb.GameLive.Wizard do
   def apply_resolver_outcome(socket, result) do
     case result do
       {:ok, {:draft_blueprint, fields}} ->
-        slug = Slug.derive(fields.name)
-
         draft = %{
+          kind: "object",
           name: fields.name,
           short_description: fields.short_description,
           long_description: fields.long_description,
           fixed: fields.fixed,
-          proposed_slug: slug
+          proposed_slug: Slug.derive(fields.name)
+        }
+
+        {:noreply,
+         socket
+         |> assign(:focused_blueprint_draft, draft)
+         |> assign(:blueprint_commit_error, nil)}
+
+      {:ok, {:draft_npc_blueprint, fields}} ->
+        draft = %{
+          kind: "npc",
+          name: fields.name,
+          short_description: fields.short_description,
+          long_description: fields.long_description,
+          fixed: fields.fixed,
+          lore: Map.get(fields, :lore, ""),
+          behaviors: Map.get(fields, :behaviors, []),
+          toolsets: Map.get(fields, :toolsets, []),
+          proposed_slug: Slug.derive(fields.name)
         }
 
         {:noreply,
@@ -127,10 +187,27 @@ defmodule AgenticRealmsWeb.GameLive.Wizard do
 
       {:ok, {:freeform_object, fields}} ->
         draft = %{
+          kind: "object",
           name: fields.name,
           short_description: fields.short_description,
           long_description: fields.long_description,
           fixed: fields.fixed
+        }
+
+        {:noreply,
+         socket
+         |> assign(:focused_object_draft, draft)
+         |> assign(:blueprint_commit_error, nil)
+         |> assign(:last_spawn, nil)}
+
+      {:ok, {:freeform_npc, fields}} ->
+        draft = %{
+          kind: "npc",
+          name: fields.name,
+          short_description: fields.short_description,
+          long_description: fields.long_description,
+          fixed: fields.fixed,
+          lore: Map.get(fields, :lore, "")
         }
 
         {:noreply,
@@ -191,7 +268,7 @@ defmodule AgenticRealmsWeb.GameLive.Wizard do
       # values but within the same second.
       now = DateTime.utc_now() |> DateTime.truncate(:second)
 
-      row = %ObjectBlueprintRow{
+      row = %BlueprintRow{
         id: bp_id,
         kind: Map.get(payload, :kind, "object"),
         name: Map.get(payload, :name, ""),

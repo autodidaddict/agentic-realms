@@ -13,7 +13,7 @@ defmodule AgenticRealms.World.Behaviors.InterpreterTest do
   alias AgenticRealmsWeb.Topics
   alias AgenticRealms.World.Behaviors.Interpreter
   alias AgenticRealms.World.Events.PlayerMoved
-  alias AgenticRealms.World.Schemas.{Room, PlayerState, NPCBlueprint, NPCClone}
+  alias AgenticRealms.World.Schemas.{Room, PlayerState, Blueprint, NPCClone}
   alias AgenticRealms.World.UIEvents.BehaviorUtterance
   alias AgenticRealmsWeb.Presence
 
@@ -32,7 +32,7 @@ defmodule AgenticRealms.World.Behaviors.InterpreterTest do
   end
 
   defp insert_blueprint do
-    Repo.insert!(%NPCBlueprint{
+    Repo.insert!(%Blueprint{
       id: "test_bp_#{System.unique_integer([:positive])}",
       name: "Test NPC",
       short_description: "short",
@@ -40,11 +40,10 @@ defmodule AgenticRealms.World.Behaviors.InterpreterTest do
     })
   end
 
-  defp insert_clone(blueprint, room, name, serial, behaviors) do
+  defp insert_clone(blueprint, room, name, behaviors) do
     Repo.insert!(%NPCClone{
       id: Ecto.UUID.generate(),
       blueprint_id: blueprint.id,
-      serial: serial,
       name: name,
       short_description: "short",
       long_description: "long",
@@ -122,7 +121,7 @@ defmodule AgenticRealms.World.Behaviors.InterpreterTest do
       blueprint = insert_blueprint()
 
       _clone =
-        insert_clone(blueprint, room, "Garrick", 1, [say_behavior("player_entered", "Welcome.")])
+        insert_clone(blueprint, room, "Garrick", [say_behavior("player_entered", "Welcome.")])
 
       alice = register_and_place("alice", room)
       bob = register_and_place("bob", room)
@@ -150,7 +149,7 @@ defmodule AgenticRealms.World.Behaviors.InterpreterTest do
       blueprint = insert_blueprint()
 
       _clone =
-        insert_clone(blueprint, room, "Garrick", 1, [say_behavior("player_entered", "NPC_SECOND")])
+        insert_clone(blueprint, room, "Garrick", [say_behavior("player_entered", "NPC_SECOND")])
 
       alice = register_and_place("alice", room)
       subscribe(alice.id)
@@ -166,7 +165,7 @@ defmodule AgenticRealms.World.Behaviors.InterpreterTest do
       blueprint = insert_blueprint()
 
       _clone =
-        insert_clone(blueprint, room, "Garrick", 1, [
+        insert_clone(blueprint, room, "Garrick", [
           say_behavior("player_entered", "FIRST"),
           say_behavior("player_entered", "SECOND")
         ])
@@ -192,7 +191,7 @@ defmodule AgenticRealms.World.Behaviors.InterpreterTest do
         ]
       }
 
-      _clone = insert_clone(blueprint, room, "Garrick", 1, [multi_action_behavior])
+      _clone = insert_clone(blueprint, room, "Garrick", [multi_action_behavior])
       alice = register_and_place("alice", room)
       subscribe(alice.id)
 
@@ -208,7 +207,7 @@ defmodule AgenticRealms.World.Behaviors.InterpreterTest do
 
       # Only a player_left behavior; spawning should not fire it.
       _clone =
-        insert_clone(blueprint, room, "Garrick", 1, [say_behavior("player_left", "Goodbye.")])
+        insert_clone(blueprint, room, "Garrick", [say_behavior("player_left", "Goodbye.")])
 
       alice = register_and_place("alice", room)
       subscribe(alice.id)
@@ -218,17 +217,17 @@ defmodule AgenticRealms.World.Behaviors.InterpreterTest do
       refute_receive %BehaviorUtterance{}, 100
     end
 
-    test "multiple NPC clones fire in serial order" do
+    test "multiple NPC clones each fire (stable order)" do
       room = insert_room()
       blueprint = insert_blueprint()
 
       _ =
-        insert_clone(blueprint, room, "First Guard", 1, [
+        insert_clone(blueprint, room, "First Guard", [
           say_behavior("player_entered", "FROM_FIRST")
         ])
 
       _ =
-        insert_clone(blueprint, room, "Second Guard", 2, [
+        insert_clone(blueprint, room, "Second Guard", [
           say_behavior("player_entered", "FROM_SECOND")
         ])
 
@@ -296,7 +295,7 @@ defmodule AgenticRealms.World.Behaviors.InterpreterTest do
       blueprint = insert_blueprint()
 
       _clone =
-        insert_clone(blueprint, source, "Garrick", 1, [
+        insert_clone(blueprint, source, "Garrick", [
           say_behavior("player_left", "Farewell, traveler.")
         ])
 
@@ -322,7 +321,7 @@ defmodule AgenticRealms.World.Behaviors.InterpreterTest do
       blueprint = insert_blueprint()
 
       _clone =
-        insert_clone(blueprint, source, "Garrick", 1, [
+        insert_clone(blueprint, source, "Garrick", [
           say_behavior("player_left", "Farewell, traveler.")
         ])
 

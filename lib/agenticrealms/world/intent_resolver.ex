@@ -19,6 +19,7 @@ defmodule AgenticRealms.World.IntentResolver do
 
   alias AgenticRealms.Anthropic
   alias AgenticRealms.World.IntentResolver.{ContextSnapshot, SystemPrompt, Tools, WizardTools}
+  alias AgenticRealms.World.Toolsets
 
   @max_input_length 500
   @max_tokens 256
@@ -186,37 +187,61 @@ defmodule AgenticRealms.World.IntentResolver do
   # ─────────────────────────────────────────────────────────────────────
 
   @wizard_system_prompt """
-  You are a tool-call dispatcher for a wizard authoring object archetypes
-  ("blueprints") in a text-driven game. The wizard speaks a prompt
-  describing the kind of thing they want to author. Your sole job is to
-  call exactly one tool — either `draft_object_blueprint` (extracting
-  fields) or `refuse` — and never to produce free-form prose.
+  You are a tool-call dispatcher for a wizard authoring reusable templates
+  ("blueprints") in a text-driven fantasy game. The wizard speaks a prompt
+  describing the kind of thing they want to author. Your sole job is to call
+  exactly one tool per turn — never produce free-form prose.
 
-  Guidelines for `draft_object_blueprint`:
-  - `name` is a short lowercase noun phrase (1–4 words).
-  - `short_description` is one concrete sentence (≤ 100 chars).
-  - `long_description` is multi-sentence prose; sensory, evocative, but
-    grounded in what the wizard wrote — do not invent facts the wizard
-    did not imply.
-  - Set `fixed: true` only when the wizard's prompt implies the thing is
-    embedded, bolted, mounted, or otherwise immobile.
+  Choose the tool by what the prompt describes:
+  - A character, creature, or person (an NPC) → `draft_npc_blueprint`.
+  - An inanimate object, item, or fixture → `draft_object_blueprint`.
+  - A question, an edit to an existing thing, a place / room, or anything
+    off-task → `refuse`.
+  - To ground toolset proposals for an NPC you MAY first call `list_toolsets`
+    to see the named behavior groups available, then call
+    `draft_npc_blueprint` proposing only names from that list.
 
-  Refuse if the prompt is a question, asks for an edit to an existing
-  thing, describes a place / NPC / quest, or is otherwise not an object
-  archetype description.
+  `draft_object_blueprint`:
+  - `name`: short lowercase noun phrase (1–4 words).
+  - `short_description`: one concrete noun phrase (≤ 100 chars).
+  - `long_description`: multi-sentence examine prose, grounded in the prompt —
+    do not invent facts the wizard did not imply.
+  - `fixed`: true only when the thing is embedded, bolted, mounted, or immobile.
+
+  `draft_npc_blueprint`:
+  - `name`: the NPC's name or short descriptor (e.g. "Garrick", "cave troll").
+  - `short_description`: one-line room-listing phrase with an article.
+  - `long_description`: multi-sentence examine prose.
+  - `lore`: private backstory / personality grounding the NPC's conversation;
+    not shown verbatim to players.
+  - `fixed`: true only if the NPC cannot be moved (rare).
+  - `toolsets`: names of behavior groups to attach, chosen from `list_toolsets`.
+    Omit or leave empty if none fit; never invent names.
   """
+
+  # The model may call `list_toolsets` to ground toolset proposals before it
+  # drafts. Bound the number of read-tool hops so a misbehaving model can't
+  # loop forever; the draft/refuse call terminates the loop.
+  @max_wizard_tool_hops 3
 
   @doc """
   Resolve a wizard's natural-language prompt into a blueprint *draft*.
-  Returns `{:ok, {:draft_blueprint, fields_map}}` or
+  Returns `{:ok, {:draft_blueprint, fields}}` (object),
+  `{:ok, {:draft_npc_blueprint, fields}}` (npc), or
   `{:error, refusal_message}`. Never raises — failures collapse to
   refusals — and never persists anything.
+
+  The model may call the `list_toolsets` read tool to ground NPC toolset
+  proposals; the resolver answers it and continues the conversation until
+  the model drafts or refuses (bounded by `@max_wizard_tool_hops`).
 
   Used by `GameLive` when a wizard submits the prompt textarea while in
   `:blueprints` mode (`:authoring_mode == :blueprints`).
   """
   @spec resolve_wizard_blueprint(integer(), String.t()) ::
-          {:ok, {:draft_blueprint, map()}} | {:error, String.t()}
+          {:ok, {:draft_blueprint, map()}}
+          | {:ok, {:draft_npc_blueprint, map()}}
+          | {:error, String.t()}
   def resolve_wizard_blueprint(player_id, raw_input)
       when is_integer(player_id) and is_binary(raw_input) do
     started_at = System.monotonic_time(:millisecond)
@@ -236,17 +261,43 @@ defmodule AgenticRealms.World.IntentResolver do
         {:error, @too_long_refusal}
 
       true ->
-        request = build_wizard_blueprint_request(trimmed)
-
-        case Anthropic.create_message(request) do
-          {:ok, response} -> parse_wizard_blueprint_response(response)
-          {:error, :no_api_key} -> {:error, @no_key_refusal}
-          {:error, _reason} -> {:error, @generic_refusal}
-        end
+        run_blueprint_loop([%{"role" => "user", "content" => trimmed}], 0)
     end
   end
 
-  defp build_wizard_blueprint_request(user_message) do
+  # Exhausted the read-tool hop budget without a draft/refuse — treat as
+  # an unparseable intent rather than looping.
+  defp run_blueprint_loop(_messages, hops) when hops >= @max_wizard_tool_hops do
+    {:error, @generic_refusal}
+  end
+
+  defp run_blueprint_loop(messages, hops) do
+    request = build_wizard_blueprint_request(messages)
+
+    case Anthropic.create_message(request) do
+      {:ok, response} ->
+        case extract_single_tool_use(response) do
+          {:ok, %{"name" => "list_toolsets", "id" => id}} when is_binary(id) ->
+            messages
+            |> append_tool_round(id, "list_toolsets", list_toolsets_result())
+            |> run_blueprint_loop(hops + 1)
+
+          {:ok, tool_use} ->
+            map_wizard_tool_use(tool_use)
+
+          {:error, reason} ->
+            {:error, reason}
+        end
+
+      {:error, :no_api_key} ->
+        {:error, @no_key_refusal}
+
+      {:error, _reason} ->
+        {:error, @generic_refusal}
+    end
+  end
+
+  defp build_wizard_blueprint_request(messages) when is_list(messages) do
     %{
       "max_tokens" => 512,
       "system" => [
@@ -258,25 +309,69 @@ defmodule AgenticRealms.World.IntentResolver do
       ],
       "tools" => WizardTools.list_blueprints(),
       "tool_choice" => %{"type" => "any"},
-      "messages" => [%{"role" => "user", "content" => user_message}]
+      "messages" => messages
     }
+  end
+
+  # Append the model's `list_toolsets` call + our tool_result so the next
+  # turn sees the grounded toolset list.
+  defp append_tool_round(messages, tool_use_id, name, result_text) do
+    messages ++
+      [
+        %{
+          "role" => "assistant",
+          "content" => [
+            %{"type" => "tool_use", "id" => tool_use_id, "name" => name, "input" => %{}}
+          ]
+        },
+        %{
+          "role" => "user",
+          "content" => [
+            %{"type" => "tool_result", "tool_use_id" => tool_use_id, "content" => result_text}
+          ]
+        }
+      ]
+  end
+
+  # The toolsets the LLM is allowed to propose for an NPC, as a readable
+  # block fed back through the `list_toolsets` tool_result.
+  defp list_toolsets_result do
+    case Toolsets.list_for(:npc) do
+      [] ->
+        "No toolsets are registered. Do not propose any."
+
+      toolsets ->
+        toolsets
+        |> Enum.map(fn t -> "- #{t.name}: #{t.description || "(no description)"}" end)
+        |> Enum.join("\n")
+    end
   end
 
   @doc """
   Parse an Anthropic Messages API response body into a wizard blueprint
-  draft outcome. Exposed for unit testing without HTTP.
+  draft outcome (single-shot, no `list_toolsets` hop). Exposed for unit
+  testing the tool-use → outcome mapping without HTTP.
   """
   @spec parse_wizard_blueprint_response(map()) ::
-          {:ok, {:draft_blueprint, map()}} | {:error, String.t()}
-  def parse_wizard_blueprint_response(%{"content" => content}) when is_list(content) do
+          {:ok, {:draft_blueprint, map()}}
+          | {:ok, {:draft_npc_blueprint, map()}}
+          | {:error, String.t()}
+  def parse_wizard_blueprint_response(response) do
+    case extract_single_tool_use(response) do
+      {:ok, tool_use} -> map_wizard_tool_use(tool_use)
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp extract_single_tool_use(%{"content" => content}) when is_list(content) do
     case Enum.filter(content, &(&1["type"] == "tool_use")) do
-      [tool_use] -> map_wizard_tool_use(tool_use)
+      [tool_use] -> {:ok, tool_use}
       [_ | _] -> {:error, @multi_step_refusal}
       [] -> {:error, @generic_refusal}
     end
   end
 
-  def parse_wizard_blueprint_response(_), do: {:error, @generic_refusal}
+  defp extract_single_tool_use(_), do: {:error, @generic_refusal}
 
   defp map_wizard_tool_use(%{"name" => name, "input" => input}) when is_map(input) do
     if MapSet.member?(WizardTools.names_blueprints(), name) do
@@ -305,10 +400,38 @@ defmodule AgenticRealms.World.IntentResolver do
     end
   end
 
+  defp to_wizard_outcome("draft_npc_blueprint", input) do
+    with name when is_binary(name) and name != "" <- input["name"],
+         short when is_binary(short) and short != "" <- input["short_description"],
+         long when is_binary(long) and long != "" <- input["long_description"] do
+      {:ok,
+       {:draft_npc_blueprint,
+        %{
+          name: name,
+          short_description: short,
+          long_description: long,
+          lore: (is_binary(input["lore"]) && input["lore"]) || "",
+          fixed: input["fixed"] == true,
+          # FR-018 — drop any proposed name not in the NPC toolset registry
+          # so a hallucinated toolset never reaches the picker/commit.
+          toolsets: grounded_toolsets(input["toolsets"])
+        }}}
+    else
+      _ -> {:error, @generic_refusal}
+    end
+  end
+
   defp to_wizard_outcome("refuse", %{"message" => m}) when is_binary(m) and m != "",
     do: {:error, m}
 
   defp to_wizard_outcome(_, _), do: {:error, @generic_refusal}
+
+  defp grounded_toolsets(names) when is_list(names) do
+    registered = Toolsets.list_for(:npc) |> MapSet.new(& &1.name)
+    Enum.filter(names, &(is_binary(&1) and MapSet.member?(registered, &1)))
+  end
+
+  defp grounded_toolsets(_), do: []
 
   @wizard_world_system_prompt """
   You are a tool-call dispatcher for a wizard manifesting a one-off
@@ -319,10 +442,13 @@ defmodule AgenticRealms.World.IntentResolver do
   fields) or `refuse` — and never to produce free-form prose.
 
   The thing being manifested is a one-off, NOT a reusable archetype.
-  Use `manifest_object_freeform` for concrete particulars
-  ("the small clay pot leaning against the eastern wall, half-empty");
-  refuse if the prompt is a question, an edit request, or describes
-  a place / NPC / quest.
+  Use `manifest_object_freeform` for a concrete inanimate particular
+  ("the small clay pot leaning against the eastern wall, half-empty").
+  Use `manifest_npc_freeform` for a one-off character / creature / person
+  ("a nervous courier catching his breath by the door") — it also takes
+  `lore` (private personality grounding the NPC's conversation).
+  Refuse if the prompt is a question, an edit request, or describes a
+  place / room / quest.
 
   Field formatting rules:
   - `name`: short lowercase noun phrase (1–4 words), no leading article.
@@ -342,7 +468,9 @@ defmodule AgenticRealms.World.IntentResolver do
   set + system prompt.
   """
   @spec resolve_wizard_world(integer(), String.t()) ::
-          {:ok, {:freeform_object, map()}} | {:error, String.t()}
+          {:ok, {:freeform_object, map()}}
+          | {:ok, {:freeform_npc, map()}}
+          | {:error, String.t()}
   def resolve_wizard_world(player_id, raw_input)
       when is_integer(player_id) and is_binary(raw_input) do
     started_at = System.monotonic_time(:millisecond)
@@ -432,6 +560,24 @@ defmodule AgenticRealms.World.IntentResolver do
     end
   end
 
+  defp to_wizard_world_outcome("manifest_npc_freeform", input) do
+    with name when is_binary(name) and name != "" <- input["name"],
+         short when is_binary(short) and short != "" <- input["short_description"],
+         long when is_binary(long) and long != "" <- input["long_description"] do
+      {:ok,
+       {:freeform_npc,
+        %{
+          name: name,
+          short_description: short,
+          long_description: long,
+          lore: (is_binary(input["lore"]) && input["lore"]) || "",
+          fixed: input["fixed"] == true
+        }}}
+    else
+      _ -> {:error, @generic_refusal}
+    end
+  end
+
   defp to_wizard_world_outcome("refuse", %{"message" => m}) when is_binary(m) and m != "",
     do: {:error, m}
 
@@ -443,6 +589,7 @@ defmodule AgenticRealms.World.IntentResolver do
     {result, tool_name} =
       case outcome do
         {:ok, {:freeform_object, _}} -> {:object_chosen, "manifest_object_freeform"}
+        {:ok, {:freeform_npc, _}} -> {:npc_chosen, "manifest_npc_freeform"}
         {:error, _} -> {:refused, nil}
       end
 
@@ -465,6 +612,7 @@ defmodule AgenticRealms.World.IntentResolver do
     {result, tool_name} =
       case outcome do
         {:ok, {:draft_blueprint, _}} -> {:draft_chosen, "draft_object_blueprint"}
+        {:ok, {:draft_npc_blueprint, _}} -> {:draft_chosen, "draft_npc_blueprint"}
         {:error, _} -> {:refused, nil}
       end
 
