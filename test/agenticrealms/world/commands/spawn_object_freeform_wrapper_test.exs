@@ -6,7 +6,7 @@ defmodule AgenticRealms.World.Commands.SpawnObjectFreeformWrapperTest do
   alias AgenticRealms.Accounts
   alias AgenticRealms.Repo
   alias AgenticRealms.World.{Commands, Queries, Seed}
-  alias AgenticRealms.World.Schemas.{Object, ObjectBlueprint}
+  alias AgenticRealms.World.Schemas.{Object, Blueprint}
 
   setup do
     try do
@@ -145,6 +145,6 @@ defmodule AgenticRealms.World.Commands.SpawnObjectFreeformWrapperTest do
 
     # Blueprint registry contains exactly one row for this scenario — the
     # one authored explicitly; the freeform path added none.
-    assert %ObjectBlueprint{id: ^slug} = Repo.get(ObjectBlueprint, slug)
+    assert %Blueprint{id: ^slug} = Repo.get(Blueprint, slug)
   end
 end

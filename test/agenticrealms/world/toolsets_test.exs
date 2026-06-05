@@ -12,7 +12,13 @@ defmodule AgenticRealms.World.ToolsetsTest do
   defp put_toolset(name, behaviors, applies_to \\ ["npc"]) do
     now = DateTime.utc_now() |> DateTime.truncate(:second)
 
-    %Toolset{name: name, behaviors: behaviors, applies_to: applies_to, inserted_at: now, updated_at: now}
+    %Toolset{
+      name: name,
+      behaviors: behaviors,
+      applies_to: applies_to,
+      inserted_at: now,
+      updated_at: now
+    }
     |> Repo.insert!()
   end
 

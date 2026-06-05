@@ -1,7 +1,7 @@
-defmodule AgenticRealms.World.ObjectBlueprint.SlugTest do
+defmodule AgenticRealms.World.Blueprint.SlugTest do
   use ExUnit.Case, async: true
 
-  alias AgenticRealms.World.ObjectBlueprint.Slug
+  alias AgenticRealms.World.Blueprint.Slug
 
   describe "derive/1" do
     test "lowercases and underscore-joins multi-word names" do

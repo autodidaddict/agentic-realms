@@ -588,8 +588,14 @@ defmodule AgenticRealms.World.Seed do
         description: "Greets arrivals and bids farewell to those who leave.",
         applies_to: ["npc"],
         behaviors: [
-          %{"trigger" => "player_entered", "actions" => [%{"type" => "say", "text" => "Welcome, traveler."}]},
-          %{"trigger" => "player_left", "actions" => [%{"type" => "say", "text" => "Safe roads."}]}
+          %{
+            "trigger" => "player_entered",
+            "actions" => [%{"type" => "say", "text" => "Welcome, traveler."}]
+          },
+          %{
+            "trigger" => "player_left",
+            "actions" => [%{"type" => "say", "text" => "Safe roads."}]
+          }
         ]
       },
       %{
@@ -599,7 +605,9 @@ defmodule AgenticRealms.World.Seed do
         behaviors: [
           %{
             "trigger" => "player_entered",
-            "actions" => [%{"type" => "emote", "text" => "looks up from the ledger, sizing you up."}]
+            "actions" => [
+              %{"type" => "emote", "text" => "looks up from the ledger, sizing you up."}
+            ]
           }
         ]
       }

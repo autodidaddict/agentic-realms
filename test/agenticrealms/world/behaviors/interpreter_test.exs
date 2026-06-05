@@ -13,7 +13,7 @@ defmodule AgenticRealms.World.Behaviors.InterpreterTest do
   alias AgenticRealmsWeb.Topics
   alias AgenticRealms.World.Behaviors.Interpreter
   alias AgenticRealms.World.Events.PlayerMoved
-  alias AgenticRealms.World.Schemas.{Room, PlayerState, NPCBlueprint, NPCClone}
+  alias AgenticRealms.World.Schemas.{Room, PlayerState, Blueprint, NPCClone}
   alias AgenticRealms.World.UIEvents.BehaviorUtterance
   alias AgenticRealmsWeb.Presence
 
@@ -32,7 +32,7 @@ defmodule AgenticRealms.World.Behaviors.InterpreterTest do
   end
 
   defp insert_blueprint do
-    Repo.insert!(%NPCBlueprint{
+    Repo.insert!(%Blueprint{
       id: "test_bp_#{System.unique_integer([:positive])}",
       name: "Test NPC",
       short_description: "short",

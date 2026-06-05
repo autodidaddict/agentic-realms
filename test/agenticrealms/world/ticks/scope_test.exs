@@ -5,7 +5,7 @@ defmodule AgenticRealms.World.Ticks.ScopeTest do
 
   use AgenticRealms.DataCase, async: false
 
-  alias AgenticRealms.World.Schemas.{NPCBlueprint, NPCClone, Object, PlayerState, Room}
+  alias AgenticRealms.World.Schemas.{Blueprint, NPCClone, Object, PlayerState, Room}
   alias AgenticRealms.World.Ticks.Scope
 
   defp tick(text, interval_ms) do
@@ -31,7 +31,7 @@ defmodule AgenticRealms.World.Ticks.ScopeTest do
   end
 
   defp insert_blueprint do
-    Repo.insert!(%NPCBlueprint{
+    Repo.insert!(%Blueprint{
       id: "test_bp_#{System.unique_integer([:positive])}",
       name: "BP",
       short_description: "s",

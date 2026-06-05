@@ -27,9 +27,9 @@ defmodule AgenticRealmsWeb.GameLiveNPCTest do
   alias AgenticRealms.Repo
   alias AgenticRealms.World.Application, as: WorldApp
   alias AgenticRealms.World.Commands, as: WorldCommands
-  alias AgenticRealms.World.Commands.CreateNPCBlueprint
+  alias AgenticRealms.World.Commands.CreateBlueprint
   alias AgenticRealms.World.{Queries, Seed}
-  alias AgenticRealms.World.Schemas.{NPCBlueprint, NPCClone}
+  alias AgenticRealms.World.Schemas.{Blueprint, NPCClone}
 
   setup %{conn: conn} do
     try do
@@ -71,8 +71,8 @@ defmodule AgenticRealmsWeb.GameLiveNPCTest do
     # clone with serial 1 lives in the starting room. Feature 013 also
     # seeds the Amaranth blueprint + clone in Hollowvale — we filter
     # this assertion to Garrick specifically.
-    assert %NPCBlueprint{id: "garrick_the_innkeeper", is_synthetic: false} =
-             Repo.get(NPCBlueprint, "garrick_the_innkeeper")
+    assert %Blueprint{id: "garrick_the_innkeeper", kind: "npc"} =
+             Repo.get(Blueprint, "garrick_the_innkeeper")
 
     [%NPCClone{name: "Garrick the Innkeeper", serial: 1, room_id: room_id}] =
       Repo.all(from(c in NPCClone, where: c.blueprint_id == "garrick_the_innkeeper"))
@@ -95,7 +95,7 @@ defmodule AgenticRealmsWeb.GameLiveNPCTest do
     # Unknown room:
     :ok =
       WorldApp.dispatch(
-        %CreateNPCBlueprint{
+        %CreateBlueprint{
           blueprint_id: "test_bp_no_room",
           name: "Test NPC No Room",
           short_description: "a test npc",
@@ -114,7 +114,7 @@ defmodule AgenticRealmsWeb.GameLiveNPCTest do
     # Name collision (Garrick is already in the starting room from seed):
     :ok =
       WorldApp.dispatch(
-        %CreateNPCBlueprint{
+        %CreateBlueprint{
           blueprint_id: "duplicate_garrick",
           name: "Garrick the Innkeeper",
           short_description: "another wiry innkeeper",
@@ -169,12 +169,12 @@ defmodule AgenticRealmsWeb.GameLiveNPCTest do
 
     {1, _} =
       Repo.update_all(
-        from(b in NPCBlueprint, where: b.id == "garrick_the_innkeeper"),
+        from(b in Blueprint, where: b.id == "garrick_the_innkeeper"),
         set: [long_description: "MUTATED — should not appear on existing clones."]
       )
 
     # Blueprint changed.
-    assert Repo.get(NPCBlueprint, "garrick_the_innkeeper").long_description ==
+    assert Repo.get(Blueprint, "garrick_the_innkeeper").long_description ==
              "MUTATED — should not appear on existing clones."
 
     # Clone unchanged.
@@ -188,7 +188,7 @@ defmodule AgenticRealmsWeb.GameLiveNPCTest do
     # purely cosmetic.
     {1, _} =
       Repo.update_all(
-        from(b in NPCBlueprint, where: b.id == "garrick_the_innkeeper"),
+        from(b in Blueprint, where: b.id == "garrick_the_innkeeper"),
         set: [long_description: original_long_description]
       )
 
@@ -279,7 +279,7 @@ defmodule AgenticRealmsWeb.GameLiveNPCTest do
 
     :ok =
       WorldApp.dispatch(
-        %CreateNPCBlueprint{
+        %CreateBlueprint{
           blueprint_id: "maelyn_the_bard",
           name: "Maelyn the Bard",
           short_description: "a slender bard tuning a lute",
@@ -336,7 +336,7 @@ defmodule AgenticRealmsWeb.GameLiveNPCTest do
 
     :ok =
       WorldApp.dispatch(
-        %CreateNPCBlueprint{
+        %CreateBlueprint{
           blueprint_id: "renn_the_apprentice",
           name: "Renn the Apprentice",
           short_description: "a fidgeting apprentice",

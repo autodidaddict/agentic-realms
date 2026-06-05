@@ -7,7 +7,7 @@ defmodule AgenticRealms.World.Commands.CreateNPCBlueprintWrapperTest do
   alias AgenticRealms.Repo
   alias AgenticRealms.World.Commands
   alias AgenticRealms.World.Queries
-  alias AgenticRealms.World.Schemas.{NPCBlueprint, ObjectBlueprint, Toolset}
+  alias AgenticRealms.World.Schemas.{Blueprint, Toolset}
 
   @greeter %{
     "trigger" => "player_entered",
@@ -54,7 +54,7 @@ defmodule AgenticRealms.World.Commands.CreateNPCBlueprintWrapperTest do
                toolsets: ["greeter"]
              })
 
-    assert %NPCBlueprint{
+    assert %Blueprint{
              id: ^slug,
              kind: "npc",
              revision: 1,
@@ -78,7 +78,7 @@ defmodule AgenticRealms.World.Commands.CreateNPCBlueprintWrapperTest do
                long_description: "z"
              })
 
-    assert is_nil(Repo.get(NPCBlueprint, slug))
+    assert is_nil(Repo.get(Blueprint, slug))
   end
 
   test "refuses an invalid slug shape", %{wizard: wizard} do
@@ -114,7 +114,8 @@ defmodule AgenticRealms.World.Commands.CreateNPCBlueprintWrapperTest do
                long_description: "z"
              })
 
-    assert is_nil(Repo.get(NPCBlueprint, slug))
+    # One namespace: the slug is taken by the object; no npc-kind row exists.
+    assert %Blueprint{kind: "object"} = Repo.get(Blueprint, slug)
   end
 
   test "an object cannot reuse an npc slug (FR-004, reverse direction)",
@@ -139,7 +140,8 @@ defmodule AgenticRealms.World.Commands.CreateNPCBlueprintWrapperTest do
                long_description: "z"
              })
 
-    assert is_nil(Repo.get(ObjectBlueprint, slug))
+    # One namespace: the slug is taken by the npc; no object-kind row exists.
+    assert %Blueprint{kind: "npc"} = Repo.get(Blueprint, slug)
   end
 
   test "refuses an unknown toolset name (FR-018)",
@@ -156,7 +158,7 @@ defmodule AgenticRealms.World.Commands.CreateNPCBlueprintWrapperTest do
                toolsets: ["ghost"]
              })
 
-    assert is_nil(Repo.get(NPCBlueprint, slug))
+    assert is_nil(Repo.get(Blueprint, slug))
   end
 
   test "refuses a direct behavior outside the feature-009 vocabulary (FR-014)",
@@ -175,6 +177,6 @@ defmodule AgenticRealms.World.Commands.CreateNPCBlueprintWrapperTest do
                behaviors: bad
              })
 
-    assert is_nil(Repo.get(NPCBlueprint, slug))
+    assert is_nil(Repo.get(Blueprint, slug))
   end
 end

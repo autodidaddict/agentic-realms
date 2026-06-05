@@ -33,9 +33,7 @@ defmodule AgenticRealms.Repo.Migrations.UnifyBlueprints do
              check: "id ~ '^[a-z][a-z0-9_]*$' AND char_length(id) BETWEEN 1 AND 64"
            )
 
-    create constraint(:blueprints, :blueprints_kind_check,
-             check: "kind IN ('object', 'npc')"
-           )
+    create constraint(:blueprints, :blueprints_kind_check, check: "kind IN ('object', 'npc')")
 
     create constraint(:blueprints, :blueprints_revision_positive, check: "revision > 0")
 

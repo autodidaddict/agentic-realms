@@ -79,7 +79,7 @@ defmodule AgenticRealmsWeb.GameLiveQuestTest do
     # The Orchard Keeper blueprint exists with the FetchQuest in its
     # catalog, and the four Hollowvale rooms were created.
     blueprint =
-      Repo.get(AgenticRealms.World.Schemas.NPCBlueprint, @blueprint_id)
+      Repo.get(AgenticRealms.World.Schemas.Blueprint, @blueprint_id)
 
     assert blueprint != nil, "Orchard Keeper blueprint should be seeded"
     assert [catalog_entry] = blueprint.quests

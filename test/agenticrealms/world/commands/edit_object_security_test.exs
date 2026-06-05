@@ -14,7 +14,7 @@ defmodule AgenticRealms.World.Commands.EditObjectSecurityTest do
   alias AgenticRealms.Accounts
   alias AgenticRealms.Repo
   alias AgenticRealms.World.{Commands, Seed}
-  alias AgenticRealms.World.Schemas.{Object, ObjectBlueprint}
+  alias AgenticRealms.World.Schemas.{Object, Blueprint}
 
   setup do
     try do
@@ -138,7 +138,7 @@ defmodule AgenticRealms.World.Commands.EditObjectSecurityTest do
                Commands.extract_object_essence(w.id, object_id, slug)
 
       # No blueprint persisted.
-      assert is_nil(Repo.get(ObjectBlueprint, slug))
+      assert is_nil(Repo.get(Blueprint, slug))
     end
   end
 

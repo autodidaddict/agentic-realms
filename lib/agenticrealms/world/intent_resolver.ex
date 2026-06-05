@@ -320,7 +320,9 @@ defmodule AgenticRealms.World.IntentResolver do
       [
         %{
           "role" => "assistant",
-          "content" => [%{"type" => "tool_use", "id" => tool_use_id, "name" => name, "input" => %{}}]
+          "content" => [
+            %{"type" => "tool_use", "id" => tool_use_id, "name" => name, "input" => %{}}
+          ]
         },
         %{
           "role" => "user",

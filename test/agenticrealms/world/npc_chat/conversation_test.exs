@@ -16,7 +16,7 @@ defmodule AgenticRealms.World.NPCChat.ConversationTest do
   alias AgenticRealms.Accounts
   alias AgenticRealmsWeb.Topics
   alias AgenticRealms.World.NPCChat.Conversation
-  alias AgenticRealms.World.Schemas.{NPCBlueprint, NPCClone, PlayerState, Room}
+  alias AgenticRealms.World.Schemas.{Blueprint, NPCClone, PlayerState, Room}
   alias AgenticRealms.World.UIEvents.{ChatSystemMessage, ChatUtterance}
 
   @pubsub AgenticRealms.PubSub
@@ -33,7 +33,7 @@ defmodule AgenticRealms.World.NPCChat.ConversationTest do
   end
 
   defp insert_blueprint do
-    Repo.insert!(%NPCBlueprint{
+    Repo.insert!(%Blueprint{
       id: "test_bp_#{System.unique_integer([:positive])}",
       name: "Test Blueprint",
       short_description: "short",

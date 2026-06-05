@@ -102,7 +102,7 @@ spawn flows route through it. Drop the two old tables/aggregates (reseed). Keep 
 
 ### U5 — Tests + green gate
 
-- [ ] T076 [P] Rework blueprint tests to the unified model: `blueprint_test.exs` (create/edit/lock — folds object+npc aggregate tests), `blueprint_projector_test.exs`, unified wrapper tests; delete the obsolete object/npc-specific aggregate+projector+wrapper tests.
+- [X] T076 [P] Rework blueprint tests to the unified model: `blueprint_test.exs` (create/edit/lock — folds object+npc aggregate tests), `blueprint_projector_test.exs`, unified wrapper tests; delete the obsolete object/npc-specific aggregate+projector+wrapper tests.
 - [ ] T077 Full non-regression: `mix test` green incl. 008/009/010/013/014/016; `mix compile --warnings-as-errors` clean; `mix format`.
 
 ---
