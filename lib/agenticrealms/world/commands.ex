@@ -317,12 +317,12 @@ defmodule AgenticRealms.World.Commands do
   the entity lifecycle (`clone_into(:npc, …)`), with the blueprint's current
   data (incl. its `blueprint_id` reference, behaviors and lore) copied into
   the `EntityCloned` payload (full-copy at dispatch time). Returns
-  `{:ok, %{clone_id, serial}}`.
+  `{:ok, %{clone_id: clone_id}}`.
 
   See `specs/008-npc-blueprints/contracts/commands.md`.
   """
   @spec spawn_npc_clone(String.t(), String.t(), String.t()) ::
-          {:ok, %{clone_id: String.t(), serial: integer()}}
+          {:ok, %{clone_id: String.t()}}
           | {:error,
              :blueprint_not_found
              | :room_not_found
@@ -346,11 +346,8 @@ defmodule AgenticRealms.World.Commands do
     with :ok <- check_room_exists(room_id),
          :ok <- check_no_clone_name_collision(room_id, bp.name),
          {:ok, effective} <- Toolsets.compose(bp.toolsets || [], bp.behaviors || []) do
-      serial = next_npc_serial(bp.id)
-
       fields = %{
         blueprint_id: bp.id,
-        serial: serial,
         name: bp.name,
         short_description: bp.short_description,
         long_description: bp.long_description,
@@ -362,7 +359,7 @@ defmodule AgenticRealms.World.Commands do
       }
 
       case clone_into(:npc, clone_id, fields, ContainerRef.room(room_id), :spawned) do
-        {:ok, _} -> {:ok, %{clone_id: clone_id, serial: serial}}
+        {:ok, _} -> {:ok, %{clone_id: clone_id}}
         {:error, _} = err -> err
       end
     end
@@ -374,18 +371,6 @@ defmodule AgenticRealms.World.Commands do
       %Blueprint{kind: "npc"} = bp -> {:ok, bp}
       # A slug that resolves to an object blueprint is not a valid NPC source.
       %Blueprint{} -> {:error, :blueprint_not_found}
-    end
-  end
-
-  defp next_npc_serial(blueprint_id) do
-    from(c in AgenticRealms.World.Schemas.NPCClone,
-      where: c.blueprint_id == ^blueprint_id,
-      select: max(c.serial)
-    )
-    |> Repo.one()
-    |> case do
-      nil -> 1
-      n -> n + 1
     end
   end
 
@@ -1002,11 +987,8 @@ defmodule AgenticRealms.World.Commands do
          :ok <- check_room_exists(room_id),
          :ok <- check_no_clone_name_collision(room_id, attrs[:name]) do
       fields = %{
+        # Freeform NPCs have no blueprint behind them.
         blueprint_id: nil,
-        # Freeform NPCs aren't the Nth instance of any blueprint, so they carry
-        # no serial (the column is nullable; the NULL blueprint_id keeps the
-        # (blueprint_id, serial) unique index distinct).
-        serial: nil,
         name: attrs[:name],
         short_description: attrs[:short_description],
         long_description: attrs[:long_description],

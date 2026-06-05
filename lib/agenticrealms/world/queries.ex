@@ -96,18 +96,16 @@ defmodule AgenticRealms.World.Queries do
           %{
             id: String.t(),
             name: String.t(),
-            serial: integer(),
             behaviors: [map()]
           }
         ]
   def list_npc_clones_in_room_with_behaviors(room_id) when is_binary(room_id) do
     from(c in NPCClone,
       where: c.room_id == ^room_id,
-      order_by: c.serial,
+      order_by: [c.name, c.id],
       select: %{
         id: c.id,
         name: c.name,
-        serial: c.serial,
         behaviors: c.behaviors
       }
     )
@@ -153,8 +151,7 @@ defmodule AgenticRealms.World.Queries do
           {:ok,
            %{
              id: String.t(),
-             blueprint_id: String.t(),
-             serial: integer(),
+             blueprint_id: String.t() | nil,
              name: String.t(),
              room_id: String.t()
            }}
@@ -169,7 +166,6 @@ defmodule AgenticRealms.World.Queries do
          %{
            id: c.id,
            blueprint_id: c.blueprint_id,
-           serial: c.serial,
            name: c.name,
            room_id: c.room_id
          }}

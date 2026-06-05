@@ -74,7 +74,7 @@ defmodule AgenticRealmsWeb.GameLiveNPCTest do
     assert %Blueprint{id: "garrick_the_innkeeper", kind: "npc"} =
              Repo.get(Blueprint, "garrick_the_innkeeper")
 
-    [%NPCClone{name: "Garrick the Innkeeper", serial: 1, room_id: room_id}] =
+    [%NPCClone{name: "Garrick the Innkeeper", room_id: room_id}] =
       Repo.all(from(c in NPCClone, where: c.blueprint_id == "garrick_the_innkeeper"))
 
     assert room_id == Seed.starting_room_id()
@@ -134,18 +134,18 @@ defmodule AgenticRealmsWeb.GameLiveNPCTest do
     # room scope of FR-015):
     corridor_id = "00000000-0000-4000-8000-000000000002"
 
-    assert {:ok, %{serial: 1}} =
+    assert {:ok, %{clone_id: _}} =
              WorldCommands.spawn_npc_clone(
                "duplicate_garrick",
                corridor_id,
                Ecto.UUID.generate()
              )
 
-    # Two spawns from the same blueprint into different rooms produce
-    # consecutive serials (SC-004):
+    # The same blueprint can be spawned again into yet another room — clones
+    # are distinguished by their entity id (no per-blueprint serial anymore):
     library_id = "00000000-0000-4000-8000-000000000003"
 
-    assert {:ok, %{serial: 2}} =
+    assert {:ok, %{clone_id: _}} =
              WorldCommands.spawn_npc_clone(
                "duplicate_garrick",
                library_id,
@@ -261,8 +261,8 @@ defmodule AgenticRealmsWeb.GameLiveNPCTest do
 
     # Feature 008 FR-011 / SC-006: the `<name>#<serial>` debug identity MUST
     # NOT leak into any player-facing surface.
-    refute html =~ ~r/Garrick the Innkeeper#\d+/,
-           "FR-011: player-facing HTML must not contain the <name>#<serial> debug identity"
+    refute html =~ ~r/Garrick the Innkeeper#[0-9a-f]/,
+           "FR-011: player-facing HTML must not contain the <name>#<id> debug identity"
 
     # SC-005: Bob sees no log entry from Alice's examine.
     assert log_count(bob_view) == log_count_before,

@@ -46,7 +46,6 @@ defmodule AgenticRealms.World.NPCChat.ConversationTest do
     Repo.insert!(%NPCClone{
       id: Ecto.UUID.generate(),
       blueprint_id: blueprint.id,
-      serial: 1,
       name: Keyword.get(opts, :name, "Garrick"),
       short_description: "short",
       long_description: "long",

@@ -294,7 +294,6 @@ defmodule AgenticRealms.World.ExamineTest do
     Repo.insert!(%NPCClone{
       id: Ecto.UUID.generate(),
       blueprint_id: blueprint_id,
-      serial: 1,
       name: name,
       short_description: "a #{name}",
       long_description: long_description,
@@ -417,7 +416,7 @@ defmodule AgenticRealms.World.ExamineTest do
 
         assert_receive {^ref, metadata}, 200
 
-        expected_debug = "#{garrick.name}##{garrick.serial}"
+        expected_debug = "#{garrick.name}##{garrick.id}"
         assert metadata.clone_debug_id == expected_debug
         assert metadata.target_kind == :npc
       after

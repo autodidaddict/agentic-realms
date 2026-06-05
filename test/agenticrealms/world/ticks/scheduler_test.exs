@@ -53,7 +53,6 @@ defmodule AgenticRealms.World.Ticks.SchedulerTest do
     Repo.insert!(%NPCClone{
       id: Ecto.UUID.generate(),
       blueprint_id: bp.id,
-      serial: Keyword.get(opts, :serial, 1),
       name: Keyword.get(opts, :name, "Guard"),
       short_description: "s",
       long_description: "l",

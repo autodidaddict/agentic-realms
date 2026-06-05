@@ -113,7 +113,6 @@ defmodule AgenticRealms.World.Projections.EntityProjector do
       %NPCClone{
         id: id,
         blueprint_id: fval(fields, :blueprint_id),
-        serial: fval(fields, :serial),
         name: fval(fields, :name),
         short_description: fval(fields, :short_description),
         long_description: fval(fields, :long_description),

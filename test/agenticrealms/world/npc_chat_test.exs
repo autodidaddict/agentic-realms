@@ -39,7 +39,6 @@ defmodule AgenticRealms.World.NPCChatTest do
     Repo.insert!(%NPCClone{
       id: Ecto.UUID.generate(),
       blueprint_id: blueprint.id,
-      serial: Keyword.get(opts, :serial, 1),
       name: Keyword.get(opts, :name, "Garrick"),
       short_description: "short",
       long_description: "long",
@@ -116,8 +115,8 @@ defmodule AgenticRealms.World.NPCChatTest do
     test "ambiguous partial match → :ambiguous_npc", %{room: room} do
       # Two NPCs with overlapping substrings.
       bp = insert_blueprint(name: "Guards", lore: "")
-      _g1 = insert_clone(bp, room, name: "Town Guard", serial: 1)
-      _g2 = insert_clone(bp, room, name: "Guard Captain", serial: 2)
+      _g1 = insert_clone(bp, room, name: "Town Guard")
+      _g2 = insert_clone(bp, room, name: "Guard Captain")
 
       {:ok, player} =
         Accounts.register_player(%{

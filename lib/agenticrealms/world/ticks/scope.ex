@@ -22,7 +22,6 @@ defmodule AgenticRealms.World.Ticks.Scope do
   @type behavior_entry :: %{
           target_kind: :room | :npc | :object,
           target_id: String.t(),
-          target_serial: integer() | nil,
           behavior_index: non_neg_integer(),
           interval_ms: pos_integer(),
           actions: [map()],
@@ -32,8 +31,8 @@ defmodule AgenticRealms.World.Ticks.Scope do
 
   @doc """
   Compute the full in-scope tick-behavior set for `room_id`. Sorted per
-  FR-008a (room → npc → object; within npc by serial; within object by
-  target_id; within a single target by authored behavior_index).
+  FR-008a (room → npc → object; within a kind by target_id; within a single
+  target by authored behavior_index).
   """
   @spec compute(room_id :: String.t()) :: [behavior_entry()]
   def compute(room_id) when is_binary(room_id) do
@@ -107,7 +106,7 @@ defmodule AgenticRealms.World.Ticks.Scope do
         |> filter_tick_behaviors()
         |> Enum.with_index()
         |> Enum.map(fn {behavior, idx} ->
-          build_entry(:room, room_id, nil, idx, behavior, {:room, room_id})
+          build_entry(:room, room_id, idx, behavior, {:room, room_id})
         end)
     end
   end
@@ -117,14 +116,14 @@ defmodule AgenticRealms.World.Ticks.Scope do
     |> Enum.flat_map(&npc_entries_for_clone_data/1)
   end
 
-  # The Queries helper returns plain maps (id, name, serial, behaviors).
-  defp npc_entries_for_clone_data(%{id: id, name: name, serial: serial, behaviors: behaviors}) do
+  # The Queries helper returns plain maps (id, name, behaviors).
+  defp npc_entries_for_clone_data(%{id: id, name: name, behaviors: behaviors}) do
     (behaviors || [])
     |> filter_tick_behaviors()
     |> Enum.with_index()
     |> Enum.map(fn {behavior, idx} ->
       speaker_ctx = {:npc_clone, %{name: name, id: id}}
-      build_entry(:npc, id, serial, idx, behavior, speaker_ctx)
+      build_entry(:npc, id, idx, behavior, speaker_ctx)
     end)
   end
 
@@ -134,7 +133,6 @@ defmodule AgenticRealms.World.Ticks.Scope do
     npc_entries_for_clone_data(%{
       id: clone.id,
       name: clone.name,
-      serial: clone.serial,
       behaviors: clone.behaviors
     })
   end
@@ -165,15 +163,14 @@ defmodule AgenticRealms.World.Ticks.Scope do
     |> Enum.with_index()
     |> Enum.map(fn {behavior, idx} ->
       speaker_ctx = {:object, %{name: obj.name, id: obj.id}}
-      build_entry(:object, obj.id, nil, idx, behavior, speaker_ctx)
+      build_entry(:object, obj.id, idx, behavior, speaker_ctx)
     end)
   end
 
-  defp build_entry(kind, target_id, target_serial, idx, behavior, speaker_ctx) do
+  defp build_entry(kind, target_id, idx, behavior, speaker_ctx) do
     %{
       target_kind: kind,
       target_id: target_id,
-      target_serial: target_serial,
       behavior_index: idx,
       interval_ms: interval_ms_of(behavior),
       actions: actions_of(behavior),
@@ -196,11 +193,10 @@ defmodule AgenticRealms.World.Ticks.Scope do
     Map.get(behavior, "actions") || Map.get(behavior, :actions) || []
   end
 
-  # Stable FR-008a sort. Tuple key: kind_rank, target_serial (nil → 0),
-  # target_id, behavior_index.
+  # Stable FR-008a sort. Tuple key: kind_rank, target_id, behavior_index.
   defp sort_per_fr008a(entries) do
     Enum.sort_by(entries, fn e ->
-      {kind_rank(e.target_kind), e.target_serial || 0, e.target_id, e.behavior_index}
+      {kind_rank(e.target_kind), e.target_id, e.behavior_index}
     end)
   end
 

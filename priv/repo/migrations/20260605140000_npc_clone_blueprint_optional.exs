@@ -2,12 +2,17 @@ defmodule AgenticRealms.Repo.Migrations.NpcCloneBlueprintOptional do
   use Ecto.Migration
 
   @moduledoc """
-  Feature 015 US5 — a freeform (one-off) NPC is cloned straight into a room
-  with no blueprint behind it, so both `npc_clones.blueprint_id` AND
-  `npc_clones.serial` become nullable: a freeform clone is not the Nth instance
-  of any blueprint, so it carries neither. The `(blueprint_id, serial)` unique
-  index still holds — Postgres treats NULLs as distinct, so multiple freeform
-  clones coexist — and `max(serial)` (next-serial) ignores the NULL rows.
+  Feature 015 — `npc_clones` cleanup.
+
+  * `blueprint_id` becomes **nullable**: a freeform (one-off) NPC is cloned
+    straight into a room with no blueprint behind it. It is kept (not dropped)
+    only as the stable, denormalized quest-identity tag feature-013 quests
+    group on — it is NOT lineage (no propagation; the clone is a full copy).
+  * `serial` is **dropped** entirely. It was vestigial — only cosmetic
+    "Garrick#2" disambiguation in telemetry and a nil-tolerant tick sort
+    tiebreaker. Clones are identified by their entity id. Dropping the column
+    also removes the `(blueprint_id, serial)` unique index; the plain
+    `blueprint_id` index (from the introducing migration) remains.
   """
 
   def change do
@@ -16,9 +21,8 @@ defmodule AgenticRealms.Repo.Migrations.NpcCloneBlueprintOptional do
       "ALTER TABLE npc_clones ALTER COLUMN blueprint_id SET NOT NULL"
     )
 
-    execute(
-      "ALTER TABLE npc_clones ALTER COLUMN serial DROP NOT NULL",
-      "ALTER TABLE npc_clones ALTER COLUMN serial SET NOT NULL"
-    )
+    alter table(:npc_clones) do
+      remove :serial, :integer, null: false
+    end
   end
 end
