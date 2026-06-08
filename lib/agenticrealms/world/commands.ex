@@ -93,7 +93,7 @@ defmodule AgenticRealms.World.Commands do
   def move(player_id, direction)
       when is_integer(player_id) and is_atom(direction) do
     with {:ok, from_room_id} <- Queries.current_room_of(player_id),
-         {:ok, to_room_id} <- resolve_exit(from_room_id, direction) do
+         {:ok, to_room_id} <- resolve_exit(from_room_id, direction, player_id) do
       case WorldApp.dispatch(
              %MovePlayer{
                player_id: player_id,
@@ -297,12 +297,18 @@ defmodule AgenticRealms.World.Commands do
     end
   end
 
-  defp resolve_exit(from_room_id, direction) do
+  # Feature 017 — viewer-aware traversal. An owner-scoped exit (the transient
+  # region's owner-only `:rift` entry) resolves only for its owner; a
+  # non-owner falls through to `:no_exit_in_direction` ("You can't go that
+  # way.").
+  defp resolve_exit(from_room_id, direction, viewer_player_id) do
     dir_str = Direction.to_string(direction)
 
     case Repo.one(
            from(e in Exit,
-             where: e.source_room_id == ^from_room_id and e.direction == ^dir_str,
+             where:
+               e.source_room_id == ^from_room_id and e.direction == ^dir_str and
+                 (is_nil(e.visible_to_user_id) or e.visible_to_user_id == ^viewer_player_id),
              select: e.target_room_id
            )
          ) do

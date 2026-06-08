@@ -75,3 +75,10 @@ config :agenticrealms, AgenticRealms.World.Ticks,
   base_tick_rate_ms: 50,
   join_grace_ms: 10,
   leave_grace_ms: 50
+
+# Feature 017 — Transient Regions. The in-memory Commanded adapter has no
+# `delete_stream`, so the purge path's event-store deletes go through a
+# recording stub in tests; read-model row deletes still hit the Postgres
+# test DB. Reaper timings are driven manually in tests via `sweep_now/0`
+# plus past-dated timestamps, so the production cadence is left intact.
+config :agenticrealms, :transient_event_store, AgenticRealms.World.Transient.EventStoreStub

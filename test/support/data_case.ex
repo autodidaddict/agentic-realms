@@ -111,6 +111,10 @@ defmodule AgenticRealms.DataCase do
     ExUnit.Callbacks.start_supervised!(AgenticRealms.World.Projections.EntityProjector)
     ExUnit.Callbacks.start_supervised!(AgenticRealms.World.UIEventBroadcaster)
     ExUnit.Callbacks.start_supervised!(AgenticRealms.World.Behaviors.Interpreter)
+    # Feature 017 — transient-region reaper. Idle for non-transient tests (its
+    # periodic sweep fires only after the production interval); transient tests
+    # drive it synchronously via `Transient.Manager.sweep_now/0`.
+    ExUnit.Callbacks.start_supervised!(AgenticRealms.World.Transient.Manager)
     :ok
   end
 

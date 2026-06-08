@@ -32,7 +32,7 @@ defmodule AgenticRealmsWeb.GameComponents.LogEntry do
       <div :if={@entry.room.exits != []} class="exits">
         <button
           :for={exit <- @entry.room.exits}
-          class="exit-chip"
+          class={["exit-chip", exit.direction == "rift" && "exit-rift"]}
           phx-click="submit_command"
           phx-value-text={exit.direction}
         >
