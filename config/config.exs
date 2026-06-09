@@ -44,7 +44,24 @@ config :agenticrealms, AgenticRealms.EventStore,
   username: "postgres",
   password: "postgres",
   database: "agenticrealms_eventstore",
-  hostname: "localhost"
+  hostname: "localhost",
+  # Feature 017 — Transient Regions. Permits irreversible hard deletes so a
+  # destroyed transient region's streams can be permanently purged from the
+  # event store (current + historical). Off by default in eventstore; the
+  # only purge path is `AgenticRealms.World.Transient.Purge`.
+  enable_hard_deletes: true
+
+# Feature 017 — Transient Regions.
+# `region_lifetime_ms`: absolute lifetime cap measured from provisioning;
+#   the reaper destroys the region once it elapses, regardless of activity.
+# `logoff_grace_ms`: reconnect grace after the provision-owner's last session
+#   leaves before the region is considered abandoned (tolerates refreshes).
+# `reap_interval_ms`: how often the singleton reaper sweeps for due regions;
+#   keep `logoff_grace_ms`-relative detection latency within the SC budget.
+config :agenticrealms, AgenticRealms.World.Transient,
+  region_lifetime_ms: 3_600_000,
+  logoff_grace_ms: 120_000,
+  reap_interval_ms: 30_000
 
 # Feature 011 — Room-Scoped Tick Timers.
 # `base_tick_rate_ms`: scheduler beat granularity; the minimum interval

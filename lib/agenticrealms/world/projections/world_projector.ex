@@ -22,6 +22,8 @@ defmodule AgenticRealms.World.Projections.WorldProjector do
     name: __MODULE__,
     consistency: :strong
 
+  import Ecto.Query
+
   alias AgenticRealms.Repo
   alias AgenticRealms.World.Direction
 
@@ -29,6 +31,9 @@ defmodule AgenticRealms.World.Projections.WorldProjector do
     RoomCreated,
     ExitAdded,
     RegionCreated,
+    TransientRegionProvisioned,
+    TransientEntryExitOpened,
+    RegionDestroyed,
     QuestAccepted
   }
 
@@ -56,6 +61,77 @@ defmodule AgenticRealms.World.Projections.WorldProjector do
       on_conflict: :nothing,
       conflict_target: :id
     )
+
+    :ok
+  end
+
+  # Feature 017 — Transient Regions. The provisioning event carries the
+  # `kind: "transient"` discriminator plus owner + lifetime anchor + the
+  # permanent source room and the generated origin room (used for owner
+  # relocation on teardown).
+  def handle(
+        %TransientRegionProvisioned{
+          region_id: id,
+          name: name,
+          provision_owner_id: owner,
+          provisioned_at: at,
+          source_room_id: src,
+          origin_room_id: origin
+        },
+        _meta
+      ) do
+    Repo.insert!(
+      %Region{
+        id: id,
+        name: name,
+        kind: "transient",
+        provision_owner_id: owner,
+        provisioned_at: ensure_datetime_usec(at),
+        source_room_id: src,
+        origin_room_id: origin
+      },
+      on_conflict: :nothing,
+      conflict_target: :id
+    )
+
+    :ok
+  end
+
+  # Feature 017 — the owner-only `:rift` entry exit. Inserted with
+  # `visible_to_user_id` set, so it resolves only for the provision-owner; the
+  # conflict target is the partial owned-exit unique index.
+  def handle(
+        %TransientEntryExitOpened{
+          source_room_id: src,
+          direction: dir,
+          target_room_id: target,
+          visible_to_user_id: owner
+        },
+        _meta
+      ) do
+    Repo.insert!(
+      %Exit{
+        source_room_id: src,
+        direction: Direction.to_string(dir),
+        target_room_id: target,
+        visible_to_user_id: owner
+      },
+      on_conflict: :nothing,
+      conflict_target:
+        {:unsafe_fragment,
+         "(source_room_id, direction, visible_to_user_id) WHERE visible_to_user_id IS NOT NULL"}
+    )
+
+    :ok
+  end
+
+  # Feature 017 — teardown tombstone. The actual rows are removed by
+  # `Transient.Purge` (which owns the crash-safe deletion order); this handler
+  # only stamps `destroyed_at` so a crash between teardown and purge leaves a
+  # marker the reaper re-detects.
+  def handle(%RegionDestroyed{region_id: id}, _meta) do
+    from(r in Region, where: r.id == ^id)
+    |> Repo.update_all(set: [destroyed_at: DateTime.utc_now()])
 
     :ok
   end
@@ -96,6 +172,9 @@ defmodule AgenticRealms.World.Projections.WorldProjector do
         %ExitAdded{room_id: source, direction: direction, target_room_id: target},
         _meta
       ) do
+    # Feature 017 — exits added via the Room aggregate are global
+    # (visible_to_user_id IS NULL); the conflict target is the partial global
+    # unique index introduced when owner-scoped exits became possible.
     Repo.insert!(
       %Exit{
         source_room_id: source,
@@ -103,7 +182,8 @@ defmodule AgenticRealms.World.Projections.WorldProjector do
         target_room_id: target
       },
       on_conflict: :nothing,
-      conflict_target: [:source_room_id, :direction]
+      conflict_target:
+        {:unsafe_fragment, "(source_room_id, direction) WHERE visible_to_user_id IS NULL"}
     )
 
     :ok
@@ -276,4 +356,17 @@ defmodule AgenticRealms.World.Projections.WorldProjector do
     {:ok, dt, _offset} = DateTime.from_iso8601(s)
     DateTime.truncate(dt, :second)
   end
+
+  # Feature 017 — `regions.provisioned_at` is a `:utc_datetime_usec` column, so
+  # the projected value must carry microsecond precision (precision 6). The
+  # event round-trips through the JSON serializer, so this also accepts the
+  # ISO 8601 string form.
+  defp ensure_datetime_usec(%DateTime{} = dt), do: with_usec(dt)
+
+  defp ensure_datetime_usec(s) when is_binary(s) do
+    {:ok, dt, _offset} = DateTime.from_iso8601(s)
+    with_usec(dt)
+  end
+
+  defp with_usec(%DateTime{microsecond: {v, _}} = dt), do: %{dt | microsecond: {v, 6}}
 end

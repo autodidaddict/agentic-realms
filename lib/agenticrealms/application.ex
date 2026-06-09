@@ -117,7 +117,12 @@ defmodule AgenticRealms.Application do
         # Phase 4, npc_clones) row write from EntityCloned/Moved/Edited.
         AgenticRealms.World.Projections.EntityProjector,
         AgenticRealms.World.UIEventBroadcaster,
-        AgenticRealms.World.Behaviors.Interpreter
+        AgenticRealms.World.Behaviors.Interpreter,
+        # Feature 017 — Transient Regions. Singleton that stamps owner presence
+        # and periodically reaps + purges due transient regions. Lives with the
+        # Commanded chain because it dispatches DestroyRegion and reads/writes
+        # the read model.
+        AgenticRealms.World.Transient.Manager
       ]
     else
       []

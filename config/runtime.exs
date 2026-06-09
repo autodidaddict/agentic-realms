@@ -69,7 +69,9 @@ if config_env() == :prod do
     serializer: EventStore.JsonSerializer,
     column_data_type: "jsonb",
     url: event_store_url,
-    pool_size: String.to_integer(System.get_env("EVENTSTORE_POOL_SIZE") || "10")
+    pool_size: String.to_integer(System.get_env("EVENTSTORE_POOL_SIZE") || "10"),
+    # Feature 017 — permit transient-region stream hard-purge in prod too.
+    enable_hard_deletes: true
 
   # The secret key base is used to sign/encrypt cookies and other secrets.
   # A default value is used in config/dev.exs and config/test.exs but you

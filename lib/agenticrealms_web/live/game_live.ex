@@ -1175,6 +1175,19 @@ defmodule AgenticRealmsWeb.GameLive do
 
   def handle_info(%RoomPlayerArrived{} = msg, socket), do: UIEvents.player_arrived(socket, msg)
   def handle_info(%RoomPlayerLeft{} = msg, socket), do: UIEvents.player_left(socket, msg)
+
+  # Feature 017 — a transient region this player was in has ended; they have
+  # already been relocated to their pre-entry room. Only online occupants
+  # receive this (offline players, e.g. a logged-off owner, have no session).
+  def handle_info(:transient_region_ended, socket) do
+    {:noreply,
+     append_log(socket, %{
+       kind: :system,
+       text:
+         "The rift collapses — the transient region has ended. You have been returned to where you came from."
+     })}
+  end
+
   def handle_info(%RoomTranceEntered{} = msg, socket), do: UIEvents.trance_entered(socket, msg)
   def handle_info(%RoomTranceExited{} = msg, socket), do: UIEvents.trance_exited(socket, msg)
   def handle_info(%RoomObjectArrived{} = msg, socket), do: UIEvents.object_arrived(socket, msg)

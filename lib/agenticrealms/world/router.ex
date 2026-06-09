@@ -18,6 +18,9 @@ defmodule AgenticRealms.World.Router do
     CreateBlueprint,
     EditBlueprint,
     CreateRegion,
+    ProvisionTransientRegion,
+    OpenTransientEntryExit,
+    DestroyRegion,
     RecordRoomDiscovery,
     AcceptQuest,
     FinalizeQuest,
@@ -49,8 +52,15 @@ defmodule AgenticRealms.World.Router do
   # Feature 012: per-player room discovery also routed to Player.
   dispatch([SpawnPlayer, MovePlayer, RecordRoomDiscovery], to: Player)
 
-  # Feature 012: region authoring
-  dispatch([CreateRegion], to: Region)
+  # Feature 012: region authoring.
+  # Feature 017: transient-region provisioning, owner-only entry exit, and
+  # teardown routed to the same Region aggregate. `RegionLifespan` evicts the
+  # aggregate process as soon as `RegionDestroyed` is emitted.
+  dispatch(
+    [CreateRegion, ProvisionTransientRegion, OpenTransientEntryExit, DestroyRegion],
+    to: Region,
+    lifespan: AgenticRealms.World.RegionLifespan
+  )
 
   # Feature 013: quest lifecycle (accept + finalize). Each quest instance
   # is its own aggregate identified by quest_id.

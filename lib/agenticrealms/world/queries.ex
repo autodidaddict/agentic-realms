@@ -42,7 +42,7 @@ defmodule AgenticRealms.World.Queries do
          id: room.id,
          name: room.name,
          description: room.description,
-         exits: list_exits(room_id),
+         exits: list_exits(room_id, player_id),
          # Feature 013 — viewer-aware object listing. Quest-scoped items
          # are visible only to their owning player.
          objects: list_objects_in_room_for_viewer(room_id, player_id),
@@ -308,11 +308,16 @@ defmodule AgenticRealms.World.Queries do
     end
   end
 
-  defp list_exits(room_id) do
+  # Feature 017 — viewer-aware exit listing. A global exit
+  # (`visible_to_user_id IS NULL`) is shown to everyone; an owner-scoped exit
+  # (the transient region's `:rift` entry) is shown only to its owner.
+  defp list_exits(room_id, viewer_player_id) do
     from(e in Exit,
       join: t in Room,
       on: t.id == e.target_room_id,
-      where: e.source_room_id == ^room_id,
+      where:
+        e.source_room_id == ^room_id and
+          (is_nil(e.visible_to_user_id) or e.visible_to_user_id == ^viewer_player_id),
       order_by: e.direction,
       select: %{direction: e.direction, target_name: t.name}
     )
