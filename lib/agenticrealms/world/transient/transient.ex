@@ -50,17 +50,34 @@ defmodule AgenticRealms.World.Transient do
       # JSON serializer (so the projector receives an ISO string).
       provisioned_at = DateTime.utc_now()
 
-      with :ok <- dispatch_provision(spec, provisioned_at),
-           :ok <- create_rooms(spec),
-           :ok <- add_intra_exits(spec),
-           :ok <- open_entry_exit(spec),
-           :ok <- place_owner(owner_id, spec) do
-        Logger.info(
-          "Transient region #{spec.region_id} provisioned for player #{owner_id} " <>
-            "(#{length(spec.rooms)} rooms, source #{source_room_id})"
-        )
+      result =
+        with :ok <- dispatch_provision(spec, provisioned_at),
+             :ok <- create_rooms(spec),
+             :ok <- add_intra_exits(spec),
+             :ok <- open_entry_exit(spec),
+             :ok <- place_owner(owner_id, spec) do
+          :ok
+        end
 
-        {:ok, spec.region_id}
+      case result do
+        :ok ->
+          Logger.info(
+            "Transient region #{spec.region_id} provisioned for player #{owner_id} " <>
+              "(#{length(spec.rooms)} rooms, source #{source_room_id})"
+          )
+
+          {:ok, spec.region_id}
+
+        {:error, reason} ->
+          # FR-020 — leave no partial/orphan region: roll back whatever was
+          # already created. `destroy/1` is idempotent and no-ops if the
+          # region row was never written.
+          Logger.warning(
+            "Transient region #{spec.region_id} provisioning failed (#{inspect(reason)}); rolling back"
+          )
+
+          _ = destroy(spec.region_id)
+          {:error, reason}
       end
     end
   end
@@ -113,6 +130,16 @@ defmodule AgenticRealms.World.Transient do
           direction: :rift
         },
         consistency: :strong
+      )
+
+      # FR-019 — notify any online occupant that the region has ended (offline
+      # players, e.g. a logged-off owner, have no live session and are simply
+      # relocated). Best-effort broadcast on the player's topic; GameLive
+      # appends a system log entry.
+      Phoenix.PubSub.broadcast(
+        AgenticRealms.PubSub,
+        AgenticRealmsWeb.Topics.player_topic(pid),
+        :transient_region_ended
       )
     end)
 

@@ -105,7 +105,7 @@ Even if a provision-owner stays logged in indefinitely, their transient region i
 
 - **FR-001**: System MUST provision a transient region on demand on behalf of a specific user, recording that user as the region's provision-owner. For the MVP, provisioning is system-initiated (invoked programmatically / by system flows or test invocation); there is no player-facing provisioning command.
 - **FR-021**: System MUST reject a provisioning request for a provision-owner who already has an active transient region (the MVP supports exactly one active transient region per owner at a time) and surface that the request was rejected.
-- **FR-002**: System MUST, at provisioning time, invoke a region generator to produce the region's rooms. For the MVP this generator is simulated by a deterministic, seed-like function that produces a small set of interconnected rooms suitable for testing, standing in for a future procedural/external generator.
+- **FR-002**: System MUST, at provisioning time, invoke a region generator to produce the region's rooms. For the MVP this generator is simulated by a deterministic, seed-like function that produces a small set (≈3) of interconnected rooms suitable for testing, standing in for a future procedural/external generator.
 - **FR-003**: System MUST create all of a transient region's rooms up front at provisioning time. Deferred ("only when entered") room creation is explicitly out of scope.
 - **FR-004**: System MUST record, for each transient region, the provision-owner and the provisioning time.
 - **FR-005**: System MUST distinguish transient regions and their rooms from permanent regions and rooms, so that transient lifecycle rules apply only to transient ones.
@@ -137,9 +137,9 @@ Even if a provision-owner stays logged in indefinitely, their transient region i
 
 **Occupant handling & failure**
 
-- **FR-019**: When a transient region is destroyed while players (owner or non-owner) are inside it, System MUST relocate each such player to the location they occupied immediately before entering the transient region, inform them the region has ended, and only then purge the region's data.
+- **FR-019**: When a transient region is destroyed while players (owner or non-owner) are inside it, System MUST relocate each such player to the location they occupied immediately before entering the transient region, notify any **online** occupants that the region has ended, and only then purge the region's data. (A player who is offline at destruction — e.g., a logged-off owner — receives no live notice; they are simply relocated and find themselves at their pre-entry location on return.)
 - **FR-020**: If region generation fails during provisioning, System MUST NOT leave a partially-created or orphaned region; provisioning fails cleanly and the requester is informed.
-- **FR-022**: System MUST record each player's pre-entry location when they enter a transient region, to serve as their relocation destination if the region is destroyed while they are inside it.
+- **FR-022**: System MUST record each player's pre-entry location when they enter a transient region, to serve as their relocation destination if the region is destroyed while they are inside it. (MVP: because the entry exit is owner-only, the sole occupant is the provision-owner, so this is the single `source_room_id` recorded at provisioning time.)
 
 ### Key Entities
 
@@ -154,11 +154,11 @@ Even if a provision-owner stays logged in indefinitely, their transient region i
 
 - **SC-001**: A logged-in user can request a transient region and be standing in an explorable, multi-room region within 5 seconds of the request.
 - **SC-002**: 100% of a transient region's rooms remain present and navigable, with state intact, after a process crash and restart (zero loss).
-- **SC-003**: When a provision-owner fully logs off, 100% of that region's associated data — rooms, contents, current records, and historical records — is purged within 1 minute of logoff, verifiable by the absence of any residual records.
+- **SC-003**: Once a provision-owner's logoff is confirmed — i.e., the ~2-minute reconnect grace (FR-013) elapses without a reconnect — 100% of that region's associated data (rooms, contents, current and historical records) is purged within 1 minute of confirmation, verifiable by the absence of any residual records.
 - **SC-004**: A transient region whose owner stays continuously logged in is automatically destroyed and purged within 1 minute of reaching its 60-minute lifetime cap.
 - **SC-005**: A transient region remains available for the entire time its owner stays logged in (up to the 60-minute cap) even with zero players inside — demonstrated by successful re-entry after the region has been empty.
 - **SC-006**: Destroying a transient region causes zero changes to permanent regions/rooms, permanent history, or other transient regions (no permanent data altered or lost).
-- **SC-007**: 100% of players inside a region at destruction time are relocated to their pre-entry location with a clear notice — no player is ever stranded in a purged room.
+- **SC-007**: 100% of players inside a region at destruction time are relocated to their pre-entry location (online occupants receive a clear end-of-region notice) — no player is ever stranded in a purged room.
 
 ## Assumptions
 
