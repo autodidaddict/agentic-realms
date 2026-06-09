@@ -58,6 +58,8 @@ defmodule AgenticRealms.World.UIEventBroadcaster do
     BlueprintCreated,
     BlueprintEdited,
     QuestAccepted,
+    QuestItemsConsumed,
+    QuestRewardMinted,
     QuestCompleted
   }
 
@@ -277,6 +279,53 @@ defmodule AgenticRealms.World.UIEventBroadcaster do
         criteria: criteria
       }
     )
+
+    :ok
+  end
+
+  # Feature 013 — quest finalization inventory deltas. The QuestProjector
+  # mutates the read model (deletes consumed objects; clones + moves the
+  # reward into inventory), but neither delta surfaces a
+  # PlayerInventoryChanged the way take/drop do: consumed items are deleted
+  # outright (no EntityMoved), and the reward moves in with cause :spawned,
+  # which the EntityMoved witness treats as silent. Without these broadcasts
+  # the inventory side panel only catches up on the next manual `inv`. We
+  # broadcast straight from the event payloads (no DB reread, like every
+  # other witness here) so the GameLive subscriber mutates :inventory in
+  # place. :removed only needs the object id; :added carries the reward's
+  # name/description from the event, so it's correct even before the async
+  # clone is projected into world_objects.
+  def handle(%QuestItemsConsumed{player_id: pid, consumed_object_ids: ids}, _meta)
+      when is_list(ids) do
+    for oid <- ids do
+      Phoenix.PubSub.broadcast(@pubsub, Topics.player_topic(pid), %PlayerInventoryChanged{
+        player_id: pid,
+        change: :removed,
+        object_id: oid,
+        object_name: nil,
+        object_short_description: nil
+      })
+    end
+
+    :ok
+  end
+
+  def handle(
+        %QuestRewardMinted{
+          player_id: pid,
+          reward_object_id: oid,
+          reward_name: name,
+          reward_description: description
+        },
+        _meta
+      ) do
+    Phoenix.PubSub.broadcast(@pubsub, Topics.player_topic(pid), %PlayerInventoryChanged{
+      player_id: pid,
+      change: :added,
+      object_id: oid,
+      object_name: name,
+      object_short_description: description
+    })
 
     :ok
   end

@@ -214,6 +214,18 @@ defmodule AgenticRealmsWeb.GameLiveQuestTest do
         not Enum.any?(inv, &(&1.name == "golden apple"))
     end)
 
+    # The inventory SIDE PANEL must reflect the finalize live, without a
+    # manual `inv` re-query. QuestItemsConsumed / QuestRewardMinted now
+    # surface PlayerInventoryChanged broadcasts that GameLive applies to the
+    # :inventory assign in place. Scoped to the `.inv-list` panel so it can't
+    # be satisfied by the quest-completion log line (which also names the
+    # reward). The `<span>golden apple</span>` check is exact-tag so the
+    # reward's "bigger golden apple" doesn't count as a leftover small apple.
+    assert_eventually(alice_view, fn ->
+      panel = render(element(alice_view, ".inv-list"))
+      panel =~ "bigger golden apple" and not (panel =~ "<span>golden apple</span>")
+    end)
+
     # ── FR-012 — sticky completion. Alice cannot re-accept.
     assert {:error, :already_completed} =
              WorldCommands.accept_quest(alice.id, @blueprint_id, @slug)
