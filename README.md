@@ -2,6 +2,12 @@
   <img src="priv/static/images/logo-wordmark.png" alt="Agentic Realms" width="420" />
 </p>
 
+<p align="center">
+  <a href="https://github.com/autodidaddict/agentic-realms/actions/workflows/ci.yml">
+    <img src="https://github.com/autodidaddict/agentic-realms/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI" />
+  </a>
+</p>
+
 To start your Phoenix server:
 
 * Run `mix setup` to install and setup dependencies
