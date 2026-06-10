@@ -1,0 +1,83 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# Cancel in-progress runs for the same ref when a new commit is pushed.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Compile, format & test
+    runs-on: ubuntu-latest
+
+    env:
+      MIX_ENV: test
+      # Tests use the in-memory Commanded event store adapter (see config/test.exs),
+      # so only the Ecto read-model database is needed here. These match the
+      # postgres/postgres@localhost defaults in config/test.exs.
+      PGHOST: localhost
+      PGUSER: postgres
+      PGPASSWORD: postgres
+
+    services:
+      # Read-model database for AgenticRealms.Repo. The `test` mix alias runs
+      # ecto.create + ecto.migrate before the test suite.
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Pin Elixir/OTP to the exact versions in .tool-versions so CI matches
+      # local development and a clean production toolchain.
+      - name: Set up Elixir
+        uses: erlef/setup-beam@v1
+        with:
+          elixir-version: "1.20.0-otp-27"
+          otp-version: "27.0.1"
+
+      - name: Cache deps and _build
+        uses: actions/cache@v4
+        with:
+          path: |
+            deps
+            _build
+          key: ${{ runner.os }}-mix-${{ hashFiles('**/mix.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-mix-
+
+      - name: Install dependencies
+        run: mix deps.get
+
+      # Fail if mix.lock carries dependencies no longer referenced in mix.exs.
+      - name: Check for unused dependencies
+        run: mix deps.unlock --check-unused
+
+      - name: Compile (warnings as errors)
+        run: mix compile --warnings-as-errors
+
+      - name: Check formatting
+        run: mix format --check-formatted
+
+      - name: Run tests
+        run: mix test
