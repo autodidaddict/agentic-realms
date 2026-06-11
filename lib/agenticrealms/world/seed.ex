@@ -106,8 +106,8 @@ defmodule AgenticRealms.World.Seed do
     :ok = ensure_region(@blackmire_region_id, "Blackmire")
     :ok = ensure_region(@hollowvale_region_id, "Hollowvale")
 
-    # ---- toolsets (feature 015) ----
-    :ok = seed_toolsets()
+    # ---- behavior_groups (feature 015) ----
+    :ok = seed_behavior_groups()
 
     # ---- behaviors (carried over from feature 011) ----
     atrium_behaviors = [
@@ -576,13 +576,13 @@ defmodule AgenticRealms.World.Seed do
     end
   end
 
-  # Feature 015 — seed-only toolsets (no wizard authoring surface yet). At
-  # least two distinct named toolsets so composition (US4) is demonstrable
-  # from a fresh world. Plain Repo upserts — toolsets are not event-sourced.
-  defp seed_toolsets do
+  # Feature 015 — seed-only behavior_groups (no wizard authoring surface yet). At
+  # least two distinct named behavior_groups so composition (US4) is demonstrable
+  # from a fresh world. Plain Repo upserts — behavior_groups are not event-sourced.
+  defp seed_behavior_groups do
     now = DateTime.utc_now() |> DateTime.truncate(:second)
 
-    toolsets = [
+    behavior_groups = [
       %{
         name: "greeter",
         description: "Greets arrivals and bids farewell to those who leave.",
@@ -613,8 +613,8 @@ defmodule AgenticRealms.World.Seed do
       }
     ]
 
-    for ts <- toolsets do
-      AgenticRealms.World.Schemas.Toolset
+    for ts <- behavior_groups do
+      AgenticRealms.World.Schemas.BehaviorGroup
       |> struct(Map.merge(ts, %{inserted_at: now, updated_at: now}))
       |> AgenticRealms.Repo.insert!(on_conflict: :nothing, conflict_target: :name)
     end

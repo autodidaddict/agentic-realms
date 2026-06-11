@@ -19,7 +19,7 @@ defmodule AgenticRealms.World.IntentResolver do
 
   alias AgenticRealms.Anthropic
   alias AgenticRealms.World.IntentResolver.{ContextSnapshot, SystemPrompt, Tools, WizardTools}
-  alias AgenticRealms.World.Toolsets
+  alias AgenticRealms.World.BehaviorGroups
 
   @max_input_length 500
   @max_tokens 256
@@ -197,7 +197,7 @@ defmodule AgenticRealms.World.IntentResolver do
   - An inanimate object, item, or fixture → `draft_object_blueprint`.
   - A question, an edit to an existing thing, a place / room, or anything
     off-task → `refuse`.
-  - To ground toolset proposals for an NPC you MAY first call `list_toolsets`
+  - To ground behavior group proposals for an NPC you MAY first call `list_behavior_groups`
     to see the named behavior groups available, then call
     `draft_npc_blueprint` proposing only names from that list.
 
@@ -215,11 +215,11 @@ defmodule AgenticRealms.World.IntentResolver do
   - `lore`: private backstory / personality grounding the NPC's conversation;
     not shown verbatim to players.
   - `fixed`: true only if the NPC cannot be moved (rare).
-  - `toolsets`: names of behavior groups to attach, chosen from `list_toolsets`.
+  - `behavior_groups`: names of behavior groups to attach, chosen from `list_behavior_groups`.
     Omit or leave empty if none fit; never invent names.
   """
 
-  # The model may call `list_toolsets` to ground toolset proposals before it
+  # The model may call `list_behavior_groups` to ground behavior group proposals before it
   # drafts. Bound the number of read-tool hops so a misbehaving model can't
   # loop forever; the draft/refuse call terminates the loop.
   @max_wizard_tool_hops 3
@@ -231,7 +231,7 @@ defmodule AgenticRealms.World.IntentResolver do
   `{:error, refusal_message}`. Never raises — failures collapse to
   refusals — and never persists anything.
 
-  The model may call the `list_toolsets` read tool to ground NPC toolset
+  The model may call the `list_behavior_groups` read tool to ground NPC behavior group
   proposals; the resolver answers it and continues the conversation until
   the model drafts or refuses (bounded by `@max_wizard_tool_hops`).
 
@@ -277,9 +277,9 @@ defmodule AgenticRealms.World.IntentResolver do
     case Anthropic.create_message(request) do
       {:ok, response} ->
         case extract_single_tool_use(response) do
-          {:ok, %{"name" => "list_toolsets", "id" => id}} when is_binary(id) ->
+          {:ok, %{"name" => "list_behavior_groups", "id" => id}} when is_binary(id) ->
             messages
-            |> append_tool_round(id, "list_toolsets", list_toolsets_result())
+            |> append_tool_round(id, "list_behavior_groups", list_behavior_groups_result())
             |> run_blueprint_loop(hops + 1)
 
           {:ok, tool_use} ->
@@ -313,8 +313,8 @@ defmodule AgenticRealms.World.IntentResolver do
     }
   end
 
-  # Append the model's `list_toolsets` call + our tool_result so the next
-  # turn sees the grounded toolset list.
+  # Append the model's `list_behavior_groups` call + our tool_result so the next
+  # turn sees the grounded behavior group list.
   defp append_tool_round(messages, tool_use_id, name, result_text) do
     messages ++
       [
@@ -333,15 +333,15 @@ defmodule AgenticRealms.World.IntentResolver do
       ]
   end
 
-  # The toolsets the LLM is allowed to propose for an NPC, as a readable
-  # block fed back through the `list_toolsets` tool_result.
-  defp list_toolsets_result do
-    case Toolsets.list_for(:npc) do
+  # The behavior groups the LLM is allowed to propose for an NPC, as a readable
+  # block fed back through the `list_behavior_groups` tool_result.
+  defp list_behavior_groups_result do
+    case BehaviorGroups.list_for(:npc) do
       [] ->
-        "No toolsets are registered. Do not propose any."
+        "No behavior groups are registered. Do not propose any."
 
-      toolsets ->
-        toolsets
+      behavior_groups ->
+        behavior_groups
         |> Enum.map(fn t -> "- #{t.name}: #{t.description || "(no description)"}" end)
         |> Enum.join("\n")
     end
@@ -349,7 +349,7 @@ defmodule AgenticRealms.World.IntentResolver do
 
   @doc """
   Parse an Anthropic Messages API response body into a wizard blueprint
-  draft outcome (single-shot, no `list_toolsets` hop). Exposed for unit
+  draft outcome (single-shot, no `list_behavior_groups` hop). Exposed for unit
   testing the tool-use → outcome mapping without HTTP.
   """
   @spec parse_wizard_blueprint_response(map()) ::
@@ -412,9 +412,9 @@ defmodule AgenticRealms.World.IntentResolver do
           long_description: long,
           lore: (is_binary(input["lore"]) && input["lore"]) || "",
           fixed: input["fixed"] == true,
-          # FR-018 — drop any proposed name not in the NPC toolset registry
-          # so a hallucinated toolset never reaches the picker/commit.
-          toolsets: grounded_toolsets(input["toolsets"])
+          # FR-018 — drop any proposed name not in the NPC behavior_group registry
+          # so a hallucinated behavior_group never reaches the picker/commit.
+          behavior_groups: grounded_behavior_groups(input["behavior_groups"])
         }}}
     else
       _ -> {:error, @generic_refusal}
@@ -426,12 +426,12 @@ defmodule AgenticRealms.World.IntentResolver do
 
   defp to_wizard_outcome(_, _), do: {:error, @generic_refusal}
 
-  defp grounded_toolsets(names) when is_list(names) do
-    registered = Toolsets.list_for(:npc) |> MapSet.new(& &1.name)
+  defp grounded_behavior_groups(names) when is_list(names) do
+    registered = BehaviorGroups.list_for(:npc) |> MapSet.new(& &1.name)
     Enum.filter(names, &(is_binary(&1) and MapSet.member?(registered, &1)))
   end
 
-  defp grounded_toolsets(_), do: []
+  defp grounded_behavior_groups(_), do: []
 
   @wizard_world_system_prompt """
   You are a tool-call dispatcher for a wizard manifesting a one-off

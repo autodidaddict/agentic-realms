@@ -3,7 +3,7 @@ defmodule AgenticRealms.World.Blueprint do
   Unified Blueprint aggregate (feature 015) — the authored template for a
   kind of world entity (`kind` ∈ {`"object"`, `"npc"`}). Owns the shared core
   (name/descriptions/fixed) plus the NPC-flavored fields (behaviors/lore/
-  toolsets/quests) and the monotonic `revision` that secures optimistic-lock
+  behavior_groups/quests) and the monotonic `revision` that secures optimistic-lock
   edits.
 
   Identified by `:blueprint_id` (the human-typable slug, FR-004) with stream
@@ -24,13 +24,13 @@ defmodule AgenticRealms.World.Blueprint do
             revision: 0,
             behaviors: [],
             lore: "",
-            toolsets: [],
+            behavior_groups: [],
             quests: []
 
   alias AgenticRealms.World.Commands.{CreateBlueprint, EditBlueprint}
   alias AgenticRealms.World.Events.{BlueprintCreated, BlueprintEdited}
 
-  @editable_fields ~w(name short_description long_description fixed lore toolsets behaviors)a
+  @editable_fields ~w(name short_description long_description fixed lore behavior_groups behaviors)a
 
   # --- CreateBlueprint ----------------------------------------------------
 
@@ -45,7 +45,7 @@ defmodule AgenticRealms.World.Blueprint do
         fixed: fixed,
         behaviors: behaviors,
         lore: lore,
-        toolsets: toolsets,
+        behavior_groups: behavior_groups,
         quests: quests
       }) do
     cond do
@@ -69,7 +69,7 @@ defmodule AgenticRealms.World.Blueprint do
           revision: 1,
           behaviors: behaviors || [],
           lore: lore || "",
-          toolsets: toolsets || [],
+          behavior_groups: behavior_groups || [],
           quests: quests || []
         }
     end
@@ -139,7 +139,7 @@ defmodule AgenticRealms.World.Blueprint do
         revision: e.revision,
         behaviors: e.behaviors || [],
         lore: e.lore || "",
-        toolsets: e.toolsets || [],
+        behavior_groups: e.behavior_groups || [],
         quests: e.quests || []
     }
   end

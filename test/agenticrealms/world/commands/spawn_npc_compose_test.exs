@@ -1,8 +1,8 @@
 defmodule AgenticRealms.World.Commands.SpawnNpcComposeTest do
   @moduledoc """
-  Feature 015 US4 — toolset composition is frozen onto the spawned clone:
-  effective behaviors = union(toolsets, attachment order) ++ direct (FR-016),
-  and editing a toolset after spawn does NOT mutate an existing clone (FR-017).
+  Feature 015 US4 — behavior_group composition is frozen onto the spawned clone:
+  effective behaviors = union(behavior_groups, attachment order) ++ direct (FR-016),
+  and editing a behavior_group after spawn does NOT mutate an existing clone (FR-017).
   """
 
   use AgenticRealms.DataCase, async: false
@@ -14,7 +14,7 @@ defmodule AgenticRealms.World.Commands.SpawnNpcComposeTest do
   alias AgenticRealms.Accounts
   alias AgenticRealms.Repo
   alias AgenticRealms.World.Commands
-  alias AgenticRealms.World.Schemas.{NPCClone, Region, Room, Toolset}
+  alias AgenticRealms.World.Schemas.{NPCClone, Region, Room, BehaviorGroup}
 
   @orc_emote %{
     "trigger" => "player_entered",
@@ -42,7 +42,7 @@ defmodule AgenticRealms.World.Commands.SpawnNpcComposeTest do
     orc = "orc_#{suffix}"
     shop = "shop_#{suffix}"
 
-    Repo.insert!(%Toolset{
+    Repo.insert!(%BehaviorGroup{
       name: orc,
       behaviors: [@orc_emote],
       applies_to: ["npc"],
@@ -50,7 +50,7 @@ defmodule AgenticRealms.World.Commands.SpawnNpcComposeTest do
       updated_at: now
     })
 
-    Repo.insert!(%Toolset{
+    Repo.insert!(%BehaviorGroup{
       name: shop,
       behaviors: [@shop_say],
       applies_to: ["npc"],
@@ -86,7 +86,7 @@ defmodule AgenticRealms.World.Commands.SpawnNpcComposeTest do
         name: "Orc Shopkeeper #{suffix}",
         short_description: "a grizzled orc trader",
         long_description: "An orc behind a plank counter, eyeing your coin.",
-        toolsets: [orc, shop],
+        behavior_groups: [orc, shop],
         behaviors: [@direct_bye]
       })
 
@@ -94,7 +94,7 @@ defmodule AgenticRealms.World.Commands.SpawnNpcComposeTest do
     slug
   end
 
-  test "effective behaviors = union(toolsets, order) ++ direct, nothing dropped (FR-016)",
+  test "effective behaviors = union(behavior_groups, order) ++ direct, nothing dropped (FR-016)",
        ctx do
     slug = author_and_spawn(ctx)
     clone = Repo.get_by(NPCClone, blueprint_id: slug)
@@ -102,19 +102,19 @@ defmodule AgenticRealms.World.Commands.SpawnNpcComposeTest do
     # Two player_entered behaviors from different sources are BOTH retained,
     # in attachment order, followed by the direct player_left behavior.
     assert clone.behaviors == [@orc_emote, @shop_say, @direct_bye]
-    assert clone.toolsets == [ctx.orc, ctx.shop]
+    assert clone.behavior_groups == [ctx.orc, ctx.shop]
     assert clone.direct_behaviors == [@direct_bye]
   end
 
-  test "editing a toolset after spawn leaves the frozen clone unchanged (FR-017)",
+  test "editing a behavior_group after spawn leaves the frozen clone unchanged (FR-017)",
        %{orc: orc} = ctx do
     slug = author_and_spawn(ctx)
     before = Repo.get_by(NPCClone, blueprint_id: slug)
 
-    # Mutate the orc toolset's behaviors at the registry level.
+    # Mutate the orc behavior_group's behaviors at the registry level.
     {1, _} =
       Repo.update_all(
-        from(t in Toolset, where: t.name == ^orc),
+        from(t in BehaviorGroup, where: t.name == ^orc),
         set: [
           behaviors: [
             %{

@@ -7,7 +7,7 @@ defmodule AgenticRealms.World.Commands.CreateNPCBlueprintWrapperTest do
   alias AgenticRealms.Repo
   alias AgenticRealms.World.Commands
   alias AgenticRealms.World.Queries
-  alias AgenticRealms.World.Schemas.{Blueprint, Toolset}
+  alias AgenticRealms.World.Schemas.{Blueprint, BehaviorGroup}
 
   @greeter %{
     "trigger" => "player_entered",
@@ -27,7 +27,7 @@ defmodule AgenticRealms.World.Commands.CreateNPCBlueprintWrapperTest do
 
     now = DateTime.utc_now() |> DateTime.truncate(:second)
 
-    Repo.insert!(%Toolset{
+    Repo.insert!(%BehaviorGroup{
       name: "greeter",
       behaviors: [@greeter],
       applies_to: ["npc"],
@@ -38,7 +38,7 @@ defmodule AgenticRealms.World.Commands.CreateNPCBlueprintWrapperTest do
     %{wizard: wizard, non_wizard: non_wizard, suffix: suffix}
   end
 
-  test "happy path persists an npc-kind row at revision 1 with toolsets + fixed",
+  test "happy path persists an npc-kind row at revision 1 with behavior_groups + fixed",
        %{wizard: wizard, suffix: suffix} do
     slug = "cave_troll_#{suffix}"
 
@@ -51,7 +51,7 @@ defmodule AgenticRealms.World.Commands.CreateNPCBlueprintWrapperTest do
                long_description: "A mountain of grey muscle and warty hide.",
                lore: "Hates sunlight.",
                fixed: true,
-               toolsets: ["greeter"]
+               behavior_groups: ["greeter"]
              })
 
     assert %Blueprint{
@@ -60,7 +60,7 @@ defmodule AgenticRealms.World.Commands.CreateNPCBlueprintWrapperTest do
              revision: 1,
              name: "Cave Troll",
              fixed: true,
-             toolsets: ["greeter"],
+             behavior_groups: ["greeter"],
              lore: "Hates sunlight."
            } = Queries.get_npc_blueprint_row(slug)
   end
@@ -144,18 +144,18 @@ defmodule AgenticRealms.World.Commands.CreateNPCBlueprintWrapperTest do
     assert %Blueprint{kind: "npc"} = Repo.get(Blueprint, slug)
   end
 
-  test "refuses an unknown toolset name (FR-018)",
+  test "refuses an unknown behavior_group name (FR-018)",
        %{wizard: wizard, suffix: suffix} do
-    slug = "ghost_toolset_#{suffix}"
+    slug = "ghost_behavior_group_#{suffix}"
 
-    assert {:error, {:unknown_toolset, "ghost"}} =
+    assert {:error, {:unknown_behavior_group, "ghost"}} =
              Commands.create_npc_blueprint(%{
                wizard_id: wizard.id,
                blueprint_id: slug,
                name: "x",
                short_description: "y",
                long_description: "z",
-               toolsets: ["ghost"]
+               behavior_groups: ["ghost"]
              })
 
     assert is_nil(Repo.get(Blueprint, slug))

@@ -4,14 +4,14 @@ defmodule AgenticRealms.Repo.Migrations.ExtendNpcBlueprintsAuthoring do
   @moduledoc """
   Feature 015 — wizard NPC authoring. Mirror the object-blueprint columns on
   `npc_blueprints`: a fixed `kind`, the ungettable `fixed` flag, referenced
-  `toolsets` (names), and a monotonic `revision` for optimistic-lock edits.
+  `behavior_groups` (names), and a monotonic `revision` for optimistic-lock edits.
   """
 
   def change do
     alter table(:npc_blueprints) do
       add :kind, :string, null: false, default: "npc"
       add :fixed, :boolean, null: false, default: false
-      add :toolsets, {:array, :string}, null: false, default: []
+      add :behavior_groups, {:array, :string}, null: false, default: []
       add :revision, :integer, null: false, default: 1
     end
 

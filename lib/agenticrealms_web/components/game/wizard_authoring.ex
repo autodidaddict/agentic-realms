@@ -29,7 +29,7 @@ defmodule AgenticRealmsWeb.GameComponents.WizardAuthoring do
   attr :focused_npc_edit, :map, default: nil
   attr :object_blueprints, :list, required: true
   attr :blueprint_filter, :atom, default: :all
-  attr :toolsets, :list, default: []
+  attr :behavior_groups, :list, default: []
   attr :room_objects, :list, default: []
   attr :room_npcs, :list, default: []
   attr :wizard_prompt, :string, required: true
@@ -73,7 +73,7 @@ defmodule AgenticRealmsWeb.GameComponents.WizardAuthoring do
           <div class="w-input-wrap">
             <div class="w-prompt-label">
               <span class="hint">
-                Describe an object archetype or a character — the model extracts its fields (an NPC also gets lore + proposed toolsets) onto the form. Refine and commit.
+                Describe an object archetype or a character — the model extracts its fields (an NPC also gets lore + proposed behavior groups) onto the form. Refine and commit.
               </span>
             </div>
             <form phx-submit="submit_wizard_prompt" phx-change="update_wizard_prompt">
@@ -224,7 +224,7 @@ defmodule AgenticRealmsWeb.GameComponents.WizardAuthoring do
             <div class="w-pane-body">
               <.blueprint_draft_form
                 draft={@focused_blueprint_draft}
-                toolsets={@toolsets}
+                behavior_groups={@behavior_groups}
                 commit_error={@blueprint_commit_error}
               />
             </div>
@@ -516,7 +516,7 @@ defmodule AgenticRealmsWeb.GameComponents.WizardAuthoring do
   end
 
   attr :draft, :map, required: true
-  attr :toolsets, :list, default: []
+  attr :behavior_groups, :list, default: []
   attr :commit_error, :any, default: nil
 
   defp blueprint_draft_form(assigns) do
@@ -585,21 +585,21 @@ defmodule AgenticRealmsWeb.GameComponents.WizardAuthoring do
 
         <div class="bp-field">
           <label class="bp-field-label">
-            Toolsets <span class="bp-field-hint">behavior groups to attach</span>
+            Behavior Groups <span class="bp-field-hint">behavior groups to attach</span>
           </label>
-          <%= if @toolsets == [] do %>
-            <div class="bp-field-hint">No toolsets registered.</div>
+          <%= if @behavior_groups == [] do %>
+            <div class="bp-field-hint">No behavior groups registered.</div>
           <% else %>
             <div
-              data-testid="blueprint-toolsets"
+              data-testid="blueprint-behavior_groups"
               style="display: flex; flex-direction: column; gap: 4px;"
             >
-              <label :for={ts <- @toolsets} class="bp-fixed-toggle">
+              <label :for={ts <- @behavior_groups} class="bp-fixed-toggle">
                 <input
                   type="checkbox"
-                  name="draft[toolsets][]"
+                  name="draft[behavior_groups][]"
                   value={ts.name}
-                  checked={ts.name in (Map.get(@draft, :toolsets, []) || [])}
+                  checked={ts.name in (Map.get(@draft, :behavior_groups, []) || [])}
                 />
                 <strong>{ts.name}</strong>
                 <%= if ts.description do %>
@@ -615,7 +615,9 @@ defmodule AgenticRealmsWeb.GameComponents.WizardAuthoring do
         <div class="bp-field">
           <label class="bp-field-label">
             Direct behaviors
-            <span class="bp-field-hint">individual triggers, on top of any toolsets (FR-015a)</span>
+            <span class="bp-field-hint">
+              individual triggers, on top of any behavior groups (FR-015a)
+            </span>
           </label>
           <div
             data-testid="blueprint-direct-behaviors"
@@ -919,8 +921,8 @@ defmodule AgenticRealmsWeb.GameComponents.WizardAuthoring do
   defp format_commit_error(:slug_already_exists),
     do: "A blueprint with that slug already exists. Choose a different slug."
 
-  defp format_commit_error(:unknown_toolset),
-    do: "One of the selected toolsets no longer exists. Reload and try again."
+  defp format_commit_error(:unknown_behavior_group),
+    do: "One of the selected behavior groups no longer exists. Reload and try again."
 
   defp format_commit_error(:name_required), do: "Name is required."
   defp format_commit_error(:short_description_required), do: "Short description is required."

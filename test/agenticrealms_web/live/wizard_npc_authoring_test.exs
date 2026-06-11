@@ -1,7 +1,7 @@
 defmodule AgenticRealmsWeb.WizardNpcAuthoringTest do
   @moduledoc """
   Feature 015 US1/US2 — the wizard authors an NPC blueprint in trance (lore +
-  composable toolsets), commits it (unified registry, kind badge), and spawns
+  composable behavior_groups), commits it (unified registry, kind badge), and spawns
   it into the room (witnessed arrival; the clone carries the composed
   behaviors).
 
@@ -17,7 +17,7 @@ defmodule AgenticRealmsWeb.WizardNpcAuthoringTest do
 
   alias AgenticRealms.{Accounts, Repo}
   alias AgenticRealms.World.{Commands, Queries, Seed}
-  alias AgenticRealms.World.Schemas.{NPCClone, Toolset}
+  alias AgenticRealms.World.Schemas.{NPCClone, BehaviorGroup}
 
   @greeter %{
     "trigger" => "player_entered",
@@ -36,7 +36,7 @@ defmodule AgenticRealmsWeb.WizardNpcAuthoringTest do
     now = DateTime.utc_now() |> DateTime.truncate(:second)
 
     Repo.insert!(
-      %Toolset{
+      %BehaviorGroup{
         name: "greeter",
         behaviors: [@greeter],
         applies_to: ["npc"],
@@ -67,7 +67,7 @@ defmodule AgenticRealmsWeb.WizardNpcAuthoringTest do
     }
   end
 
-  test "author an NPC in trance (lore + toolset) → commit → npc-kind row + registry badge",
+  test "author an NPC in trance (lore + behavior_group) → commit → npc-kind row + registry badge",
        %{wizard_conn: wzc, suffix: suffix} do
     {:ok, view, _} = live(wzc, ~p"/play")
     render_hook(view, "switch_mode", %{"mode" => "wizard"})
@@ -80,7 +80,7 @@ defmodule AgenticRealmsWeb.WizardNpcAuthoringTest do
       "short_description" => "a hulking cave troll",
       "long_description" => "A mountain of grey muscle and warty hide.",
       "lore" => "Hates sunlight; speaks in short grunts.",
-      "toolsets" => ["greeter"]
+      "behavior_groups" => ["greeter"]
     })
 
     view
@@ -90,7 +90,7 @@ defmodule AgenticRealmsWeb.WizardNpcAuthoringTest do
     await_wizard_unlock(view)
 
     html = render(view)
-    # Draft card populated, incl. the NPC-only lore field + toolset picker.
+    # Draft card populated, incl. the NPC-only lore field + behavior_group picker.
     assert html =~ name
     assert html =~ "Lore"
     assert html =~ "Hates sunlight"
@@ -103,7 +103,7 @@ defmodule AgenticRealmsWeb.WizardNpcAuthoringTest do
     assert bp.kind == "npc"
     assert bp.revision == 1
     assert bp.lore =~ "Hates sunlight"
-    assert bp.toolsets == ["greeter"]
+    assert bp.behavior_groups == ["greeter"]
 
     html = render(view)
     assert html =~ name
@@ -122,7 +122,7 @@ defmodule AgenticRealmsWeb.WizardNpcAuthoringTest do
         short_description: "a moss-covered ogre",
         long_description: "A lumbering ogre draped in river moss.",
         lore: "Guards the old bridge.",
-        toolsets: ["greeter"]
+        behavior_groups: ["greeter"]
       })
 
     {:ok, wizard_view, _} = live(wzc, ~p"/play")
@@ -139,14 +139,14 @@ defmodule AgenticRealmsWeb.WizardNpcAuthoringTest do
     assert render(witness_view) =~ "Mossback the Ogre arrives."
 
     # A real NPC clone exists in the room, referencing the blueprint, with the
-    # toolset's greeting folded into its effective behaviors (FR-016).
+    # behavior_group's greeting folded into its effective behaviors (FR-016).
     clone = Repo.get_by(NPCClone, blueprint_id: slug)
     refute is_nil(clone)
     assert clone.room_id == Seed.starting_room_id()
     assert Enum.any?(clone.behaviors, &(&1["trigger"] == "player_entered"))
   end
 
-  test "direct-behavior editor: add a behavior alongside a toolset → both commit (FR-015a)",
+  test "direct-behavior editor: add a behavior alongside a behavior_group → both commit (FR-015a)",
        %{wizard_conn: wzc, suffix: suffix} do
     {:ok, view, _} = live(wzc, ~p"/play")
     render_hook(view, "switch_mode", %{"mode" => "wizard"})
@@ -159,7 +159,7 @@ defmodule AgenticRealmsWeb.WizardNpcAuthoringTest do
       "short_description" => "a stern gate warden",
       "long_description" => "A scarred warden in studded leather.",
       "lore" => "You keep the gate and trust no one after dark.",
-      "toolsets" => ["greeter"]
+      "behavior_groups" => ["greeter"]
     })
 
     view
@@ -171,7 +171,7 @@ defmodule AgenticRealmsWeb.WizardNpcAuthoringTest do
     # The direct-behavior editor is present and starts empty.
     assert render(view) =~ "Direct behaviors"
 
-    # Add a row, then fill it via the form-change with the toolset preserved.
+    # Add a row, then fill it via the form-change with the behavior_group preserved.
     render_hook(view, "add_direct_behavior", %{})
 
     render_hook(view, "update_blueprint_draft", %{
@@ -180,7 +180,7 @@ defmodule AgenticRealmsWeb.WizardNpcAuthoringTest do
         "short_description" => "a stern gate warden",
         "long_description" => "A scarred warden in studded leather.",
         "lore" => "You keep the gate and trust no one after dark.",
-        "toolsets" => ["greeter"],
+        "behavior_groups" => ["greeter"],
         "behaviors" => %{
           "0" => %{"trigger" => "player_left", "type" => "emote", "text" => "narrows his eyes."}
         }
@@ -192,8 +192,8 @@ defmodule AgenticRealmsWeb.WizardNpcAuthoringTest do
     slug = name |> String.replace(~r/[^a-z0-9]+/, "_") |> String.trim("_")
     bp = Queries.get_npc_blueprint_row(slug)
 
-    # The blueprint carries BOTH the toolset and the individually-added behavior.
-    assert bp.toolsets == ["greeter"]
+    # The blueprint carries BOTH the behavior_group and the individually-added behavior.
+    assert bp.behavior_groups == ["greeter"]
 
     assert bp.behaviors == [
              %{
@@ -248,7 +248,7 @@ defmodule AgenticRealmsWeb.WizardNpcAuthoringTest do
       "short_description" => "a wise sage",
       "long_description" => "An old sage by the fire.",
       "lore" => "v1 lore",
-      "toolsets" => []
+      "behavior_groups" => []
     })
 
     view

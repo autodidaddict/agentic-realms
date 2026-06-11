@@ -152,11 +152,11 @@ defmodule AgenticRealmsWeb.GameLive do
      )
      # Feature 015 US8 — unified registry kind filter (:all | :object | :npc).
      |> assign(:blueprint_filter, :all)
-     # Feature 015 — toolsets available to attach to an NPC blueprint draft.
+     # Feature 015 — behavior_groups available to attach to an NPC blueprint draft.
      |> assign(
-       :toolsets,
+       :behavior_groups,
        if(socket.assigns.current_player.is_wizard,
-         do: AgenticRealms.World.Toolsets.list_for(:npc),
+         do: AgenticRealms.World.BehaviorGroups.list_for(:npc),
          else: []
        )
      )
@@ -464,7 +464,7 @@ defmodule AgenticRealmsWeb.GameLive do
           fixed: bp.fixed,
           lore: bp.lore || "",
           behaviors: bp.behaviors || [],
-          toolsets: bp.toolsets || [],
+          behavior_groups: bp.behavior_groups || [],
           proposed_slug: bp.id,
           expected_revision: bp.revision
         }
@@ -911,7 +911,7 @@ defmodule AgenticRealmsWeb.GameLive do
 
   # Feature 015 US6 — extract essence from an in-world NPC clone. Flips into
   # trance and pre-populates the focused npc blueprint draft with a wholesale
-  # copy of the clone's settable fields (lore + toolsets + direct behaviors)
+  # copy of the clone's settable fields (lore + behavior_groups + direct behaviors)
   # plus an auto-derived slug. The source clone is NOT modified — the blueprint
   # is created later when the wizard clicks Commit.
   def handle_event(
@@ -940,7 +940,7 @@ defmodule AgenticRealmsWeb.GameLive do
           fixed: clone.fixed == true,
           lore: clone.lore || "",
           behaviors: clone.direct_behaviors || [],
-          toolsets: clone.toolsets || [],
+          behavior_groups: clone.behavior_groups || [],
           proposed_slug: AgenticRealms.World.Blueprint.Slug.derive(clone.name || "")
         }
 
@@ -1242,13 +1242,13 @@ defmodule AgenticRealmsWeb.GameLive do
     }
   end
 
-  # Feature 015 — npc drafts carry lore + a toolset multi-select. Checkboxes
-  # only submit when checked, so an absent `toolsets` means "none selected".
+  # Feature 015 — npc drafts carry lore + a behavior_group multi-select. Checkboxes
+  # only submit when checked, so an absent `behavior_groups` means "none selected".
   # Object drafts have no such fields and are left untouched.
   defp put_npc_draft_fields(%{kind: "npc"} = draft, params) do
     draft
     |> Map.put(:lore, Map.get(params, "lore", Map.get(draft, :lore, "")) || "")
-    |> Map.put(:toolsets, params |> Map.get("toolsets", []) |> List.wrap())
+    |> Map.put(:behavior_groups, params |> Map.get("behavior_groups", []) |> List.wrap())
     |> Map.put(:behaviors, parse_direct_behaviors(params, draft))
   end
 

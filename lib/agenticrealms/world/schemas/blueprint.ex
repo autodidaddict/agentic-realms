@@ -6,7 +6,7 @@ defmodule AgenticRealms.World.Schemas.Blueprint do
 
   Shared core (`name`/`short_description`/`long_description`/`fixed`/`revision`)
   applies to every kind. The NPC-flavored columns (`behaviors`/`lore`/
-  `toolsets`/`quests`) are empty for objects in this milestone (the table
+  `behavior_groups`/`quests`) are empty for objects in this milestone (the table
   supports them; the object authoring UI doesn't expose them yet).
 
   Spawned instances are freestanding: a blueprint stamps a clone's frozen
@@ -24,11 +24,11 @@ defmodule AgenticRealms.World.Schemas.Blueprint do
     field :long_description, :string
     field :fixed, :boolean, default: false
     field :revision, :integer, default: 1
-    # Direct behaviors (feature 009). Effective set = union(toolsets) ++ these,
+    # Direct behaviors (feature 009). Effective set = union(behavior_groups) ++ these,
     # composed at spawn time.
     field :behaviors, {:array, :map}, default: []
     field :lore, :string, default: ""
-    field :toolsets, {:array, :string}, default: []
+    field :behavior_groups, {:array, :string}, default: []
     # Feature 013 — per-NPC FetchQuest catalog.
     field :quests, {:array, :map}, default: []
 

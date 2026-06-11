@@ -37,7 +37,7 @@ defmodule AgenticRealmsWeb.GameLive.Wizard do
         fixed: Map.get(draft, :fixed, false),
         lore: Map.get(draft, :lore, ""),
         behaviors: draft |> Map.get(:behaviors, []) |> drop_blank_behaviors(),
-        toolsets: Map.get(draft, :toolsets, [])
+        behavior_groups: Map.get(draft, :behavior_groups, [])
       }
 
     case Commands.create_blueprint(attrs) do
@@ -54,9 +54,9 @@ defmodule AgenticRealmsWeb.GameLive.Wizard do
     end
   end
 
-  # `create_blueprint` can return `{:error, {:unknown_toolset, name}}`; surface
+  # `create_blueprint` can return `{:error, {:unknown_behavior_group, name}}`; surface
   # a flat atom the component's `format_commit_error/1` already understands.
-  defp normalize_error({:unknown_toolset, _name}), do: :unknown_toolset
+  defp normalize_error({:unknown_behavior_group, _name}), do: :unknown_behavior_group
   defp normalize_error(reason), do: reason
 
   # US4 — a freshly-added editor row with no text is incomplete; drop it before
@@ -88,12 +88,12 @@ defmodule AgenticRealmsWeb.GameLive.Wizard do
       fixed: Map.get(draft, :fixed, false)
     }
 
-    # NPC blueprints also edit lore + toolsets + direct behaviors.
+    # NPC blueprints also edit lore + behavior_groups + direct behaviors.
     fields_changed =
       if Map.get(draft, :kind) == "npc" do
         Map.merge(base, %{
           lore: Map.get(draft, :lore, ""),
-          toolsets: Map.get(draft, :toolsets, []),
+          behavior_groups: Map.get(draft, :behavior_groups, []),
           behaviors: draft |> Map.get(:behaviors, []) |> drop_blank_behaviors()
         })
       else
@@ -124,7 +124,7 @@ defmodule AgenticRealmsWeb.GameLive.Wizard do
           fixed: bp.fixed,
           lore: bp.lore || "",
           behaviors: bp.behaviors || [],
-          toolsets: bp.toolsets || [],
+          behavior_groups: bp.behavior_groups || [],
           proposed_slug: bp.id,
           expected_revision: current
         }
@@ -176,7 +176,7 @@ defmodule AgenticRealmsWeb.GameLive.Wizard do
           fixed: fields.fixed,
           lore: Map.get(fields, :lore, ""),
           behaviors: Map.get(fields, :behaviors, []),
-          toolsets: Map.get(fields, :toolsets, []),
+          behavior_groups: Map.get(fields, :behavior_groups, []),
           proposed_slug: Slug.derive(fields.name)
         }
 

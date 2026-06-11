@@ -33,7 +33,7 @@ defmodule AgenticRealms.World.Projections.BlueprintProjector do
       revision: Map.get(e, :revision, 1),
       behaviors: Map.get(e, :behaviors, []) || [],
       lore: Map.get(e, :lore, "") || "",
-      toolsets: Map.get(e, :toolsets, []) || [],
+      behavior_groups: Map.get(e, :behavior_groups, []) || [],
       quests: Map.get(e, :quests, []) || [],
       inserted_at: now,
       updated_at: now
