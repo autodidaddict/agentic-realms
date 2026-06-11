@@ -76,7 +76,7 @@ defmodule AgenticRealms.World.BlueprintTest do
   end
 
   describe "execute/2 — CreateBlueprint (npc)" do
-    test "creates an npc blueprint carrying lore/behaviors/toolsets/quests, revision 1" do
+    test "creates an npc blueprint carrying lore/behaviors/behavior_groups/quests, revision 1" do
       behaviors = [
         %{"trigger" => "player_entered", "actions" => [%{"type" => "say", "text" => "hi"}]}
       ]
@@ -84,7 +84,7 @@ defmodule AgenticRealms.World.BlueprintTest do
       assert %BlueprintCreated{
                kind: "npc",
                lore: "wary",
-               toolsets: ["greeter"],
+               behavior_groups: ["greeter"],
                behaviors: ^behaviors,
                revision: 1
              } =
@@ -96,7 +96,7 @@ defmodule AgenticRealms.World.BlueprintTest do
                  long_description: "A wiry man in a stained apron.",
                  lore: "wary",
                  behaviors: behaviors,
-                 toolsets: ["greeter"]
+                 behavior_groups: ["greeter"]
                })
     end
   end
@@ -116,7 +116,7 @@ defmodule AgenticRealms.World.BlueprintTest do
                })
     end
 
-    test "npc-only fields (lore, toolsets, behaviors) are editable" do
+    test "npc-only fields (lore, behavior_groups, behaviors) are editable" do
       state = created_state(%{kind: "npc"})
 
       assert %BlueprintEdited{revision: 2, fields_changed: %{lore: "now brave"}} =
@@ -173,12 +173,12 @@ defmodule AgenticRealms.World.BlueprintTest do
 
   describe "apply/2 round-trip" do
     test "BlueprintCreated sets id/kind/content fields" do
-      state = created_state(%{kind: "npc", lore: "grim", toolsets: ["greeter"]})
+      state = created_state(%{kind: "npc", lore: "grim", behavior_groups: ["greeter"]})
 
       assert state.id == "test_chest"
       assert state.kind == "npc"
       assert state.lore == "grim"
-      assert state.toolsets == ["greeter"]
+      assert state.behavior_groups == ["greeter"]
       assert state.revision == 1
     end
 

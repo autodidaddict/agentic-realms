@@ -8,7 +8,7 @@ defmodule AgenticRealms.World.Commands.CreateBlueprint do
   `wizard_id` is optional so the world seed can author system NPCs directly.
 
   `kind` ∈ {`"object"`, `"npc"`}. The NPC-flavored fields (`behaviors`/`lore`/
-  `toolsets`/`quests`) default empty and are unused for objects.
+  `behavior_groups`/`quests`) default empty and are unused for objects.
 
   Replaces `CreateObjectBlueprint` + `CreateNPCBlueprint`.
   """
@@ -26,7 +26,7 @@ defmodule AgenticRealms.World.Commands.CreateBlueprint do
     fixed: false,
     behaviors: [],
     lore: "",
-    toolsets: [],
+    behavior_groups: [],
     quests: []
   ]
 end

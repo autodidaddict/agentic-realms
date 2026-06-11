@@ -42,7 +42,7 @@ defmodule AgenticRealms.World.Commands do
   alias AgenticRealms.World.Exits.Validator, as: ExitsValidator
   alias AgenticRealms.World.Queries
   alias AgenticRealms.World.Quests
-  alias AgenticRealms.World.Toolsets
+  alias AgenticRealms.World.BehaviorGroups
 
   alias AgenticRealms.World.Schemas.{
     Exit,
@@ -354,13 +354,13 @@ defmodule AgenticRealms.World.Commands do
     end
   end
 
-  # Shared NPC spawn: per-room name-collision check, toolset composition
-  # (FR-016 — effective = union(toolsets) ++ direct), and the full-copy clone
-  # into the room carrying the toolset/direct-behavior provenance.
+  # Shared NPC spawn: per-room name-collision check, behavior_group composition
+  # (FR-016 — effective = union(behavior_groups) ++ direct), and the full-copy clone
+  # into the room carrying the behavior_group/direct-behavior provenance.
   defp spawn_npc_clone_row(%Blueprint{} = bp, room_id, clone_id) do
     with :ok <- check_room_exists(room_id),
          :ok <- check_no_clone_name_collision(room_id, bp.name),
-         {:ok, effective} <- Toolsets.compose(bp.toolsets || [], bp.behaviors || []) do
+         {:ok, effective} <- BehaviorGroups.compose(bp.behavior_groups || [], bp.behaviors || []) do
       fields = %{
         blueprint_id: bp.id,
         name: bp.name,
@@ -368,7 +368,7 @@ defmodule AgenticRealms.World.Commands do
         long_description: bp.long_description,
         behaviors: effective,
         direct_behaviors: bp.behaviors || [],
-        toolsets: bp.toolsets || [],
+        behavior_groups: bp.behavior_groups || [],
         lore: bp.lore || "",
         fixed: bp.fixed
       }
@@ -805,28 +805,28 @@ defmodule AgenticRealms.World.Commands do
 
   FR-WIZ-5 authorization, FR-004 slug-shape + one-namespace uniqueness, and —
   for `kind: "npc"` — validates the direct `behaviors` against the feature-009
-  vocabulary (FR-014) and every referenced `toolset` against the registry
+  vocabulary (FR-014) and every referenced `behavior_group` against the registry
   (FR-018). `behaviors` are the DIRECT behaviors; the effective set is composed
-  (union with toolsets) at spawn time.
+  (union with behavior_groups) at spawn time.
 
   Returns `{:ok, blueprint_id}`. Refusals: `:not_a_wizard` / `:unknown_player`,
   `:invalid_slug` / `:slug_already_exists`, the `*_required` content errors,
-  `{:unknown_toolset, name}`, or a feature-009 behavior-validation error.
+  `{:unknown_behavior_group, name}`, or a feature-009 behavior-validation error.
 
   `create_object_blueprint/2` and `create_npc_blueprint/2` are thin wrappers
   that fix `kind`.
   """
   @spec create_blueprint(map(), keyword()) ::
-          {:ok, String.t()} | {:error, atom()} | {:error, {:unknown_toolset, String.t()}}
+          {:ok, String.t()} | {:error, atom()} | {:error, {:unknown_behavior_group, String.t()}}
   def create_blueprint(attrs, _opts \\ []) when is_map(attrs) do
     kind = Map.get(attrs, :kind, "npc")
     behaviors = Map.get(attrs, :behaviors, []) || []
-    toolsets = Map.get(attrs, :toolsets, []) || []
+    behavior_groups = Map.get(attrs, :behavior_groups, []) || []
 
     with :ok <- ensure_wizard(attrs[:wizard_id]),
          :ok <- validate_slug(attrs[:blueprint_id]),
          :ok <- ensure_slug_unused(attrs[:blueprint_id]),
-         :ok <- validate_kind_payload(kind, behaviors, toolsets) do
+         :ok <- validate_kind_payload(kind, behaviors, behavior_groups) do
       cmd = %CreateBlueprint{
         blueprint_id: attrs[:blueprint_id],
         wizard_id: attrs[:wizard_id],
@@ -837,7 +837,7 @@ defmodule AgenticRealms.World.Commands do
         lore: Map.get(attrs, :lore, "") || "",
         behaviors: behaviors,
         fixed: Map.get(attrs, :fixed, false),
-        toolsets: toolsets
+        behavior_groups: behavior_groups
       }
 
       case WorldApp.dispatch(cmd, consistency: :strong) do
@@ -847,15 +847,15 @@ defmodule AgenticRealms.World.Commands do
     end
   end
 
-  # Objects carry no behaviors/toolsets surface in this milestone, so only
+  # Objects carry no behaviors/behavior_groups surface in this milestone, so only
   # npc blueprints validate them.
-  defp validate_kind_payload("npc", behaviors, toolsets) do
-    with :ok <- Toolsets.validate_behaviors(behaviors) do
-      Toolsets.all_exist?(toolsets)
+  defp validate_kind_payload("npc", behaviors, behavior_groups) do
+    with :ok <- BehaviorGroups.validate_behaviors(behaviors) do
+      BehaviorGroups.all_exist?(behavior_groups)
     end
   end
 
-  defp validate_kind_payload(_kind, _behaviors, _toolsets), do: :ok
+  defp validate_kind_payload(_kind, _behaviors, _behavior_groups), do: :ok
 
   @doc "Author an object blueprint (thin wrapper over `create_blueprint/2`)."
   @spec create_object_blueprint(map(), keyword()) :: {:ok, String.t()} | {:error, atom()}
@@ -864,7 +864,7 @@ defmodule AgenticRealms.World.Commands do
 
   @doc "Author an npc blueprint (thin wrapper over `create_blueprint/2`)."
   @spec create_npc_blueprint(map(), keyword()) ::
-          {:ok, String.t()} | {:error, atom()} | {:error, {:unknown_toolset, String.t()}}
+          {:ok, String.t()} | {:error, atom()} | {:error, {:unknown_behavior_group, String.t()}}
   def create_npc_blueprint(attrs, opts \\ []) when is_map(attrs),
     do: create_blueprint(Map.put(attrs, :kind, "npc"), opts)
 
@@ -874,13 +874,13 @@ defmodule AgenticRealms.World.Commands do
   model and stamps the denormalized fields into the clone (full-copy, FR-013):
 
     * object → `clone_into(:object, …)`.
-    * npc → `Toolsets.compose(toolsets, behaviors)` → effective behaviors,
-      then `clone_into(:npc, …)` carrying the toolset/direct-behavior
+    * npc → `BehaviorGroups.compose(behavior_groups, behaviors)` → effective behaviors,
+      then `clone_into(:npc, …)` carrying the behavior_group/direct-behavior
       provenance; with the per-room name-collision pre-check (FR-013).
 
   Returns `{:ok, entity_id}`. Refusals: `:not_a_wizard` / `:unknown_player`,
   `:unknown_blueprint`, `:room_not_found`, `:clone_name_taken_in_room`,
-  `{:unknown_toolset, name}`.
+  `{:unknown_behavior_group, name}`.
   """
   @spec spawn_from_blueprint(integer(), String.t(), String.t()) ::
           {:ok, String.t()} | {:error, term()}
@@ -998,7 +998,7 @@ defmodule AgenticRealms.World.Commands do
 
     with :ok <- ensure_wizard(wizard_id),
          :ok <- validate_object_attrs(attrs),
-         :ok <- Toolsets.validate_behaviors(behaviors),
+         :ok <- BehaviorGroups.validate_behaviors(behaviors),
          :ok <- check_room_exists(room_id),
          :ok <- check_no_clone_name_collision(room_id, attrs[:name]) do
       fields = %{
@@ -1009,7 +1009,7 @@ defmodule AgenticRealms.World.Commands do
         long_description: attrs[:long_description],
         behaviors: behaviors,
         direct_behaviors: behaviors,
-        toolsets: [],
+        behavior_groups: [],
         lore: Map.get(attrs, :lore, "") || "",
         fixed: Map.get(attrs, :fixed, false)
       }
@@ -1026,7 +1026,7 @@ defmodule AgenticRealms.World.Commands do
   persist a new Blueprint at `revision: 1` (FR-012 / FR-016 / FR-018). The
   source entity is NOT modified. The entity kind is detected from its id: a
   world Object yields an object blueprint; an NPC clone yields an npc blueprint
-  (copying its lore + DIRECT behaviors + toolset names, so the new blueprint
+  (copying its lore + DIRECT behaviors + behavior_group names, so the new blueprint
   recomposes the same effective set — not the frozen union).
 
   Returns `{:ok, blueprint_id}`. Refusals:
@@ -1034,7 +1034,7 @@ defmodule AgenticRealms.World.Commands do
     * `{:error, :unknown_entity}` — `entity_id` is not an extractable object or
       NPC clone (incl. a quest-scoped object, which wizards do not extract).
     * `{:error, :invalid_slug}` / `{:error, :slug_already_exists}`.
-    * (npc) `{:error, {:unknown_toolset, name}}` / a feature-009 behavior error.
+    * (npc) `{:error, {:unknown_behavior_group, name}}` / a feature-009 behavior error.
 
   Intended for `iex` / test setup; the LiveView paths (`extract_essence` /
   `extract_npc_essence` events) instead pre-populate the trance card and let the
@@ -1067,7 +1067,7 @@ defmodule AgenticRealms.World.Commands do
             lore: clone.lore || "",
             fixed: clone.fixed,
             behaviors: clone.direct_behaviors || [],
-            toolsets: clone.toolsets || []
+            behavior_groups: clone.behavior_groups || []
           })
       end
     end
@@ -1117,8 +1117,8 @@ defmodule AgenticRealms.World.Commands do
 
   # In-place world-Object edit (feature 014) — narrow field set.
   @object_only_edit_fields ~w(name short_description long_description fixed)a
-  # Blueprint + npc-clone edits also reach lore/toolsets/behaviors.
-  @edit_blueprint_fields ~w(name short_description long_description fixed lore toolsets behaviors)a
+  # Blueprint + npc-clone edits also reach lore/behavior_groups/behaviors.
+  @edit_blueprint_fields ~w(name short_description long_description fixed lore behavior_groups behaviors)a
 
   @doc """
   Edit an existing Object Blueprint. `expected_revision` MUST equal the
@@ -1196,20 +1196,22 @@ defmodule AgenticRealms.World.Commands do
   defp validate_edit_fields(_, _), do: {:error, :invalid_field}
 
   # When an edit touches the npc-flavored fields, validate them the same way
-  # create does (feature-009 behavior vocabulary + toolset existence).
+  # create does (feature-009 behavior vocabulary + behavior_group existence).
   defp validate_edit_payload(fields) do
     with :ok <- maybe_validate_behaviors(fields) do
-      maybe_validate_toolsets(fields)
+      maybe_validate_behavior_groups(fields)
     end
   end
 
   defp maybe_validate_behaviors(%{behaviors: behaviors}),
-    do: Toolsets.validate_behaviors(behaviors || [])
+    do: BehaviorGroups.validate_behaviors(behaviors || [])
 
   defp maybe_validate_behaviors(_), do: :ok
 
-  defp maybe_validate_toolsets(%{toolsets: toolsets}), do: Toolsets.all_exist?(toolsets || [])
-  defp maybe_validate_toolsets(_), do: :ok
+  defp maybe_validate_behavior_groups(%{behavior_groups: behavior_groups}),
+    do: BehaviorGroups.all_exist?(behavior_groups || [])
+
+  defp maybe_validate_behavior_groups(_), do: :ok
 
   @doc """
   Edit a world Object in place. Routes through the Room aggregate that
@@ -1275,7 +1277,7 @@ defmodule AgenticRealms.World.Commands do
   blueprint or sibling clones).
 
   Returns `{:ok, :updated | :no_change}`. Refusals: `:not_a_wizard` /
-  `:unknown_player`, `:unknown_npc`, `:invalid_field`, a behavior/toolset
+  `:unknown_player`, `:unknown_npc`, `:invalid_field`, a behavior/behavior_group
   validation error, or `:object_not_editable_here` (clone not co-located).
   """
   @spec edit_npc(integer(), String.t(), map()) :: {:ok, :updated | :no_change} | {:error, term()}

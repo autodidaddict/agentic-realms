@@ -6,7 +6,7 @@ defmodule AgenticRealms.World.Commands.EditBlueprint do
   mismatch fires the optimistic lock and the command is refused with no
   event. `fields_changed` is a sparse map of changed fields; allowed keys are
   `:name`, `:short_description`, `:long_description`, `:fixed`, `:lore`,
-  `:toolsets`, `:behaviors`. The aggregate emits `BlueprintEdited` with the
+  `:behavior_groups`, `:behaviors`. The aggregate emits `BlueprintEdited` with the
   sparse diff and `revision: N+1`.
 
   Replaces `EditObjectBlueprint`.

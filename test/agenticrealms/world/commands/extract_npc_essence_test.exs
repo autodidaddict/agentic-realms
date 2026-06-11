@@ -2,7 +2,7 @@ defmodule AgenticRealms.World.Commands.ExtractNpcEssenceTest do
   @moduledoc """
   Feature 015 US6 — extract a new NPC Blueprint from an in-world clone: the
   extracted blueprint copies the clone's name/short/long/lore/fixed + its
-  toolsets + DIRECT behaviors at revision 1, and the source clone is left
+  behavior_groups + DIRECT behaviors at revision 1, and the source clone is left
   byte-for-byte unchanged (FR-012 / SC-005).
   """
 
@@ -13,7 +13,7 @@ defmodule AgenticRealms.World.Commands.ExtractNpcEssenceTest do
   alias AgenticRealms.Accounts
   alias AgenticRealms.Repo
   alias AgenticRealms.World.{Commands, Queries}
-  alias AgenticRealms.World.Schemas.{NPCClone, Region, Room, Toolset}
+  alias AgenticRealms.World.Schemas.{NPCClone, Region, Room, BehaviorGroup}
 
   @greeter %{
     "trigger" => "player_entered",
@@ -38,7 +38,7 @@ defmodule AgenticRealms.World.Commands.ExtractNpcEssenceTest do
     now = DateTime.utc_now() |> DateTime.truncate(:second)
     orc = "orc_#{suffix}"
 
-    Repo.insert!(%Toolset{
+    Repo.insert!(%BehaviorGroup{
       name: orc,
       behaviors: [@greeter],
       applies_to: ["npc"],
@@ -72,7 +72,7 @@ defmodule AgenticRealms.World.Commands.ExtractNpcEssenceTest do
         long_description: "A troll behind a counter.",
         lore: "Hoards shiny coins.",
         fixed: true,
-        toolsets: [orc],
+        behavior_groups: [orc],
         behaviors: [@direct]
       })
 
@@ -96,8 +96,8 @@ defmodule AgenticRealms.World.Commands.ExtractNpcEssenceTest do
     assert bp.long_description == "A troll behind a counter."
     assert bp.lore == "Hoards shiny coins." or bp.lore == "Hoards shiny coins"
     assert bp.fixed == true
-    # The clone's DIRECT behaviors + toolset names carry over (not the frozen union).
-    assert bp.toolsets == [orc]
+    # The clone's DIRECT behaviors + behavior_group names carry over (not the frozen union).
+    assert bp.behavior_groups == [orc]
     assert bp.behaviors == [@direct]
 
     # Source clone is byte-for-byte unchanged.
@@ -105,7 +105,7 @@ defmodule AgenticRealms.World.Commands.ExtractNpcEssenceTest do
     assert after_edit.name == before.name
     assert after_edit.lore == before.lore
     assert after_edit.behaviors == before.behaviors
-    assert after_edit.toolsets == before.toolsets
+    assert after_edit.behavior_groups == before.behavior_groups
     assert after_edit.direct_behaviors == before.direct_behaviors
     assert after_edit.blueprint_id == before.blueprint_id
   end

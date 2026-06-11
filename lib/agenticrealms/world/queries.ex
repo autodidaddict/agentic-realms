@@ -174,7 +174,7 @@ defmodule AgenticRealms.World.Queries do
 
   @doc """
   Feature 015 US6 — fetch a full NPC clone row by id (for extract-essence,
-  which reads its lore/toolsets/direct_behaviors). Returns `nil` if unknown.
+  which reads its lore/behavior_groups/direct_behaviors). Returns `nil` if unknown.
   """
   @spec get_npc_clone_row(String.t()) :: %NPCClone{} | nil
   def get_npc_clone_row(clone_id) when is_binary(clone_id) do

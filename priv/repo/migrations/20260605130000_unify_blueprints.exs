@@ -23,7 +23,7 @@ defmodule AgenticRealms.Repo.Migrations.UnifyBlueprints do
       add :revision, :integer, null: false, default: 1
       add :behaviors, :jsonb, null: false, default: fragment("'[]'::jsonb")
       add :lore, :text, null: false, default: ""
-      add :toolsets, {:array, :string}, null: false, default: []
+      add :behavior_groups, {:array, :string}, null: false, default: []
       add :quests, :jsonb, null: false, default: fragment("'[]'::jsonb")
 
       timestamps(type: :utc_datetime)

@@ -20,12 +20,12 @@ defmodule AgenticRealms.World.Schemas.NPCClone do
     field :name, :string
     field :short_description, :string
     field :long_description, :string
-    # Effective behaviors (toolsets ∪ direct), frozen at spawn.
+    # Effective behaviors (behavior_groups ∪ direct), frozen at spawn.
     field :behaviors, {:array, :map}, default: []
     field :lore, :string, default: ""
     # Feature 015 — authoring/extract provenance, frozen at spawn.
     field :fixed, :boolean, default: false
-    field :toolsets, {:array, :string}, default: []
+    field :behavior_groups, {:array, :string}, default: []
     field :direct_behaviors, {:array, :map}, default: []
 
     belongs_to :blueprint, AgenticRealms.World.Schemas.Blueprint,

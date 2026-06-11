@@ -10,8 +10,8 @@ defmodule AgenticRealms.World.IntentResolver.WizardTools do
       (NOT a dispatched command). The LiveView populates the Interpreted
       Data card and the wizard refines + commits via form. The model picks
       the npc tool for a character/creature, the object tool otherwise.
-    * `list_toolsets` (feature 015) — a read tool returning the named
-      behavior groups, so `draft_npc_blueprint` toolset proposals are
+    * `list_behavior_groups` (feature 015) — a read tool returning the named
+      behavior groups, so `draft_npc_blueprint` behavior_group proposals are
       grounded in real registered names (FR-020a). Unknown names are
       dropped before commit (FR-018).
     * `refuse` — the escape hatch when the prompt is not an archetype.
@@ -26,7 +26,7 @@ defmodule AgenticRealms.World.IntentResolver.WizardTools do
   @doc "Set of recognized tool names in :blueprints mode."
   @spec names_blueprints() :: MapSet.t(String.t())
   def names_blueprints,
-    do: MapSet.new(~w(draft_object_blueprint draft_npc_blueprint list_toolsets refuse))
+    do: MapSet.new(~w(draft_object_blueprint draft_npc_blueprint list_behavior_groups refuse))
 
   @doc "Set of recognized tool names in :world mode (wizard-only)."
   @spec names_world() :: MapSet.t(String.t())
@@ -70,7 +70,7 @@ defmodule AgenticRealms.World.IntentResolver.WizardTools do
       %{
         "name" => "draft_npc_blueprint",
         "description" =>
-          "Extract fields for a new reusable NPC archetype (blueprint) the wizard is authoring — a character, creature, or person meant to be spawned into the world later (e.g., 'Garrick, a gruff but kind innkeeper', 'a hulking cave troll that hates sunlight'). Use when the prompt describes a living / sentient / animate being. Do NOT use for inanimate objects — that's `draft_object_blueprint`. You MAY call `list_toolsets` first to ground any toolsets you propose.",
+          "Extract fields for a new reusable NPC archetype (blueprint) the wizard is authoring — a character, creature, or person meant to be spawned into the world later (e.g., 'Garrick, a gruff but kind innkeeper', 'a hulking cave troll that hates sunlight'). Use when the prompt describes a living / sentient / animate being. Do NOT use for inanimate objects — that's `draft_object_blueprint`. You MAY call `list_behavior_groups` first to ground any behavior_groups you propose.",
         "input_schema" => %{
           "type" => "object",
           "required" => ["name", "short_description", "long_description"],
@@ -100,19 +100,19 @@ defmodule AgenticRealms.World.IntentResolver.WizardTools do
               "description" =>
                 "True only if the NPC cannot be moved or relocated (rare). Default false."
             },
-            "toolsets" => %{
+            "behavior_groups" => %{
               "type" => "array",
               "items" => %{"type" => "string"},
               "description" =>
-                "Names of behavior groups (\"toolsets\") to attach, chosen ONLY from the list returned by `list_toolsets`. Omit or leave empty if none fit. Never invent names."
+                "Names of behavior groups (\"behavior_groups\") to attach, chosen ONLY from the list returned by `list_behavior_groups`. Omit or leave empty if none fit. Never invent names."
             }
           }
         }
       },
       %{
-        "name" => "list_toolsets",
+        "name" => "list_behavior_groups",
         "description" =>
-          "List the named behavior groups (\"toolsets\") available to attach to an NPC blueprint, with their descriptions. Call this BEFORE `draft_npc_blueprint` whenever you intend to propose toolsets, so your proposals reference real registered names.",
+          "List the named behavior groups (\"behavior_groups\") available to attach to an NPC blueprint, with their descriptions. Call this BEFORE `draft_npc_blueprint` whenever you intend to propose behavior_groups, so your proposals reference real registered names.",
         "input_schema" => %{"type" => "object", "properties" => %{}}
       },
       refuse_tool(

@@ -25,7 +25,7 @@ defmodule AgenticRealms.World.Projections.EntityProjector do
   @object_edit_fields ~w(name short_description long_description fixed behaviors)a
   # Feature 015 US7 — in-place NPC clone edit. The clone is freestanding, so
   # its behaviors are edited directly (the effective set).
-  @npc_edit_fields ~w(name short_description long_description fixed lore behaviors toolsets direct_behaviors)a
+  @npc_edit_fields ~w(name short_description long_description fixed lore behaviors behavior_groups direct_behaviors)a
 
   # --- EntityCloned: insert the read row in the void ----------------------
 
@@ -132,7 +132,7 @@ defmodule AgenticRealms.World.Projections.EntityProjector do
         lore: fval(fields, :lore) || "",
         # Feature 015 — authoring/extract provenance (default for freeform NPCs).
         fixed: fval(fields, :fixed) || false,
-        toolsets: fval(fields, :toolsets) || [],
+        behavior_groups: fval(fields, :behavior_groups) || [],
         direct_behaviors: fval(fields, :direct_behaviors) || [],
         # Born in the void; the subsequent EntityMoved sets the room.
         room_id: nil

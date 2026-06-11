@@ -21,7 +21,7 @@ defmodule AgenticRealms.World.Events.BlueprintCreated do
     revision: 1,
     behaviors: [],
     lore: "",
-    toolsets: [],
+    behavior_groups: [],
     quests: [],
     version: 1
   ]

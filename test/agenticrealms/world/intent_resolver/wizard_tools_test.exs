@@ -123,7 +123,7 @@ defmodule AgenticRealms.World.IntentResolver.WizardToolsTest do
   end
 
   describe "parse_wizard_blueprint_response/1 — npc drafts (feature 015)" do
-    test "extracts an npc draft from draft_npc_blueprint (no toolsets)" do
+    test "extracts an npc draft from draft_npc_blueprint (no behavior_groups)" do
       response = %{
         "content" => [
           %{
@@ -148,11 +148,11 @@ defmodule AgenticRealms.World.IntentResolver.WizardToolsTest do
                  long_description: "A wiry man in a stained apron, eyeing newcomers.",
                  lore: "Lost his brother to the mines; distrusts strangers.",
                  fixed: false,
-                 toolsets: []
+                 behavior_groups: []
                }}} = IntentResolver.parse_wizard_blueprint_response(response)
     end
 
-    test "defaults lore to \"\" and toolsets to [] when omitted" do
+    test "defaults lore to \"\" and behavior_groups to [] when omitted" do
       response = %{
         "content" => [
           %{
@@ -167,7 +167,7 @@ defmodule AgenticRealms.World.IntentResolver.WizardToolsTest do
         ]
       }
 
-      assert {:ok, {:draft_npc_blueprint, %{lore: "", toolsets: [], fixed: false}}} =
+      assert {:ok, {:draft_npc_blueprint, %{lore: "", behavior_groups: [], fixed: false}}} =
                IntentResolver.parse_wizard_blueprint_response(response)
     end
 
