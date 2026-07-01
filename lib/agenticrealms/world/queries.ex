@@ -370,6 +370,45 @@ defmodule AgenticRealms.World.Queries do
   end
 
   @doc """
+  Feature 018 — global (non-owner-scoped) exits of `room_id` with their
+  destination room ids. Unlike `list_exits/2`, this returns `target_room_id`
+  (not the display name) and includes ONLY exits with `visible_to_user_id IS
+  NULL`, so an external NPC mind never sees or traverses another actor's
+  owner-only (`:rift`) transient-region exit.
+  """
+  @spec list_global_exits(String.t()) :: [%{direction: String.t(), target_room_id: String.t()}]
+  def list_global_exits(room_id) when is_binary(room_id) do
+    from(e in Exit,
+      where: e.source_room_id == ^room_id and is_nil(e.visible_to_user_id),
+      order_by: e.direction,
+      select: %{direction: e.direction, target_room_id: e.target_room_id}
+    )
+    |> Repo.all()
+  end
+
+  @doc """
+  Feature 018 — online players currently in `room_id` (id + username), for the
+  external NPC surroundings read. Mirrors the online-presence filtering used for
+  the player-facing room view, but without any self-exclusion (the caller is a
+  service, not a player).
+  """
+  @spec list_players_in_room(String.t()) :: [%{id: integer(), username: String.t()}]
+  def list_players_in_room(room_id) when is_binary(room_id) do
+    rows =
+      from(ps in PlayerState,
+        join: p in AccountPlayer,
+        on: p.id == ps.player_id,
+        where: ps.current_room_id == ^room_id,
+        order_by: p.username,
+        select: %{id: p.id, username: p.username}
+      )
+      |> Repo.all()
+
+    online = online_player_ids()
+    Enum.filter(rows, fn %{id: id} -> MapSet.member?(online, id) end)
+  end
+
+  @doc """
   All players currently in `room_id` except `self_player_id`. Drives the
   Present HUD card and the `other_players` list in `look_room/1`.
   """

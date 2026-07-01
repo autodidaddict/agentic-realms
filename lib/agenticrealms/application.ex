@@ -118,11 +118,20 @@ defmodule AgenticRealms.Application do
         AgenticRealms.World.Projections.EntityProjector,
         AgenticRealms.World.UIEventBroadcaster,
         AgenticRealms.World.Behaviors.Interpreter,
+        # Feature 018 — External NPC Brains. The lifecycle "process manager" (a
+        # named Commanded event handler → exclusive cluster-wide subscriber)
+        # starts/terminates each NPC's Temporal workflow on spawn/removal.
+        AgenticRealms.NpcMinds.LifecycleManager,
         # Feature 017 — Transient Regions. Singleton that stamps owner presence
         # and periodically reaps + purges due transient regions. Lives with the
         # Commanded chain because it dispatches DestroyRegion and reads/writes
         # the read model.
-        AgenticRealms.World.Transient.Manager
+        AgenticRealms.World.Transient.Manager,
+        # Feature 018 — cluster-singleton reconciliation sweep that converges
+        # running Temporal minds to the set of live NPCs (backstop for the
+        # best-effort handoff). Registered under :global; a duplicate start on
+        # another node returns :ignore.
+        AgenticRealms.NpcMinds.Reconciler
       ]
     else
       []

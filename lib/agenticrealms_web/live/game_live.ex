@@ -40,6 +40,7 @@ defmodule AgenticRealmsWeb.GameLive do
     RoomObjectArrived,
     RoomObjectEdited,
     RoomNPCArrived,
+    RoomNPCLeft,
     RoomTranceEntered,
     RoomTranceExited,
     WizardBlueprintRegistryChanged,
@@ -1195,6 +1196,7 @@ defmodule AgenticRealmsWeb.GameLive do
   def handle_info(%RoomObjectTaken{} = msg, socket), do: UIEvents.object_taken(socket, msg)
   def handle_info(%RoomObjectDropped{} = msg, socket), do: UIEvents.object_dropped(socket, msg)
   def handle_info(%RoomNPCArrived{} = msg, socket), do: UIEvents.npc_arrived(socket, msg)
+  def handle_info(%RoomNPCLeft{} = msg, socket), do: UIEvents.npc_left(socket, msg)
 
   def handle_info(%BehaviorUtterance{} = msg, socket),
     do: UIEvents.behavior_utterance(socket, msg)

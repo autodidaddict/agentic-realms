@@ -40,6 +40,7 @@ defmodule AgenticRealmsWeb.GameLive.UIEvents do
     PlayerQuestProgress,
     PrivateUtterance,
     RoomNPCArrived,
+    RoomNPCLeft,
     RoomObjectArrived,
     RoomObjectDropped,
     RoomObjectEdited,
@@ -173,6 +174,15 @@ defmodule AgenticRealmsWeb.GameLive.UIEvents do
     {:noreply,
      socket
      |> append_log(%{kind: :system, text: "#{name} arrives."})
+     |> refresh_room_objects()}
+  end
+
+  # Feature 018 — an NPC leaving the room (mind-driven relocation or removal),
+  # mirroring npc_arrived. No actor exclusion — NPCs have no acting player.
+  def npc_left(socket, %RoomNPCLeft{npc_name: name}) do
+    {:noreply,
+     socket
+     |> append_log(%{kind: :system, text: "#{name} leaves."})
      |> refresh_room_objects()}
   end
 

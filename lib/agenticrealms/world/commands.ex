@@ -31,7 +31,8 @@ defmodule AgenticRealms.World.Commands do
     EditBlueprint,
     CloneEntity,
     MoveEntity,
-    EditEntity
+    EditEntity,
+    RemoveEntity
   }
 
   alias AgenticRealms.World.ContainerRef
@@ -150,6 +151,23 @@ defmodule AgenticRealms.World.Commands do
       )
     end
   end
+
+  @doc """
+  Feature 018 — remove an entity from the world. First-class, event-sourced
+  removal: dispatches `RemoveEntity` to the `Entity` aggregate, which emits
+  `EntityRemoved` (the read-model row is then deleted by the projector, the
+  witness announces an NPC's departure, and the NPC-mind process manager
+  terminates the mind). Returns `:ok`, or `{:error, :not_found}` for an unknown
+  or already-removed entity (idempotent).
+  """
+  @spec remove_entity(String.t()) :: :ok | {:error, atom()}
+  def remove_entity(entity_id) when is_binary(entity_id) do
+    WorldApp.dispatch(%RemoveEntity{entity_id: entity_id}, consistency: :strong)
+  end
+
+  @doc "Remove an NPC clone (thin alias over `remove_entity/1`)."
+  @spec remove_npc(String.t()) :: :ok | {:error, atom()}
+  def remove_npc(npc_id) when is_binary(npc_id), do: remove_entity(npc_id)
 
   @doc "Clone an entity and immediately move it into `to` (the void → target wrapper)."
   @spec clone_into(:object | :npc, map(), ContainerRef.t(), atom()) ::

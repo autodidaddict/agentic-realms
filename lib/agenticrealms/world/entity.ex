@@ -20,17 +20,25 @@ defmodule AgenticRealms.World.Entity do
   """
 
   alias AgenticRealms.World.ContainerRef
-  alias AgenticRealms.World.Commands.{CloneEntity, MoveEntity, EditEntity}
-  alias AgenticRealms.World.Events.{EntityCloned, EntityMoved, EntityEdited}
+  alias AgenticRealms.World.Commands.{CloneEntity, MoveEntity, EditEntity, RemoveEntity}
+  alias AgenticRealms.World.Events.{EntityCloned, EntityMoved, EntityEdited, EntityRemoved}
 
   @kinds ~w(object npc)a
 
-  defstruct id: nil, kind: nil, container: nil
+  # `name` is tracked so `EntityRemoved` can carry it for the departure witness
+  # (the read-model row is deleted on the same event, so the broadcaster can't
+  # look it up).
+  defstruct id: nil, kind: nil, container: nil, name: nil, removed: false
 
   # --- CloneEntity --------------------------------------------------------
 
-  @spec execute(%__MODULE__{}, %CloneEntity{} | %MoveEntity{} | %EditEntity{}) ::
-          %EntityCloned{} | %EntityMoved{} | %EntityEdited{} | :ok | {:error, atom()}
+  @spec execute(%__MODULE__{}, %CloneEntity{} | %MoveEntity{} | %EditEntity{} | %RemoveEntity{}) ::
+          %EntityCloned{}
+          | %EntityMoved{}
+          | %EntityEdited{}
+          | %EntityRemoved{}
+          | :ok
+          | {:error, atom()}
   def execute(%__MODULE__{id: nil}, %CloneEntity{
         entity_id: id,
         kind: kind,
@@ -85,20 +93,47 @@ defmodule AgenticRealms.World.Entity do
     end
   end
 
+  # --- RemoveEntity (feature 018) -----------------------------------------
+
+  # Never cloned, or already removed → not found (idempotent removal).
+  def execute(%__MODULE__{id: nil}, %RemoveEntity{}), do: {:error, :not_found}
+  def execute(%__MODULE__{removed: true}, %RemoveEntity{}), do: {:error, :not_found}
+
+  def execute(%__MODULE__{kind: kind, container: container, name: name}, %RemoveEntity{
+        entity_id: id
+      }) do
+    %EntityRemoved{entity_id: id, kind: kind, from: container, name: name}
+  end
+
   # --- apply/2 ------------------------------------------------------------
 
-  @spec apply(%__MODULE__{}, %EntityCloned{} | %EntityMoved{} | %EntityEdited{}) ::
+  @spec apply(
+          %__MODULE__{},
+          %EntityCloned{} | %EntityMoved{} | %EntityEdited{} | %EntityRemoved{}
+        ) ::
           %__MODULE__{}
-  def apply(%__MODULE__{} = state, %EntityCloned{entity_id: id, kind: kind}) do
-    %__MODULE__{state | id: id, kind: normalize_kind(kind), container: ContainerRef.void()}
+  def apply(%__MODULE__{} = state, %EntityCloned{entity_id: id, kind: kind, fields: fields}) do
+    %__MODULE__{
+      state
+      | id: id,
+        kind: normalize_kind(kind),
+        container: ContainerRef.void(),
+        name: fetch_field(fields, :name)
+    }
   end
 
   def apply(%__MODULE__{} = state, %EntityMoved{to: to}) do
     %__MODULE__{state | container: ContainerRef.from_map(to)}
   end
 
-  # Field edits live in the read model, not the aggregate.
+  # Field edits live in the read model, not the aggregate. (`name` is captured at
+  # clone time for the removal witness; a post-spawn rename is not reflected in
+  # `EntityRemoved`'s cosmetic departure label — an accepted tradeoff for keeping
+  # the aggregate unchanged by edits.)
   def apply(%__MODULE__{} = state, %EntityEdited{}), do: state
+
+  # Removal marks the aggregate terminal; `EntityLifespan` then stops it.
+  def apply(%__MODULE__{} = state, %EntityRemoved{}), do: %__MODULE__{state | removed: true}
 
   # --- helpers ------------------------------------------------------------
 
@@ -106,6 +141,16 @@ defmodule AgenticRealms.World.Entity do
   defp normalize_kind("object"), do: :object
   defp normalize_kind("npc"), do: :npc
   defp normalize_kind(_), do: nil
+
+  # Read a field tolerant of atom- (in-process) or string-keyed (replayed) maps.
+  defp fetch_field(fields, key) when is_map(fields) do
+    case Map.fetch(fields, key) do
+      {:ok, v} -> v
+      :error -> Map.get(fields, Atom.to_string(key))
+    end
+  end
+
+  defp fetch_field(_fields, _key), do: nil
 end
 
 # Snapshot serialization (mirrors the Player aggregate): `container` is a

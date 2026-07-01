@@ -26,7 +26,8 @@ defmodule AgenticRealms.World.Router do
     FinalizeQuest,
     CloneEntity,
     MoveEntity,
-    EditEntity
+    EditEntity,
+    RemoveEntity
   }
 
   identify(Room, by: :room_id, prefix: "room-")
@@ -70,5 +71,10 @@ defmodule AgenticRealms.World.Router do
   dispatch([CreateBlueprint, EditBlueprint], to: Blueprint)
 
   # Feature 016: entity clone / move / edit — the one uniform lifecycle.
-  dispatch([CloneEntity, MoveEntity, EditEntity], to: Entity)
+  # Feature 018: entity removal (`RemoveEntity` → `EntityRemoved`); `EntityLifespan`
+  # evicts the aggregate as soon as the entity is removed.
+  dispatch([CloneEntity, MoveEntity, EditEntity, RemoveEntity],
+    to: Entity,
+    lifespan: AgenticRealms.World.EntityLifespan
+  )
 end

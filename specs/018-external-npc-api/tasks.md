@@ -28,9 +28,9 @@ type `NpcWorkflow`, workflow id `npc-<entity_id>`, task queue `npc-minds`, input
 **Purpose**: Config plumbing and the new context skeleton. No new dependencies
 (Req, Commanded, Ecto, Horde already present).
 
-- [ ] T001 [P] Add compile-time defaults in `config/config.exs` under `:agenticrealms`: `temporal_base_url` (`http://localhost:7243`), `temporal_namespace` (`default`), `temporal_task_queue` (`npc-minds`), `npc_workflow_type` (`NpcWorkflow`), `npc_mind_reconcile_interval_ms` (`60000`).
-- [ ] T002 [P] Add runtime env wiring in the non-`:test` block of `config/runtime.exs`: `NPC_SERVICE_SECRET`, `TEMPORAL_HTTP_URL`, `TEMPORAL_NAMESPACE`, `NPC_TASK_QUEUE`, `TEMPORAL_API_KEY` (optional), `NPC_MIND_RECONCILE_MS` → the `:agenticrealms` keys.
-- [ ] T003 [P] Create `AgenticRealms.NpcMinds.Config` in `lib/agenticrealms/npc_minds/config.ex` reading the `:agenticrealms` app-env keys with defaults + helpers (`workflow_id(entity_id)` → `"npc-" <> id`), plus unit test `test/agenticrealms/npc_minds/config_test.exs`.
+- [x] T001 [P] Add compile-time defaults in `config/config.exs` under `:agenticrealms`: `temporal_base_url` (`http://localhost:7243`), `temporal_namespace` (`default`), `temporal_task_queue` (`npc-minds`), `npc_workflow_type` (`NpcWorkflow`), `npc_mind_reconcile_interval_ms` (`60000`).
+- [x] T002 [P] Add runtime env wiring in the non-`:test` block of `config/runtime.exs`: `NPC_SERVICE_SECRET`, `TEMPORAL_HTTP_URL`, `TEMPORAL_NAMESPACE`, `NPC_TASK_QUEUE`, `TEMPORAL_API_KEY` (optional), `NPC_MIND_RECONCILE_MS` → the `:agenticrealms` keys.
+- [x] T003 [P] Create `AgenticRealms.NpcMinds.Config` in `lib/agenticrealms/npc_minds/config.ex` reading the `:agenticrealms` app-env keys with defaults + helpers (`workflow_id(entity_id)` → `"npc-" <> id`), plus unit test `test/agenticrealms/npc_minds/config_test.exs`.
 
 ---
 
@@ -39,8 +39,8 @@ type `NpcWorkflow`, workflow id `npc-<entity_id>`, task queue `npc-minds`, input
 **Purpose**: The `/api` surface and the shared read query that multiple HTTP
 stories depend on. **⚠️ No HTTP user story can be completed until this phase is done.**
 
-- [ ] T004 Add `scope "/api", AgenticRealmsWeb` (pipe_through `[:api]`) with routes `get "/npc/:id/identity"`, `get "/npc/:id/surroundings"`, `post "/npc/:id/move"` in `lib/agenticrealms_web/router.ex`, and create `AgenticRealmsWeb.NpcServiceController` in `lib/agenticrealms_web/controllers/npc_service_controller.ex` with three stub actions (`identity/2`, `surroundings/2`, `move/2`) returning a placeholder JSON (filled per story). Auth plug is added in US3.
-- [ ] T005 [P] Add `AgenticRealms.World.Queries.list_global_exits/1` in `lib/agenticrealms/world/queries.ex` returning `[%{direction, target_room_id}]` for `source_room_id == room AND is_nil(visible_to_user_id)` (global exits only — excludes owner-only transient exits), with test `test/agenticrealms/world/queries_global_exits_test.exs`.
+- [x] T004 Add `scope "/api", AgenticRealmsWeb` (pipe_through `[:api]`) with routes `get "/npc/:id/identity"`, `get "/npc/:id/surroundings"`, `post "/npc/:id/move"` in `lib/agenticrealms_web/router.ex`, and create `AgenticRealmsWeb.NpcServiceController` in `lib/agenticrealms_web/controllers/npc_service_controller.ex` with three stub actions (`identity/2`, `surroundings/2`, `move/2`) returning a placeholder JSON (filled per story). Auth plug is added in US3.
+- [x] T005 [P] Add `AgenticRealms.World.Queries.list_global_exits/1` in `lib/agenticrealms/world/queries.ex` returning `[%{direction, target_room_id}]` for `source_room_id == room AND is_nil(visible_to_user_id)` (global exits only — excludes owner-only transient exits), with test `test/agenticrealms/world/queries_global_exits_test.exs`.
 
 **Checkpoint**: `/api` routes resolve (unauthenticated stubs); shared exits query ready.
 
@@ -58,14 +58,14 @@ arrival; stale `expected_room_id` → `409`; bad direction → `422`.
 
 ### Tests for User Story 1 ⚠️ (write first, must fail)
 
-- [ ] T006 [P] [US1] Contract tests for `POST /api/npc/:id/move` (200 ok; 409 conflict on stale origin; 422 no_such_exit on bad direction; 404 unknown entity) in `test/agenticrealms_web/npc_service_controller_move_test.exs`.
-- [ ] T007 [P] [US1] Broadcaster test: an `EntityMoved{kind: :npc, cause: :relocated, from: room, to: room}` fans out `RoomNPCLeft` to origin + `RoomNPCArrived` to destination in `test/agenticrealms/world/ui_event_broadcaster_npc_relocate_test.exs`.
+- [x] T006 [P] [US1] Contract tests for `POST /api/npc/:id/move` (200 ok; 409 conflict on stale origin; 422 no_such_exit on bad direction; 404 unknown entity) in `test/agenticrealms_web/npc_service_controller_move_test.exs`.
+- [x] T007 [P] [US1] Broadcaster test: an `EntityMoved{kind: :npc, cause: :relocated, from: room, to: room}` fans out `RoomNPCLeft` to origin + `RoomNPCArrived` to destination in `test/agenticrealms/world/ui_event_broadcaster_npc_relocate_test.exs`.
 
 ### Implementation for User Story 1
 
-- [ ] T008 [US1] Implement `move/2` in `lib/agenticrealms_web/controllers/npc_service_controller.ex`: resolve `direction` against `Queries.list_global_exits(expected_room_id)` (absent → 422 `no_such_exit`); dispatch `Commands.move_entity(id, ContainerRef.room(expected_room_id), ContainerRef.room(to_room_id), :relocated)`; map `:ok`→200 `{result: ok, from_room_id, to_room_id}`, `{:error, :container_conflict}`→409 `{result: conflict}`, `{:error, :not_found}`→404, `{:error, :unsupported_container}`→422 `{result: no_such_exit}`.
-- [ ] T009 [US1] Add `witness_object_move(:npc, :relocated, %ContainerRef{type: :room, id: from}, %ContainerRef{type: :room, id: to}, npc_id)` clause in `lib/agenticrealms/world/ui_event_broadcaster.ex` → broadcast `RoomNPCLeft` to `room:from` + `RoomNPCArrived` to `room:to` (name via `lookup_npc_name/1`).
-- [ ] T010 [US1] Add `handle_info(%RoomNPCLeft{} = msg, socket)` → `UIEvents.npc_left(socket, msg)` in `lib/agenticrealms_web/live/game_live.ex`, and `npc_left/2` in `lib/agenticrealms_web/live/game_live/ui_events.ex` (append "<name> leaves." log; no Presence mutation — NPCs aren't in Presence).
+- [x] T008 [US1] Implement `move/2` in `lib/agenticrealms_web/controllers/npc_service_controller.ex`: resolve `direction` against `Queries.list_global_exits(expected_room_id)` (absent → 422 `no_such_exit`); dispatch `Commands.move_entity(id, ContainerRef.room(expected_room_id), ContainerRef.room(to_room_id), :relocated)`; map `:ok`→200 `{result: ok, from_room_id, to_room_id}`, `{:error, :container_conflict}`→409 `{result: conflict}`, `{:error, :not_found}`→404, `{:error, :unsupported_container}`→422 `{result: no_such_exit}`.
+- [x] T009 [US1] Add `witness_object_move(:npc, :relocated, %ContainerRef{type: :room, id: from}, %ContainerRef{type: :room, id: to}, npc_id)` clause in `lib/agenticrealms/world/ui_event_broadcaster.ex` → broadcast `RoomNPCLeft` to `room:from` + `RoomNPCArrived` to `room:to` (name via `lookup_npc_name/1`).
+- [x] T010 [US1] Add `handle_info(%RoomNPCLeft{} = msg, socket)` → `UIEvents.npc_left(socket, msg)` in `lib/agenticrealms_web/live/game_live.ex`, and `npc_left/2` in `lib/agenticrealms_web/live/game_live/ui_events.ex` (append "<name> leaves." log; no Presence mutation — NPCs aren't in Presence).
 
 **Checkpoint**: US1 fully functional and independently testable.
 
@@ -83,12 +83,12 @@ void/removed NPC returns `{room_id:null, exits:[], occupants:[]}`; unknown → 4
 
 ### Tests for User Story 2 ⚠️ (write first, must fail)
 
-- [ ] T011 [P] [US2] Contract tests for `GET /api/npc/:id/surroundings` (200 in-room with exits+occupants tagged by kind; 200 empty snapshot for void/removed; 404 unknown) in `test/agenticrealms_web/npc_service_controller_surroundings_test.exs`.
-- [ ] T012 [P] [US2] Add `AgenticRealms.World.Queries.list_players_in_room/1` (public) returning `[%{id, username}]` for players present in the room in `lib/agenticrealms/world/queries.ex` + test `test/agenticrealms/world/queries_players_in_room_test.exs`.
+- [x] T011 [P] [US2] Contract tests for `GET /api/npc/:id/surroundings` (200 in-room with exits+occupants tagged by kind; 200 empty snapshot for void/removed; 404 unknown) in `test/agenticrealms_web/npc_service_controller_surroundings_test.exs`.
+- [x] T012 [P] [US2] Add `AgenticRealms.World.Queries.list_players_in_room/1` (public) returning `[%{id, username}]` for players present in the room in `lib/agenticrealms/world/queries.ex` + test `test/agenticrealms/world/queries_players_in_room_test.exs`.
 
 ### Implementation for User Story 2
 
-- [ ] T013 [US2] Implement `surroundings/2` in `lib/agenticrealms_web/controllers/npc_service_controller.ex`: `room_id` = `NPCClone.room_id` (nil → empty snapshot); `exits` = `Queries.list_global_exits/1` mapped to `{direction, to_room_id}`; `occupants` = merge of `list_npcs_in_room` (kind `npc`), `list_objects_in_room` (kind `object`, all), `list_players_in_room` (kind `player`, `username` as name, **id stringified**); 404 when the entity is not an NPC.
+- [x] T013 [US2] Implement `surroundings/2` in `lib/agenticrealms_web/controllers/npc_service_controller.ex`: `room_id` = `NPCClone.room_id` (nil → empty snapshot); `exits` = `Queries.list_global_exits/1` mapped to `{direction, to_room_id}`; `occupants` = merge of `list_npcs_in_room` (kind `npc`), `list_objects_in_room` (kind `object`, all), `list_players_in_room` (kind `player`, `username` as name, **id stringified**); 404 when the entity is not an NPC.
 
 **Checkpoint**: US1 + US2 both work independently.
 
@@ -106,13 +106,13 @@ unset secret rejects all.
 
 ### Tests for User Story 3 ⚠️ (write first, must fail)
 
-- [ ] T014 [P] [US3] Unit tests for the auth plug (missing header → 401; wrong token → 401; correct token → pass; unset secret → 401; no missing-vs-wrong disclosure) in `test/agenticrealms_web/plugs/require_service_token_test.exs`.
-- [ ] T015 [P] [US3] Integration tests across all 3 `/api/npc` routes: missing/wrong → 401, correct → non-401; secret rotation (reconfigure → old rejected, new accepted) in `test/agenticrealms_web/npc_service_auth_test.exs`.
+- [x] T014 [P] [US3] Unit tests for the auth plug (missing header → 401; wrong token → 401; correct token → pass; unset secret → 401; no missing-vs-wrong disclosure) in `test/agenticrealms_web/plugs/require_service_token_test.exs`.
+- [x] T015 [P] [US3] Integration tests across all 3 `/api/npc` routes: missing/wrong → 401, correct → non-401; secret rotation (reconfigure → old rejected, new accepted) in `test/agenticrealms_web/npc_service_auth_test.exs`.
 
 ### Implementation for User Story 3
 
-- [ ] T016 [US3] Implement `AgenticRealmsWeb.Plugs.RequireServiceToken` in `lib/agenticrealms_web/plugs/require_service_token.ex`: read `Application.get_env(:agenticrealms, :npc_service_secret)`; require `authorization: "Bearer <token>"`; `Plug.Crypto.secure_compare/2`; else `put_status(:unauthorized) |> json(...) |> halt()`; fail-closed when secret is nil/"".
-- [ ] T017 [US3] Add `AgenticRealmsWeb.Plugs.RequireServiceToken` to the `/api` scope's `pipe_through` in `lib/agenticrealms_web/router.ex` (→ `[:api, ...RequireServiceToken]`).
+- [x] T016 [US3] Implement `AgenticRealmsWeb.Plugs.RequireServiceToken` in `lib/agenticrealms_web/plugs/require_service_token.ex`: read `Application.get_env(:agenticrealms, :npc_service_secret)`; require `authorization: "Bearer <token>"`; `Plug.Crypto.secure_compare/2`; else `put_status(:unauthorized) |> json(...) |> halt()`; fail-closed when secret is nil/"".
+- [x] T017 [US3] Add `AgenticRealmsWeb.Plugs.RequireServiceToken` to the `/api` scope's `pipe_through` in `lib/agenticrealms_web/router.ex` (→ `[:api, ...RequireServiceToken]`).
 
 **Checkpoint**: All three routes are authenticated; US1–US3 = secure read+move MVP.
 
@@ -129,14 +129,14 @@ retried/replayed spawn starts no second mind; a Temporal outage doesn't block th
 
 ### Tests for User Story 4 ⚠️ (write first, must fail)
 
-- [ ] T018 [P] [US4] `TemporalClient.start_workflow/1` tests via `Req.Test` stub: asserts `POST .../workflows/npc-<id>`, body has `workflowType NpcWorkflow`, `taskQueue npc-minds`, `workflowIdConflictPolicy USE_EXISTING`, and base64 `input` payload (encoding + data); 2xx → `:ok`; non-2xx/transport error → `{:error, _}` in `test/agenticrealms/npc_minds/temporal_client_test.exs`.
-- [ ] T019 [P] [US4] `LifecycleManager` test: fed `EntityCloned{kind: :npc}` it calls `start_workflow(entity_id)`; `EntityCloned{kind: :object}` is ignored (inject a stub/mock client) in `test/agenticrealms/npc_minds/lifecycle_manager_test.exs`.
+- [x] T018 [P] [US4] `TemporalClient.start_workflow/1` tests via `Req.Test` stub: asserts `POST .../workflows/npc-<id>`, body has `workflowType NpcWorkflow`, `taskQueue npc-minds`, `workflowIdConflictPolicy USE_EXISTING`, and base64 `input` payload (encoding + data); 2xx → `:ok`; non-2xx/transport error → `{:error, _}` in `test/agenticrealms/npc_minds/temporal_client_test.exs`.
+- [x] T019 [P] [US4] `LifecycleManager` test: fed `EntityCloned{kind: :npc}` it calls `start_workflow(entity_id)`; `EntityCloned{kind: :object}` is ignored (inject a stub/mock client) in `test/agenticrealms/npc_minds/lifecycle_manager_test.exs`.
 
 ### Implementation for User Story 4
 
-- [ ] T020 [US4] Implement `AgenticRealms.NpcMinds.TemporalClient` in `lib/agenticrealms/npc_minds/temporal_client.ex`: `start_workflow/1` using `Req` (URL/namespace/queue/api-key from `NpcMinds.Config`), a Temporal `Payload` encoder (base64 `json/plain` + base64 data), `USE_EXISTING`, optional `Authorization: Bearer`; return `:ok | {:error, reason}` with logging (never raises).
-- [ ] T021 [US4] Implement `AgenticRealms.NpcMinds.LifecycleManager` (`use Commanded.Event.Handler, application: AgenticRealms.World.Application, name: __MODULE__, consistency: :eventual`) in `lib/agenticrealms/npc_minds/lifecycle_manager.ex` with `handle(%EntityCloned{kind: :npc}, _)` → `TemporalClient.start_workflow/1`; catch-all `→ :ok`.
-- [ ] T022 [US4] Register `AgenticRealms.NpcMinds.LifecycleManager` in the supervision tree in `lib/agenticrealms/application.ex` (after the World handlers block, e.g. beside `UIEventBroadcaster`).
+- [x] T020 [US4] Implement `AgenticRealms.NpcMinds.TemporalClient` in `lib/agenticrealms/npc_minds/temporal_client.ex`: `start_workflow/1` using `Req` (URL/namespace/queue/api-key from `NpcMinds.Config`), a Temporal `Payload` encoder (base64 `json/plain` + base64 data), `USE_EXISTING`, optional `Authorization: Bearer`; return `:ok | {:error, reason}` with logging (never raises).
+- [x] T021 [US4] Implement `AgenticRealms.NpcMinds.LifecycleManager` (`use Commanded.Event.Handler, application: AgenticRealms.World.Application, name: __MODULE__, consistency: :eventual`) in `lib/agenticrealms/npc_minds/lifecycle_manager.ex` with `handle(%EntityCloned{kind: :npc}, _)` → `TemporalClient.start_workflow/1`; catch-all `→ :ok`.
+- [x] T022 [US4] Register `AgenticRealms.NpcMinds.LifecycleManager` in the supervision tree in `lib/agenticrealms/application.ex` (after the World handlers block, e.g. beside `UIEventBroadcaster`).
 
 **Checkpoint**: Spawning an NPC starts exactly one mind; MVP (US1–US4) complete.
 
@@ -155,21 +155,21 @@ its NPCs' minds.
 
 ### Tests for User Story 5 ⚠️ (write first, must fail)
 
-- [ ] T023 [P] [US5] `Entity` aggregate tests: `RemoveEntity` on an existing entity emits `EntityRemoved{kind, from}`; on unknown/already-removed → `{:error, :not_found}`; `apply` marks removed; lifespan `:stop` on `EntityRemoved` in `test/agenticrealms/world/entity_remove_test.exs`.
-- [ ] T024 [P] [US5] Projector test: `EntityRemoved{kind: :npc}` deletes the `npc_clones` row and is idempotent/replay-safe (re-handle = no-op) in `test/agenticrealms/world/entity_removed_projector_test.exs`.
-- [ ] T025 [P] [US5] `TemporalClient.terminate_workflow/1` test (`POST .../workflows/npc-<id>/terminate`; absent/closed workflow → `:ok`) — extend `test/agenticrealms/npc_minds/temporal_client_test.exs`.
-- [ ] T026 [P] [US5] Purge test: `Transient.Purge` calls `terminate_workflow` for each removed NPC id (stub client) and still completes if a terminate fails in `test/agenticrealms/world/transient/purge_terminate_test.exs`.
+- [x] T023 [P] [US5] `Entity` aggregate tests: `RemoveEntity` on an existing entity emits `EntityRemoved{kind, from}`; on unknown/already-removed → `{:error, :not_found}`; `apply` marks removed; lifespan `:stop` on `EntityRemoved` in `test/agenticrealms/world/entity_remove_test.exs`.
+- [x] T024 [P] [US5] Projector test: `EntityRemoved{kind: :npc}` deletes the `npc_clones` row and is idempotent/replay-safe (re-handle = no-op) in `test/agenticrealms/world/entity_removed_projector_test.exs`.
+- [x] T025 [P] [US5] `TemporalClient.terminate_workflow/1` test (`POST .../workflows/npc-<id>/terminate`; absent/closed workflow → `:ok`) — extend `test/agenticrealms/npc_minds/temporal_client_test.exs`.
+- [x] T026 [P] [US5] Purge test: `Transient.Purge` calls `terminate_workflow` for each removed NPC id (stub client) and still completes if a terminate fails in `test/agenticrealms/world/transient/purge_terminate_test.exs`.
 
 ### Implementation for User Story 5
 
-- [ ] T027 [P] [US5] Add `AgenticRealms.World.Commands.RemoveEntity` (`%{entity_id}`) in `lib/agenticrealms/world/commands/remove_entity.ex` and `AgenticRealms.World.Events.EntityRemoved` (`%{entity_id, kind, from, version: 1}`, `@derive Jason.Encoder`) in `lib/agenticrealms/world/events/entity_removed.ex`.
-- [ ] T028 [US5] `Entity` aggregate in `lib/agenticrealms/world/entity.ex`: `execute(RemoveEntity)` → `EntityRemoved{kind: state.kind, from: state.container}` (unknown/removed → `{:error, :not_found}`); `apply(%EntityRemoved{})` marks removed; add `after_event(%EntityRemoved{})` → `:stop` to the lifespan.
-- [ ] T029 [US5] Route `[RemoveEntity]` → `Entity` in `lib/agenticrealms/world/router.ex`; add `remove_entity/1` + `remove_npc/1` (dispatch `consistency: :strong`) to `lib/agenticrealms/world/commands.ex`.
-- [ ] T030 [US5] Handle `EntityRemoved` in the entity/world projector (`lib/agenticrealms/world/projections/...`): delete `npc_clones` row for `:npc` (and `world_objects` for `:object`), delete-by-pk, idempotent.
-- [ ] T031 [US5] Add `TemporalClient.terminate_workflow/1` to `lib/agenticrealms/npc_minds/temporal_client.ex` (map absent/closed → `:ok`).
-- [ ] T032 [US5] Add `handle(%EntityRemoved{kind: :npc}, _)` → `TemporalClient.terminate_workflow/1` to `lib/agenticrealms/npc_minds/lifecycle_manager.ex`.
-- [ ] T033 [US5] Add witness for `EntityRemoved{kind: :npc, from: %{type: :room, id: rid}}` → broadcast `RoomNPCLeft` to `room:rid` in `lib/agenticrealms/world/ui_event_broadcaster.ex` (+ test alongside T007's file or a new one).
-- [ ] T034 [US5] In `lib/agenticrealms/world/transient/purge.ex`, terminate minds for the collected NPC ids (best-effort `TemporalClient.terminate_workflow/1`) before deleting read-model rows; failures logged, never block the purge.
+- [x] T027 [P] [US5] Add `AgenticRealms.World.Commands.RemoveEntity` (`%{entity_id}`) in `lib/agenticrealms/world/commands/remove_entity.ex` and `AgenticRealms.World.Events.EntityRemoved` (`%{entity_id, kind, from, version: 1}`, `@derive Jason.Encoder`) in `lib/agenticrealms/world/events/entity_removed.ex`.
+- [x] T028 [US5] `Entity` aggregate in `lib/agenticrealms/world/entity.ex`: `execute(RemoveEntity)` → `EntityRemoved{kind: state.kind, from: state.container}` (unknown/removed → `{:error, :not_found}`); `apply(%EntityRemoved{})` marks removed; add `after_event(%EntityRemoved{})` → `:stop` to the lifespan.
+- [x] T029 [US5] Route `[RemoveEntity]` → `Entity` in `lib/agenticrealms/world/router.ex`; add `remove_entity/1` + `remove_npc/1` (dispatch `consistency: :strong`) to `lib/agenticrealms/world/commands.ex`.
+- [x] T030 [US5] Handle `EntityRemoved` in the entity/world projector (`lib/agenticrealms/world/projections/...`): delete `npc_clones` row for `:npc` (and `world_objects` for `:object`), delete-by-pk, idempotent.
+- [x] T031 [US5] Add `TemporalClient.terminate_workflow/1` to `lib/agenticrealms/npc_minds/temporal_client.ex` (map absent/closed → `:ok`).
+- [x] T032 [US5] Add `handle(%EntityRemoved{kind: :npc}, _)` → `TemporalClient.terminate_workflow/1` to `lib/agenticrealms/npc_minds/lifecycle_manager.ex`.
+- [x] T033 [US5] Add witness for `EntityRemoved{kind: :npc, from: %{type: :room, id: rid}}` → broadcast `RoomNPCLeft` to `room:rid` in `lib/agenticrealms/world/ui_event_broadcaster.ex` (+ test alongside T007's file or a new one).
+- [x] T034 [US5] In `lib/agenticrealms/world/transient/purge.ex`, terminate minds for the collected NPC ids (best-effort `TemporalClient.terminate_workflow/1`) before deleting read-model rows; failures logged, never block the purge.
 
 **Checkpoint**: Removal (command path + purge path) terminates minds and cleans the read model.
 
@@ -185,11 +185,11 @@ NPC; unknown → 404.
 
 ### Tests for User Story 6 ⚠️ (write first, must fail)
 
-- [ ] T035 [P] [US6] Contract tests for `GET /api/npc/:id/identity` (200 with name/short_description/long_description/lore; 404 unknown) in `test/agenticrealms_web/npc_service_controller_identity_test.exs`.
+- [x] T035 [P] [US6] Contract tests for `GET /api/npc/:id/identity` (200 with name/short_description/long_description/lore; 404 unknown) in `test/agenticrealms_web/npc_service_controller_identity_test.exs`.
 
 ### Implementation for User Story 6
 
-- [ ] T036 [US6] Implement `identity/2` in `lib/agenticrealms_web/controllers/npc_service_controller.ex` via `Repo.get(NPCClone, id)` (404 when nil); ensure/reuse `Queries.get_npc_clone_row/1`.
+- [x] T036 [US6] Implement `identity/2` in `lib/agenticrealms_web/controllers/npc_service_controller.ex` via `Repo.get(NPCClone, id)` (404 when nil); ensure/reuse `Queries.get_npc_clone_row/1`.
 
 **Checkpoint**: All six user stories independently functional.
 
@@ -200,12 +200,12 @@ NPC; unknown → 404.
 **Purpose**: The reconciliation backstop (FR-029a, SC-013) that spans US4+US5, plus
 validation. Not optional polish.
 
-- [ ] T037 [P] `Reconciler.diff/2` pure-function test (`{to_start: live − running, to_terminate: running − live}`) in `test/agenticrealms/npc_minds/reconciler_test.exs`.
-- [ ] T038 Add `TemporalClient.list_running_npc_ids/0` (ListWorkflowExecutions visibility query `WorkflowType = 'NpcWorkflow' AND ExecutionStatus = 'Running'`, paginate, strip `npc-` prefix) in `lib/agenticrealms/npc_minds/temporal_client.ex` + test extension.
-- [ ] T039 Implement `AgenticRealms.NpcMinds.Reconciler` in `lib/agenticrealms/npc_minds/reconciler.ex`: cluster-singleton GenServer with `Process.send_after` sweep; each sweep computes `live` (ids from `npc_clones`) vs `running` (`list_running_npc_ids/0`), starts `to_start`, terminates `to_terminate` (all idempotent).
-- [ ] T040 Register `Reconciler` as a **cluster singleton** in `lib/agenticrealms/application.ex` via the project's Horde registry/supervisor (one cluster-wide instance; `:global`-named fallback documented in research R5).
+- [x] T037 [P] `Reconciler.diff/2` pure-function test (`{to_start: live − running, to_terminate: running − live}`) in `test/agenticrealms/npc_minds/reconciler_test.exs`.
+- [x] T038 Add `TemporalClient.list_running_npc_ids/0` (ListWorkflowExecutions visibility query `WorkflowType = 'NpcWorkflow' AND ExecutionStatus = 'Running'`, paginate, strip `npc-` prefix) in `lib/agenticrealms/npc_minds/temporal_client.ex` + test extension.
+- [x] T039 Implement `AgenticRealms.NpcMinds.Reconciler` in `lib/agenticrealms/npc_minds/reconciler.ex`: cluster-singleton GenServer with `Process.send_after` sweep; each sweep computes `live` (ids from `npc_clones`) vs `running` (`list_running_npc_ids/0`), starts `to_start`, terminates `to_terminate` (all idempotent).
+- [x] T040 Register `Reconciler` as a **cluster singleton** in `lib/agenticrealms/application.ex` via the project's Horde registry/supervisor (one cluster-wide instance; `:global`-named fallback documented in research R5).
 - [ ] T041 [P] Execute `specs/018-external-npc-api/quickstart.md` end-to-end (auth gate, identity/surroundings, move + witness, spawn→start, remove→terminate, outage→reconcile).
-- [ ] T042 Run `mix precommit` (compile `--warnings-as-errors`, `format`, full `test`) — the merge gate (Constitution IV).
+- [x] T042 Run `mix precommit` (compile `--warnings-as-errors`, `format`, full `test`) — the merge gate (Constitution IV).
 
 ---
 

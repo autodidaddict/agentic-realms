@@ -65,6 +65,20 @@ config :agenticrealms, AgenticRealms.Anthropic,
   api_key: "test-key-not-real",
   req_options: [plug: {Req.Test, AgenticRealms.Anthropic}]
 
+# Feature 018 — External NPC Brains. A set shared secret (so auth tests can
+# present a correct token; individual tests override it with `Application.put_env`
+# to exercise rotation / unset) plus a Req.Test plug so no Temporal HTTP request
+# ever leaves the BEAM. Tests register per-test stubs with
+# `Req.Test.stub(AgenticRealms.NpcMinds.TemporalClient, fun)`.
+config :agenticrealms, AgenticRealms.NpcMinds,
+  service_secret: "test-npc-secret",
+  temporal_base_url: "http://temporal.test",
+  temporal_namespace: "default",
+  temporal_task_queue: "npc-minds",
+  npc_workflow_type: "NpcWorkflow",
+  reconcile_interval_ms: 60_000,
+  req_options: [plug: {Req.Test, AgenticRealms.NpcMinds.TemporalClient}]
+
 # Feature 010 — idle-timeout override for NPC chat Conversation GenServers.
 # Keeps idle-reap tests fast (200ms instead of 60_000ms).
 config :agenticrealms, AgenticRealms.World.NPCChat, idle_timeout_ms: 200

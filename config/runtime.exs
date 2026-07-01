@@ -40,6 +40,22 @@ if config_env() != :test do
     timeout_ms: String.to_integer(System.get_env("ANTHROPIC_TIMEOUT_MS") || "5000")
 end
 
+# Feature 018 — External NPC Brains. `NPC_SERVICE_SECRET` is the shared bearer
+# token the contract routes require (unset ⇒ the API fails closed). The Temporal
+# HTTP API location/namespace/queue and the reconcile cadence are configurable;
+# `TEMPORAL_API_KEY` is sent only when set (Temporal Cloud). Skipped in :test —
+# config/test.exs owns the test values (a set secret + a Req.Test stub).
+if config_env() != :test do
+  config :agenticrealms, AgenticRealms.NpcMinds,
+    service_secret: System.get_env("NPC_SERVICE_SECRET"),
+    temporal_base_url: System.get_env("TEMPORAL_HTTP_URL") || "http://localhost:7243",
+    temporal_namespace: System.get_env("TEMPORAL_NAMESPACE") || "default",
+    temporal_task_queue: System.get_env("NPC_TASK_QUEUE") || "npc-minds",
+    temporal_api_key: System.get_env("TEMPORAL_API_KEY"),
+    npc_workflow_type: "NpcWorkflow",
+    reconcile_interval_ms: String.to_integer(System.get_env("NPC_MIND_RECONCILE_MS") || "60000")
+end
+
 if config_env() == :prod do
   database_url =
     System.get_env("DATABASE_URL") ||
