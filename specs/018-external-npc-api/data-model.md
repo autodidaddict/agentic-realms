@@ -125,7 +125,10 @@ Direction ∈ `north south east west northeast northwest southeast southwest up 
 
 The reconciler holds only its timer ref/config in GenServer state; it is
 crash-safe because it rebuilds `live`/`running` from source every sweep
-(Principle VI — restartable, no state to lose).
+(Principle VI — restartable, no state to lose). It runs as a **Horde cluster
+singleton** (dedicated `Horde.Registry` + `Horde.DynamicSupervisor`), so exactly
+one instance runs cluster-wide and Horde relocates it on node loss — no state to
+migrate on relocation.
 
 ---
 

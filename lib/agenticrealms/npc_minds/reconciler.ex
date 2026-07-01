@@ -8,11 +8,11 @@ defmodule AgenticRealms.NpcMinds.Reconciler do
   SC-013). Every operation is idempotent (Temporal `USE_EXISTING` start /
   tolerant terminate), so the sweep is safe to repeat.
 
-  **Cluster semantics (Principle I).** Registered under `:global` so exactly one
-  instance runs cluster-wide (a duplicate start on another node returns
-  `:ignore`); `:global` is the constitution-permitted strategy. Redistribution of
-  the singleton onto a surviving node after the owning node fails is a documented
-  follow-up (the sweep is a backstop, and its operations are idempotent).
+  **Cluster semantics (Principle I).** Runs as a Horde cluster singleton: started
+  under `NpcMinds.Supervisor` (a `Horde.DynamicSupervisor`) and named via
+  `NpcMinds.Registry` (a `Horde.Registry`), so exactly one instance runs
+  cluster-wide and Horde **relocates it to a surviving node** if the owning node
+  leaves. Same mechanism the project uses for tick schedulers and NPC chats.
   """
 
   use GenServer
@@ -22,20 +22,15 @@ defmodule AgenticRealms.NpcMinds.Reconciler do
 
   alias AgenticRealms.Repo
   alias AgenticRealms.World.Schemas.NPCClone
-  alias AgenticRealms.NpcMinds.{Config, TemporalClient}
-
-  @name {:global, __MODULE__}
+  alias AgenticRealms.NpcMinds.{Config, Registry, TemporalClient}
 
   def start_link(opts) do
-    case GenServer.start_link(__MODULE__, opts, name: @name) do
-      {:ok, pid} -> {:ok, pid}
-      {:error, {:already_started, _pid}} -> :ignore
-    end
+    GenServer.start_link(__MODULE__, opts, name: Registry.via_tuple())
   end
 
   @doc "Run one reconciliation sweep synchronously. Test/ops helper."
   @spec sweep_now() :: {:ok, map()} | {:error, term()}
-  def sweep_now, do: GenServer.call(@name, :sweep, 30_000)
+  def sweep_now, do: GenServer.call(Registry.via_tuple(), :sweep, 30_000)
 
   @doc """
   Pure diff of the two id sets: which NPC ids need a mind started (live but not

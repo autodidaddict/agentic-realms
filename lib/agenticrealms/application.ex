@@ -129,9 +129,17 @@ defmodule AgenticRealms.Application do
         AgenticRealms.World.Transient.Manager,
         # Feature 018 — cluster-singleton reconciliation sweep that converges
         # running Temporal minds to the set of live NPCs (backstop for the
-        # best-effort handoff). Registered under :global; a duplicate start on
-        # another node returns :ignore.
-        AgenticRealms.NpcMinds.Reconciler
+        # best-effort handoff). Runs as a Horde singleton: a cluster-wide
+        # registry + dynamic supervisor place the reconciler on one node and
+        # relocate it on node loss. Each node's boot ensures it is started
+        # (idempotent); the starter Task exits once the singleton is running.
+        AgenticRealms.NpcMinds.Registry,
+        AgenticRealms.NpcMinds.Supervisor,
+        %{
+          id: AgenticRealms.NpcMinds.ReconcilerStarter,
+          start: {Task, :start_link, [&AgenticRealms.NpcMinds.Supervisor.ensure_reconciler/0]},
+          restart: :transient
+        }
       ]
     else
       []

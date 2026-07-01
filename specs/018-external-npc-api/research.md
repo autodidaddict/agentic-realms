@@ -110,24 +110,29 @@ task queue, optional API key are config.
 
 ## R5. Reconciler — cluster-singleton periodic diff
 
-- **Decision**: `AgenticRealms.NpcMinds.Reconciler`, a **cluster-wide singleton
-  GenServer** started via the project's existing Horde registry/supervisor (so
-  exactly one runs cluster-wide and is relocated on node loss), with a
-  `Process.send_after/3` sweep loop (mirroring `Transient.Manager`'s timer
-  style). Each sweep: `live = ids(npc_clones)`, `running =
+- **Decision**: `AgenticRealms.NpcMinds.Reconciler`, a **Horde cluster singleton**.
+  It gets its own `NpcMinds.Registry` (`Horde.Registry`) + `NpcMinds.Supervisor`
+  (`Horde.DynamicSupervisor`, `members: :auto`, `Horde.UniformDistribution`) —
+  the exact pattern used for `Ticks`/`NPCChat` — and is registered under a fixed
+  via-name so exactly one instance runs cluster-wide and **Horde relocates it to a
+  surviving node if the owner leaves**. Each node's boot calls
+  `Supervisor.ensure_reconciler/0` (idempotent). It runs a `Process.send_after/3`
+  sweep loop: `live = ids(npc_clones)`, `running =
   TemporalClient.list_running_npc_ids()`; **start** `live − running`, **terminate**
-  `running − live`. The diff is a pure function (`Reconciler.diff/2`) and is
-  unit-tested in isolation.
+  `running − live`. The diff is a pure function (`Reconciler.diff/2`), unit-tested
+  in isolation.
 - **Rationale**: Realizes the "best-effort + reconcile" clarification and SC-013
-  (convergence after a Temporal outage). Cluster singleton (Principle I) avoids N
-  nodes each scanning Temporal every interval. All operations are idempotent
-  (USE_EXISTING start, tolerant terminate), so even overlapping sweeps are safe —
-  the singleton is for efficiency and clarity, not correctness of a single op.
+  (convergence after a Temporal outage). A Horde singleton (Principle I — Horde is
+  the project's cluster-wide mechanism) avoids N nodes each scanning Temporal every
+  interval AND survives node loss. All operations are idempotent (USE_EXISTING
+  start, tolerant terminate), so even overlapping sweeps during a relocation window
+  are safe.
 - **Cluster note**: `Ticks.Lifecycle` and `Transient.Manager` are deliberately
   *node-local* (they observe Presence per node). The reconciler is different — a
-  global convergence task — so it is a singleton. `:global`-registered name is the
-  documented fallback if Horde singleton wiring proves heavy.
-- **Interval**: config `:npc_mind_reconcile_interval_ms`, default 60_000.
+  global convergence task — so it is a Horde singleton (not `:global`, which would
+  not auto-relocate). This matches "Horde is always preferred for cluster-wide
+  support".
+- **Interval**: config `:reconcile_interval_ms`, default 60_000.
 - **Alternatives**: durable outbox (persist intents + retry) — rejected as
   heavier than an idempotent list-and-diff that leans on Temporal's own
   guarantees; per-node sweep — rejected (redundant Temporal load at scale).

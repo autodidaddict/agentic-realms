@@ -61,7 +61,7 @@ Constitution v1.0.0 (ratified 2026-06-09). Assessment against the six principles
 
 | Principle | Assessment |
 |---|---|
-| **I. Cluster-Correct by Default (NON-NEGOTIABLE)** | **PASS (with stated semantics).** The lifecycle handoff is a *named* `Commanded.Event.Handler` → exclusive single cluster-wide subscriber, so exactly one node issues each start/terminate. The **reconciler** is a **cluster-wide singleton** (registered via the project's existing Horde registry/supervisor so exactly one runs cluster-wide and is relocated on node loss); `:global` is the documented fallback. Cluster semantics are stated in the spec (best-effort + reconcile) and here. The API controller and auth plug are stateless request-scoped code (node-local is correct). |
+| **I. Cluster-Correct by Default (NON-NEGOTIABLE)** | **PASS.** The lifecycle handoff is a *named* `Commanded.Event.Handler` → exclusive single cluster-wide subscriber, so exactly one node issues each start/terminate. The **reconciler** is a **Horde cluster singleton** — its own `NpcMinds.Registry` (`Horde.Registry`) + `NpcMinds.Supervisor` (`Horde.DynamicSupervisor`), the same pattern as `Ticks`/`NPCChat`, so exactly one instance runs cluster-wide and Horde relocates it to a surviving node on node loss (Horde is the project's preferred cluster-wide mechanism; `:global` is deliberately avoided as it would not relocate). Cluster semantics are stated in the spec (best-effort + reconcile) and here. The API controller and auth plug are stateless request-scoped code (node-local is correct). |
 | **II. Event-Sourcing Invariants (NON-NEGOTIABLE)** | **PASS.** NPC removal is added as `RemoveEntity` → `EntityRemoved` through the `Entity` aggregate (sole writer; validates existence; state via `apply/2`). The read-model row is deleted **only by a projector** reacting to `EntityRemoved` (idempotent). Temporal start/terminate are external side effects in an event handler, not read-model writes; business decisions read the *event*, not raw event tables. The transient-purge terminate is an out-of-band external call within the already-justified destructive purge flow (no event-store write added). |
 | **III. Local-First LiveView Interaction** | **PASS.** The only LiveView change is a new `RoomNPCLeft` `handle_info` clause that appends a log line from a PubSub world event. A round-trip is inherent and justified: it is a server-authoritative, cross-client world broadcast (not client-local behavior). |
 | **IV. Test-First, Green-Before-Merge** | **PASS.** Unit tests precede/accompany: `Entity` `RemoveEntity` execute/apply, the `EntityRemoved` projector (deletes row, idempotent/replay-safe), the reconciler diff (pure), Temporal payload encoding, the auth plug, and the controller contract behaviors (200/401/404/409/422). `mix precommit` (warnings-as-errors, format, test) is the gate. |
@@ -99,7 +99,9 @@ New `NpcMinds` context (lifecycle + Temporal + reconciler), a new web API surfac
 lib/agenticrealms/npc_minds/            # NEW context
 ├── temporal_client.ex                  # NEW  Req client: start_workflow/1, terminate_workflow/1, list_running_npc_ids/0 (payload encode, conflict policy USE_EXISTING)
 ├── lifecycle_manager.ex                # NEW  Commanded.Event.Handler ("process manager", consistency: :eventual): EntityCloned{kind: :npc}→start; EntityRemoved{kind: :npc}→terminate
-├── reconciler.ex                       # NEW  cluster-singleton GenServer: periodic sweep diff(live npc_clones ids ↔ running Temporal ids) → start missing / terminate orphaned
+├── reconciler.ex                       # NEW  Horde-singleton GenServer: periodic sweep diff(live npc_clones ids ↔ running Temporal ids) → start missing / terminate orphaned
+├── registry.ex                         # NEW  Horde.Registry — cluster-wide via-name for the singleton reconciler
+├── supervisor.ex                       # NEW  Horde.DynamicSupervisor — places/relocates the singleton reconciler; ensure_reconciler/0
 └── config.ex                           # NEW  reads :agenticrealms app-env (temporal base_url/namespace/api_key/task_queue, workflow type, id scheme, sweep interval)
 
 lib/agenticrealms/world/
@@ -130,7 +132,7 @@ test/agenticrealms/world/                 # NEW entity_remove_test (execute/appl
 test/agenticrealms_web/                    # NEW require_service_token_test, npc_service_controller_test (identity/surroundings/move + 401/404/409/422)
 ```
 
-**Structure Decision**: Single Phoenix app. New domain-adjacent logic lives in a cohesive `AgenticRealms.NpcMinds` context (lifecycle handler + Temporal client + reconciler), keeping the outward Temporal integration in one place. Write-side removal follows the established command/event/projector layering on the existing `Entity` aggregate (feature 016). The inbound service API is a conventional Phoenix `/api` scope guarded by a bearer plug. Cluster semantics: the handler is an exclusive Commanded subscriber; the reconciler is a Horde-registered cluster singleton.
+**Structure Decision**: Single Phoenix app. New domain-adjacent logic lives in a cohesive `AgenticRealms.NpcMinds` context (lifecycle handler + Temporal client + reconciler), keeping the outward Temporal integration in one place. Write-side removal follows the established command/event/projector layering on the existing `Entity` aggregate (feature 016). The inbound service API is a conventional Phoenix `/api` scope guarded by a bearer plug. Cluster semantics: the handler is an exclusive Commanded subscriber; the reconciler is a Horde cluster singleton (dedicated `Horde.Registry` + `Horde.DynamicSupervisor`) that relocates on node loss.
 
 ## Complexity Tracking
 

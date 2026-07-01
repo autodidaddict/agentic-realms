@@ -78,5 +78,6 @@ or fails the purge.
 
 - `LifecycleManager` — named Commanded handler ⇒ exactly one node handles each
   event.
-- `Reconciler` — cluster-wide singleton (Horde-registered; `:global` fallback).
+- `Reconciler` — Horde cluster singleton (dedicated `Horde.Registry` +
+  `Horde.DynamicSupervisor`); relocates to a surviving node on node loss.
 - Controller/auth plug — stateless, request-scoped (node-local correct).
