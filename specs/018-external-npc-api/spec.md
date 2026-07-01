@@ -52,6 +52,14 @@ delegating those decisions to the external mind. Existing reactive, scripted NPC
 content (e.g. an NPC greeting a player who enters) is unrelated to autonomous
 decision-making and is unaffected.
 
+## Clarifications
+
+### Session 2026-07-01
+
+- Q: Which spawned NPCs should the game start an external mind for? → A: Every spawned NPC — no per-NPC gating; the ungettable `fixed` flag (which means "cannot be picked up", not "stationary") does not exempt an NPC.
+- Q: NPCs are only removed today via the transient-region hard-purge (which emits no subscribable domain event) — how should mind-termination be triggered? → A: Introduce a first-class, event-sourced NPC-removal command/event and terminate the mind on it; also terminate out-of-band in the transient-region purge path (which deletes the stream and so cannot carry an event).
+- Q: If the Temporal server is unreachable when an NPC spawns/despawns, how hard must the game try to start/stop the mind (world change never blocked)? → A: Best-effort single attempt that never blocks the world change, backed by a periodic reconciliation sweep that converges minds to the set of live NPCs (starts missing minds, terminates orphaned ones).
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Enact an externally-decided move that players witness (Priority: P1)
@@ -151,9 +159,13 @@ rejected and the new value is honored, with no code change.
 
 ### User Story 4 - Automatically start a mind when an NPC is spawned (Priority: P1)
 
-When an NPC is spawned into the world through the game's existing flow, the game
-reacts to that spawn by submitting a start request for that NPC's mind to the
-orchestration server, with no manual step. The request is keyed to the NPC's
+When **any** NPC is spawned into the world through the game's existing flow, the
+game reacts to that spawn by submitting a start request for that NPC's mind to the
+orchestration server, with no manual step. Every spawned NPC gets a mind — there
+is no per-NPC gating, and the ungettable `fixed` flag (which means "cannot be
+picked up", not "stationary") does not exempt an NPC; a character that should
+stay put simply has a mind that tends to choose "stay". The request is keyed to
+the NPC's
 deterministic identity and carries the agreed id-conflict policy. Crucially, the
 game does not check whether a mind already exists and does not enforce uniqueness
 itself: exactly-one-mind-per-NPC is a property of the **orchestration server**.
@@ -189,13 +201,19 @@ invented at runtime also gains a mind with no deployment.
 
 When an NPC is removed or destroyed from the world, the game reacts by submitting
 a terminate request for that NPC's mind to the orchestration server so no
-orphaned mind keeps running for an NPC that no longer exists. As with the start,
-the game does not track which NPCs have minds and does not check whether a mind
-is actually running: it submits the terminate for the NPC's deterministic
-identity and relies on the **orchestration server** to tolerate a terminate that
-targets a mind which is already stopped or was never started. Safe, no-op-on-
-absent termination is therefore a property of the orchestration server, not
-game-side bookkeeping.
+orphaned mind keeps running for an NPC that no longer exists. Today the game has
+no first-class NPC-removal signal (NPCs are only removed by the transient-region
+hard-purge, which deletes the NPC's stream and emits nothing subscribable), so
+this feature **introduces a first-class, event-sourced NPC-removal command and
+event**; termination is triggered from that event. In addition, the existing
+transient-region purge path also terminates the minds of the NPCs it removes —
+done out-of-band, because the purge deletes the stream and so cannot carry an
+event. As with the start, the game does not track which NPCs have minds and does
+not check whether a mind is actually running: it submits the terminate for the
+NPC's deterministic identity and relies on the **orchestration server** to
+tolerate a terminate that targets a mind which is already stopped or was never
+started. Safe, no-op-on-absent termination is therefore a property of the
+orchestration server, not game-side bookkeeping.
 
 **Why this priority**: This keeps the mind population in step with the live NPC
 population and prevents orphaned minds accumulating, but the world remains
@@ -211,9 +229,10 @@ error (the orchestration server no-ops the absent target).
 
 **Acceptance Scenarios**:
 
-1. **Given** an NPC with a running mind, **When** the NPC is removed or destroyed, **Then** the game submits a terminate for that NPC's mind to the orchestration server and the mind stops.
-2. **Given** an NPC with no running mind, **When** the NPC is removed or destroyed, **Then** the game still submits the terminate for the NPC's deterministic identity, the orchestration server tolerates the absent target, and the removal completes cleanly with no error — without the game checking mind existence beforehand.
-3. **Given** the orchestration server is temporarily unavailable, **When** an NPC is removed, **Then** the NPC is still removed normally in the world and no player sees an error attributable to the mind termination.
+1. **Given** an NPC with a running mind, **When** the NPC is removed via the new first-class NPC-removal command/event, **Then** the game submits a terminate for that NPC's mind to the orchestration server and the mind stops.
+2. **Given** an NPC with a running mind that sits in a transient region, **When** that region is purged, **Then** the purge path also terminates that NPC's mind (out-of-band, since the purge carries no event) and the mind stops.
+3. **Given** an NPC with no running mind, **When** the NPC is removed, **Then** the game still submits the terminate for the NPC's deterministic identity, the orchestration server tolerates the absent target, and the removal completes cleanly with no error — without the game checking mind existence beforehand.
+4. **Given** the orchestration server is temporarily unavailable, **When** an NPC is removed, **Then** the NPC is still removed normally in the world, no player sees an error attributable to the mind termination, and the later reconciliation sweep terminates the now-orphaned mind.
 
 ---
 
@@ -256,7 +275,7 @@ an existing NPC and confirm the game reports it as unknown.
 - **Per-player-gated content**: The surroundings read is a trusted service view, not a specific player's view; it reports occupants of the room as they exist, independent of any single player's per-player content gating.
 - **Duplicate spawn handoff**: A retried or replayed NPC spawn must never produce a second mind for the same NPC. The game re-submits the same deterministic-identity start; the "never two" guarantee is provided by the orchestration server's id-conflict handling, not by any game-side check.
 - **Terminating a non-existent mind**: Removing an NPC that has no running mind (already terminated, or never started) must complete cleanly without error. The game submits the terminate unconditionally; the orchestration server no-ops the absent target — the game does not verify existence first.
-- **Orchestration server unavailable during lifecycle handoff**: If the orchestration server cannot be reached when an NPC is spawned or removed, the world spawn/removal must still succeed, no player may see an error, and the handoff failure must not roll back or block the world change.
+- **Orchestration server unavailable during lifecycle handoff**: If the orchestration server cannot be reached when an NPC is spawned or removed, the world spawn/removal must still succeed, no player may see an error, and the handoff failure must not roll back or block the world change. The periodic reconciliation sweep later brings the mind population back in line — starting the mind that was missed, or terminating the mind that was orphaned.
 - **NPC removed while its mind is mid-cycle**: Terminating the mind and any in-flight contract call from that mind must not corrupt world state; a late move from a mind whose NPC is gone is simply refused (unknown entity or conflict), never applied.
 
 ## Requirements *(mandatory)*
@@ -303,12 +322,14 @@ an existing NPC and confirm the game reports it as unknown.
 
 **Mind lifecycle (spawn / despawn handoff)**
 
-- **FR-024**: The game MUST react to an NPC being spawned through its existing flow by submitting a start request for that NPC's mind to the **Temporal server over its HTTP API** (starting the agreed Temporal workflow), with no manual step. This call MUST be made to the Temporal server and MUST NOT be made to the `agentic-realms-npc` mind worker service; the game never contacts the worker directly.
+- **FR-024**: The game MUST react to **every** NPC being spawned through its existing flow by submitting a start request for that NPC's mind to the **Temporal server over its HTTP API** (starting the agreed Temporal workflow), with no manual step and no per-NPC gating (the ungettable `fixed` flag does NOT exempt an NPC). This call MUST be made to the Temporal server and MUST NOT be made to the `agentic-realms-npc` mind worker service; the game never contacts the worker directly.
 - **FR-025**: The game MUST submit the mind start keyed to the NPC's deterministic identity and carrying the agreed id-conflict policy, and MUST rely solely on the orchestration server to guarantee at most one mind per NPC. On a retried or replayed spawn the game MUST re-submit the same start; the single-mind (exactly-one, never-two) guarantee is the orchestration server's, NOT the game's. The game MUST NOT maintain any registry of which NPCs have minds, MUST NOT check for an existing mind before starting, and MUST NOT perform any duplicate detection of its own.
 - **FR-026**: The game MUST start the mind using the workflow type, workflow-id scheme (one deterministic id per NPC identity), task queue, input shape, and id-conflict policy agreed with the mind service, so the correct generic mind is animated for the correct NPC and so the orchestration server can enforce uniqueness by identity.
 - **FR-027**: The game MUST react to an NPC being removed or destroyed by submitting a terminate request for that NPC's mind to the **Temporal server over its HTTP API** (terminating the `npc-<entity_id>` workflow). As with the start, this call MUST be made to the Temporal server and MUST NOT be made to the `agentic-realms-npc` mind worker service.
+- **FR-027a**: Because the game has no first-class NPC-removal signal today, this feature MUST introduce an event-sourced NPC-removal command and event (command → aggregate → event → projector), and mind termination MUST be triggered from that removal event. Additionally, the existing transient-region purge path MUST terminate the minds of the NPCs it removes; since the purge hard-deletes the NPC's stream and cannot carry an event, that termination MUST be invoked directly within the purge flow via the same reusable terminate step.
 - **FR-028**: The game MUST submit the mind terminate keyed to the NPC's deterministic identity WITHOUT first checking whether a mind is running, and MUST rely solely on the orchestration server to tolerate a terminate that targets a mind which is already stopped or was never started; such a no-op termination MUST NOT surface an error to the removal flow. The game MUST NOT track mind existence to decide whether to submit the terminate.
-- **FR-029**: The mind lifecycle handoff (start on spawn, terminate on removal) MUST NOT block, delay, or roll back the underlying world change: if the orchestration server is unavailable or the handoff fails, the NPC MUST still be spawned or removed in the world and no player may see an error attributable to the handoff.
+- **FR-029**: The mind lifecycle handoff (start on spawn, terminate on removal) MUST NOT block, delay, or roll back the underlying world change: it is a best-effort attempt, and if the orchestration server is unavailable or the handoff fails, the NPC MUST still be spawned or removed in the world and no player may see an error attributable to the handoff.
+- **FR-029a**: The game MUST run a periodic reconciliation sweep that converges the set of running minds to the set of live NPCs: it MUST start a mind for any live NPC missing one and terminate any mind whose NPC no longer exists. Reconciliation is what makes the best-effort handoff eventually consistent after a transient orchestration-server outage; it MUST rely on the orchestration server's start-idempotency and terminate-tolerance (per FR-025/FR-028) and MUST NOT require game-side mind bookkeeping beyond the live-NPC set the game already owns.
 
 **Authentication & security**
 
@@ -335,6 +356,8 @@ an existing NPC and confirm the game reports it as unknown.
 - **NPC Mind**: The external, durable decision-maker for a single NPC, run in the orchestration server. Exactly one exists per live NPC, keyed to the NPC's identity via a deterministic per-NPC workflow id. Its uniqueness is enforced by the orchestration server, not the game. The game submits start-on-spawn and terminate-on-removal requests for it, but owns none of its internal state and keeps no record of its existence.
 - **Temporal Server (orchestration server)**: The external durable-workflow engine that hosts and runs NPC minds and is the **authority for mind lifecycle guarantees** — deduplicating starts by identity (at most one mind per NPC) and tolerating terminates that target an absent mind. The game calls its **HTTP API** to submit start (on spawn) and terminate (on removal) requests for the agreed workflow (type, per-NPC workflow-id scheme, task queue, input shape, and id-conflict policy); the game does no bookkeeping of its own. This is a different system from the mind worker service: the game calls the Temporal server, never the worker. Its HTTP API address, namespace, and credentials are configuration.
 - **Mind Worker Service (`agentic-realms-npc`)**: The external process that hosts the mind workflow code, connects out to the Temporal server, and polls the task queue to run minds. The game never calls it; it reaches the game only through the authenticated HTTP contract (identity/surroundings/move).
+- **NPC Removal Command/Event**: A new, first-class, event-sourced way to remove an NPC from the world (command → aggregate → event → projector), introduced by this feature because none exists today. Its removal event is the primary trigger for terminating the NPC's mind. (The transient-region purge remains a separate removal path that terminates minds out-of-band, since it deletes streams and carries no event.)
+- **Reconciliation Sweep**: A periodic game-side process that compares the set of live NPCs to the set of running minds and converges them — starting a mind for any live NPC missing one and terminating any mind whose NPC is gone. It is the backstop that makes the best-effort lifecycle handoff eventually consistent after transient orchestration-server outages, relying on the orchestration server's start-idempotency and terminate-tolerance.
 
 ## Success Criteria *(mandatory)*
 
@@ -352,6 +375,7 @@ an existing NPC and confirm the game reports it as unknown.
 - **SC-010**: Every NPC spawned through the existing flow results in the game submitting exactly one deterministic-identity start request; across repeated or replayed spawns for the same NPC, no more than one mind runs (0 duplicate minds), with the game performing 0 duplicate-detection checks of its own (the guarantee is the orchestration server's).
 - **SC-011**: Every NPC removed or destroyed results in the game submitting a terminate request for that NPC's mind; after removal, 0 orphaned minds remain running for NPCs that no longer exist, and terminating a mind that is absent produces 0 errors — with the game performing 0 mind-existence checks beforehand.
 - **SC-012**: When the orchestration server is unavailable during a spawn or removal, 100% of those world spawns/removals still succeed and 0 player-visible errors are attributable to the mind lifecycle handoff.
+- **SC-013**: After a transient orchestration-server outage, the periodic reconciliation sweep converges to exactly one running mind per live NPC and 0 orphaned minds within one sweep interval, with 0 manual intervention.
 
 ## Assumptions
 
@@ -361,7 +385,8 @@ an existing NPC and confirm the game reports it as unknown.
 - **Single shared secret for the milestone**: One shared secret authenticates all callers on all routes. Richer authentication (per-caller credentials, mutual TLS, per-route scopes) may be added later without changing this feature's behavior. Secure transport is assumed to be provided by the deployment environment.
 - **Trusted service view for reads**: The surroundings read is a trusted internal/service view rather than a specific player's view; it reports the room's occupants as they exist and is not filtered by any one player's per-player content gating. Objects are reported regardless of quest-specific per-player visibility.
 - **Only globally-traversable exits for NPCs**: An NPC's surroundings report and honor only exits that are part of the shared world; private/owner-restricted exits belonging to another actor are excluded.
-- **Existing spawn and removal signals drive the lifecycle**: The game already emits signals when an NPC is spawned/placed and when an NPC is removed/destroyed; these existing signals drive the mind start and terminate handoffs without new world-side spawn/removal logic.
+- **Spawn signal exists; removal signal is introduced here**: The game already emits a spawn/placement signal for every NPC (the existing clone/spawn flow), which drives the mind start with no new spawn logic. There is, however, **no** first-class NPC-removal signal today — NPCs are only removed by the transient-region hard-purge, which deletes the stream and emits nothing subscribable — so this feature introduces an event-sourced NPC-removal command/event (per the event-sourcing mandate) as the primary termination trigger, and additionally terminates within the purge flow for the NPCs a purge removes.
+- **Reconciliation is the backstop for eventual consistency**: A periodic reconciliation sweep converges running minds to live NPCs (start-missing, terminate-orphaned), leaning on the orchestration server's start-idempotency and terminate-tolerance. It is what turns the best-effort, non-blocking handoff into an eventually-consistent "exactly one mind per live NPC" guarantee after transient outages.
 - **Lifecycle calls target the Temporal server, not the worker**: Starting and stopping a mind is a call the game makes to the **Temporal server over its HTTP API** to start/terminate a Temporal workflow (`NpcWorkflow`, id `npc-<entity_id>`, task queue `npc-minds`). It is explicitly **not** a call to the `agentic-realms-npc` worker service — the worker connects out to the Temporal server and polls for work on its own. The game and the worker never call each other directly; their only interaction is the worker calling the game's contract routes.
 - **Lifecycle handoff is best-effort relative to the world change**: Starting and terminating a mind is decoupled from the durability of the world change itself — the world spawn/removal is authoritative and never blocked by the handoff. Robustness of the handoff (e.g. retry on transient orchestration-server failure) is expected but is not allowed to gate the world change.
 - **Deterministic per-NPC mind identity, guarantees owned by the orchestrator**: The mind is uniquely identified by the NPC's identity (a deterministic per-NPC workflow id). Idempotency of the start (at most one mind per NPC) and safe no-op tolerance of a terminate against an absent mind are guaranteed by the **orchestration server** — via its id-conflict handling and its tolerance of terminating an already-stopped/absent workflow — NOT by any game-side bookkeeping. The game holds no registry of which NPCs have minds and performs no existence checks; it simply submits deterministic-id start and terminate requests and lets the orchestration server enforce the invariants.
@@ -374,7 +399,8 @@ an existing NPC and confirm the game reports it as unknown.
 - **Existing game movement command and guard**: The origin-room compare-and-swap movement path used to enact and reject moves safely.
 - **Existing NPC read data and room queries**: The denormalized NPC identity data and the live room/exits/occupants queries used to answer the reads.
 - **Existing NPC room notifications**: The room-scoped "NPC left"/"NPC arrived" notifications used so external moves are witnessed like any other move.
-- **Existing NPC spawn and removal signals**: The game-side signals for NPC spawn/placement and NPC removal/destruction that drive the mind start and terminate handoffs.
+- **Existing NPC spawn signal**: The game-side spawn/placement signal for NPCs that drives the mind start handoff. (There is no existing NPC-removal signal; this feature introduces the event-sourced NPC-removal command/event that drives the terminate handoff.)
+- **Transient-region purge path (feature 017)**: The existing hard-purge flow that removes NPCs in a purged region; this feature adds a mind-terminate step to it (invoked directly, since the purge carries no event).
 - **Temporal server (orchestration server)**: The durable-workflow engine that hosts NPC minds. The game calls its **HTTP API** to start a mind on spawn and terminate a mind on removal, using the agreed workflow type, per-NPC workflow-id scheme, task queue, input shape, and id-conflict policy. This is the game's lifecycle target — distinct from the mind worker service, which the game never calls. Locally a developer-run instance (e.g. `temporal server start-dev` with its HTTP port); later a hosted one (e.g. Temporal Cloud's HTTP API).
 
 ## Out of Scope
