@@ -23,6 +23,7 @@ defmodule AgenticRealms.World.Transient.Purge do
   import Ecto.Query
 
   alias AgenticRealms.Repo
+  alias AgenticRealms.NpcMinds.TemporalClient
 
   alias AgenticRealms.World.Schemas.{
     Region,
@@ -52,6 +53,13 @@ defmodule AgenticRealms.World.Transient.Purge do
       )
 
     npc_ids = Repo.all(from(c in NPCClone, where: c.room_id in ^room_ids, select: c.id))
+
+    # Feature 018 — terminate the external mind of every NPC being purged. The
+    # purge hard-deletes the entity stream, so it cannot carry an `EntityRemoved`
+    # event; this out-of-band, best-effort call is how the purge path stops
+    # orphaned minds. `terminate_workflow/1` never raises and a failure is not
+    # allowed to block the purge.
+    Enum.each(npc_ids, &TemporalClient.terminate_workflow/1)
 
     purge_event_streams(region_id, room_ids, object_ids ++ npc_ids)
     purge_read_model(region_id, room_ids)

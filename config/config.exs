@@ -132,6 +132,19 @@ config :agenticrealms, AgenticRealms.Anthropic,
   model: "claude-haiku-4-5-20251001",
   timeout_ms: 5_000
 
+# Feature 018 — External NPC Brains. The game calls the Temporal server's HTTP
+# API to start/terminate one durable workflow per NPC (never the worker), and
+# runs a reconciliation sweep that converges running minds to live NPCs.
+# Compile-time defaults; `service_secret` and any overrides are applied in
+# config/runtime.exs from environment variables. `service_secret` is
+# deliberately absent here (unset ⇒ the API fails closed).
+config :agenticrealms, AgenticRealms.NpcMinds,
+  temporal_base_url: "http://localhost:7243",
+  temporal_namespace: "default",
+  temporal_task_queue: "npc-minds",
+  npc_workflow_type: "NpcWorkflow",
+  reconcile_interval_ms: 60_000
+
 # Import environment specific config. This must remain at the bottom
 # of this file so it overrides the configuration defined above.
 import_config "#{config_env()}.exs"

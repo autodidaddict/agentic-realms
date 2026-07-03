@@ -19,7 +19,7 @@ defmodule AgenticRealms.World.Projections.EntityProjector do
 
   alias AgenticRealms.Repo
   alias AgenticRealms.World.ContainerRef
-  alias AgenticRealms.World.Events.{EntityCloned, EntityMoved, EntityEdited}
+  alias AgenticRealms.World.Events.{EntityCloned, EntityMoved, EntityEdited, EntityRemoved}
   alias AgenticRealms.World.Schemas.{Object, NPCClone}
 
   @object_edit_fields ~w(name short_description long_description fixed behaviors)a
@@ -93,6 +93,25 @@ defmodule AgenticRealms.World.Projections.EntityProjector do
         from(c in NPCClone, where: c.id == ^id)
         |> Repo.update_all(set: updates)
 
+        :ok
+    end
+  end
+
+  # --- EntityRemoved: delete the read-model row ---------------------------
+
+  # Feature 018 — removal deletes the denormalized row. Delete-by-pk is
+  # idempotent/replay-safe (0 rows when already gone). Deleting the `npc_clones`
+  # row is load-bearing: the NPC-mind reconciler treats the live rows as the set
+  # of NPCs that should have a mind, so a stale row would resurrect a terminated
+  # mind on the next sweep.
+  def handle(%EntityRemoved{kind: kind, entity_id: id}, _meta) do
+    case norm_kind(kind) do
+      :object ->
+        from(o in Object, where: o.id == ^id) |> Repo.delete_all()
+        :ok
+
+      :npc ->
+        from(c in NPCClone, where: c.id == ^id) |> Repo.delete_all()
         :ok
     end
   end

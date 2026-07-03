@@ -55,6 +55,7 @@ defmodule AgenticRealms.World.UIEventBroadcaster do
     PlayerMoved,
     EntityMoved,
     EntityEdited,
+    EntityRemoved,
     BlueprintCreated,
     BlueprintEdited,
     QuestAccepted,
@@ -75,6 +76,7 @@ defmodule AgenticRealms.World.UIEventBroadcaster do
     RoomObjectDeparted,
     RoomObjectEdited,
     RoomNPCArrived,
+    RoomNPCLeft,
     WizardBlueprintRegistryChanged,
     PlayerCurrentRoomChanged,
     PlayerInventoryChanged,
@@ -183,6 +185,23 @@ defmodule AgenticRealms.World.UIEventBroadcaster do
         Topics.room_topic(rid),
         %RoomObjectEdited{room_id: rid, object_id: oid, fields_changed: fields_changed}
       )
+    end
+
+    :ok
+  end
+
+  # Feature 018 — an NPC removed from a room departs it, witnessed like any NPC
+  # leave. The `from` container is captured on the EntityRemoved event, so no DB
+  # read is needed (and the row is being deleted by the projector anyway). Only a
+  # removal from a room is visible; removal from the void is silent.
+  def handle(%EntityRemoved{kind: kind, entity_id: id, from: from, name: name}, _meta) do
+    with :npc <- norm_kind(kind),
+         %ContainerRef{type: :room, id: rid} <- ContainerRef.from_map(from || ContainerRef.void()) do
+      Phoenix.PubSub.broadcast(@pubsub, Topics.room_topic(rid), %RoomNPCLeft{
+        room_id: rid,
+        npc_id: id,
+        npc_name: name || "someone"
+      })
     end
 
     :ok
@@ -467,6 +486,32 @@ defmodule AgenticRealms.World.UIEventBroadcaster do
       room_id: rid,
       npc_id: npc_id,
       npc_name: lookup_npc_name(npc_id)
+    })
+  end
+
+  # Feature 018 — NPC room→room relocation (e.g. an external mind's move) is
+  # witnessed exactly like any NPC move: departure in the origin room, arrival in
+  # the destination room. The clone row still exists (a move only changes its
+  # room), so the name is looked up.
+  defp witness_object_move(
+         :npc,
+         :relocated,
+         %ContainerRef{type: :room, id: from_rid},
+         %ContainerRef{type: :room, id: to_rid},
+         npc_id
+       ) do
+    name = lookup_npc_name(npc_id)
+
+    Phoenix.PubSub.broadcast(@pubsub, Topics.room_topic(from_rid), %RoomNPCLeft{
+      room_id: from_rid,
+      npc_id: npc_id,
+      npc_name: name
+    })
+
+    Phoenix.PubSub.broadcast(@pubsub, Topics.room_topic(to_rid), %RoomNPCArrived{
+      room_id: to_rid,
+      npc_id: npc_id,
+      npc_name: name
     })
   end
 
