@@ -110,6 +110,10 @@ defmodule AgenticRealms.Application do
         # events; separate from WorldProjector to keep concerns focused
         # and isolate replay positions.
         AgenticRealms.World.Projections.QuestProjector,
+        # Feature 019 — Real Stats. Awards quest experience to players: a named
+        # Commanded event handler (exclusive cluster-wide subscriber) reacting to
+        # QuestCompleted{xp} → AwardXp on the Player aggregate.
+        AgenticRealms.World.Progression.XpAwarder,
         # Feature 015 — unified Blueprint read-model (`blueprints`); handles
         # BlueprintCreated/BlueprintEdited for both object + npc kinds.
         AgenticRealms.World.Projections.BlueprintProjector,

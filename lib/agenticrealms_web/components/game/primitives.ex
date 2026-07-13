@@ -122,7 +122,7 @@ defmodule AgenticRealmsWeb.GameComponents.Primitives do
         <button class="hud-card-head" phx-click="open_modal" phx-value-modal="stats">
           <span class="title">Character</span>
           <span style="display: flex; align-items: center; gap: 8px;">
-            <span class="count">{@stats.class}</span>
+            <span class="count">{"Lvl #{@stats.level}"}</span>
             <svg
               class="expand-icon"
               viewBox="0 0 10 10"
@@ -136,17 +136,17 @@ defmodule AgenticRealmsWeb.GameComponents.Primitives do
         </button>
         <div class="hud-card-body">
           <div style="display: grid; grid-template-columns: auto 1fr; gap: 10px; align-items: center; margin-bottom: 12px;">
-            <div class="sigil">V</div>
+            <div class="sigil">{String.upcase(String.first(@stats.name))}</div>
             <div>
               <div class="who-name">{@stats.name}</div>
-              <div class="who-class">{@stats.class}</div>
+              <div class="who-class">{"Level #{@stats.level}"}</div>
             </div>
           </div>
           <.hp_bar label="Health" cur={@stats.hp.cur} max={@stats.hp.max} kind="hp" />
           <div style="height: 8px" />
-          <.hp_bar label="Mana" cur={@stats.mp.cur} max={@stats.mp.max} kind="mp" />
+          <.hp_bar label="Mana" cur={@stats.mana.cur} max={@stats.mana.max} kind="mp" />
           <div style="height: 8px" />
-          <.hp_bar label="Experience" cur={@stats.xp.cur} max={@stats.xp.max} kind="xp" />
+          <.hp_bar label="Experience" cur={@stats.xp.into_level} max={@stats.xp.to_next} kind="xp" />
         </div>
       </div>
 

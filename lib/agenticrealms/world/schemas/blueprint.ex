@@ -32,6 +32,18 @@ defmodule AgenticRealms.World.Schemas.Blueprint do
     # Feature 013 — per-NPC FetchQuest catalog.
     field :quests, {:array, :map}, default: []
 
+    # Feature 019 — Real Stats. Base authoring stats for NPC-kind blueprints
+    # (frozen onto each clone at spawn); ignored for object kind.
+    field :str, :integer, default: 12
+    field :dex, :integer, default: 12
+    field :con, :integer, default: 12
+    field :int, :integer, default: 12
+    field :wis, :integer, default: 12
+    field :cha, :integer, default: 12
+    field :level, :integer, default: 1
+    field :max_hp, :integer, default: 10
+    field :max_mana, :integer, default: 10
+
     has_many :clones, AgenticRealms.World.Schemas.NPCClone, foreign_key: :blueprint_id
 
     timestamps(type: :utc_datetime)

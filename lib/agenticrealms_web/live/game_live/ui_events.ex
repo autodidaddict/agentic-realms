@@ -28,7 +28,7 @@ defmodule AgenticRealmsWeb.GameLive.UIEvents do
     ]
 
   alias AgenticRealms.Accounts
-  alias AgenticRealms.World.{Direction, Queries}
+  alias AgenticRealms.World.{Direction, LevelCurve, Queries}
 
   alias AgenticRealms.World.UIEvents.{
     BehaviorUtterance,
@@ -38,6 +38,7 @@ defmodule AgenticRealmsWeb.GameLive.UIEvents do
     PlayerQuestAccepted,
     PlayerQuestFinalized,
     PlayerQuestProgress,
+    PlayerStatsChanged,
     PrivateUtterance,
     RoomNPCArrived,
     RoomNPCLeft,
@@ -56,6 +57,52 @@ defmodule AgenticRealmsWeb.GameLive.UIEvents do
   alias AgenticRealmsWeb.Topics
 
   @pubsub AgenticRealms.PubSub
+
+  # ── Feature 019 — Real Stats progression notices ──────────────
+  #
+  # Refresh the character sheet from the broadcast payload (no DB read — the
+  # deltas are authoritative and a re-query could race the :strong projector)
+  # and append the chat-window notice(s). Two events arrive in order: the xp
+  # gain (carries new_total) then, on level-up, the level notice.
+  def stats_changed(socket, %PlayerStatsChanged{} = msg) do
+    socket =
+      socket
+      |> apply_xp(msg.new_total)
+      |> apply_level(msg.leveled_to)
+      |> xp_notice(msg.xp_gained)
+      |> level_notice(msg.leveled_to)
+
+    {:noreply, socket}
+  end
+
+  defp apply_xp(socket, nil), do: socket
+
+  defp apply_xp(socket, new_total) do
+    p = LevelCurve.progress(new_total)
+
+    stats =
+      Map.merge(socket.assigns.stats, %{
+        level: p.level,
+        xp: %{into_level: p.into_level, to_next: p.to_next, fraction: p.fraction}
+      })
+
+    assign(socket, :stats, stats)
+  end
+
+  defp apply_level(socket, nil), do: socket
+
+  defp apply_level(socket, level),
+    do: assign(socket, :stats, Map.put(socket.assigns.stats, :level, level))
+
+  defp xp_notice(socket, nil), do: socket
+
+  defp xp_notice(socket, gained),
+    do: append_log(socket, %{kind: :system, text: "You gain #{gained} experience."})
+
+  defp level_notice(socket, nil), do: socket
+
+  defp level_notice(socket, level),
+    do: append_log(socket, %{kind: :system, text: "You are now level #{level}!"})
 
   # ────────────────────────────────────────────────────────────
   # Room player arrival / departure

@@ -154,7 +154,20 @@ defmodule AgenticRealms.World.Projections.EntityProjector do
         behavior_groups: fval(fields, :behavior_groups) || [],
         direct_behaviors: fval(fields, :direct_behaviors) || [],
         # Born in the void; the subsequent EntityMoved sets the room.
-        room_id: nil
+        room_id: nil,
+        # Feature 019 — Real Stats. Frozen from the blueprint at spawn; current
+        # hp/mana start at max. Fallbacks cover any pre-feature field map.
+        str: fval(fields, :str) || 12,
+        dex: fval(fields, :dex) || 12,
+        con: fval(fields, :con) || 12,
+        int: fval(fields, :int) || 12,
+        wis: fval(fields, :wis) || 12,
+        cha: fval(fields, :cha) || 12,
+        level: fval(fields, :level) || 1,
+        hp: fval(fields, :hp) || fval(fields, :max_hp) || 10,
+        max_hp: fval(fields, :max_hp) || 10,
+        mana: fval(fields, :mana) || fval(fields, :max_mana) || 10,
+        max_mana: fval(fields, :max_mana) || 10
       },
       on_conflict: :nothing,
       conflict_target: :id

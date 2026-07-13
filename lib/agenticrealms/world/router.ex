@@ -22,6 +22,7 @@ defmodule AgenticRealms.World.Router do
     OpenTransientEntryExit,
     DestroyRegion,
     RecordRoomDiscovery,
+    AwardXp,
     AcceptQuest,
     FinalizeQuest,
     CloneEntity,
@@ -51,7 +52,7 @@ defmodule AgenticRealms.World.Router do
 
   # Phase 4 (US1) + Phase 5 (US2): player lifecycle + movement routed to Player.
   # Feature 012: per-player room discovery also routed to Player.
-  dispatch([SpawnPlayer, MovePlayer, RecordRoomDiscovery], to: Player)
+  dispatch([SpawnPlayer, MovePlayer, RecordRoomDiscovery, AwardXp], to: Player)
 
   # Feature 012: region authoring.
   # Feature 017: transient-region provisioning, owner-only entry exit, and

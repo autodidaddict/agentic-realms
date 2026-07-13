@@ -62,17 +62,6 @@ defmodule AgenticRealms.GameData do
     ]
   end
 
-  @spec player_stats() :: map()
-  def player_stats do
-    %{
-      name: "Veyr of Ashfall",
-      class: "Cleric · lvl 7",
-      hp: %{cur: 41, max: 58},
-      mp: %{cur: 22, max: 30},
-      xp: %{cur: 1840, max: 2400}
-    }
-  end
-
   @spec inventory() :: [map()]
   def inventory do
     [
@@ -404,21 +393,6 @@ defmodule AgenticRealms.GameData do
       "Odra" => %{role: "Innkeep · friendly", kind: "npc"},
       "Vosk" => %{role: "Mercenary · neutral", kind: "other"}
     }
-  end
-
-  @doc """
-  Returns the ability scores for the player character sheet modal.
-  """
-  @spec ability_scores() :: [map()]
-  def ability_scores do
-    [
-      %{name: "Strength", value: "14", modifier: "+2"},
-      %{name: "Dexterity", value: "11", modifier: "+0"},
-      %{name: "Wisdom", value: "17", modifier: "+3"},
-      %{name: "Charisma", value: "13", modifier: "+1"},
-      %{name: "Constitution", value: "15", modifier: "+2"},
-      %{name: "Intellect", value: "12", modifier: "+1"}
-    ]
   end
 
   @doc """

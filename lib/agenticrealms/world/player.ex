@@ -19,15 +19,52 @@ defmodule AgenticRealms.World.Player do
             # unconditionally dispatches and relies on this MapSet to decide
             # whether to emit a PlayerDiscoveredRoom event. See
             # `specs/012-maps/contracts/discovery.md`.
-            discovered_room_ids: MapSet.new()
+            discovered_room_ids: MapSet.new(),
+            # Feature 019 — Real Stats. Aggregate-owned; nil until PlayerSpawned
+            # seeds the documented defaults (abilities 12, level 1, xp 0, hp/mana
+            # 10/10). Plain integers — no snapshot-serialization treatment needed.
+            str: nil,
+            dex: nil,
+            con: nil,
+            int: nil,
+            wis: nil,
+            cha: nil,
+            level: nil,
+            xp: nil,
+            hp: nil,
+            max_hp: nil,
+            mana: nil,
+            max_mana: nil,
+            # Feature 019 — idempotency guard. award_ids already applied, so a
+            # redelivered/replayed AwardXp is a no-op. Serialized like
+            # discovered_room_ids (list on the wire, MapSet in memory).
+            applied_award_ids: MapSet.new()
 
-  alias AgenticRealms.World.Commands.{SpawnPlayer, MovePlayer, RecordRoomDiscovery}
-  alias AgenticRealms.World.Events.{PlayerSpawned, PlayerMoved, PlayerDiscoveredRoom}
+  alias AgenticRealms.World.Commands.{SpawnPlayer, MovePlayer, RecordRoomDiscovery, AwardXp}
+
+  alias AgenticRealms.World.Events.{
+    PlayerSpawned,
+    PlayerMoved,
+    PlayerDiscoveredRoom,
+    PlayerXpAwarded,
+    PlayerLeveledUp
+  }
+
+  alias AgenticRealms.World.LevelCurve
 
   # --- SpawnPlayer --------------------------------------------------------
 
-  @spec execute(%__MODULE__{}, %SpawnPlayer{} | %MovePlayer{} | %RecordRoomDiscovery{}) ::
-          %PlayerSpawned{} | %PlayerMoved{} | %PlayerDiscoveredRoom{} | :ok | {:error, atom()}
+  @spec execute(
+          %__MODULE__{},
+          %SpawnPlayer{} | %MovePlayer{} | %RecordRoomDiscovery{} | %AwardXp{}
+        ) ::
+          %PlayerSpawned{}
+          | %PlayerMoved{}
+          | %PlayerDiscoveredRoom{}
+          | %PlayerXpAwarded{}
+          | [%PlayerXpAwarded{} | %PlayerLeveledUp{}]
+          | :ok
+          | {:error, atom()}
   def execute(%__MODULE__{current_room_id: nil}, %SpawnPlayer{
         player_id: pid,
         starting_room_id: room_id
@@ -87,12 +124,77 @@ defmodule AgenticRealms.World.Player do
     end
   end
 
+  # --- AwardXp (feature 019) ----------------------------------------------
+  #
+  # Players only. Idempotent per `award_id` (a redelivered/replayed source
+  # event is a no-op) and a no-op for non-positive amounts. Re-evaluates the
+  # level against the curve and emits PlayerLeveledUp only when the level rises
+  # (possibly by more than one level at once).
+
+  def execute(%__MODULE__{} = state, %AwardXp{
+        player_id: pid,
+        amount: amount,
+        award_id: award_id
+      }) do
+    cond do
+      not is_integer(amount) or amount <= 0 ->
+        :ok
+
+      MapSet.member?(state.applied_award_ids, award_id) ->
+        :ok
+
+      true ->
+        new_total = (state.xp || 0) + amount
+        current_level = state.level || 1
+        new_level = LevelCurve.level_for_xp(new_total)
+
+        awarded = %PlayerXpAwarded{
+          player_id: pid,
+          amount: amount,
+          new_total: new_total,
+          award_id: award_id
+        }
+
+        if new_level > current_level do
+          [
+            awarded,
+            %PlayerLeveledUp{player_id: pid, from_level: current_level, to_level: new_level}
+          ]
+        else
+          awarded
+        end
+    end
+  end
+
   # --- apply/2 ------------------------------------------------------------
 
-  @spec apply(%__MODULE__{}, %PlayerSpawned{} | %PlayerMoved{} | %PlayerDiscoveredRoom{}) ::
-          %__MODULE__{}
+  @spec apply(
+          %__MODULE__{},
+          %PlayerSpawned{}
+          | %PlayerMoved{}
+          | %PlayerDiscoveredRoom{}
+          | %PlayerXpAwarded{}
+          | %PlayerLeveledUp{}
+        ) :: %__MODULE__{}
   def apply(%__MODULE__{} = state, %PlayerSpawned{player_id: pid, room_id: room_id}) do
-    %__MODULE__{state | id: pid, current_room_id: room_id}
+    # Feature 019 — seed the documented starting stats on spawn.
+    %__MODULE__{
+      state
+      | id: pid,
+        current_room_id: room_id,
+        str: 12,
+        dex: 12,
+        con: 12,
+        int: 12,
+        wis: 12,
+        cha: 12,
+        level: 1,
+        xp: 0,
+        hp: 10,
+        max_hp: 10,
+        mana: 10,
+        max_mana: 10
+    }
   end
 
   def apply(%__MODULE__{} = state, %PlayerMoved{to_room_id: to}) do
@@ -103,6 +205,17 @@ defmodule AgenticRealms.World.Player do
         room_id: rid
       }) do
     %__MODULE__{state | discovered_room_ids: MapSet.put(discovered, rid)}
+  end
+
+  def apply(%__MODULE__{applied_award_ids: applied} = state, %PlayerXpAwarded{
+        new_total: new_total,
+        award_id: award_id
+      }) do
+    %__MODULE__{state | xp: new_total, applied_award_ids: MapSet.put(applied, award_id)}
+  end
+
+  def apply(%__MODULE__{} = state, %PlayerLeveledUp{to_level: to_level}) do
+    %__MODULE__{state | level: to_level}
   end
 end
 
@@ -117,15 +230,21 @@ defimpl Jason.Encoder, for: AgenticRealms.World.Player do
     player
     |> Map.from_struct()
     |> Map.update!(:discovered_room_ids, &MapSet.to_list/1)
+    |> Map.update!(:applied_award_ids, &MapSet.to_list/1)
     |> Jason.Encode.map(opts)
   end
 end
 
 defimpl Commanded.Serialization.JsonDecoder, for: AgenticRealms.World.Player do
-  def decode(%AgenticRealms.World.Player{discovered_room_ids: ids} = state)
-      when is_list(ids) do
-    %{state | discovered_room_ids: MapSet.new(ids)}
+  def decode(%AgenticRealms.World.Player{} = state) do
+    %{
+      state
+      | discovered_room_ids: to_set(state.discovered_room_ids),
+        applied_award_ids: to_set(state.applied_award_ids)
+    }
   end
 
-  def decode(%AgenticRealms.World.Player{} = state), do: state
+  defp to_set(%MapSet{} = set), do: set
+  defp to_set(ids) when is_list(ids), do: MapSet.new(ids)
+  defp to_set(_), do: MapSet.new()
 end
