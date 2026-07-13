@@ -22,8 +22,11 @@ defmodule AgenticRealms.World.Examine do
   """
 
   alias AgenticRealms.Accounts
+  alias AgenticRealms.Repo
   alias AgenticRealms.World.Examine.Match
   alias AgenticRealms.World.Queries
+  alias AgenticRealms.World.Schemas.{NPCClone, PlayerState}
+  alias AgenticRealms.World.Stats
 
   @type error_reason ::
           :no_current_room
@@ -59,15 +62,73 @@ defmodule AgenticRealms.World.Examine do
     cond do
       needle in @self_aliases ->
         case acting_username(player_id) do
-          {:ok, username} -> {:ok, %Match{target_kind: :player, name: username}}
-          :error -> {:error, :no_current_room}
+          {:ok, username} ->
+            match = %Match{target_kind: :player, name: username, id: player_id}
+            {:ok, enrich(match, player_id, player_level(player_id))}
+
+          :error ->
+            {:error, :no_current_room}
         end
 
       true ->
         case gather_scope(player_id) do
-          {:ok, scope} -> resolve(scope, needle)
-          {:error, :no_current_room} = err -> err
+          {:ok, scope} ->
+            case resolve(scope, needle) do
+              {:ok, match} -> {:ok, enrich(match, scope.examiner_id, scope.examiner_level)}
+              {:error, _} = err -> err
+            end
+
+          {:error, :no_current_room} = err ->
+            err
         end
+    end
+  end
+
+  # --- Feature 019 — health-tier + relative-power enrichment --------------
+  #
+  # Enrich the resolved Match with a qualitative health sentence and a
+  # relative-power phrase. NEVER exposes exact numbers (FR-020). Self-
+  # examination omits the relative-power phrase (FR-021).
+
+  defp enrich(%Match{target_kind: :npc, id: npc_id} = match, _examiner_id, examiner_level) do
+    case Repo.get(NPCClone, npc_id) do
+      %NPCClone{hp: hp, max_hp: max_hp, level: level} ->
+        {_atom, sentence} = Stats.health_tier(hp, max_hp)
+
+        %{
+          match
+          | health_tier: sentence,
+            power_phrase: Stats.relative_power(examiner_level, level)
+        }
+
+      _ ->
+        match
+    end
+  end
+
+  defp enrich(%Match{target_kind: :player, id: target_id} = match, examiner_id, examiner_level) do
+    case Repo.get(PlayerState, target_id) do
+      %PlayerState{hp: hp, max_hp: max_hp, level: level} ->
+        {_atom, sentence} = Stats.health_tier(hp, max_hp)
+
+        power =
+          if target_id == examiner_id,
+            do: nil,
+            else: Stats.relative_power(examiner_level, level)
+
+        %{match | health_tier: sentence, power_phrase: power}
+
+      _ ->
+        match
+    end
+  end
+
+  defp enrich(%Match{} = match, _examiner_id, _examiner_level), do: match
+
+  defp player_level(player_id) do
+    case Repo.get(PlayerState, player_id) do
+      %PlayerState{level: level} -> level
+      _ -> 1
     end
   end
 
@@ -90,7 +151,9 @@ defmodule AgenticRealms.World.Examine do
          room_objects: room_view.objects,
          inventory: inventory,
          players: players,
-         npcs: room_view.npcs
+         npcs: room_view.npcs,
+         examiner_id: player_id,
+         examiner_level: player_level(player_id)
        }}
     else
       {:error, :no_current_room} -> {:error, :no_current_room}
@@ -203,8 +266,8 @@ defmodule AgenticRealms.World.Examine do
     %Match{target_kind: :object, name: name, long_description: long_description_of(obj)}
   end
 
-  defp player_match(%{username: name}) do
-    %Match{target_kind: :player, name: name, long_description: nil}
+  defp player_match(%{id: id, username: name}) do
+    %Match{target_kind: :player, name: name, id: id, long_description: nil}
   end
 
   defp npc_match(%{id: id, name: name}) do

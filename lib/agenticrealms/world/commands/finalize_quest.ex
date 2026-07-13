@@ -15,6 +15,8 @@ defmodule AgenticRealms.World.Commands.FinalizeQuest do
     :reward_name,
     :reward_description,
     :remaining_quest_object_ids,
-    :completed_at
+    :completed_at,
+    # Feature 019 — experience reward granted on completion (0 when unauthored).
+    reward_xp: 0
   ]
 end

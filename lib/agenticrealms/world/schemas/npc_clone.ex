@@ -28,6 +28,20 @@ defmodule AgenticRealms.World.Schemas.NPCClone do
     field :behavior_groups, {:array, :string}, default: []
     field :direct_behaviors, {:array, :map}, default: []
 
+    # Feature 019 — Real Stats. Frozen from the blueprint at spawn; current
+    # hp/mana are per-instance (NPCs never carry xp).
+    field :str, :integer, default: 12
+    field :dex, :integer, default: 12
+    field :con, :integer, default: 12
+    field :int, :integer, default: 12
+    field :wis, :integer, default: 12
+    field :cha, :integer, default: 12
+    field :level, :integer, default: 1
+    field :hp, :integer, default: 10
+    field :max_hp, :integer, default: 10
+    field :mana, :integer, default: 10
+    field :max_mana, :integer, default: 10
+
     belongs_to :blueprint, AgenticRealms.World.Schemas.Blueprint,
       foreign_key: :blueprint_id,
       type: :string,

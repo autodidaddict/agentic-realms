@@ -283,4 +283,17 @@ defmodule AgenticRealms.World.UIEvents do
     @enforce_keys [:kind, :npc_name, :text, :player_id]
     defstruct [:kind, :npc_name, :text, :player_id]
   end
+
+  defmodule PlayerStatsChanged do
+    @moduledoc """
+    Feature 019 — transient progression notice. Broadcast on
+    `player:<player_id>` ONLY when a player gains experience (`xp_gained` +
+    `new_total`) and/or levels up (`leveled_to`). `GameLive` refreshes the
+    character sheet from the payload (no DB read — the deltas are authoritative)
+    and appends the chat-window notice(s). The two domain events
+    (`PlayerXpAwarded`, `PlayerLeveledUp`) each broadcast one of these.
+    """
+    @enforce_keys [:player_id]
+    defstruct [:player_id, :xp_gained, :new_total, :leveled_to]
+  end
 end

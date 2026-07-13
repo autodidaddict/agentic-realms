@@ -21,6 +21,7 @@ defmodule AgenticRealms.World.Commands do
   alias AgenticRealms.World.Commands.{
     SpawnPlayer,
     MovePlayer,
+    AwardXp,
     CreateRegion,
     CreateRoom,
     AddExit,
@@ -79,6 +80,26 @@ defmodule AgenticRealms.World.Commands do
           {:error, _} = err -> err
         end
     end
+  end
+
+  @doc """
+  Award experience to a player (feature 019). Players only; idempotent per
+  `award_id` (a redelivered/replayed source event cannot double-award).
+  Dispatched `:strong` so the `player_state` read model reflects the new
+  xp/level before this returns.
+  """
+  @spec award_xp(integer(), pos_integer(), String.t()) :: :ok | {:error, term()}
+  def award_xp(player_id, amount, award_id)
+      when is_integer(player_id) and is_integer(amount) and is_binary(award_id) do
+    WorldApp.dispatch(
+      %AwardXp{
+        player_id: player_id,
+        amount: amount,
+        award_id: award_id,
+        source: award_id
+      },
+      consistency: :strong
+    )
   end
 
   @doc """
@@ -379,23 +400,60 @@ defmodule AgenticRealms.World.Commands do
     with :ok <- check_room_exists(room_id),
          :ok <- check_no_clone_name_collision(room_id, bp.name),
          {:ok, effective} <- BehaviorGroups.compose(bp.behavior_groups || [], bp.behaviors || []) do
-      fields = %{
-        blueprint_id: bp.id,
-        name: bp.name,
-        short_description: bp.short_description,
-        long_description: bp.long_description,
-        behaviors: effective,
-        direct_behaviors: bp.behaviors || [],
-        behavior_groups: bp.behavior_groups || [],
-        lore: bp.lore || "",
-        fixed: bp.fixed
-      }
+      fields =
+        %{
+          blueprint_id: bp.id,
+          name: bp.name,
+          short_description: bp.short_description,
+          long_description: bp.long_description,
+          behaviors: effective,
+          direct_behaviors: bp.behaviors || [],
+          behavior_groups: bp.behavior_groups || [],
+          lore: bp.lore || "",
+          fixed: bp.fixed
+        }
+        |> Map.merge(npc_stat_fields(bp))
 
       case clone_into(:npc, clone_id, fields, ContainerRef.room(room_id), :spawned) do
         {:ok, _} -> {:ok, %{clone_id: clone_id}}
         {:error, _} = err -> err
       end
     end
+  end
+
+  # Feature 019 — freeze the blueprint's base stats onto the clone at spawn.
+  # Current hp/mana start at their maxima; NPCs never carry xp.
+  defp npc_stat_fields(%Blueprint{} = bp) do
+    %{
+      str: bp.str,
+      dex: bp.dex,
+      con: bp.con,
+      int: bp.int,
+      wis: bp.wis,
+      cha: bp.cha,
+      level: bp.level,
+      hp: bp.max_hp,
+      max_hp: bp.max_hp,
+      mana: bp.max_mana,
+      max_mana: bp.max_mana
+    }
+  end
+
+  # Default base stats for a freeform NPC (no blueprint) — same as a player.
+  defp default_npc_stat_fields do
+    %{
+      str: 12,
+      dex: 12,
+      con: 12,
+      int: 12,
+      wis: 12,
+      cha: 12,
+      level: 1,
+      hp: 10,
+      max_hp: 10,
+      mana: 10,
+      max_mana: 10
+    }
   end
 
   defp fetch_npc_blueprint(blueprint_id) do
@@ -747,6 +805,8 @@ defmodule AgenticRealms.World.Commands do
       reward = inst.definition_snapshot["reward"] || %{}
       reward_name = reward["name"] || "reward"
       reward_description = reward["description"] || ""
+      # Feature 019 — the authored experience reward (0 when unauthored).
+      reward_xp = normalize_xp(reward["xp"])
 
       case WorldApp.dispatch(
              %FinalizeQuest{
@@ -756,7 +816,8 @@ defmodule AgenticRealms.World.Commands do
                reward_name: reward_name,
                reward_description: reward_description,
                remaining_quest_object_ids: plan.remaining_quest_object_ids,
-               completed_at: completed_at
+               completed_at: completed_at,
+               reward_xp: reward_xp
              },
              consistency: :strong
            ) do
@@ -777,6 +838,10 @@ defmodule AgenticRealms.World.Commands do
       {:error, :criteria_unmet, missing} -> {:error, :criteria_unmet, missing}
     end
   end
+
+  # Feature 019 — coerce an authored quest xp reward to a non-negative integer.
+  defp normalize_xp(xp) when is_integer(xp) and xp > 0, do: xp
+  defp normalize_xp(_), do: 0
 
   defp build_finalize_plan(%QuestInstance{
          id: qid,
@@ -1019,18 +1084,20 @@ defmodule AgenticRealms.World.Commands do
          :ok <- BehaviorGroups.validate_behaviors(behaviors),
          :ok <- check_room_exists(room_id),
          :ok <- check_no_clone_name_collision(room_id, attrs[:name]) do
-      fields = %{
-        # Freeform NPCs have no blueprint behind them.
-        blueprint_id: nil,
-        name: attrs[:name],
-        short_description: attrs[:short_description],
-        long_description: attrs[:long_description],
-        behaviors: behaviors,
-        direct_behaviors: behaviors,
-        behavior_groups: [],
-        lore: Map.get(attrs, :lore, "") || "",
-        fixed: Map.get(attrs, :fixed, false)
-      }
+      fields =
+        %{
+          # Freeform NPCs have no blueprint behind them.
+          blueprint_id: nil,
+          name: attrs[:name],
+          short_description: attrs[:short_description],
+          long_description: attrs[:long_description],
+          behaviors: behaviors,
+          direct_behaviors: behaviors,
+          behavior_groups: [],
+          lore: Map.get(attrs, :lore, "") || "",
+          fixed: Map.get(attrs, :fixed, false)
+        }
+        |> Map.merge(default_npc_stat_fields())
 
       case clone_into(:npc, Ecto.UUID.generate(), fields, ContainerRef.room(room_id), :spawned) do
         {:ok, entity_id} -> {:ok, entity_id}

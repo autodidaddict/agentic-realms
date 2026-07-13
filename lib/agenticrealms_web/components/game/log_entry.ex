@@ -108,7 +108,9 @@ defmodule AgenticRealmsWeb.GameComponents.LogEntry do
   def log_entry(%{entry: %{kind: :detail, target_kind: :player}} = assigns) do
     ~H"""
     <div class="log-entry detail detail-player">
-      <span class="detail-name">{@entry.name}</span> is a player.
+      <div class="detail-body"><span class="detail-name">{@entry.name}</span> is a player.</div>
+      <div :if={@entry[:health_tier]} class="detail-condition">{@entry.health_tier}.</div>
+      <div :if={@entry[:power_phrase]} class="detail-power">They seem {@entry.power_phrase}.</div>
     </div>
     """
   end
@@ -120,6 +122,10 @@ defmodule AgenticRealmsWeb.GameComponents.LogEntry do
         <span class="detail-name">{@entry.name}</span>
       </div>
       <div class="detail-body">{@entry.long_description}</div>
+      <div :if={@entry[:health_tier]} class="detail-condition">{@entry.health_tier}.</div>
+      <div :if={@entry[:power_phrase]} class="detail-power">
+        It seems {@entry.power_phrase}.
+      </div>
     </div>
     """
   end

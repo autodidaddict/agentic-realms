@@ -83,7 +83,8 @@ defmodule AgenticRealms.World.Quest do
           reward_name: reward_name,
           reward_description: reward_description,
           remaining_quest_object_ids: remaining,
-          completed_at: at
+          completed_at: at,
+          reward_xp: reward_xp
         }
       ) do
     [
@@ -102,7 +103,8 @@ defmodule AgenticRealms.World.Quest do
       %QuestCompleted{
         quest_id: qid,
         player_id: pid,
-        completed_at: at
+        completed_at: at,
+        xp: reward_xp
       },
       %QuestItemsCleanedUp{
         quest_id: qid,

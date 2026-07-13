@@ -23,12 +23,17 @@ defmodule AgenticRealms.World.Projections.PlayerStateProjector do
 
   alias AgenticRealms.Repo
   alias AgenticRealms.World.Commands, as: WorldCommands
-  alias AgenticRealms.World.Events.{PlayerSpawned, PlayerMoved}
+  alias AgenticRealms.World.Events.{PlayerSpawned, PlayerMoved, PlayerXpAwarded, PlayerLeveledUp}
   alias AgenticRealms.World.Schemas.{PlayerState, Room}
 
   def handle(%PlayerSpawned{player_id: pid, room_id: room_id}, _meta) do
     now = utc_now()
 
+    # Feature 019 — Real Stats. Starting stats (abilities 12, level 1, xp 0,
+    # hp/mana 10/10) are seeded on first insert via the `PlayerState` schema
+    # field defaults. `on_conflict` intentionally sets ONLY current_room_id so
+    # a redelivered/replayed PlayerSpawned never resets a player's earned
+    # xp/level — those are updated by their own event clauses below.
     Repo.insert!(
       %PlayerState{
         player_id: pid,
@@ -73,6 +78,26 @@ defmodule AgenticRealms.World.Projections.PlayerStateProjector do
     if not is_nil(target) do
       :ok = WorldCommands.record_room_discovery(pid, target)
     end
+
+    :ok
+  end
+
+  # Feature 019 — Real Stats. Progression updates. `new_total`/`to_level` are
+  # absolute values from the event, so re-handling is idempotent.
+  def handle(%PlayerXpAwarded{player_id: pid, new_total: new_total}, _meta) do
+    Repo.update_all(
+      from(ps in PlayerState, where: ps.player_id == ^pid),
+      set: [xp: new_total, updated_at: utc_now()]
+    )
+
+    :ok
+  end
+
+  def handle(%PlayerLeveledUp{player_id: pid, to_level: to_level}, _meta) do
+    Repo.update_all(
+      from(ps in PlayerState, where: ps.player_id == ^pid),
+      set: [level: to_level, updated_at: utc_now()]
+    )
 
     :ok
   end

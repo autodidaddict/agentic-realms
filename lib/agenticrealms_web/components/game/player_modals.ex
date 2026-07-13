@@ -9,8 +9,6 @@ defmodule AgenticRealmsWeb.GameComponents.PlayerModals do
 
   import AgenticRealmsWeb.GameComponents.Primitives, only: [modal: 1, hp_bar: 1]
 
-  alias AgenticRealms.GameData
-
   # ────────────────────────────────────────────────────────────
   # Stats Modal
   # ────────────────────────────────────────────────────────────
@@ -18,53 +16,39 @@ defmodule AgenticRealmsWeb.GameComponents.PlayerModals do
   attr :stats, :map, required: true
 
   def stats_modal(assigns) do
-    assigns = assign(assigns, :ability_scores, GameData.ability_scores())
-
     ~H"""
-    <.modal
-      title="Character Sheet"
-      glyph="✧"
-      foot_hint="Click a stat to invoke — spend mana, rest, meditate."
-    >
+    <.modal title="Character Sheet" glyph="✧">
       <div style="display: grid; grid-template-columns: 200px 1fr; gap: 32px; align-items: start;">
         <div>
-          <div class="sigil" style="width: 80px; height: 80px; font-size: 44px;">V</div>
+          <div class="sigil" style="width: 80px; height: 80px; font-size: 44px;">
+            {String.upcase(String.first(@stats.name))}
+          </div>
           <div style="margin-top: 14px;">
             <div style="font-family: var(--serif); font-size: 22px; color: var(--ink); font-weight: 500;">
               {@stats.name}
             </div>
             <div style="font-size: 11px; color: var(--ink-faint); text-transform: uppercase; letter-spacing: 0.14em; margin-top: 2px;">
-              {@stats.class}
+              {"Level #{@stats.level}"}
             </div>
-          </div>
-          <div style="margin-top: 18px; font-size: 12px; color: var(--ink-dim); line-height: 1.7; font-family: var(--prose);">
-            Devoted to the Dawnbringer. Bound by oath to protect the pilgrim roads between Ashfall and Hollowvale.
           </div>
         </div>
         <div>
           <div class="big-bar-block">
             <.hp_bar label="Health" cur={@stats.hp.cur} max={@stats.hp.max} kind="hp" />
-            <div style="font-size: 11px; color: var(--ink-faint); margin-top: 6px;">
-              Regenerates slowly while resting
-            </div>
           </div>
           <div class="big-bar-block">
-            <.hp_bar label="Mana" cur={@stats.mp.cur} max={@stats.mp.max} kind="mp" />
-            <div style="font-size: 11px; color: var(--ink-faint); margin-top: 6px;">
-              Channel Dawnlight — 8 mp
-            </div>
+            <.hp_bar label="Mana" cur={@stats.mana.cur} max={@stats.mana.max} kind="mp" />
           </div>
           <div class="big-bar-block">
-            <.hp_bar label="Experience" cur={@stats.xp.cur} max={@stats.xp.max} kind="xp" />
+            <.hp_bar label="Experience" cur={@stats.xp.into_level} max={@stats.xp.to_next} kind="xp" />
             <div style="font-size: 11px; color: var(--ink-faint); margin-top: 6px;">
-              560 xp to level 8
+              {@stats.xp.to_next - @stats.xp.into_level} xp to level {@stats.level + 1}
             </div>
           </div>
           <div class="stats-grid" style="margin-top: 22px;">
-            <div :for={score <- @ability_scores} class="stat-row">
+            <div :for={score <- @stats.abilities} class="stat-row">
               <span class="k">{score.name}</span>
               <span class="v">{score.value}</span>
-              <span class="sub">{score.modifier}</span>
             </div>
           </div>
         </div>

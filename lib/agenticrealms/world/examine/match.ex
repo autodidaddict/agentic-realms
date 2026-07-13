@@ -18,13 +18,17 @@ defmodule AgenticRealms.World.Examine.Match do
   """
 
   @enforce_keys [:target_kind, :name]
-  defstruct [:target_kind, :name, :long_description, :id]
+  defstruct [:target_kind, :name, :long_description, :id, :health_tier, :power_phrase]
 
   @type t :: %__MODULE__{
           target_kind: :object | :player | :npc,
           name: String.t(),
           long_description: String.t() | nil,
-          # NPC clone entity id — carried only for telemetry debug identity.
-          id: String.t() | nil
+          # NPC clone entity id (telemetry debug identity) OR target player id
+          # (feature 019 health/power lookup); nil for objects.
+          id: String.t() | integer() | nil,
+          # Feature 019 — examine surfaces only qualitative bands, never numbers.
+          health_tier: String.t() | nil,
+          power_phrase: String.t() | nil
         }
 end

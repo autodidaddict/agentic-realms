@@ -147,13 +147,19 @@ defmodule AgenticRealmsWeb.GameLive.PlayerCommands do
            long_description: ld
          })}
 
-      {:ok, %ExamineMatch{target_kind: :player, name: name}} ->
+      {:ok, %ExamineMatch{target_kind: :player, name: name} = m} ->
         {:noreply,
          socket
          |> echo(raw)
-         |> append_log(%{kind: :detail, target_kind: :player, name: name})}
+         |> append_log(%{
+           kind: :detail,
+           target_kind: :player,
+           name: name,
+           health_tier: m.health_tier,
+           power_phrase: m.power_phrase
+         })}
 
-      {:ok, %ExamineMatch{target_kind: :npc, name: name, long_description: ld}} ->
+      {:ok, %ExamineMatch{target_kind: :npc, name: name, long_description: ld} = m} ->
         {:noreply,
          socket
          |> echo(raw)
@@ -161,7 +167,9 @@ defmodule AgenticRealmsWeb.GameLive.PlayerCommands do
            kind: :detail,
            target_kind: :npc,
            name: name,
-           long_description: ld
+           long_description: ld,
+           health_tier: m.health_tier,
+           power_phrase: m.power_phrase
          })}
 
       {:error, :no_such_target} when allow_fallback? ->

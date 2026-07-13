@@ -29,8 +29,7 @@ defmodule AgenticRealmsWeb.GameLive do
 
   use AgenticRealmsWeb.GameComponents
 
-  alias AgenticRealms.GameData
-  alias AgenticRealms.World.{Commands, CommandParser, MapView, Queries, Quests, Seed}
+  alias AgenticRealms.World.{Commands, CommandParser, MapView, Queries, Quests, Seed, Stats}
 
   alias AgenticRealms.World.UIEvents.{
     RoomPlayerArrived,
@@ -50,6 +49,7 @@ defmodule AgenticRealmsWeb.GameLive do
     PlayerQuestAccepted,
     PlayerQuestProgress,
     PlayerQuestFinalized,
+    PlayerStatsChanged,
     RoomUtterance,
     PrivateUtterance
   }
@@ -193,7 +193,7 @@ defmodule AgenticRealmsWeb.GameLive do
      # `input_locked` disables the command input while it runs.
      |> assign(:resolver_task, nil)
      |> assign(:input_locked, false)
-     |> assign(:stats, GameData.player_stats())
+     |> assign(:stats, Stats.for_player(player_id))
      |> assign(:inventory, inventory)
      # Feature 013 — Quests. `:quests` is the active-quest list
      # rendered in the HUD card with per-criterion progress lines;
@@ -1224,6 +1224,9 @@ defmodule AgenticRealmsWeb.GameLive do
 
   def handle_info(%PlayerQuestAccepted{} = msg, socket),
     do: UIEvents.quest_accepted(socket, msg)
+
+  def handle_info(%PlayerStatsChanged{} = msg, socket),
+    do: UIEvents.stats_changed(socket, msg)
 
   def handle_info(%Phoenix.Socket.Broadcast{event: "presence_diff"} = msg, socket),
     do: UIEvents.presence_diff(socket, msg)

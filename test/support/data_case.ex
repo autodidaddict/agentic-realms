@@ -103,6 +103,9 @@ defmodule AgenticRealms.DataCase do
     # Feature 013 — Quests. Handles the four finalize-side events. Must
     # be supervised in tests too, otherwise QuestCompleted never lands.
     ExUnit.Callbacks.start_supervised!(AgenticRealms.World.Projections.QuestProjector)
+    # Feature 019 — Real Stats. Awards quest xp; required for any test whose
+    # quest completion should grant experience / level a player up.
+    ExUnit.Callbacks.start_supervised!(AgenticRealms.World.Progression.XpAwarder)
     # Feature 015 — unified Blueprint projector. Required by any test that
     # dispatches `CreateBlueprint`/`EditBlueprint`, because the wrapper uses
     # `:strong` consistency and waits for this projector to acknowledge.

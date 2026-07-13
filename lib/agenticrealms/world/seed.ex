@@ -526,7 +526,9 @@ defmodule AgenticRealms.World.Seed do
         "reward" => %{
           "name" => "bigger golden apple",
           "description" =>
-            "An impossibly large golden apple, warm to the touch, the prize of Amaranth's private cellar."
+            "An impossibly large golden apple, warm to the touch, the prize of Amaranth's private cellar.",
+          # Feature 019 — 100 xp lands a fresh player exactly at Level 2.
+          "xp" => 100
         }
       }
     ]

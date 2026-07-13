@@ -53,6 +53,8 @@ defmodule AgenticRealms.World.UIEventBroadcaster do
   alias AgenticRealms.World.Events.{
     PlayerSpawned,
     PlayerMoved,
+    PlayerXpAwarded,
+    PlayerLeveledUp,
     EntityMoved,
     EntityEdited,
     EntityRemoved,
@@ -82,7 +84,8 @@ defmodule AgenticRealms.World.UIEventBroadcaster do
     PlayerInventoryChanged,
     PlayerQuestAccepted,
     PlayerQuestProgress,
-    PlayerQuestFinalized
+    PlayerQuestFinalized,
+    PlayerStatsChanged
   }
 
   alias AgenticRealmsWeb.Topics
@@ -154,6 +157,32 @@ defmodule AgenticRealms.World.UIEventBroadcaster do
         to_room_id: to
       }
     )
+
+    :ok
+  end
+
+  # Feature 019 — Real Stats. Progression notices to the earning player only.
+  # Two events → one PlayerStatsChanged each (xp gain, then level-up). The
+  # payload carries the authoritative deltas so GameLive refreshes the sheet
+  # without a DB read (which could race the :strong projector under :eventual).
+  def handle(%PlayerXpAwarded{player_id: pid, amount: amount, new_total: new_total}, _meta) do
+    Phoenix.PubSub.broadcast(@pubsub, Topics.player_topic(pid), %PlayerStatsChanged{
+      player_id: pid,
+      xp_gained: amount,
+      new_total: new_total,
+      leveled_to: nil
+    })
+
+    :ok
+  end
+
+  def handle(%PlayerLeveledUp{player_id: pid, to_level: to_level}, _meta) do
+    Phoenix.PubSub.broadcast(@pubsub, Topics.player_topic(pid), %PlayerStatsChanged{
+      player_id: pid,
+      xp_gained: nil,
+      new_total: nil,
+      leveled_to: to_level
+    })
 
     :ok
   end
