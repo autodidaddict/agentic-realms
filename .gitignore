@@ -36,8 +36,12 @@ npm-debug.log
 /assets/node_modules/
 
 settings.local.json
-CLAUDE.local.md
-.claude/logs/
+
+# Exclude personal Claude Code settings and session history
+.claude/settings.json
+.claude/memory/
+.claude/history/
+*.local.md
 
 # Local environment files — may hold ANTHROPIC_API_KEY and other secrets.
 .env
