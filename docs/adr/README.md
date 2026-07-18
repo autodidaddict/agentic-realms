@@ -11,3 +11,4 @@ rewriting history. Statuses: `Proposed` → `Accepted` → (`Superseded by NNNN`
 | # | Title | Status |
 |---|---|---|
 | [0001](0001-npc-autonomy-separation-of-responsibilities.md) | NPC Autonomy & Separation of Responsibilities | Accepted |
+| [0002](0002-roll-our-own-combat-resolution.md) | Roll Our Own Combat Resolution (No Third-Party Rules Dependency) | Accepted |
