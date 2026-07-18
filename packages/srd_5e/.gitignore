@@ -1,0 +1,17 @@
+# Build artifacts
+/_build/
+/cover/
+/deps/
+/doc/
+/.fetch
+erl_crash.dump
+*.ez
+
+# Library convention: do not commit the lock file.
+mix.lock
+
+# Published package tarball
+srd_5e-*.tar
+
+# Editor / language-server
+.elixir_ls/
