@@ -35,4 +35,17 @@ defmodule Srd.Rules.Check do
       margin: t.margin
     }
   end
+
+  @doc """
+  The passive score for a check: `10 + modifier`, plus 5 for advantage or minus
+  5 for disadvantage.
+  """
+  @spec passive(integer(), keyword()) :: integer()
+  def passive(modifier, opts \\ []) do
+    10 + modifier + passive_adjustment(Keyword.get(opts, :advantage, :normal))
+  end
+
+  defp passive_adjustment(:advantage), do: 5
+  defp passive_adjustment(:disadvantage), do: -5
+  defp passive_adjustment(:normal), do: 0
 end

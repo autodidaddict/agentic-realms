@@ -37,4 +37,15 @@ defmodule Srd.Rules.CheckTest do
       end
     end
   end
+
+  describe "passive/2" do
+    test "is 10 plus the modifier" do
+      assert Check.passive(4) == 14
+    end
+
+    test "adds 5 for advantage and subtracts 5 for disadvantage" do
+      assert Check.passive(4, advantage: :advantage) == 19
+      assert Check.passive(4, advantage: :disadvantage) == 9
+    end
+  end
 end
