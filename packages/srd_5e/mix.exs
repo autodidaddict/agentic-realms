@@ -41,7 +41,7 @@ defmodule Srd.MixProject do
     [
       licenses: ["Apache-2.0"],
       maintainers: ["Kevin Hoffman"],
-      files: ~w(lib mix.exs README.md LICENSE CHANGELOG.md .formatter.exs),
+      files: ~w(lib priv mix.exs README.md LICENSE CHANGELOG.md .formatter.exs),
       links: %{
         "GitHub" => @package_url,
         "Changelog" => "#{@repo_url}/blob/main/packages/srd_5e/CHANGELOG.md"
