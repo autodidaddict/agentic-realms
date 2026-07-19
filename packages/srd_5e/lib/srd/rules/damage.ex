@@ -5,7 +5,7 @@ defmodule Srd.Rules.Damage do
   Resolves a completed damage roll into a final amount after applying the
   target's resistances, vulnerabilities, and immunities to the damage type.
   """
-  alias Srd.Dice.Roll
+  alias Srd.Dice.{Expr, Roll}
 
   @damage_types ~w(acid bludgeoning cold fire force lightning necrotic piercing
                    poison psychic radiant slashing thunder)a
@@ -72,6 +72,21 @@ defmodule Srd.Rules.Damage do
 
     %__MODULE__{type: type, raw: raw, final: apply_defenses(raw, type, opts)}
   end
+
+  @doc """
+  Apply the save-for-half pattern: on a successful save the damage is halved,
+  rounded down; on a failed save it is unchanged.
+  """
+  @spec save_for_half(t(), boolean()) :: t()
+  def save_for_half(%__MODULE__{} = damage, true), do: %{damage | final: div(damage.final, 2)}
+  def save_for_half(%__MODULE__{} = damage, false), do: damage
+
+  @doc """
+  Double the damage dice for a critical hit: the dice count is doubled and the
+  modifier is left alone.
+  """
+  @spec critical_dice(Expr.t()) :: Expr.t()
+  def critical_dice(%Expr{} = expr), do: %{expr | count: expr.count * 2}
 
   defp validate_type!(type) when type in @damage_types, do: type
   defp validate_type!(type), do: raise(ArgumentError, "unknown damage type: #{inspect(type)}")
