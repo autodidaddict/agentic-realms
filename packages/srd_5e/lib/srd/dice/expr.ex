@@ -19,6 +19,9 @@ defmodule Srd.Dice.Expr do
   def parse(string) when is_binary(string) do
     case Regex.run(@dice_notation, String.trim(string), capture: :all_but_first) do
       [count, sides, sign, mod] -> build(count, sides, sign, mod, string)
+      # :re drops trailing non-participating groups, so a modifier-less roll
+      # comes back as just [count, sides].
+      [count, sides] -> build(count, sides, "", "", string)
       _ -> {:error, {:invalid_dice, string}}
     end
   end
