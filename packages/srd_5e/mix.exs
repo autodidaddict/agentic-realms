@@ -33,8 +33,8 @@ defmodule Srd.MixProject do
   end
 
   defp description do
-    "Pure-Elixir tabletop RPG resolution (dice and rules) modeled on the " <>
-      "System Reference Document (SRD) 5.1."
+    "Pure-Elixir tabletop RPG game support and rules modeled on the " <>
+      "System Reference Document (SRD) 5.2 with opt-in support for some 5.1 rules."
   end
 
   defp package do
