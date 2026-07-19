@@ -20,7 +20,7 @@ defmodule Srd.Dice.Roll do
   """
   @type t :: %__MODULE__{
           count: pos_integer(),
-          sides: pos_integer(),
+          sides: non_neg_integer(),
           modifier: integer(),
           dice: [pos_integer()],
           reduce: :sum | :min | :max | :drop_lowest,
