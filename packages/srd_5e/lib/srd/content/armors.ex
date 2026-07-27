@@ -19,6 +19,25 @@ defmodule Srd.Content.Armors do
   def all, do: Map.values(armor())
 
   @doc """
+  Every armor matching the given filters.
+
+  Supported filters: `:category` and `:stealth_disadvantage`.
+
+      iex> Srd.Content.Armors.all(category: :heavy) |> length()
+      4
+  """
+  @spec all(keyword()) :: [Armor.t()]
+  def all(filters) do
+    Enum.filter(all(), fn armor ->
+      Enum.all?(filters, fn
+        {:category, category} -> armor.category == category
+        {:stealth_disadvantage, value} -> armor.stealth_disadvantage == value
+        {key, _} -> raise ArgumentError, "unknown armor filter: #{inspect(key)}"
+      end)
+    end)
+  end
+
+  @doc """
   Look up armor by slug, returning `nil` if there is none.
   """
   @spec get(String.t()) :: Armor.t() | nil

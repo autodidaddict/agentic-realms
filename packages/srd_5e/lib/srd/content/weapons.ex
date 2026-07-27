@@ -19,6 +19,35 @@ defmodule Srd.Content.Weapons do
   def all, do: Map.values(weapons())
 
   @doc """
+  Every weapon matching the given filters.
+
+  Supported filters: `:category`, `:kind`, `:mastery`, and `:property`.
+
+      iex> Srd.Content.Weapons.all(category: :martial, kind: :ranged) |> length()
+      5
+  """
+  @spec all(keyword()) :: [Weapon.t()]
+  def all(filters) do
+    Enum.filter(all(), fn weapon ->
+      Enum.all?(filters, fn
+        {:category, category} -> weapon.category == category
+        {:kind, kind} -> weapon.kind == kind
+        {:mastery, mastery} -> weapon.mastery == mastery
+        {:property, property} -> property in weapon.properties
+        {key, _} -> raise ArgumentError, "unknown weapon filter: #{inspect(key)}"
+      end)
+    end)
+  end
+
+  @doc """
+  The slugs of every weapon matching the given filters, sorted.
+  """
+  @spec slugs(keyword()) :: [String.t()]
+  def slugs(filters \\ []) do
+    filters |> all() |> Enum.map(& &1.slug) |> Enum.sort()
+  end
+
+  @doc """
   Look up a weapon by slug, returning `nil` if there is none.
   """
   @spec get(String.t()) :: Weapon.t() | nil
