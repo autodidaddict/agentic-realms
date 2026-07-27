@@ -18,6 +18,7 @@ defmodule Srd.Rules.Attack do
           target_ac: pos_integer()
         }
 
+  @spec resolve(Roll.t(), target_ac: integer()) :: t()
   @doc """
   Resolve a single attack based on a dice roll and the target's AC
   """
