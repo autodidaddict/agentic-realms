@@ -1,6 +1,6 @@
 # 4. Expose SRD Character-Creation Content
 
-- **Status**: Proposed
+- **Status**: Accepted
 - **Date**: 2026-07-27
 - **Deciders**: Kevin Hoffman
 - **Related**: ADR-0002 (roll our own resolution; breadth lives in authored data
