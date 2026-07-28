@@ -42,4 +42,26 @@ defmodule Srd.Rules.SkillTest do
       assert Skill.check_modifier(3, 2, proficient?: true, expertise?: true) == 7
     end
   end
+
+  describe "name/1" do
+    test "gives the display name for a single-word skill" do
+      assert Skill.name(:acrobatics) == "Acrobatics"
+      assert Skill.name(:stealth) == "Stealth"
+    end
+
+    test "gives the display name for a multi-word skill" do
+      assert Skill.name(:animal_handling) == "Animal Handling"
+      assert Skill.name(:sleight_of_hand) == "Sleight of Hand"
+    end
+
+    test "names every skill" do
+      for skill <- Skill.all() do
+        assert is_binary(Skill.name(skill))
+      end
+    end
+
+    test "raises for something that is not a skill" do
+      assert_raise KeyError, fn -> Skill.name(:haggling) end
+    end
+  end
 end

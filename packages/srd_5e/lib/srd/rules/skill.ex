@@ -54,6 +54,24 @@ defmodule Srd.Rules.Skill do
   @spec ability(skill()) :: ability()
   def ability(skill), do: Map.fetch!(@skills, skill)
 
+  @doc """
+  The display name of a skill.
+
+      iex> Srd.Rules.Skill.name(:sleight_of_hand)
+      "Sleight of Hand"
+  """
+  @spec name(skill()) :: String.t()
+  def name(skill) do
+    # Fetch first so an unknown skill raises rather than being titlecased.
+    _ = Map.fetch!(@skills, skill)
+
+    skill
+    |> Atom.to_string()
+    |> String.split("_")
+    |> Enum.map_join(" ", &String.capitalize/1)
+    |> String.replace(" Of ", " of ")
+  end
+
   @doc "The skills governed by an ability."
   @spec by_ability(ability()) :: [skill()]
   def by_ability(ability) do

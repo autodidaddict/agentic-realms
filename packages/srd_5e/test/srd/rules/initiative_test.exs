@@ -31,4 +31,12 @@ defmodule Srd.Rules.InitiativeTest do
       assert Initiative.order([]) == []
     end
   end
+
+  describe "modifier/1" do
+    test "is the Dexterity modifier" do
+      assert Initiative.modifier(3) == 3
+      assert Initiative.modifier(0) == 0
+      assert Initiative.modifier(-2) == -2
+    end
+  end
 end

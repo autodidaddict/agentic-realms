@@ -37,4 +37,20 @@ defmodule Srd.Rules.SaveTest do
       end
     end
   end
+
+  describe "modifier/3" do
+    test "is the ability modifier when not proficient" do
+      assert Save.modifier(3, 2) == 3
+      assert Save.modifier(-1, 2) == -1
+    end
+
+    test "adds the proficiency bonus when proficient" do
+      assert Save.modifier(3, 2, proficient?: true) == 5
+      assert Save.modifier(0, 6, proficient?: true) == 6
+    end
+
+    test "is explicit about not being proficient" do
+      assert Save.modifier(3, 2, proficient?: false) == 3
+    end
+  end
 end
