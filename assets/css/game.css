@@ -621,7 +621,9 @@ button { font: inherit; color: inherit; }
   font-size: var(--fs-md);
   color: var(--ink);
   font-weight: 600;
-  letter-spacing: 0.01em;
+  text-transform: uppercase;
+  /* Uppercase runs tight in this face; open it up so the name stays legible. */
+  letter-spacing: 0.06em;
 }
 .who-class {
   font-size: var(--fs-xs);
@@ -824,6 +826,99 @@ button { font: inherit; color: inherit; }
 .stat-row .k { color: var(--ink-faint); text-transform: uppercase; letter-spacing: 0.08em; font-size: 10px; }
 .stat-row .v { color: var(--ink); font-variant-numeric: tabular-nums; }
 .stat-row .sub { color: var(--ink-faint); font-size: 10px; }
+
+/* Character sheet — feature 020 */
+.sheet-head {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 16px;
+  align-items: center;
+  padding-bottom: 18px;
+}
+.sheet-sigil { width: 64px; height: 64px; font-size: 34px; }
+.sheet-name {
+  font-family: var(--serif);
+  font-size: 22px;
+  color: var(--ink);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.sheet-descriptor {
+  font-size: 11px;
+  color: var(--ink-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  margin-top: 2px;
+}
+
+.sheet-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  border-bottom: 1px solid var(--line-soft);
+  margin-bottom: 20px;
+}
+.sheet-tabs button {
+  background: none;
+  border: 1px solid transparent;
+  border-bottom: none;
+  color: var(--ink-faint);
+  font-family: inherit;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  padding: 8px 14px;
+  cursor: pointer;
+  border-radius: 3px 3px 0 0;
+}
+.sheet-tabs button:hover { color: var(--ink); }
+.sheet-tabs button.active {
+  color: var(--ink);
+  border-color: var(--line-soft);
+  background: var(--bg);
+  margin-bottom: -1px;
+  padding-bottom: 9px;
+}
+
+.sheet-details { margin-top: 22px; }
+.sheet-xp-caption { font-size: 11px; color: var(--ink-faint); margin-top: 6px; }
+
+.sheet-section + .sheet-section { margin-top: 30px; }
+/* A real header, not another row label. The stat rows beneath are 10px
+   uppercase faint text, so a section title in that same voice disappears into
+   them — this borrows the serif face the sheet already uses for names. */
+.sheet-section-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--serif);
+  font-size: 16px;
+  font-weight: 500;
+  letter-spacing: 0.005em;
+  color: var(--ink);
+  padding-bottom: 9px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 14px;
+}
+.sheet-section-title::before {
+  content: "";
+  width: 3px;
+  height: 15px;
+  border-radius: 1px;
+  background: var(--player);
+  flex: none;
+}
+
+.prof-mark { color: var(--ink-faint); font-size: 9px; }
+.prof-mark.on { color: var(--ink); }
+
+.sheet-empty {
+  color: var(--ink-faint);
+  font-size: var(--fs-sm);
+  text-align: center;
+  padding: 48px 12px;
+}
 
 .big-bar-block { padding: 4px 0 14px; }
 .big-bar-block + .big-bar-block { border-top: 1px solid var(--line-soft); padding-top: 14px; }

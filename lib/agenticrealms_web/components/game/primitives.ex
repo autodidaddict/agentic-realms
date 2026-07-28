@@ -11,6 +11,22 @@ defmodule AgenticRealmsWeb.GameComponents.Primitives do
   # HP Bar
   # ────────────────────────────────────────────────────────────
 
+  @doc """
+  A modifier with an explicit sign, so `+2` and `-1` are never ambiguous and a
+  zero reads as `+0` rather than a bare `0` (FR-007).
+  """
+  @spec signed(integer()) :: String.t()
+  def signed(value) when value >= 0, do: "+#{value}"
+  def signed(value), do: Integer.to_string(value)
+
+  @doc """
+  The one-line description under a character's name: `Level 3 Human Fighter`.
+  """
+  @spec descriptor(map()) :: String.t()
+  def descriptor(stats) do
+    "Level #{stats.level} #{stats.species.name} #{stats.class.name}"
+  end
+
   attr :label, :string, required: true
   attr :cur, :integer, required: true
   attr :max, :integer, required: true
@@ -104,9 +120,28 @@ defmodule AgenticRealmsWeb.GameComponents.Primitives do
     """
   end
 
+  @doc """
+  The experience bar.
+
+  At level 20 there is no next threshold — `to_next` is `nil` — so the bar is
+  rendered full rather than dividing by nothing.
+  """
+  attr :xp, :map, required: true
+
+  def xp_bar(assigns) do
+    ~H"""
+    <.hp_bar
+      label="Experience"
+      cur={if @xp.maxed?, do: 1, else: @xp.into_level}
+      max={if @xp.maxed?, do: 1, else: @xp.to_next}
+      kind="xp"
+    />
+    """
+  end
+
   # ────────────────────────────────────────────────────────────
   # Stats Panel — the player sidebar with Character / Inventory /
-  # Quest Log / Present HUD cards.
+  # Quest Log / Here HUD cards.
   # ────────────────────────────────────────────────────────────
 
   attr :stats, :map, required: true
@@ -139,14 +174,12 @@ defmodule AgenticRealmsWeb.GameComponents.Primitives do
             <div class="sigil">{String.upcase(String.first(@stats.name))}</div>
             <div>
               <div class="who-name">{@stats.name}</div>
-              <div class="who-class">{"Level #{@stats.level}"}</div>
+              <div class="who-class">{descriptor(@stats)}</div>
             </div>
           </div>
           <.hp_bar label="Health" cur={@stats.hp.cur} max={@stats.hp.max} kind="hp" />
           <div style="height: 8px" />
-          <.hp_bar label="Mana" cur={@stats.mana.cur} max={@stats.mana.max} kind="mp" />
-          <div style="height: 8px" />
-          <.hp_bar label="Experience" cur={@stats.xp.into_level} max={@stats.xp.to_next} kind="xp" />
+          <.xp_bar xp={@stats.xp} />
         </div>
       </div>
 
@@ -184,7 +217,7 @@ defmodule AgenticRealmsWeb.GameComponents.Primitives do
           </div>
         </.hud_card>
 
-        <.hud_card title="Present" count={"#{length(@presence)} here"} modal_type="presence">
+        <.hud_card title="Here" count={Integer.to_string(length(@presence))} modal_type="presence">
           <div :if={@presence == []} style="font-size: 11px; color: var(--ink-faint);">
             (no one else)
           </div>

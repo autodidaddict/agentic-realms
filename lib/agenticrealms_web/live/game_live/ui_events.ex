@@ -28,7 +28,8 @@ defmodule AgenticRealmsWeb.GameLive.UIEvents do
     ]
 
   alias AgenticRealms.Accounts
-  alias AgenticRealms.World.{Direction, LevelCurve, Queries}
+  alias AgenticRealms.World.{Direction, Queries, Stats}
+  alias Srd.Rules.Experience
 
   alias AgenticRealms.World.UIEvents.{
     BehaviorUtterance,
@@ -58,41 +59,60 @@ defmodule AgenticRealmsWeb.GameLive.UIEvents do
 
   @pubsub AgenticRealms.PubSub
 
-  # ── Feature 019 — Real Stats progression notices ──────────────
+  # ── Feature 019/020 — progression notices ─────────────────────
   #
-  # Refresh the character sheet from the broadcast payload (no DB read — the
-  # deltas are authoritative and a re-query could race the :strong projector)
-  # and append the chat-window notice(s). Two events arrive in order: the xp
-  # gain (carries new_total) then, on level-up, the level notice.
+  # Two events arrive in order: the xp gain (carries new_total) then, on
+  # level-up, the level notice.
+  #
+  # An xp-only change moves nothing but the bar, so it is patched from the
+  # broadcast payload with no database read. A *level* change moves the
+  # proficiency bonus, the hitpoint maximum, the hit dice, and every proficient
+  # save and skill — far more than the payload carries — so the whole sheet is
+  # re-derived from the read model. That is one indexed read on a rare event.
   def stats_changed(socket, %PlayerStatsChanged{} = msg) do
     socket =
       socket
-      |> apply_xp(msg.new_total)
-      |> apply_level(msg.leveled_to)
+      |> refresh_stats(msg)
       |> xp_notice(msg.xp_gained)
       |> level_notice(msg.leveled_to)
 
     {:noreply, socket}
   end
 
-  defp apply_xp(socket, nil), do: socket
+  defp refresh_stats(socket, %PlayerStatsChanged{leveled_to: nil, new_total: nil}), do: socket
 
-  defp apply_xp(socket, new_total) do
-    p = LevelCurve.progress(new_total)
+  defp refresh_stats(socket, %PlayerStatsChanged{leveled_to: nil, new_total: new_total}) do
+    p = Experience.progress(new_total)
 
     stats =
       Map.merge(socket.assigns.stats, %{
         level: p.level,
-        xp: %{into_level: p.into_level, to_next: p.to_next, fraction: p.fraction}
+        xp: %{
+          total: new_total,
+          into_level: p.into_level,
+          to_next: p.to_next,
+          fraction: p.fraction,
+          maxed?: p.maxed?
+        }
       })
 
     assign(socket, :stats, stats)
   end
 
-  defp apply_level(socket, nil), do: socket
+  # A level change re-derives from the read model, but the broadcast's own
+  # level and total win: progression is published by an `:eventual` handler, so
+  # the projector may not have written them yet when this lands.
+  defp refresh_stats(socket, %PlayerStatsChanged{} = msg) do
+    overrides =
+      %{}
+      |> put_present(:level, msg.leveled_to)
+      |> put_present(:xp, msg.new_total)
 
-  defp apply_level(socket, level),
-    do: assign(socket, :stats, Map.put(socket.assigns.stats, :level, level))
+    assign(socket, :stats, Stats.for_player(socket.assigns.current_player.id, overrides))
+  end
+
+  defp put_present(map, _key, nil), do: map
+  defp put_present(map, key, value), do: Map.put(map, key, value)
 
   defp xp_notice(socket, nil), do: socket
 

@@ -10,6 +10,7 @@ defmodule AgenticRealms.World.Commands do
     * `move/2`  — Phase 5 (US2)
     * `take/2`  — Phase 6 (US3)
     * `drop/2`  — Phase 6 (US3)
+    * `ensure_character/1` — feature 020
   """
 
   import Ecto.Query
@@ -22,6 +23,7 @@ defmodule AgenticRealms.World.Commands do
     SpawnPlayer,
     MovePlayer,
     AwardXp,
+    CreateCharacter,
     CreateRegion,
     CreateRoom,
     AddExit,
@@ -36,6 +38,7 @@ defmodule AgenticRealms.World.Commands do
     RemoveEntity
   }
 
+  alias AgenticRealms.World.CharacterGen
   alias AgenticRealms.World.ContainerRef
 
   alias AgenticRealms.World.Blueprint.Slug
@@ -53,6 +56,7 @@ defmodule AgenticRealms.World.Commands do
     Blueprint,
     QuestInstance,
     Object,
+    PlayerState,
     NPCClone
   }
 
@@ -80,6 +84,48 @@ defmodule AgenticRealms.World.Commands do
           {:error, _} = err -> err
         end
     end
+  end
+
+  @doc """
+  Give a player their SRD character if they do not have one yet (feature 020).
+
+  Dispatched on every mount and idempotent at the aggregate, which guards on
+  whether a character already exists. `:strong` so `player_state` carries the
+  character before the caller reads the sheet.
+
+  Called *before* `spawn/2` so the row is born complete rather than existing
+  briefly with no character. `Queries.current_room_of/1` treats a row with no
+  current room the same as no row at all, so spawning still works against the
+  row this creates.
+  """
+  @spec ensure_character(integer()) ::
+          {:ok, :created | :already_created} | {:error, term()}
+  def ensure_character(player_id) when is_integer(player_id) do
+    if has_character?(player_id) do
+      {:ok, :already_created}
+    else
+      command =
+        CharacterGen.default()
+        |> Map.put(:player_id, player_id)
+        |> then(&struct!(CreateCharacter, &1))
+
+      case WorldApp.dispatch(command, consistency: :strong) do
+        :ok -> {:ok, :created}
+        {:error, _} = err -> err
+      end
+    end
+  end
+
+  # A read-model short-circuit so a returning player does not dispatch on every
+  # mount, the same shape `spawn/2` uses. The aggregate's own guard stays the
+  # authority — this only saves the round trip, and a race that slips past it
+  # still emits exactly one event.
+  defp has_character?(player_id) do
+    Repo.exists?(
+      from(ps in PlayerState,
+        where: ps.player_id == ^player_id and not is_nil(ps.species_slug)
+      )
+    )
   end
 
   @doc """

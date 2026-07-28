@@ -67,6 +67,46 @@ defmodule AgenticRealms.DataCase do
     region.id
   end
 
+  @doc """
+  The character columns a `player_state` row carries once `CharacterCreated`
+  has been projected, as a keyword list.
+
+  Feature 020 removed the schema's placeholder stat defaults, so a row built
+  straight from `%PlayerState{}` has no character and renders nothing. Tests
+  that only need *a* character — examine, presence, the sheet — should splat
+  this into their insert rather than restating the default Human Fighter:
+
+      Repo.insert!(struct!(PlayerState,
+        [player_id: p.id, current_room_id: room_id] ++ DataCase.character_columns()))
+
+  Pass overrides to vary one thing, e.g. `character_columns(level: 5)`.
+  """
+  def character_columns(overrides \\ []) do
+    character = AgenticRealms.World.CharacterGen.default()
+
+    defaults = [
+      species_slug: character.species_slug,
+      class_slug: character.class_slug,
+      background_slug: character.background_slug,
+      size: character.size,
+      str: character.abilities.str,
+      dex: character.abilities.dex,
+      con: character.abilities.con,
+      int: character.abilities.int,
+      wis: character.abilities.wis,
+      cha: character.abilities.cha,
+      level: 1,
+      xp: 0,
+      hp: character.max_hp,
+      max_hp: character.max_hp,
+      skill_proficiencies: character.skill_proficiencies,
+      save_proficiencies: character.save_proficiencies,
+      feat_slugs: character.feat_slugs
+    ]
+
+    Keyword.merge(defaults, overrides)
+  end
+
   setup tags do
     AgenticRealms.DataCase.setup_sandbox(tags)
     if tags[:commanded], do: AgenticRealms.DataCase.setup_commanded()
