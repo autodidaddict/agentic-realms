@@ -9,6 +9,7 @@ defmodule AgenticRealms.World.ExamineTest do
   use AgenticRealms.DataCase, async: false
 
   alias AgenticRealms.Accounts
+  alias AgenticRealms.DataCase
   alias AgenticRealms.World.Examine
   alias AgenticRealms.World.Examine.Match
   alias AgenticRealms.World.Schemas.{Object, PlayerState, Room, Blueprint, NPCClone}
@@ -56,10 +57,12 @@ defmodule AgenticRealms.World.ExamineTest do
   end
 
   defp place_in_room(player, room) do
-    Repo.insert!(%PlayerState{
-      player_id: player.id,
-      current_room_id: room.id
-    })
+    Repo.insert!(
+      struct!(
+        PlayerState,
+        [player_id: player.id, current_room_id: room.id] ++ DataCase.character_columns()
+      )
+    )
   end
 
   defp track_online(player) do
@@ -250,7 +253,14 @@ defmodule AgenticRealms.World.ExamineTest do
     test "offline players are not examinable", %{alice: alice, bob: bob, room: _room} do
       # Re-register Alice but DO NOT track her in presence
       offline = register_player("ghost")
-      Repo.insert!(%PlayerState{player_id: offline.id, current_room_id: bob_room_id(bob)})
+
+      Repo.insert!(
+        struct!(
+          PlayerState,
+          [player_id: offline.id, current_room_id: bob_room_id(bob)] ++
+            DataCase.character_columns()
+        )
+      )
 
       assert {:error, :no_such_target} =
                Examine.examine(alice.id, String.downcase(offline.username))

@@ -1,13 +1,17 @@
 defmodule AgenticRealmsWeb.GameComponents.PlayerModals do
   @moduledoc """
   The four player-facing modal surfaces wired to the HUD cards in the
-  player sidebar: Character (stats), Inventory, Quest Log, Present in
-  Room. Each one wraps the shared `<.modal>` shell from Primitives.
+  player sidebar: Character (stats), Inventory, Quest Log, and Here (who
+  else is in the room). Each one wraps the shared `<.modal>` shell from
+  Primitives.
   """
 
   use AgenticRealmsWeb, :html
 
-  import AgenticRealmsWeb.GameComponents.Primitives, only: [modal: 1, hp_bar: 1]
+  import AgenticRealmsWeb.GameComponents.Primitives,
+    only: [modal: 1, hp_bar: 1, xp_bar: 1, signed: 1, descriptor: 1]
+
+  alias Phoenix.LiveView.JS
 
   # ────────────────────────────────────────────────────────────
   # Stats Modal
@@ -15,45 +19,206 @@ defmodule AgenticRealmsWeb.GameComponents.PlayerModals do
 
   attr :stats, :map, required: true
 
+  @doc """
+  The character sheet: three tabs over the viewing player's own character.
+
+  Tab switching is client-side. Which tab is showing is not authoritative, not
+  persisted, and not broadcast, so sending it to the server would buy nothing —
+  all three panels render into the DOM and `JS.show/JS.hide` swaps them
+  (Principle III). Reopening the sheet therefore always lands on Main, because
+  the modal is unmounted on close.
+  """
   def stats_modal(assigns) do
     ~H"""
     <.modal title="Character Sheet" glyph="✧">
-      <div style="display: grid; grid-template-columns: 200px 1fr; gap: 32px; align-items: start;">
-        <div>
-          <div class="sigil" style="width: 80px; height: 80px; font-size: 44px;">
-            {String.upcase(String.first(@stats.name))}
-          </div>
-          <div style="margin-top: 14px;">
-            <div style="font-family: var(--serif); font-size: 22px; color: var(--ink); font-weight: 500;">
-              {@stats.name}
-            </div>
-            <div style="font-size: 11px; color: var(--ink-faint); text-transform: uppercase; letter-spacing: 0.14em; margin-top: 2px;">
-              {"Level #{@stats.level}"}
-            </div>
-          </div>
+      <div class="sheet-head">
+        <div class="sigil sheet-sigil">
+          {String.upcase(String.first(@stats.name))}
         </div>
         <div>
-          <div class="big-bar-block">
-            <.hp_bar label="Health" cur={@stats.hp.cur} max={@stats.hp.max} kind="hp" />
-          </div>
-          <div class="big-bar-block">
-            <.hp_bar label="Mana" cur={@stats.mana.cur} max={@stats.mana.max} kind="mp" />
-          </div>
-          <div class="big-bar-block">
-            <.hp_bar label="Experience" cur={@stats.xp.into_level} max={@stats.xp.to_next} kind="xp" />
-            <div style="font-size: 11px; color: var(--ink-faint); margin-top: 6px;">
-              {@stats.xp.to_next - @stats.xp.into_level} xp to level {@stats.level + 1}
-            </div>
-          </div>
-          <div class="stats-grid" style="margin-top: 22px;">
-            <div :for={score <- @stats.abilities} class="stat-row">
-              <span class="k">{score.name}</span>
-              <span class="v">{score.value}</span>
-            </div>
-          </div>
+          <div class="sheet-name">{@stats.name}</div>
+          <div class="sheet-descriptor">{descriptor(@stats)}</div>
         </div>
       </div>
+
+      <div class="sheet-tabs" role="tablist" aria-label="Character sheet sections">
+        <.sheet_tab tab="main" label="Main Stats" selected />
+        <.sheet_tab tab="abilities" label="Abilities" />
+        <.sheet_tab tab="spells" label="Spells" />
+      </div>
+
+      <div id="sheet-panel-main" role="tabpanel" aria-labelledby="sheet-tab-main">
+        <.main_panel stats={@stats} />
+      </div>
+
+      <div
+        id="sheet-panel-abilities"
+        role="tabpanel"
+        aria-labelledby="sheet-tab-abilities"
+        style="display: none;"
+      >
+        <.abilities_panel stats={@stats} />
+      </div>
+
+      <div
+        id="sheet-panel-spells"
+        role="tabpanel"
+        aria-labelledby="sheet-tab-spells"
+        style="display: none;"
+      >
+        <.spells_panel />
+      </div>
     </.modal>
+    """
+  end
+
+  attr :tab, :string, required: true
+  attr :label, :string, required: true
+  attr :selected, :boolean, default: false
+
+  defp sheet_tab(assigns) do
+    ~H"""
+    <button
+      id={"sheet-tab-#{@tab}"}
+      class={["sheet-tab", @selected && "active"]}
+      type="button"
+      role="tab"
+      aria-selected={to_string(@selected)}
+      aria-controls={"sheet-panel-#{@tab}"}
+      phx-click={select_tab(@tab)}
+    >
+      {@label}
+    </button>
+    """
+  end
+
+  # Show the chosen panel, hide the other two, and move the selected state
+  # across the tab strip. No server round trip.
+  defp select_tab(tab) do
+    Enum.reduce(~w(main abilities spells), %JS{}, fn other, js ->
+      if other == tab do
+        js
+        |> JS.show(to: "#sheet-panel-#{other}")
+        |> JS.add_class("active", to: "#sheet-tab-#{other}")
+        |> JS.set_attribute({"aria-selected", "true"}, to: "#sheet-tab-#{other}")
+      else
+        js
+        |> JS.hide(to: "#sheet-panel-#{other}")
+        |> JS.remove_class("active", to: "#sheet-tab-#{other}")
+        |> JS.set_attribute({"aria-selected", "false"}, to: "#sheet-tab-#{other}")
+      end
+    end)
+  end
+
+  # --- Main tab ------------------------------------------------------------
+
+  attr :stats, :map, required: true
+
+  defp main_panel(assigns) do
+    ~H"""
+    <div class="big-bar-block">
+      <.hp_bar label="Health" cur={@stats.hp.cur} max={@stats.hp.max} kind="hp" />
+    </div>
+    <div class="big-bar-block">
+      <.xp_bar xp={@stats.xp} />
+      <div class="sheet-xp-caption">
+        <%= if @stats.xp.maxed? do %>
+          Fully levelled
+        <% else %>
+          {@stats.xp.to_next - @stats.xp.into_level} xp to level {@stats.level + 1}
+        <% end %>
+      </div>
+    </div>
+
+    <div class="stats-grid sheet-details">
+      <.detail k="Armor Class" v={@stats.armor_class} />
+      <.detail k="Movement" v={"#{@stats.speed} ft."} />
+      <.detail k="Initiative" v={signed(@stats.initiative)} />
+      <.detail k="Size" v={String.capitalize(to_string(@stats.size))} />
+      <.detail k="Proficiency" v={signed(@stats.proficiency_bonus)} />
+      <.detail k="Hit Dice" v={"#{@stats.hit_dice.count}d#{@stats.hit_dice.sides}"} />
+      <.detail k="Passive Perception" v={@stats.passive_perception} />
+      <.detail k="Background" v={@stats.background && @stats.background.name} />
+    </div>
+    """
+  end
+
+  attr :k, :string, required: true
+  attr :v, :any, required: true
+
+  defp detail(assigns) do
+    ~H"""
+    <div class="stat-row">
+      <span class="k">{@k}</span>
+      <span class="v">{@v}</span>
+    </div>
+    """
+  end
+
+  # --- Abilities tab -------------------------------------------------------
+
+  attr :stats, :map, required: true
+
+  defp abilities_panel(assigns) do
+    ~H"""
+    <div class="sheet-section">
+      <div class="sheet-section-title">Ability Scores</div>
+      <div class="stats-grid">
+        <div :for={a <- @stats.abilities} class="stat-row">
+          <span class="k">{a.name}</span>
+          <span class="v">{a.score}</span>
+          <span class="sub">{signed(a.modifier)}</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="sheet-section">
+      <div class="sheet-section-title">Saving Throws</div>
+      <div class="stats-grid">
+        <div :for={sv <- @stats.saves} class="stat-row">
+          <span class="k">{sv.name}</span>
+          <span class="v">{signed(sv.modifier)}</span>
+          <.proficiency_mark proficient?={sv.proficient?} what={"#{sv.name} saving throw"} />
+        </div>
+      </div>
+    </div>
+
+    <div class="sheet-section">
+      <div class="sheet-section-title">Skills</div>
+      <div class="stats-grid">
+        <div :for={sk <- @stats.skills} class="stat-row">
+          <span class="k">{sk.name}</span>
+          <span class="v">{signed(sk.modifier)}</span>
+          <.proficiency_mark proficient?={sk.proficient?} what={sk.name} />
+        </div>
+      </div>
+    </div>
+    """
+  end
+
+  attr :proficient?, :boolean, required: true
+  attr :what, :string, required: true
+
+  # Proficiency is carried by the filled/hollow glyph and the label both, never
+  # by colour alone.
+  defp proficiency_mark(assigns) do
+    ~H"""
+    <span
+      class={["prof-mark", @proficient? && "on"]}
+      aria-label={"#{@what}: #{if @proficient?, do: "proficient", else: "not proficient"}"}
+    >
+      {if @proficient?, do: "●", else: "○"}
+    </span>
+    """
+  end
+
+  # --- Spells tab ----------------------------------------------------------
+
+  defp spells_panel(assigns) do
+    ~H"""
+    <div class="sheet-empty">
+      Spellcasting is not yet available.
+    </div>
     """
   end
 
@@ -141,7 +306,7 @@ defmodule AgenticRealmsWeb.GameComponents.PlayerModals do
   def presence_modal(assigns) do
     ~H"""
     <.modal
-      title="Present in Room"
+      title="Here"
       glyph="◈"
       foot_hint="Other players currently in this room."
     >

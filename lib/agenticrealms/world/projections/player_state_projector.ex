@@ -3,9 +3,10 @@ defmodule AgenticRealms.World.Projections.PlayerStateProjector do
   Projects player lifecycle events into the `player_state` read model.
 
   Event handler clauses added so far:
-    * Phase 4 (US1): PlayerSpawned → upsert player_state.current_room_id
-    * Phase 5 (US2): PlayerMoved   → update player_state.current_room_id
-                                     (with FR-022 nilify if target room gone)
+    * Phase 4 (US1): PlayerSpawned    → upsert player_state.current_room_id
+    * Phase 5 (US2): PlayerMoved      → update player_state.current_room_id
+                                        (with FR-022 nilify if target room gone)
+    * Feature 020:   CharacterCreated → upsert the character columns
 
   All upserts use `on_conflict: :replace_all` so replays are safe.
   """
@@ -23,17 +24,82 @@ defmodule AgenticRealms.World.Projections.PlayerStateProjector do
 
   alias AgenticRealms.Repo
   alias AgenticRealms.World.Commands, as: WorldCommands
-  alias AgenticRealms.World.Events.{PlayerSpawned, PlayerMoved, PlayerXpAwarded, PlayerLeveledUp}
+
+  alias AgenticRealms.World.Events.{
+    CharacterCreated,
+    PlayerSpawned,
+    PlayerMoved,
+    PlayerXpAwarded,
+    PlayerLeveledUp
+  }
+
   alias AgenticRealms.World.Schemas.{PlayerState, Room}
+
+  # Feature 020 — the character columns. An upsert, like the PlayerSpawned
+  # clause: `ensure_character/1` runs first at mount so this is normally the
+  # insert that creates the row, but neither clause may assume the other has
+  # run — a replay from position 0 can deliver them in either order.
+  #
+  # Every value is absolute and comes from the event, so re-handling is a no-op.
+  # The `on_conflict` set names only the character columns, so a redelivered
+  # CharacterCreated cannot reset current_room_id, xp, or level.
+  def handle(%CharacterCreated{} = e, _meta) do
+    now = utc_now()
+    abilities = normalize_abilities(e.abilities)
+
+    # What the event is authoritative about: who the character is. Set on
+    # insert and on conflict alike, because the event is the record of them.
+    identity = [
+      species_slug: e.species_slug,
+      class_slug: e.class_slug,
+      background_slug: e.background_slug,
+      size: e.size,
+      str: abilities.str,
+      dex: abilities.dex,
+      con: abilities.con,
+      int: abilities.int,
+      wis: abilities.wis,
+      cha: abilities.cha,
+      max_hp: e.max_hp,
+      skill_proficiencies: e.skill_proficiencies,
+      save_proficiencies: e.save_proficiencies,
+      feat_slugs: e.feat_slugs
+    ]
+
+    # What it only *seeds*: progression and current health. A redelivered or
+    # replayed CharacterCreated must never knock a level 7 player back to 1, so
+    # on conflict these are kept when already present and filled in only when
+    # PlayerSpawned made the row and left them empty.
+    seeded = [level: 1, xp: 0, hp: e.hp]
+
+    Repo.insert!(
+      struct!(
+        PlayerState,
+        [player_id: e.player_id, inserted_at: now, updated_at: now] ++ identity ++ seeded
+      ),
+      on_conflict:
+        from(ps in PlayerState,
+          update: [set: ^(identity ++ [updated_at: now])],
+          update: [
+            set: [
+              level: fragment("COALESCE(?, 1)", ps.level),
+              xp: fragment("COALESCE(?, 0)", ps.xp),
+              hp: fragment("COALESCE(?, ?)", ps.hp, ^e.hp)
+            ]
+          ]
+        ),
+      conflict_target: :player_id
+    )
+
+    :ok
+  end
 
   def handle(%PlayerSpawned{player_id: pid, room_id: room_id}, _meta) do
     now = utc_now()
 
-    # Feature 019 — Real Stats. Starting stats (abilities 12, level 1, xp 0,
-    # hp/mana 10/10) are seeded on first insert via the `PlayerState` schema
-    # field defaults. `on_conflict` intentionally sets ONLY current_room_id so
-    # a redelivered/replayed PlayerSpawned never resets a player's earned
-    # xp/level — those are updated by their own event clauses below.
+    # `on_conflict` intentionally sets ONLY current_room_id so a
+    # redelivered/replayed PlayerSpawned never resets a player's character or
+    # earned xp/level — those are written by their own event clauses.
     Repo.insert!(
       %PlayerState{
         player_id: pid,
@@ -104,6 +170,13 @@ defmodule AgenticRealms.World.Projections.PlayerStateProjector do
 
   defp room_exists?(room_id) do
     Repo.exists?(from(r in Room, where: r.id == ^room_id))
+  end
+
+  # Abilities come back from the event store with string keys.
+  defp normalize_abilities(abilities) do
+    Map.new(~w(str dex con int wis cha)a, fn key ->
+      {key, abilities[key] || Map.fetch!(abilities, Atom.to_string(key))}
+    end)
   end
 
   defp utc_now, do: DateTime.utc_now() |> DateTime.truncate(:second)

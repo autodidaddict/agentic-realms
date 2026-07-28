@@ -22,6 +22,24 @@ each point. See ADR-0004.
 - Spells are deliberately not here; they are large enough to belong in an
   optional package of their own. Casters are described but not complete.
 
+The derived layer: what follows from a character's choices, once they are made.
+Content says what may be chosen and this says what the choices come to, so a
+consumer never reimplements the arithmetic behind a character sheet.
+
+- `Srd.Character.derive/1` takes a character's facts and returns the sheet:
+  modifiers, proficiency bonus, saving throws, all eighteen skills, passive
+  perception, armor class, initiative, hit point maximum, hit dice, and progress
+  toward the next level. It holds no character, exactly as the content layer
+  holds none — a map in, a map out.
+- `Srd.Rules.Experience` carries the twenty-level table and the calculations
+  over it: `threshold/1`, `level_for_xp/1`, and `progress/1`, which reports the
+  absence of a next level at the cap rather than inventing one.
+- `Srd.Rules.Hitpoints` sizes the pool as well as tracking it: `starting/2`,
+  `per_level/2`, `maximum/3`, and `hit_dice/2`.
+- Smaller additions the sheet needed: `Ability.all/0`, `Ability.name/1`,
+  `Ability.standard_array/0`, `Skill.name/1`, `Save.modifier/3`, and
+  `Initiative.modifier/1`.
+
 ## [0.2.0]
 
 First working release, modeling SRD 5.2 by default with 5.1 rules as explicit

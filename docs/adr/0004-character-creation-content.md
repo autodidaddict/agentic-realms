@@ -252,3 +252,32 @@ growing a registry or a runtime content-loading path.
   Rejected: the spell catalog is larger than everything in this ADR combined, and
   every consumer would compile and carry it whether or not it casts. An optional
   companion package keeps the cost with the consumers who want it.
+
+## Amendment: the derived layer (2026-07-28, feature 020)
+
+The package now owns the calculations behind a character sheet, not only the
+content that feeds them. `Srd.Character.derive/1` takes a character's facts —
+species, class, background, level, ability scores, proficiencies — and returns
+what follows: modifiers, proficiency bonus, saving throws, skills, passive
+perception, armor class, initiative, hit point maximum, hit dice, and progress
+toward the next level. `Srd.Rules.Experience` carries the advancement table
+alongside it.
+
+The line this ADR drew is unchanged, and the amendment exists because the module
+name says otherwise at a glance. What was rejected above was a character builder
+that *holds choices and validates a finished build*. `derive/1` holds nothing,
+validates nothing, and constructs no struct. Facts in, numbers out, with the
+consumer still owning the character in its aggregates and read models. It is the
+same shape as `Srd.Content`'s "you pass in what you know and get back the
+options", applied to arithmetic instead of options.
+
+The reason to put it here rather than in the consumer is that the alternative
+splits one set of rules across two repositories. `Save.modifier/3` in the library
+while the saving-throw row is assembled in the game is an arbitrary boundary,
+and the half left behind is the half no other consumer can reuse.
+
+What the consumer still owns: persistence, and the *choices* a character makes.
+The SRD says a fighter picks two skills from a list; it does not say which two.
+Picking is the game's business, and the package supplies only the raw material —
+`Ability.standard_array/0`, `Background.spreads/0`, and each class's
+`skill_choice`.

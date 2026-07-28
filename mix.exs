@@ -68,7 +68,8 @@ defmodule AgenticRealms.MixProject do
       {:commanded_eventstore_adapter, "~> 1.4"},
       {:eventstore, "~> 1.4"},
       {:horde, "~> 0.9"},
-      {:req, "~> 0.5"}
+      {:req, "~> 0.5"},
+      {:srd_5e, path: "packages/srd_5e"}
     ]
   end
 

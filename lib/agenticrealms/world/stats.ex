@@ -1,56 +1,92 @@
 defmodule AgenticRealms.World.Stats do
   @moduledoc """
-  Feature 019 — Real Stats: the character-sheet read plus qualitative banding.
+  Feature 020 — the character-sheet read, plus the qualitative banding examine
+  uses.
 
-  `for_player/1` builds the character-sheet shape (contracts/read-and-display)
-  from the `player_state` read model and the `LevelCurve`. `health_tier/2` and
-  `relative_power/2` are pure banding helpers used by `Examine` — they surface
-  only qualitative bands, never the target's exact numbers (FR-020).
+  `for_player/1` is an adapter and nothing more: it reads the `player_state`
+  row, hands the facts to `Srd.Character.derive/1`, and merges in the two things
+  the SRD does not own — the player's name and their current hitpoints. Every
+  number on the sheet comes from the rules package; no SRD arithmetic happens in
+  this module or anywhere else in the game.
+
+  `health_tier/2` and `relative_power/2` are pure banding helpers used by
+  `Examine`. They surface only qualitative bands, never the target's exact
+  numbers (FR-025), and are unchanged from feature 019.
   """
 
   alias AgenticRealms.Accounts
   alias AgenticRealms.Repo
-  alias AgenticRealms.World.LevelCurve
   alias AgenticRealms.World.Schemas.PlayerState
+  alias Srd.Rules.Ability
+  alias Srd.Rules.Skill
 
-  @ability_order [
-    {:str, "Strength"},
-    {:dex, "Dexterity"},
-    {:con, "Constitution"},
-    {:int, "Intelligence"},
-    {:wis, "Wisdom"},
-    {:cha, "Charisma"}
-  ]
+  @sizes ~w(tiny small medium large huge gargantuan)a
 
   @doc """
-  The character-sheet shape for `player_id`:
+  The character-sheet shape for `player_id`.
 
-      %{name, level, xp: %{into_level, to_next, fraction},
-        hp: %{cur, max}, mana: %{cur, max},
-        abilities: [%{name, value}, ...]}   # 6, STR..CHA order, full names
+  Returns the map `Srd.Character.derive/1` produces, plus `:name`, `:hp` (the
+  current pool against its derived maximum), and `:xp` (the experience block,
+  named for the UI that renders it).
 
-  Falls back to schema defaults if the player has no `player_state` row yet
-  (mount spawns before reading, so this is only a safety net).
+  `overrides` may carry `:level` and `:xp` to derive against values the caller
+  knows are ahead of the read model. Progression is broadcast by an `:eventual`
+  handler, so a socket reacting to a level-up can hold the authoritative new
+  level before the projector has written it; passing it here avoids re-deriving
+  a sheet one level stale. Everything else still comes from the row.
+
+  Raises if the player has no character. `GameLive.mount` dispatches
+  `Commands.ensure_character/1` at `:strong` consistency before reading, so a
+  missing character here means the read model and the aggregate have diverged —
+  the same class of failure `mount` already raises on for a missing room.
   """
-  @spec for_player(term()) :: map()
-  def for_player(player_id) do
-    ps = Repo.get(PlayerState, player_id) || %PlayerState{}
-    progress = LevelCurve.progress(ps.xp)
+  @spec for_player(integer(), map()) :: map()
+  def for_player(player_id, overrides \\ %{}) do
+    ps = Repo.get(PlayerState, player_id) || missing!(player_id, "no player_state row")
 
-    %{
+    if is_nil(ps.species_slug) do
+      missing!(player_id, "player_state row has no character")
+    end
+
+    sheet =
+      ps
+      |> facts()
+      |> Map.merge(Map.take(overrides, [:level, :xp]))
+      |> Srd.Character.derive()
+
+    sheet
+    |> Map.delete(:experience)
+    |> Map.merge(%{
       name: player_name(player_id),
+      hp: %{cur: ps.hp, max: sheet.max_hit_points},
+      xp: sheet.experience
+    })
+  end
+
+  defp facts(%PlayerState{} = ps) do
+    %{
+      species: ps.species_slug,
+      class: ps.class_slug,
+      background: ps.background_slug,
+      size: to_known(ps.size, @sizes, "size"),
       level: ps.level,
-      xp: %{
-        into_level: progress.into_level,
-        to_next: progress.to_next,
-        fraction: progress.fraction
+      xp: ps.xp,
+      abilities: %{
+        str: ps.str,
+        dex: ps.dex,
+        con: ps.con,
+        int: ps.int,
+        wis: ps.wis,
+        cha: ps.cha
       },
-      hp: %{cur: ps.hp, max: ps.max_hp},
-      mana: %{cur: ps.mana, max: ps.max_mana},
-      abilities:
-        for {field, label} <- @ability_order do
-          %{name: label, value: Map.fetch!(ps, field)}
-        end
+      skill_proficiencies: Enum.map(ps.skill_proficiencies, &to_known(&1, Skill.all(), "skill")),
+      save_proficiencies:
+        Enum.map(ps.save_proficiencies, &to_known(&1, Ability.all(), "ability")),
+      # Equipment does not affect armor class this milestone, so every character
+      # is unarmored. The derived layer takes these explicitly rather than
+      # assuming, so combat can start passing real armor without changing this.
+      armor: nil,
+      shield: nil
     }
   end
 
@@ -90,10 +126,26 @@ defmodule AgenticRealms.World.Stats do
     end
   end
 
+  # The read model stores the SRD's vocabulary as strings. Resolving them
+  # against the known set rather than `String.to_existing_atom/1` is deliberate:
+  # that function depends on the atom already being in the table, which in turn
+  # depends on whether the rules module happens to have been loaded yet. Looking
+  # the value up in a list we just asked for both forces the load and rejects
+  # anything that is not real vocabulary.
+  defp to_known(value, known, kind) do
+    Enum.find(known, &(Atom.to_string(&1) == value)) ||
+      raise ArgumentError, "player_state holds an unknown #{kind}: #{inspect(value)}"
+  end
+
   defp player_name(player_id) do
     case Accounts.get_player(player_id) do
       nil -> "Adventurer"
       player -> player.username
     end
+  end
+
+  defp missing!(player_id, why) do
+    raise "Stats.for_player/1: #{why} for player #{player_id} — " <>
+            "ensure_character/1 must be dispatched before reading the sheet"
   end
 end

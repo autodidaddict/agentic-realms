@@ -145,6 +145,24 @@ config :agenticrealms, AgenticRealms.NpcMinds,
   npc_workflow_type: "NpcWorkflow",
   reconcile_interval_ms: 60_000
 
+# Feature 020 — SRD 5e Character Stats. Character creation is not interactive
+# yet, so every new character is generated from these defaults. This is the one
+# place they live: changing a value here changes what new characters are made
+# as, with no other code edit. Existing characters keep whatever their
+# CharacterCreated event recorded.
+#
+# `species_skill` fills Human's Skillful trait and `species_feat` its Versatile
+# trait, both of which the SRD leaves to the player. Perception is the most
+# broadly useful skill in play; Alert is the one origin feat with no sub-choice
+# of its own, and Soldier has already taken Savage Attacker.
+config :agenticrealms, :character_defaults,
+  species: "human",
+  class: "fighter",
+  background: "soldier",
+  size: :medium,
+  species_skill: :perception,
+  species_feat: "alert"
+
 # Import environment specific config. This must remain at the bottom
 # of this file so it overrides the configuration defined above.
 import_config "#{config_env()}.exs"

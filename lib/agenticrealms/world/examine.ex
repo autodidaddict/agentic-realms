@@ -92,7 +92,8 @@ defmodule AgenticRealms.World.Examine do
 
   defp enrich(%Match{target_kind: :npc, id: npc_id} = match, _examiner_id, examiner_level) do
     case Repo.get(NPCClone, npc_id) do
-      %NPCClone{hp: hp, max_hp: max_hp, level: level} ->
+      %NPCClone{hp: hp, max_hp: max_hp, level: level}
+      when is_integer(hp) and is_integer(max_hp) and is_integer(level) ->
         {_atom, sentence} = Stats.health_tier(hp, max_hp)
 
         %{
@@ -108,7 +109,12 @@ defmodule AgenticRealms.World.Examine do
 
   defp enrich(%Match{target_kind: :player, id: target_id} = match, examiner_id, examiner_level) do
     case Repo.get(PlayerState, target_id) do
-      %PlayerState{hp: hp, max_hp: max_hp, level: level} ->
+      # Feature 020 — a row with no character has nothing to describe. Mount
+      # creates one before anybody can look at anything, so this is the replay
+      # window rather than a state a player can reach; falling through leaves
+      # the match un-enriched instead of crashing the look.
+      %PlayerState{hp: hp, max_hp: max_hp, level: level}
+      when is_integer(hp) and is_integer(max_hp) and is_integer(level) ->
         {_atom, sentence} = Stats.health_tier(hp, max_hp)
 
         power =
@@ -127,7 +133,7 @@ defmodule AgenticRealms.World.Examine do
 
   defp player_level(player_id) do
     case Repo.get(PlayerState, player_id) do
-      %PlayerState{level: level} -> level
+      %PlayerState{level: level} when is_integer(level) -> level
       _ -> 1
     end
   end

@@ -41,6 +41,9 @@ defmodule AgenticRealmsWeb.XpLevelupFlowTest do
     suffix = System.unique_integer([:positive])
 
     {:ok, alice} = Accounts.register_player(%{username: "xp_#{suffix}", password: "pw12345678"})
+    # Feature 020 — mount creates the character before spawning; this setup
+    # bypasses mount, so it does the same two dispatches in the same order.
+    {:ok, _} = WorldCommands.ensure_character(alice.id)
     {:ok, _} = WorldCommands.spawn(alice.id, Seed.starting_room_id())
 
     conn =
@@ -51,7 +54,7 @@ defmodule AgenticRealmsWeb.XpLevelupFlowTest do
     %{conn: conn, alice: alice}
   end
 
-  test "orchard quest grants 100 xp → Level 2 + chat notices + live sheet",
+  test "orchard quest grants 300 xp → Level 2 + chat notices + live sheet",
        %{conn: conn, alice: alice} do
     # Fresh player: default stats.
     assert %PlayerState{level: 1, xp: 0} = Repo.get(PlayerState, alice.id)
@@ -73,11 +76,11 @@ defmodule AgenticRealmsWeb.XpLevelupFlowTest do
 
     # Projector lands the new xp/level (XpAwarder is :eventual → poll).
     assert_eventually(view, fn ->
-      match?(%PlayerState{level: 2, xp: 100}, Repo.get(PlayerState, alice.id))
+      match?(%PlayerState{level: 2, xp: 300}, Repo.get(PlayerState, alice.id))
     end)
 
     # Chat-window notices (FR-022, FR-023).
-    assert_eventually(view, fn -> render(view) =~ "You gain 100 experience." end)
+    assert_eventually(view, fn -> render(view) =~ "You gain 300 experience." end)
     assert_eventually(view, fn -> render(view) =~ "You are now level 2!" end)
 
     # The character sheet assign reflects Level 2 live.

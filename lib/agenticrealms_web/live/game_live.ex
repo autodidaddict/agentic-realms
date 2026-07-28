@@ -75,6 +75,12 @@ defmodule AgenticRealmsWeb.GameLive do
     player_id = socket.assigns.current_player.id
     username = socket.assigns.current_player.username
 
+    # Feature 020 — a character before a world. Idempotent at the aggregate, so
+    # all but the first mount are a read-model check and nothing more. Dispatched
+    # `:strong`, and *before* spawning, so the `player_state` row is born with a
+    # complete character rather than existing briefly with none.
+    {:ok, _} = Commands.ensure_character(player_id)
+
     :ok =
       case Commands.spawn(player_id, Seed.starting_room_id()) do
         {:ok, _} -> :ok

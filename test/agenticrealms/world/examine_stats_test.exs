@@ -9,6 +9,7 @@ defmodule AgenticRealms.World.ExamineStatsTest do
   alias AgenticRealms.Accounts
   alias AgenticRealms.World.Examine
   alias AgenticRealms.World.Examine.Match
+  alias AgenticRealms.DataCase
   alias AgenticRealms.World.Schemas.{Room, PlayerState, Blueprint, NPCClone}
   alias AgenticRealmsWeb.Presence
 
@@ -28,7 +29,13 @@ defmodule AgenticRealms.World.ExamineStatsTest do
   end
 
   defp place(player, room, attrs \\ %{}) do
-    Repo.insert!(struct(%PlayerState{player_id: player.id, current_room_id: room.id}, attrs))
+    Repo.insert!(
+      struct!(
+        PlayerState,
+        [player_id: player.id, current_room_id: room.id] ++
+          DataCase.character_columns(Enum.to_list(attrs))
+      )
+    )
   end
 
   defp online(player) do

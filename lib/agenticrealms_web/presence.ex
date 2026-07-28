@@ -7,7 +7,7 @@ defmodule AgenticRealmsWeb.Presence do
   emits a `joins` entry when a player's first tab connects, and a `leaves`
   entry when their last tab disconnects.
 
-  The Present HUD card in `GameLive` is NOT driven from this — that's
+  The Here HUD card in `GameLive` is NOT driven from this — that's
   per-room world state (from `AgenticRealms.World.Queries.other_occupants_of/2`).
   A future administrative `who` command will consume this presence list.
 

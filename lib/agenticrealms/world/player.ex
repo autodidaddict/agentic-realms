@@ -20,9 +20,19 @@ defmodule AgenticRealms.World.Player do
             # whether to emit a PlayerDiscoveredRoom event. See
             # `specs/012-maps/contracts/discovery.md`.
             discovered_room_ids: MapSet.new(),
-            # Feature 019 — Real Stats. Aggregate-owned; nil until PlayerSpawned
-            # seeds the documented defaults (abilities 12, level 1, xp 0, hp/mana
-            # 10/10). Plain integers — no snapshot-serialization treatment needed.
+            # Feature 020 — SRD 5e Character Stats. Who the character is, set
+            # once by CharacterCreated and nil until then. `species_slug` is the
+            # aggregate's "does a character exist yet" guard.
+            species_slug: nil,
+            class_slug: nil,
+            background_slug: nil,
+            size: nil,
+            skill_proficiencies: [],
+            save_proficiencies: [],
+            feat_slugs: [],
+            # Ability scores, progression and vitals. Aggregate-owned; nil until
+            # CharacterCreated. Plain integers — no snapshot-serialization
+            # treatment needed. Mana is gone: the SRD has no such resource.
             str: nil,
             dex: nil,
             con: nil,
@@ -33,35 +43,45 @@ defmodule AgenticRealms.World.Player do
             xp: nil,
             hp: nil,
             max_hp: nil,
-            mana: nil,
-            max_mana: nil,
             # Feature 019 — idempotency guard. award_ids already applied, so a
             # redelivered/replayed AwardXp is a no-op. Serialized like
             # discovered_room_ids (list on the wire, MapSet in memory).
             applied_award_ids: MapSet.new()
 
-  alias AgenticRealms.World.Commands.{SpawnPlayer, MovePlayer, RecordRoomDiscovery, AwardXp}
+  alias AgenticRealms.World.Commands.{
+    SpawnPlayer,
+    MovePlayer,
+    RecordRoomDiscovery,
+    AwardXp,
+    CreateCharacter
+  }
 
   alias AgenticRealms.World.Events.{
     PlayerSpawned,
     PlayerMoved,
     PlayerDiscoveredRoom,
     PlayerXpAwarded,
-    PlayerLeveledUp
+    PlayerLeveledUp,
+    CharacterCreated
   }
 
-  alias AgenticRealms.World.LevelCurve
+  alias Srd.Rules.Experience
 
   # --- SpawnPlayer --------------------------------------------------------
 
   @spec execute(
           %__MODULE__{},
-          %SpawnPlayer{} | %MovePlayer{} | %RecordRoomDiscovery{} | %AwardXp{}
+          %SpawnPlayer{}
+          | %MovePlayer{}
+          | %RecordRoomDiscovery{}
+          | %AwardXp{}
+          | %CreateCharacter{}
         ) ::
           %PlayerSpawned{}
           | %PlayerMoved{}
           | %PlayerDiscoveredRoom{}
           | %PlayerXpAwarded{}
+          | %CharacterCreated{}
           | [%PlayerXpAwarded{} | %PlayerLeveledUp{}]
           | :ok
           | {:error, atom()}
@@ -124,6 +144,35 @@ defmodule AgenticRealms.World.Player do
     end
   end
 
+  # --- CreateCharacter (feature 020) --------------------------------------
+  #
+  # Guarded on `species_slug`: a character is made once. GameLive dispatches
+  # this on every mount, so all but the first are no-ops — the same shape as
+  # RecordRoomDiscovery, where the aggregate is the authority on whether the
+  # thing has already happened.
+  #
+  # The command carries a fully-generated character. Nothing is looked up or
+  # defaulted here, so replaying this stream reproduces exactly the character
+  # that was created, no matter what the configured defaults have become since.
+
+  def execute(%__MODULE__{species_slug: nil}, %CreateCharacter{} = cmd) do
+    %CharacterCreated{
+      player_id: cmd.player_id,
+      species_slug: cmd.species_slug,
+      class_slug: cmd.class_slug,
+      background_slug: cmd.background_slug,
+      size: cmd.size,
+      abilities: cmd.abilities,
+      skill_proficiencies: cmd.skill_proficiencies,
+      save_proficiencies: cmd.save_proficiencies,
+      feat_slugs: cmd.feat_slugs,
+      hp: cmd.max_hp,
+      max_hp: cmd.max_hp
+    }
+  end
+
+  def execute(%__MODULE__{}, %CreateCharacter{}), do: :ok
+
   # --- AwardXp (feature 019) ----------------------------------------------
   #
   # Players only. Idempotent per `award_id` (a redelivered/replayed source
@@ -146,7 +195,7 @@ defmodule AgenticRealms.World.Player do
       true ->
         new_total = (state.xp || 0) + amount
         current_level = state.level || 1
-        new_level = LevelCurve.level_for_xp(new_total)
+        new_level = Experience.level_for_xp(new_total)
 
         awarded = %PlayerXpAwarded{
           player_id: pid,
@@ -175,25 +224,39 @@ defmodule AgenticRealms.World.Player do
           | %PlayerDiscoveredRoom{}
           | %PlayerXpAwarded{}
           | %PlayerLeveledUp{}
+          | %CharacterCreated{}
         ) :: %__MODULE__{}
   def apply(%__MODULE__{} = state, %PlayerSpawned{player_id: pid, room_id: room_id}) do
-    # Feature 019 — seed the documented starting stats on spawn.
+    # Feature 020 — spawning means "entered the world", nothing more. Stats
+    # arrive with CharacterCreated, which is the event that means a character
+    # exists. Seeding placeholders here would let a spawned-but-uncreated player
+    # look like a real character.
+    %__MODULE__{state | id: pid, current_room_id: room_id}
+  end
+
+  def apply(%__MODULE__{} = state, %CharacterCreated{} = e) do
+    abilities = normalize_abilities(e.abilities)
+
     %__MODULE__{
       state
-      | id: pid,
-        current_room_id: room_id,
-        str: 12,
-        dex: 12,
-        con: 12,
-        int: 12,
-        wis: 12,
-        cha: 12,
+      | id: e.player_id,
+        species_slug: e.species_slug,
+        class_slug: e.class_slug,
+        background_slug: e.background_slug,
+        size: e.size,
+        skill_proficiencies: e.skill_proficiencies,
+        save_proficiencies: e.save_proficiencies,
+        feat_slugs: e.feat_slugs,
+        str: abilities.str,
+        dex: abilities.dex,
+        con: abilities.con,
+        int: abilities.int,
+        wis: abilities.wis,
+        cha: abilities.cha,
         level: 1,
         xp: 0,
-        hp: 10,
-        max_hp: 10,
-        mana: 10,
-        max_mana: 10
+        hp: e.hp,
+        max_hp: e.max_hp
     }
   end
 
@@ -216,6 +279,14 @@ defmodule AgenticRealms.World.Player do
 
   def apply(%__MODULE__{} = state, %PlayerLeveledUp{to_level: to_level}) do
     %__MODULE__{state | level: to_level}
+  end
+
+  # Abilities survive the event store as a JSON object, so they come back with
+  # string keys. Same treatment discovered_room_ids gets on the way in.
+  defp normalize_abilities(abilities) do
+    Map.new(~w(str dex con int wis cha)a, fn key ->
+      {key, abilities[key] || Map.fetch!(abilities, Atom.to_string(key))}
+    end)
   end
 end
 

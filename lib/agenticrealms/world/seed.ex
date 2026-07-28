@@ -527,8 +527,10 @@ defmodule AgenticRealms.World.Seed do
           "name" => "bigger golden apple",
           "description" =>
             "An impossibly large golden apple, warm to the touch, the prize of Amaranth's private cellar.",
-          # Feature 019 — 100 xp lands a fresh player exactly at Level 2.
-          "xp" => 100
+          # Feature 020 — rescaled to the SRD 5.2 table, where level 2 is at
+          # 300. Preserves feature 019's intent that the first quest is worth
+          # exactly one level.
+          "xp" => 300
         }
       }
     ]
