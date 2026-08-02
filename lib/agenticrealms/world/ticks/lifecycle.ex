@@ -19,6 +19,7 @@ defmodule AgenticRealms.World.Ticks.Lifecycle do
   alias AgenticRealms.Repo
   alias AgenticRealms.World.Queries
   alias AgenticRealms.World.Schemas.Room
+  alias AgenticRealms.World.Ticks.Registry
   alias AgenticRealms.World.Ticks.Supervisor, as: TicksSupervisor
 
   alias AgenticRealms.World.UIEvents.{
@@ -70,13 +71,50 @@ defmodule AgenticRealms.World.Ticks.Lifecycle do
     # Lazy subscription on first-arrival doesn't work for moves: the
     # first arrival event IS the signal that's broadcast on a topic we
     # haven't subscribed to yet.
+    #
+    # Occupancy and the started-scheduler set are rebuilt from authority
+    # rather than accumulated from zero. Both are derived state: who is live
+    # in a room comes from `Queries.live_occupants_of/1` (read model ∩
+    # Presence) and which rooms already tick comes from the Horde registry.
+    # Without this a restarted Lifecycle believes every room is empty, and
+    # since the stop path is guarded on `started_schedulers` it would never
+    # stop the schedulers it had forgotten — leaving them ticking an empty
+    # room until somebody walked back in. Principle VI: a supervised process
+    # rebuilds its state rather than relying on never crashing.
+    rooms = Repo.all(Room) |> Enum.map(& &1.id)
+
     state =
-      Repo.all(Room)
-      |> Enum.reduce(%__MODULE__{}, fn %Room{id: room_id}, st ->
-        ensure_room_subscription(st, room_id)
+      Enum.reduce(rooms, %__MODULE__{}, fn room_id, st ->
+        st
+        |> ensure_room_subscription(room_id)
+        |> seed_room(room_id)
       end)
 
-    {:ok, state}
+    # Then reconcile what was seeded against what should be running. This is
+    # the same decision the arrival and departure paths make, so a restart
+    # converges in both directions: a room that gained occupants while we were
+    # down gets a scheduler, and one that emptied loses the one it had.
+    {:ok, Enum.reduce(rooms, state, &occupancy_changed(&2, &1))}
+  end
+
+  # One room's live occupants and whether it already has a Scheduler.
+  defp seed_room(state, room_id) do
+    occupants = room_id |> Queries.live_occupants_of() |> MapSet.new()
+
+    state =
+      case Registry.lookup(room_id) do
+        {:ok, _pid} ->
+          %{state | started_schedulers: MapSet.put(state.started_schedulers, room_id)}
+
+        :error ->
+          state
+      end
+
+    if MapSet.size(occupants) == 0 do
+      state
+    else
+      %{state | live_per_room: Map.put(state.live_per_room, room_id, occupants)}
+    end
   end
 
   @impl true

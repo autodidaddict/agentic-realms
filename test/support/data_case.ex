@@ -194,6 +194,11 @@ defmodule AgenticRealms.DataCase do
     # Feature 017 — transient-region reaper. Idle for non-transient tests (its
     # periodic sweep fires only after the production interval); transient tests
     # drive it synchronously via `Transient.Manager.sweep_now/0`.
+    #
+    # The registry supplies the manager's cluster-wide name. In production Horde
+    # also places it (one per cluster); a test runs a single node, so supervising
+    # it directly here is enough and keeps the harness flat.
+    ExUnit.Callbacks.start_supervised!(AgenticRealms.World.Transient.Registry)
     ExUnit.Callbacks.start_supervised!(AgenticRealms.World.Transient.Manager)
     :ok
   end
