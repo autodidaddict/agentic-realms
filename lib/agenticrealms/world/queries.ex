@@ -72,6 +72,19 @@ defmodule AgenticRealms.World.Queries do
   end
 
   @doc """
+  The full `NPCClone` rows in `room_id`, ordered by name.
+
+  `list_npcs_in_room/1` selects only what a room listing renders. Callers that
+  need the whole row — NPC chat wants `lore` — take this rather than mapping
+  `Repo.get/2` over the listing, which cost one query per NPC.
+  """
+  @spec list_npc_clones_in_room(String.t()) :: [NPCClone.t()]
+  def list_npc_clones_in_room(room_id) when is_binary(room_id) do
+    from(c in NPCClone, where: c.room_id == ^room_id, order_by: c.name)
+    |> Repo.all()
+  end
+
+  @doc """
   Fetch the behaviors list attached to a room (feature 009).
 
   Returns `{:ok, behaviors_list}` (which may be `[]`) or

@@ -11,6 +11,7 @@ defmodule AgenticRealms.World.Quests do
 
   import Ecto.Query
 
+  alias AgenticRealms.World.EventData
   alias AgenticRealms.Repo
   alias AgenticRealms.World.Schemas.{Object, QuestInstance}
 
@@ -45,8 +46,8 @@ defmodule AgenticRealms.World.Quests do
     |> Enum.map(fn inst ->
       %{
         quest_id: inst.id,
-        title: snapshot_get(inst.definition_snapshot, "title"),
-        narrative: snapshot_get(inst.definition_snapshot, "narrative"),
+        title: EventData.get(inst.definition_snapshot, "title"),
+        narrative: EventData.get(inst.definition_snapshot, "narrative"),
         criteria: progress_for(inst)
       }
     end)
@@ -66,9 +67,9 @@ defmodule AgenticRealms.World.Quests do
     |> Enum.map(fn inst ->
       %{
         quest_id: inst.id,
-        title: snapshot_get(inst.definition_snapshot, "title"),
+        title: EventData.get(inst.definition_snapshot, "title"),
         completed_at: inst.completed_at,
-        reward_name: snapshot_get(inst.definition_snapshot, ["reward", "name"])
+        reward_name: EventData.get(inst.definition_snapshot, ["reward", "name"])
       }
     end)
   end
@@ -100,12 +101,12 @@ defmodule AgenticRealms.World.Quests do
       |> Repo.all()
 
     snapshot
-    |> snapshot_get("criteria")
+    |> EventData.get("criteria")
     |> List.wrap()
     |> Enum.map(fn criterion ->
-      tag = snapshot_get(criterion, "quest_tag")
-      target = snapshot_get(criterion, "target_count") || 0
-      name = snapshot_get(criterion, "name") || ""
+      tag = EventData.get(criterion, "quest_tag")
+      target = EventData.get(criterion, "target_count") || 0
+      name = EventData.get(criterion, "name") || ""
       count = Enum.count(inventory_items, fn obj -> has_quest_tag?(obj, tag) end)
       %{name: name, count: count, target: target}
     end)
@@ -138,9 +139,9 @@ defmodule AgenticRealms.World.Quests do
           |> Repo.all()
           |> Enum.filter(fn inst ->
             inst.definition_snapshot
-            |> snapshot_get("criteria")
+            |> EventData.get("criteria")
             |> List.wrap()
-            |> Enum.any?(fn c -> snapshot_get(c, "quest_tag") in tags end)
+            |> Enum.any?(fn c -> EventData.get(c, "quest_tag") in tags end)
           end)
         end
     end
@@ -152,33 +153,6 @@ defmodule AgenticRealms.World.Quests do
   # keys regardless of how it was written (Postgres jsonb -> Elixir map).
   # We support atom-keyed lookups too for defensive parity in case the
   # value ever arrives via the eventstore atom-keying path.
-  defp snapshot_get(nil, _), do: nil
-
-  defp snapshot_get(map, key) when is_map(map) and is_binary(key) do
-    case Map.get(map, key) do
-      nil ->
-        # Last-ditch atom-key fallback. The atom must exist for this to
-        # be reachable, which is fine because every key we use here is
-        # also referenced as a literal atom elsewhere in this module.
-        try do
-          Map.get(map, String.to_existing_atom(key))
-        rescue
-          ArgumentError -> nil
-        end
-
-      v ->
-        v
-    end
-  end
-
-  defp snapshot_get(map, [k | rest]) when is_map(map) do
-    case snapshot_get(map, k) do
-      nil -> nil
-      next -> snapshot_get(next, rest)
-    end
-  end
-
-  defp snapshot_get(value, []), do: value
 
   defp has_quest_tag?(_, nil), do: false
 

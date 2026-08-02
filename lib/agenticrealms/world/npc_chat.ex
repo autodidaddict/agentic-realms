@@ -21,10 +21,8 @@ defmodule AgenticRealms.World.NPCChat do
   See `specs/010-npc-conversations/contracts/npc_chat_api.md`.
   """
 
-  alias AgenticRealms.Repo
   alias AgenticRealms.World.NPCChat.{Registry, Supervisor}
   alias AgenticRealms.World.Queries
-  alias AgenticRealms.World.Schemas.NPCClone
 
   @max_message_length 500
 
@@ -82,12 +80,9 @@ defmodule AgenticRealms.World.NPCChat do
   defp resolve_npc(room_id, token) do
     needle = String.trim(token) |> String.downcase()
 
-    clones =
-      Queries.list_npcs_in_room(room_id)
-      # The room-list query returns name + short_description only — fetch the
-      # full clones row so we can pass `lore` into the Conversation.
-      |> Enum.map(&Repo.get(NPCClone, &1.id))
-      |> Enum.reject(&is_nil/1)
+    # The whole row, not the room listing's projection — the Conversation needs
+    # `lore`. One query; this used to be one per NPC in the room.
+    clones = Queries.list_npc_clones_in_room(room_id)
 
     exact = Enum.filter(clones, fn c -> String.downcase(c.name) == needle end)
 
