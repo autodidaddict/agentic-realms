@@ -3,14 +3,48 @@ defmodule AgenticRealms.World.Communication.RecipientResolverTest do
   Unit tests for case-insensitive recipient resolution shared by tell/whisper.
   Covers FR-010 (case-insensitive exact match, ambiguous refusal) and
   FR-010a (self-target refusal).
+
+  Feature 021 — players are resolved by their character's name, so every
+  fixture here registers an account and then gives it a character to be
+  addressed by. The account username is no longer a way to reach anyone.
   """
   use AgenticRealms.DataCase, async: false
+
+  @moduletag :commanded
 
   alias AgenticRealms.Accounts
   alias AgenticRealms.World.Communication.RecipientResolver
 
+  # A character with a name that collides with one already in use. The creation
+  # path refuses this, and rightly — but FR-013 permits it to arise from two
+  # confirmations racing, so the resolver still has to cope. Written straight
+  # into the projection because that is the only way to reach the state.
+  defp collide!(name) do
+    {:ok, p} =
+      Accounts.register_player(%{
+        username: "login_#{System.unique_integer([:positive])}",
+        password: "pw12345678"
+      })
+
+    AgenticRealms.Repo.insert!(
+      struct!(
+        AgenticRealms.World.Schemas.PlayerState,
+        [player_id: p.id] ++ AgenticRealms.DataCase.character_columns(character_name: name)
+      )
+    )
+
+    p
+  end
+
+  # `name` becomes the character's name; the login is incidental and different.
   defp register!(name) do
-    {:ok, p} = Accounts.register_player(%{username: name, password: "pw12345678"})
+    {:ok, p} =
+      Accounts.register_player(%{
+        username: "login_#{System.unique_integer([:positive])}",
+        password: "pw12345678"
+      })
+
+    AgenticRealms.DataCase.create_character!(p.id, name: name)
     p
   end
 
@@ -19,7 +53,7 @@ defmodule AgenticRealms.World.Communication.RecipientResolverTest do
     alice = register!("alice_#{suffix}")
     sender = register!("sender_#{suffix}")
 
-    assert {:ok, %{id: id, username: name}} =
+    assert {:ok, %{id: id, name: name}} =
              RecipientResolver.resolve("alice_#{suffix}", sender.id)
 
     assert id == alice.id
@@ -31,7 +65,7 @@ defmodule AgenticRealms.World.Communication.RecipientResolverTest do
     alice = register!("Alice_#{suffix}")
     sender = register!("sender_#{suffix}")
 
-    assert {:ok, %{id: id, username: "Alice_" <> _}} =
+    assert {:ok, %{id: id, name: "Alice_" <> _}} =
              RecipientResolver.resolve("alice_#{suffix}", sender.id)
 
     assert id == alice.id
@@ -57,20 +91,21 @@ defmodule AgenticRealms.World.Communication.RecipientResolverTest do
     # matching the sender id; with multiple rows, ambiguous wins.
     suffix = unique()
     sender = register!("carol_#{suffix}")
-    _other = register!("CAROL_#{suffix}")
+    _other = collide!("CAROL_#{suffix}")
 
     # With two matches, ambiguous (not self_target) — because the case clause
     # checks `[%{id: ^sender_id}]` (singleton) before `[_ | _]`.
     assert {:error, :ambiguous} = RecipientResolver.resolve("carol_#{suffix}", sender.id)
   end
 
-  test ":ambiguous when two players share a case-insensitive username" do
-    # AgenticRealms.Accounts.Player.unique_constraint is case-sensitive, so
-    # `bob_X` and `BOB_X` can both be registered.
+  test ":ambiguous when two characters share a case-insensitive name" do
+    # Creation refuses a name already in use, so this state can only arise from
+    # the race FR-013 permits. The resolver still has to handle it rather than
+    # picking one of the two arbitrarily.
     suffix = unique()
     sender = register!("sender_#{suffix}")
     _bob = register!("bob_#{suffix}")
-    _bob_caps = register!("BOB_#{suffix}")
+    _bob_caps = collide!("BOB_#{suffix}")
 
     assert {:error, :ambiguous} = RecipientResolver.resolve("bob_#{suffix}", sender.id)
   end

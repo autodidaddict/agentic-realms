@@ -39,7 +39,9 @@ defmodule AgenticRealmsWeb.GameLiveOfflineFilterTest do
     {:ok, kevin} = Accounts.register_player(%{username: "kevin_off", password: "pw12345678"})
 
     starting = Seed.starting_room_id()
+    AgenticRealms.DataCase.create_character!(alice.id, name: alice.username)
     {:ok, _} = Commands.spawn(alice.id, starting)
+    AgenticRealms.DataCase.create_character!(kevin.id, name: kevin.username)
     {:ok, _} = Commands.spawn(kevin.id, starting)
 
     alice_conn =

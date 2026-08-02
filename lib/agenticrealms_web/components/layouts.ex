@@ -90,6 +90,10 @@ defmodule AgenticRealmsWeb.Layouts do
                 )
               }
             >
+              <%!-- The account menu, so this is the owner reading their own
+                    login. Feature 021 moved the world to character names, and
+                    SC-012 forbids showing a username to any player *other than*
+                    its owner; this is the exception it names. --%>
               {@current_player.username}
               <.icon name="hero-chevron-down-mini" class="ar-nav-chevron" />
             </button>

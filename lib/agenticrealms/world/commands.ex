@@ -10,7 +10,7 @@ defmodule AgenticRealms.World.Commands do
     * `move/2`  — Phase 5 (US2)
     * `take/2`  — Phase 6 (US3)
     * `drop/2`  — Phase 6 (US3)
-    * `ensure_character/1` — feature 020
+    * `create_character/2` — feature 021
   """
 
   import Ecto.Query
@@ -38,8 +38,10 @@ defmodule AgenticRealms.World.Commands do
     RemoveEntity
   }
 
+  alias AgenticRealms.World.CharacterDraft
   alias AgenticRealms.World.CharacterGen
   alias AgenticRealms.World.ContainerRef
+  alias AgenticRealms.World.PlayerNames
 
   alias AgenticRealms.World.Blueprint.Slug
 
@@ -87,40 +89,74 @@ defmodule AgenticRealms.World.Commands do
   end
 
   @doc """
-  Give a player their SRD character if they do not have one yet (feature 020).
+  Create a player's character from the choices they made (feature 021).
 
-  Dispatched on every mount and idempotent at the aggregate, which guards on
-  whether a character already exists. `:strong` so `player_state` carries the
-  character before the caller reads the sheet.
+  Three steps:
 
-  Called *before* `spawn/2` so the row is born complete rather than existing
-  briefly with no character. `Queries.current_room_of/1` treats a row with no
-  current room the same as no row at all, so spawning still works against the
-  row this creates.
+  1. **Complete** the draft. A draft only carries the choices a shipped user
+     story asked for, so while later stories are unshipped it arrives without
+     ability scores, skill picks, or a lineage. `CharacterGen.complete/1` fills
+     exactly what the player was not asked, from the same options the rules
+     package offers. This is what lets a story ship on its own; without it
+     nothing could be created until every step of the dialog existed.
+  2. **Validate** the completed draft. Every rule is unconditional because the
+     validator only ever sees a whole character. Generated fills come from the
+     offered options, so they cannot fail — every error a player sees is about
+     something they entered.
+  3. **Create** the character, `:strong`, so `player_state` carries it before
+     the caller enters the world and reads the sheet.
+
+  ## Names are checked, not reserved
+
+  Between the availability check and the projection there is a window in which
+  two players confirming the same name both succeed. The window is milliseconds
+  wide and the consequence is cosmetic — two characters share a name, and
+  addressing one by name is ambiguous until somebody renames.
+
+  Closing it needs something atomic across the cluster, and the two ways to get
+  that both cost more than the problem. A uniqueness aggregate turns creation
+  into a two-phase commit with a compensating command and a claim that can
+  outlive a dying node. A unique index needs a reservation table written outside
+  a projector. Neither is worth carrying to prevent a rare cosmetic collision,
+  so this checks and moves on.
   """
-  @spec ensure_character(integer()) ::
-          {:ok, :created | :already_created} | {:error, term()}
-  def ensure_character(player_id) when is_integer(player_id) do
-    if has_character?(player_id) do
-      {:ok, :already_created}
-    else
-      command =
-        CharacterGen.default()
-        |> Map.put(:player_id, player_id)
-        |> then(&struct!(CreateCharacter, &1))
+  @spec create_character(integer(), CharacterDraft.t()) ::
+          {:ok, :created}
+          | {:error, :name_taken}
+          | {:error, [{atom(), String.t()}]}
+          | {:error, term()}
+  def create_character(player_id, %CharacterDraft{} = draft) when is_integer(player_id) do
+    complete = CharacterGen.complete(draft)
 
-      case WorldApp.dispatch(command, consistency: :strong) do
-        :ok -> {:ok, :created}
-        {:error, _} = err -> err
-      end
+    with :ok <- CharacterDraft.Validator.validate(complete),
+         :ok <- name_available(complete.name),
+         :ok <- create(player_id, complete) do
+      {:ok, :created}
     end
   end
 
-  # A read-model short-circuit so a returning player does not dispatch on every
-  # mount, the same shape `spawn/2` uses. The aggregate's own guard stays the
-  # authority — this only saves the round trip, and a race that slips past it
-  # still emits exactly one event.
-  defp has_character?(player_id) do
+  defp name_available(name) do
+    if PlayerNames.taken?(name), do: {:error, :name_taken}, else: :ok
+  end
+
+  defp create(player_id, draft) do
+    command =
+      draft
+      |> CharacterGen.payload()
+      |> Map.put(:player_id, player_id)
+      |> then(&struct!(CreateCharacter, &1))
+
+    WorldApp.dispatch(command, consistency: :strong)
+  end
+
+  @doc """
+  Whether a player already has a character.
+
+  What `GameLive` mounts on: no character means the creation dialog rather than
+  the world.
+  """
+  @spec has_character?(integer()) :: boolean()
+  def has_character?(player_id) when is_integer(player_id) do
     Repo.exists?(
       from(ps in PlayerState,
         where: ps.player_id == ^player_id and not is_nil(ps.species_slug)

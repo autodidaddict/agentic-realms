@@ -12,9 +12,9 @@ defmodule AgenticRealms.World.NPCChat.Context do
   See `specs/010-npc-conversations/contracts/context.md`.
   """
 
-  alias AgenticRealms.Accounts
   alias AgenticRealms.Repo
   alias AgenticRealms.World.NPCChat.{SystemPrompt, Tools}
+  alias AgenticRealms.World.PlayerNames
   alias AgenticRealms.World.Queries
   alias AgenticRealms.World.Quests
   alias AgenticRealms.World.Schemas.{Blueprint, QuestInstance}
@@ -71,8 +71,6 @@ defmodule AgenticRealms.World.NPCChat.Context do
           {:ok, snapshot()} | {:error, :no_current_room}
   def snapshot(player_id, npc_clone) when is_integer(player_id) do
     with {:ok, room_view} <- Queries.look_room(player_id) do
-      player = Accounts.get_player!(player_id)
-
       {:ok,
        %{
          npc_name: npc_clone.name,
@@ -81,7 +79,7 @@ defmodule AgenticRealms.World.NPCChat.Context do
          room_description: room_view.description,
          other_players: Enum.map(room_view.other_players, &display_name/1),
          objects: Enum.map(room_view.objects, &object_entry/1),
-         player_name: player.username,
+         player_name: PlayerNames.get(player_id),
          # Feature 013 — per-(viewer, NPC) quest context. Empty maps when
          # the NPC has no catalog and the player has no history with it,
          # in which case SystemPrompt omits the entire Quests section.
@@ -226,8 +224,8 @@ defmodule AgenticRealms.World.NPCChat.Context do
     end)
   end
 
-  defp display_name(%{username: u}), do: u
-  defp display_name(u) when is_binary(u), do: u
+  defp display_name(%{name: n}), do: n
+  defp display_name(n) when is_binary(n), do: n
 
   defp object_entry(%{name: n, short_description: s}) do
     %{name: n, short_description: truncate(s, @object_short_desc_limit)}

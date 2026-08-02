@@ -90,12 +90,29 @@ defmodule AgenticRealmsWeb.GameComponents.Primitives do
   attr :title, :string, required: true
   attr :glyph, :string, default: nil
   attr :foot_hint, :string, default: nil
+
+  attr :dismissable, :boolean,
+    default: true,
+    doc: """
+    Whether the modal offers a way out. When false, all three are omitted: the
+    Escape binding, the click-catching backdrop, and the ✕ button. Feature 021's
+    character creation needs this — a character comes before a world, so there
+    is nothing to go back to — and leaving the controls rendered would show a
+    close button that silently does nothing, since `close_modal` only clears the
+    `@modal` assign that dialog does not use.
+    """
+
   slot :inner_block, required: true
 
   def modal(assigns) do
     ~H"""
-    <div class="gm-backdrop" phx-window-keydown="close_modal" phx-key="Escape">
+    <div
+      class="gm-backdrop"
+      phx-window-keydown={@dismissable && "close_modal"}
+      phx-key={@dismissable && "Escape"}
+    >
       <div
+        :if={@dismissable}
         class="gm-backdrop-click"
         phx-click="close_modal"
         style="position: absolute; inset: 0; z-index: 0;"
@@ -106,14 +123,16 @@ defmodule AgenticRealmsWeb.GameComponents.Primitives do
             <span :if={@glyph} class="glyph">{@glyph}</span>
             <span>{@title}</span>
           </div>
-          <button class="gm-close" phx-click="close_modal" aria-label="Close">✕</button>
+          <button :if={@dismissable} class="gm-close" phx-click="close_modal" aria-label="Close">
+            ✕
+          </button>
         </div>
         <div class="gm-body">
           {render_slot(@inner_block)}
         </div>
         <div :if={@foot_hint} class="gm-foot-hint">
           <span>{@foot_hint}</span>
-          <span><span class="kbd">esc</span> to close</span>
+          <span :if={@dismissable}><span class="kbd">esc</span> to close</span>
         </div>
       </div>
     </div>
@@ -223,7 +242,7 @@ defmodule AgenticRealmsWeb.GameComponents.Primitives do
           </div>
           <div :for={p <- @presence} class="presence-row">
             <span class="presence-dot" />
-            <span>{p.username}</span>
+            <span>{p.name}</span>
           </div>
         </.hud_card>
       <% end %>

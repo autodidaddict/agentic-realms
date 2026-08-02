@@ -24,22 +24,22 @@ defmodule AgenticRealms.World.WizardTrance do
   @pubsub AgenticRealms.PubSub
 
   @spec enter(integer(), String.t(), String.t()) :: :ok
-  def enter(wizard_id, wizard_username, room_id)
-      when is_integer(wizard_id) and is_binary(wizard_username) and is_binary(room_id) do
+  def enter(wizard_id, wizard_name, room_id)
+      when is_integer(wizard_id) and is_binary(wizard_name) and is_binary(room_id) do
     Phoenix.PubSub.broadcast(@pubsub, Topics.room_topic(room_id), %RoomTranceEntered{
       room_id: room_id,
       wizard_id: wizard_id,
-      wizard_username: wizard_username
+      wizard_name: wizard_name
     })
   end
 
   @spec exit(integer(), String.t(), String.t()) :: :ok
-  def exit(wizard_id, wizard_username, room_id)
-      when is_integer(wizard_id) and is_binary(wizard_username) and is_binary(room_id) do
+  def exit(wizard_id, wizard_name, room_id)
+      when is_integer(wizard_id) and is_binary(wizard_name) and is_binary(room_id) do
     Phoenix.PubSub.broadcast(@pubsub, Topics.room_topic(room_id), %RoomTranceExited{
       room_id: room_id,
       wizard_id: wizard_id,
-      wizard_username: wizard_username
+      wizard_name: wizard_name
     })
   end
 end

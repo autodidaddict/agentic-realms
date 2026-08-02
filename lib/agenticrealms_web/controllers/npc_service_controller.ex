@@ -124,7 +124,7 @@ defmodule AgenticRealmsWeb.NpcServiceController do
     players =
       Enum.map(
         Queries.list_players_in_room(room_id),
-        &%{id: Integer.to_string(&1.id), kind: "player", name: &1.username}
+        &%{id: Integer.to_string(&1.id), kind: "player", name: &1.name}
       )
 
     npcs ++ objects ++ players

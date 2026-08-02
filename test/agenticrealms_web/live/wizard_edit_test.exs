@@ -34,7 +34,9 @@ defmodule AgenticRealmsWeb.WizardEditTest do
 
     {:ok, _} = Accounts.promote_to_wizard(wizard.id)
     {:ok, _} = Accounts.promote_to_wizard(second_wizard.id)
+    AgenticRealms.DataCase.create_character!(wizard.id, name: wizard.username)
     {:ok, _} = Commands.spawn(wizard.id, Seed.starting_room_id())
+    AgenticRealms.DataCase.create_character!(second_wizard.id, name: second_wizard.username)
     {:ok, _} = Commands.spawn(second_wizard.id, Seed.starting_room_id())
 
     slug = "edit_loop_chest_#{suffix}"

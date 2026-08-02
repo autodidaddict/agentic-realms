@@ -5,49 +5,58 @@
   is_wizard={@is_wizard}
 >
   <div class="app" id="game-root" phx-hook=".ThemeSwitch">
-    <%= if @mode == :player do %>
-      <.player_view
-        log={@log}
-        stats={@stats}
-        inventory={@inventory}
-        quests={@quests}
-        presence={@presence}
-        input={@input}
-        streaming={@streaming}
-        map_open={@map_open}
-        map_view={@map_view}
-        input_locked={@input_locked}
-        tweaks={@tweaks}
-      />
-
-      <.stats_modal :if={@modal == :stats} stats={@stats} />
-      <.inventory_modal :if={@modal == :inv} inventory={@inventory} />
-      <.quest_modal
-        :if={@modal == :quests}
-        quests={@quests}
-        completed_quests={@completed_quests}
-      />
-      <.presence_modal :if={@modal == :presence} presence={@presence} />
+    <%= if @phase == :creating do %>
+      <%!-- Feature 021 — a character before a world. The pane behind the dialog
+            is deliberately empty rather than a dimmed game: the player has not
+            been spawned, so there is no room, no inventory, and nothing to
+            play. --%>
+      <div class="cc-void" aria-hidden="true"></div>
+      <.character_creation_modal draft={@draft} />
     <% else %>
-      <.wizard_authoring_view
-        authoring_mode={@authoring_mode}
-        focused_blueprint_draft={@focused_blueprint_draft}
-        focused_object_draft={@focused_object_draft}
-        focused_object_edit={@focused_object_edit}
-        focused_npc_edit={@focused_npc_edit}
-        object_blueprints={@object_blueprints}
-        blueprint_filter={@blueprint_filter}
-        behavior_groups={@behavior_groups}
-        room_objects={@room_objects}
-        room_npcs={@room_npcs}
-        wizard_prompt={@wizard_prompt}
-        wizard_input_locked={@wizard_input_locked}
-        blueprint_commit_error={@blueprint_commit_error}
-        current_room_id={@current_room_id}
-        current_room_name={@current_room_name}
-        last_spawn={@last_spawn}
-        tweaks={@tweaks}
-      />
+      <%= if @mode == :player do %>
+        <.player_view
+          log={@log}
+          stats={@stats}
+          inventory={@inventory}
+          quests={@quests}
+          presence={@presence}
+          input={@input}
+          streaming={@streaming}
+          map_open={@map_open}
+          map_view={@map_view}
+          input_locked={@input_locked}
+          tweaks={@tweaks}
+        />
+
+        <.stats_modal :if={@modal == :stats} stats={@stats} />
+        <.inventory_modal :if={@modal == :inv} inventory={@inventory} />
+        <.quest_modal
+          :if={@modal == :quests}
+          quests={@quests}
+          completed_quests={@completed_quests}
+        />
+        <.presence_modal :if={@modal == :presence} presence={@presence} />
+      <% else %>
+        <.wizard_authoring_view
+          authoring_mode={@authoring_mode}
+          focused_blueprint_draft={@focused_blueprint_draft}
+          focused_object_draft={@focused_object_draft}
+          focused_object_edit={@focused_object_edit}
+          focused_npc_edit={@focused_npc_edit}
+          object_blueprints={@object_blueprints}
+          blueprint_filter={@blueprint_filter}
+          behavior_groups={@behavior_groups}
+          room_objects={@room_objects}
+          room_npcs={@room_npcs}
+          wizard_prompt={@wizard_prompt}
+          wizard_input_locked={@wizard_input_locked}
+          blueprint_commit_error={@blueprint_commit_error}
+          current_room_id={@current_room_id}
+          current_room_name={@current_room_name}
+          last_spawn={@last_spawn}
+          tweaks={@tweaks}
+        />
+      <% end %>
     <% end %>
   </div>
 

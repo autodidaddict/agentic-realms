@@ -50,6 +50,12 @@ defmodule AgenticRealms.World.Projections.PlayerStateProjector do
     # What the event is authoritative about: who the character is. Set on
     # insert and on conflict alike, because the event is the record of them.
     identity = [
+      # Feature 021 — the player's own choices. Set on insert and on conflict
+      # alike, like every other identity column: the event is the record of who
+      # the character is, so re-handling it can only write the same values.
+      character_name: e.character_name,
+      lineage_slug: e.lineage_slug,
+      choices: e.choices || %{},
       species_slug: e.species_slug,
       class_slug: e.class_slug,
       background_slug: e.background_slug,

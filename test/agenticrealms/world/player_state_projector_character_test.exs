@@ -24,6 +24,7 @@ defmodule AgenticRealms.World.PlayerStateProjectorCharacterTest do
     Map.merge(
       %CharacterCreated{
         player_id: player_id,
+        character_name: "Gandalf",
         species_slug: "human",
         class_slug: "fighter",
         background_slug: "soldier",
@@ -32,6 +33,8 @@ defmodule AgenticRealms.World.PlayerStateProjectorCharacterTest do
         skill_proficiencies: ["athletics", "perception"],
         save_proficiencies: ["con", "str"],
         feat_slugs: ["alert"],
+        lineage_slug: nil,
+        choices: %{"feature:Fighting Style" => ["defense"]},
         hp: 12,
         max_hp: 12
       },
@@ -177,6 +180,58 @@ defmodule AgenticRealms.World.PlayerStateProjectorCharacterTest do
       assert ps.current_room_id == room.id
       assert ps.species_slug == "human"
       assert ps.str == 17
+    end
+  end
+
+  describe "feature 021 — the player's own choices reach the row" do
+    test "the name, lineage, and choices map round-trip through the event" do
+      player = register_player()
+
+      :ok =
+        PlayerStateProjector.handle(
+          created_event(player.id, %{
+            character_name: "Legolas",
+            lineage_slug: "wood-elf",
+            choices: %{
+              "feature:Weapon Mastery" => ["longbow", "shortsword"],
+              "background_tool" => ["dice-set"]
+            }
+          }),
+          %{}
+        )
+
+      ps = row(player.id)
+
+      assert ps.character_name == "Legolas"
+      assert ps.lineage_slug == "wood-elf"
+      assert ps.choices["feature:Weapon Mastery"] == ["longbow", "shortsword"]
+      assert ps.choices["background_tool"] == ["dice-set"]
+    end
+
+    test "a species with no lineage stores nil rather than a placeholder" do
+      player = register_player()
+
+      :ok = PlayerStateProjector.handle(created_event(player.id, %{lineage_slug: nil}), %{})
+
+      assert row(player.id).lineage_slug == nil
+    end
+
+    test "an empty choices map is stored as an empty map, not null" do
+      player = register_player()
+
+      :ok = PlayerStateProjector.handle(created_event(player.id, %{choices: %{}}), %{})
+
+      assert row(player.id).choices == %{}
+    end
+
+    test "re-handling replaces the choices rather than merging them" do
+      player = register_player()
+      event = created_event(player.id, %{choices: %{"a" => ["one"]}})
+
+      :ok = PlayerStateProjector.handle(event, %{})
+      :ok = PlayerStateProjector.handle(event, %{})
+
+      assert row(player.id).choices == %{"a" => ["one"]}
     end
   end
 end

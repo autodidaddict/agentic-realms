@@ -85,7 +85,10 @@ defmodule AgenticRealms.DataCase do
     character = AgenticRealms.World.CharacterGen.default()
 
     defaults = [
+      character_name: character.character_name,
       species_slug: character.species_slug,
+      lineage_slug: character.lineage_slug,
+      choices: character.choices,
       class_slug: character.class_slug,
       background_slug: character.background_slug,
       size: character.size,
@@ -105,6 +108,40 @@ defmodule AgenticRealms.DataCase do
     ]
 
     Keyword.merge(defaults, overrides)
+  end
+
+  @doc """
+  Give a player a character through the real creation path (feature 021).
+
+  Needed by any test that mounts `/play`: a player with no character now gets
+  the creation dialog rather than the world, which is the point of the feature.
+  Requires Commanded, so tag the test `:commanded`.
+
+  Pass a name to make a player addressable by it, and any of `:species`,
+  `:class`, or `:background` to vary the character.
+  """
+  def create_character!(player_id, opts \\ []) do
+    alias AgenticRealms.World.CharacterDraft, as: Draft
+
+    name = Keyword.get(opts, :name, "Hero#{player_id}")
+
+    draft =
+      Draft.new()
+      |> Draft.put_name(name)
+      |> Draft.put_selection(:species, Keyword.get(opts, :species, "human"))
+      |> Draft.put_selection(:class, Keyword.get(opts, :class, "fighter"))
+      |> Draft.put_selection(:background, Keyword.get(opts, :background, "soldier"))
+
+    case AgenticRealms.World.PlayerNames.get(player_id) do
+      # Idempotent: a fixture that runs twice for one player returns the name
+      # they already have rather than colliding with it.
+      existing when is_binary(existing) ->
+        existing
+
+      nil ->
+        {:ok, :created} = AgenticRealms.World.Commands.create_character(player_id, draft)
+        name
+    end
   end
 
   setup tags do

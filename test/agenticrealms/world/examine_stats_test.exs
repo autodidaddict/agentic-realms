@@ -33,7 +33,9 @@ defmodule AgenticRealms.World.ExamineStatsTest do
       struct!(
         PlayerState,
         [player_id: player.id, current_room_id: room.id] ++
-          DataCase.character_columns(Enum.to_list(attrs))
+          DataCase.character_columns(
+            Keyword.put_new(Enum.to_list(attrs), :character_name, player.username)
+          )
       )
     )
   end

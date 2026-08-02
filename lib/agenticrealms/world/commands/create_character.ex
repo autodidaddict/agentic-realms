@@ -8,13 +8,18 @@ defmodule AgenticRealms.World.Commands.CreateCharacter do
   records what was actually created and changing the configured defaults later
   cannot rewrite what past players were made as.
 
-  Idempotent at the aggregate: dispatched on every mount, it emits only the
-  first time. Interactive creation will dispatch this same command with values
-  the player chose instead of values the configuration chose.
+  Idempotent at the aggregate: dispatched once per confirmation, it emits only
+  the first time.
+
+  Feature 021 — the values are now the player's own. `AgenticRealms.World.
+  Commands.create_character/2` completes their draft, validates it, claims the
+  name, and dispatches this. Generation still fills whatever the dialog has not
+  learned to ask.
   """
 
   @enforce_keys [
     :player_id,
+    :character_name,
     :species_slug,
     :class_slug,
     :background_slug,
@@ -27,14 +32,19 @@ defmodule AgenticRealms.World.Commands.CreateCharacter do
   ]
   defstruct [
     :player_id,
+    :character_name,
     :species_slug,
     :class_slug,
     :background_slug,
     :size,
+    # nil for the four species that offer no lineage.
+    :lineage_slug,
     :abilities,
     :skill_proficiencies,
     :save_proficiencies,
     :feat_slugs,
-    :max_hp
+    :max_hp,
+    # Picks with no typed field: tools, weapon masteries, feature options.
+    choices: %{}
   ]
 end

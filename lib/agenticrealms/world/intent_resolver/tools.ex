@@ -133,7 +133,7 @@ defmodule AgenticRealms.World.IntentResolver.Tools do
           "properties" => %{
             "recipient" => %{
               "type" => "string",
-              "description" => "The recipient's display name (username). Case-insensitive."
+              "description" => "The recipient's character name. Case-insensitive."
             },
             "text" => %{"type" => "string", "description" => "The private message text."}
           },

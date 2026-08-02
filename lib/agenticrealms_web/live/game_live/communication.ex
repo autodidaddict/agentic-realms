@@ -44,7 +44,7 @@ defmodule AgenticRealmsWeb.GameLive.Communication do
     sender = sender_context(socket)
 
     case Communication.whisper(sender, recipient, message) do
-      {:ok, %{recipient_username: rname}} ->
+      {:ok, %{recipient_name: rname}} ->
         {:noreply,
          append_log(socket, %{
            kind: :private_whisper_out,
@@ -89,7 +89,7 @@ defmodule AgenticRealmsWeb.GameLive.Communication do
     sender = sender_context(socket)
 
     case Communication.tell(sender, recipient, message) do
-      {:ok, %{recipient_username: rname}} ->
+      {:ok, %{recipient_name: rname}} ->
         {:noreply,
          append_log(socket, %{
            kind: :private_tell_out,
@@ -205,7 +205,7 @@ defmodule AgenticRealmsWeb.GameLive.Communication do
   defp sender_context(socket) do
     %{
       id: socket.assigns.current_player.id,
-      username: socket.assigns.current_player.username,
+      name: socket.assigns.stats.name,
       session_id: socket.assigns.session_id,
       room_id: socket.assigns.current_room_id
     }

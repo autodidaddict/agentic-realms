@@ -25,11 +25,19 @@ defmodule AgenticRealms.World.Schemas.PlayerState do
 
     belongs_to :current_room, AgenticRealms.World.Schemas.Room, type: :binary_id
 
+    # Feature 021 — what the player is called in the world. Replaces the account
+    # username everywhere another player can see it; the username stays a login
+    # credential. Nullable at the database because either projector clause may
+    # create the row, not because a character may go unnamed.
+    field :character_name, :string
+
     # Who the character is. Slugs into the SRD content catalog.
     field :species_slug, :string
     field :class_slug, :string
     field :background_slug, :string
     field :size, :string
+    # nil for the four species that offer no lineage.
+    field :lineage_slug, :string
 
     # Ability scores, as chosen at creation.
     field :str, :integer
@@ -51,6 +59,12 @@ defmodule AgenticRealms.World.Schemas.PlayerState do
     field :save_proficiencies, {:array, :string}, default: []
     # Recorded, not applied — feats have no mechanical effect this milestone.
     field :feat_slugs, {:array, :string}, default: []
+
+    # Feature 021 — the picks with no typed column of their own: tool
+    # proficiencies, weapon masteries, feature options. Keyed by the stable key
+    # `Srd.Character.choices/1` assigns, so a new kind of choice needs no
+    # migration. Recorded, not applied, for the same reason feats are.
+    field :choices, :map, default: %{}
 
     timestamps(type: :utc_datetime)
   end

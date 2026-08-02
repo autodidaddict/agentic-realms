@@ -335,7 +335,7 @@ defmodule AgenticRealms.World.Ticks.SchedulerTest do
       send(pid, %RoomPlayerArrived{
         room_id: room.id,
         actor_id: player.id,
-        actor_username: player.username,
+        actor_name: player.username,
         from_direction: nil,
         carried_object_ids: [obj.id]
       })
@@ -352,7 +352,7 @@ defmodule AgenticRealms.World.Ticks.SchedulerTest do
       send(pid, %RoomPlayerLeft{
         room_id: room.id,
         actor_id: player.id,
-        actor_username: player.username,
+        actor_name: player.username,
         to_direction: :north,
         carried_object_ids: [obj.id]
       })

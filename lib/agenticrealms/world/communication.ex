@@ -13,7 +13,7 @@ defmodule AgenticRealms.World.Communication do
   All four functions accept a `sender` map sourced from a `GameLive` socket's
   assigns:
 
-      %{id: integer(), username: binary(), session_id: reference(), room_id: binary()}
+      %{id: integer(), name: binary(), session_id: reference(), room_id: binary()}
 
   Validation order is fixed: trim → non-empty → length cap (500 chars) →
   recipient resolution (tell/whisper) → self-target check → scope/Presence
@@ -35,7 +35,7 @@ defmodule AgenticRealms.World.Communication do
   """
   @type sender :: %{
           required(:id) => integer(),
-          required(:username) => binary(),
+          required(:name) => binary(),
           required(:session_id) => reference(),
           required(:room_id) => binary()
         }
@@ -59,7 +59,7 @@ defmodule AgenticRealms.World.Communication do
       event = %RoomUtterance{
         room_id: sender.room_id,
         actor_id: sender.id,
-        actor_username: sender.username,
+        actor_name: sender.name,
         actor_session_id: sender.session_id,
         kind: :say,
         text: trimmed,
@@ -87,19 +87,19 @@ defmodule AgenticRealms.World.Communication do
   rule for the sender (FR-018) without any session-id filter.
   """
   @spec whisper(sender(), recipient_name :: String.t(), String.t()) ::
-          {:ok, %{recipient_id: integer(), recipient_username: binary()}}
+          {:ok, %{recipient_id: integer(), recipient_name: binary()}}
           | {:error,
              :empty | :too_long | :not_found | :ambiguous | :self_target | :recipient_not_in_room}
   def whisper(%{} = sender, recipient_name, text)
       when is_binary(recipient_name) and is_binary(text) do
     with {:ok, trimmed} <- trim_and_validate(text),
-         {:ok, %{id: rid, username: rname}} <-
+         {:ok, %{id: rid, name: rname}} <-
            RecipientResolver.resolve(recipient_name, sender.id),
          :ok <- ensure_in_room(rid, sender.room_id, sender.id) do
       event = %RoomUtterance{
         room_id: sender.room_id,
         actor_id: sender.id,
-        actor_username: sender.username,
+        actor_name: sender.name,
         actor_session_id: sender.session_id,
         kind: :whisper,
         text: trimmed,
@@ -107,7 +107,7 @@ defmodule AgenticRealms.World.Communication do
       }
 
       broadcast_room(sender.room_id, event)
-      {:ok, %{recipient_id: rid, recipient_username: rname}}
+      {:ok, %{recipient_id: rid, recipient_name: rname}}
     end
   end
 
@@ -123,25 +123,25 @@ defmodule AgenticRealms.World.Communication do
   neutral "could not be delivered" refusal that does not reveal presence.
   """
   @spec tell(sender(), recipient_name :: String.t(), String.t()) ::
-          {:ok, %{recipient_id: integer(), recipient_username: binary()}}
+          {:ok, %{recipient_id: integer(), recipient_name: binary()}}
           | {:error,
              :empty | :too_long | :not_found | :ambiguous | :self_target | :not_deliverable}
   def tell(%{} = sender, recipient_name, text)
       when is_binary(recipient_name) and is_binary(text) do
     with {:ok, trimmed} <- trim_and_validate(text),
-         {:ok, %{id: rid, username: rname}} <-
+         {:ok, %{id: rid, name: rname}} <-
            RecipientResolver.resolve(recipient_name, sender.id),
          :ok <- ensure_online(rid) do
       event = %PrivateUtterance{
         actor_id: sender.id,
-        actor_username: sender.username,
+        actor_name: sender.name,
         recipient_id: rid,
         kind: :tell,
         text: trimmed
       }
 
       broadcast_private(rid, event)
-      {:ok, %{recipient_id: rid, recipient_username: rname}}
+      {:ok, %{recipient_id: rid, recipient_name: rname}}
     end
   end
 
@@ -160,7 +160,7 @@ defmodule AgenticRealms.World.Communication do
       event = %RoomUtterance{
         room_id: sender.room_id,
         actor_id: sender.id,
-        actor_username: sender.username,
+        actor_name: sender.name,
         actor_session_id: sender.session_id,
         kind: :emote,
         text: with_punct,

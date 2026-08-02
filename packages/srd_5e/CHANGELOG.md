@@ -40,6 +40,30 @@ consumer never reimplements the arithmetic behind a character sheet.
   `Ability.standard_array/0`, `Skill.name/1`, `Save.modifier/3`, and
   `Initiative.modifier/1`.
 
+What a character still has to decide, which is what a builder asks before a
+character exists. The counterpart to `derive/1`: one says what follows from the
+choices, this says which choices are still open.
+
+- `Srd.Character.choices/1` takes a species, class, and background and returns
+  every pick-N-of-M decision they leave open at a level, each tagged with a
+  stable key, its source, its label, and the `Choice` itself. Settled choices
+  and choices the SRD defers to a higher level are omitted, so a dwarf returns
+  no lineage question and a level 1 character is never asked for a subclass.
+- `Srd.Character.grants/1` returns what those three grant outright — skills,
+  saving throws, feats, tool proficiencies, and the features in force at a
+  level, a granted feat's own features included — deduplicated, so a feat
+  granted twice appears once. Which abilities a background may raise is
+  deliberately not among them: that is the set an increase may be spent on
+  rather than something granted, and the background already carries it.
+- A choice with no more options than picks is settled rather than open, so
+  `choices/1` omits it and `grants/1` reports it. Between them every decision
+  the content carries is either answered or asked, and none is dropped.
+- `Srd.Content.Choice` gains a `:size` kind, so a species that may be more than
+  one size offers that as a choice like any other.
+
+Both take selections and return options. Neither holds a character, a partial
+build, or any state, so the line ADR-0004 drew is unchanged.
+
 ## [0.2.0]
 
 First working release, modeling SRD 5.2 by default with 5.1 rules as explicit

@@ -29,7 +29,17 @@ defmodule AgenticRealmsWeb.GameLive do
 
   use AgenticRealmsWeb.GameComponents
 
-  alias AgenticRealms.World.{Commands, CommandParser, MapView, Queries, Quests, Seed, Stats}
+  alias AgenticRealms.World.{
+    CharacterDraft,
+    Commands,
+    CommandParser,
+    MapView,
+    PlayerNames,
+    Queries,
+    Quests,
+    Seed,
+    Stats
+  }
 
   alias AgenticRealms.World.UIEvents.{
     RoomPlayerArrived,
@@ -54,7 +64,15 @@ defmodule AgenticRealmsWeb.GameLive do
     PrivateUtterance
   }
 
-  alias AgenticRealmsWeb.GameLive.{Communication, Helpers, PlayerCommands, UIEvents, Wizard}
+  alias AgenticRealmsWeb.GameLive.{
+    Communication,
+    Creation,
+    Helpers,
+    PlayerCommands,
+    UIEvents,
+    Wizard
+  }
+
   alias AgenticRealmsWeb.Presence
   alias AgenticRealmsWeb.Topics
 
@@ -72,14 +90,30 @@ defmodule AgenticRealmsWeb.GameLive do
 
   @impl true
   def mount(_params, _session, socket) do
-    player_id = socket.assigns.current_player.id
-    username = socket.assigns.current_player.username
+    # Feature 021 — a character before a world, and the character is the
+    # player's own. A player without one gets the creation dialog over an inert
+    # pane rather than a world, because there is no world for them yet: nothing
+    # is spawned, no room is loaded, and nothing is subscribed to until they
+    # confirm.
+    if Commands.has_character?(socket.assigns.current_player.id) do
+      {:ok, enter_world(socket)}
+    else
+      {:ok,
+       socket
+       |> assign(:phase, :creating)
+       |> assign(:draft, CharacterDraft.new())
+       |> assign(:mode, :player)
+       |> assign(:is_wizard, socket.assigns.current_player.is_wizard)
+       |> assign(:tweaks, build_tweaks(socket.assigns.current_player))}
+    end
+  end
 
-    # Feature 020 — a character before a world. Idempotent at the aggregate, so
-    # all but the first mount are a read-model check and nothing more. Dispatched
-    # `:strong`, and *before* spawning, so the `player_state` row is born with a
-    # complete character rather than existing briefly with none.
-    {:ok, _} = Commands.ensure_character(player_id)
+  # Everything from spawning onward. Extracted from `mount/3` because the
+  # creation dialog needs the same sequence after the player confirms their
+  # character, and two copies of it would drift.
+  defp enter_world(socket) do
+    player_id = socket.assigns.current_player.id
+    character_name = PlayerNames.get(player_id)
 
     :ok =
       case Commands.spawn(player_id, Seed.starting_room_id()) do
@@ -110,7 +144,9 @@ defmodule AgenticRealmsWeb.GameLive do
         Phoenix.PubSub.subscribe(@pubsub, Topics.blueprints_topic())
       end
 
-      {:ok, _} = Presence.track_player(self(), player_id, username)
+      # Feature 021 — presence carries the character name, which is what other
+      # players see. The account username is a login credential and nothing more.
+      {:ok, _} = Presence.track_player(self(), player_id, character_name)
 
       # Feature 009 — fire `player_entered` behaviors for this session's
       # arrival in the player's current room. Behaviors fire on EVERY
@@ -124,99 +160,162 @@ defmodule AgenticRealmsWeb.GameLive do
       )
     end
 
-    {:ok,
-     socket
-     |> assign(:mode, :player)
-     # Feature 014 — wizard authorization + trance mode. `:is_wizard`
-     # is the FR-WIZ-1 flag; `:authoring_mode` is the world/blueprints
-     # sub-mode within Wizard view (only meaningful when :is_wizard
-     # and :mode == :wizard). Non-wizards never see the top-bar Wizard
-     # switch (FR-WIZ-3), enforced by the layout.
-     |> assign(:is_wizard, socket.assigns.current_player.is_wizard)
-     |> assign(
-       :authoring_mode,
-       if(socket.assigns.current_player.is_wizard, do: :world, else: nil)
-     )
-     |> assign(:focused_object_id, nil)
-     |> assign(:focused_blueprint_id, nil)
-     # Feature 014 US1 — blueprint authoring state. Populated by the
-     # LLM resolver on submit_wizard_prompt; refined by the wizard via
-     # form fields; committed via commit_blueprint_draft (US1) or
-     # edited in place via the edit flow that lands in US5.
-     |> assign(:focused_blueprint_draft, nil)
-     |> assign(:focused_object_draft, nil)
-     |> assign(:focused_object_edit, nil)
-     |> assign(:focused_npc_edit, nil)
-     |> assign(:wizard_prompt, "")
-     |> assign(:wizard_resolver_task, nil)
-     |> assign(:wizard_input_locked, false)
-     |> assign(:blueprint_commit_error, nil)
-     |> assign(:last_spawn, nil)
-     |> assign(:current_room_name, Map.get(room_view, :name))
-     |> assign(
-       :object_blueprints,
-       if(socket.assigns.current_player.is_wizard, do: Queries.list_blueprint_rows(), else: [])
-     )
-     # Feature 015 US8 — unified registry kind filter (:all | :object | :npc).
-     |> assign(:blueprint_filter, :all)
-     # Feature 015 — behavior_groups available to attach to an NPC blueprint draft.
-     |> assign(
-       :behavior_groups,
-       if(socket.assigns.current_player.is_wizard,
-         do: AgenticRealms.World.BehaviorGroups.list_for(:npc),
-         else: []
-       )
-     )
-     |> assign(
-       :room_objects,
-       if(socket.assigns.current_player.is_wizard,
-         do: Queries.list_objects_in_room_for_wizard(current_room_id),
-         else: []
-       )
-     )
-     # Feature 015 US6 — in-room NPCs the wizard can extract a blueprint from.
-     |> assign(
-       :room_npcs,
-       if(socket.assigns.current_player.is_wizard,
-         do: Queries.list_npcs_in_room(current_room_id),
-         else: []
-       )
-     )
-     |> assign(:modal, nil)
-     |> assign(:map_open, false)
-     |> assign(:map_view, MapView.for_player(player_id))
-     |> assign(:log, [%{kind: :room, room: room_view}])
-     |> assign(:current_room_id, current_room_id)
-     |> assign(:input, "")
-     |> assign(:streaming, false)
-     # Per-LiveView opaque id for actor-side self-filtering of own
-     # broadcasts (FR-005: speaker's own session does not render the
-     # witness broadcast it produced). See
-     # specs/004-player-communication/contracts/ui_events.md.
-     |> assign(:session_id, make_ref())
-     # Feature 005 — natural-language intent resolution.
-     # `resolver_task` tracks an in-flight async LLM call;
-     # `input_locked` disables the command input while it runs.
-     |> assign(:resolver_task, nil)
-     |> assign(:input_locked, false)
-     |> assign(:stats, Stats.for_player(player_id))
-     |> assign(:inventory, inventory)
-     # Feature 013 — Quests. `:quests` is the active-quest list
-     # rendered in the HUD card with per-criterion progress lines;
-     # `:completed_quests` backs the Completed section of the quest
-     # modal and is retained indefinitely (FR-025).
-     |> assign(:quests, Quests.active_for(player_id))
-     |> assign(:completed_quests, Quests.history_for(player_id))
-     |> assign(:presence, presence)
-     |> assign(:selected_quest, 0)
-     |> assign(:tweaks, build_tweaks(socket.assigns.current_player))}
+    socket
+    |> assign(:phase, :playing)
+    |> assign(:mode, :player)
+    # Feature 014 — wizard authorization + trance mode. `:is_wizard`
+    # is the FR-WIZ-1 flag; `:authoring_mode` is the world/blueprints
+    # sub-mode within Wizard view (only meaningful when :is_wizard
+    # and :mode == :wizard). Non-wizards never see the top-bar Wizard
+    # switch (FR-WIZ-3), enforced by the layout.
+    |> assign(:is_wizard, socket.assigns.current_player.is_wizard)
+    |> assign(
+      :authoring_mode,
+      if(socket.assigns.current_player.is_wizard, do: :world, else: nil)
+    )
+    |> assign(:focused_object_id, nil)
+    |> assign(:focused_blueprint_id, nil)
+    # Feature 014 US1 — blueprint authoring state. Populated by the
+    # LLM resolver on submit_wizard_prompt; refined by the wizard via
+    # form fields; committed via commit_blueprint_draft (US1) or
+    # edited in place via the edit flow that lands in US5.
+    |> assign(:focused_blueprint_draft, nil)
+    |> assign(:focused_object_draft, nil)
+    |> assign(:focused_object_edit, nil)
+    |> assign(:focused_npc_edit, nil)
+    |> assign(:wizard_prompt, "")
+    |> assign(:wizard_resolver_task, nil)
+    |> assign(:wizard_input_locked, false)
+    |> assign(:blueprint_commit_error, nil)
+    |> assign(:last_spawn, nil)
+    |> assign(:current_room_name, Map.get(room_view, :name))
+    |> assign(
+      :object_blueprints,
+      if(socket.assigns.current_player.is_wizard, do: Queries.list_blueprint_rows(), else: [])
+    )
+    # Feature 015 US8 — unified registry kind filter (:all | :object | :npc).
+    |> assign(:blueprint_filter, :all)
+    # Feature 015 — behavior_groups available to attach to an NPC blueprint draft.
+    |> assign(
+      :behavior_groups,
+      if(socket.assigns.current_player.is_wizard,
+        do: AgenticRealms.World.BehaviorGroups.list_for(:npc),
+        else: []
+      )
+    )
+    |> assign(
+      :room_objects,
+      if(socket.assigns.current_player.is_wizard,
+        do: Queries.list_objects_in_room_for_wizard(current_room_id),
+        else: []
+      )
+    )
+    # Feature 015 US6 — in-room NPCs the wizard can extract a blueprint from.
+    |> assign(
+      :room_npcs,
+      if(socket.assigns.current_player.is_wizard,
+        do: Queries.list_npcs_in_room(current_room_id),
+        else: []
+      )
+    )
+    |> assign(:modal, nil)
+    |> assign(:map_open, false)
+    |> assign(:map_view, MapView.for_player(player_id))
+    |> assign(:log, [%{kind: :room, room: room_view}])
+    |> assign(:current_room_id, current_room_id)
+    |> assign(:input, "")
+    |> assign(:streaming, false)
+    # Per-LiveView opaque id for actor-side self-filtering of own
+    # broadcasts (FR-005: speaker's own session does not render the
+    # witness broadcast it produced). See
+    # specs/004-player-communication/contracts/ui_events.md.
+    |> assign(:session_id, make_ref())
+    # Feature 005 — natural-language intent resolution.
+    # `resolver_task` tracks an in-flight async LLM call;
+    # `input_locked` disables the command input while it runs.
+    |> assign(:resolver_task, nil)
+    |> assign(:input_locked, false)
+    |> assign(:stats, Stats.for_player(player_id))
+    |> assign(:inventory, inventory)
+    # Feature 013 — Quests. `:quests` is the active-quest list
+    # rendered in the HUD card with per-criterion progress lines;
+    # `:completed_quests` backs the Completed section of the quest
+    # modal and is retained indefinitely (FR-025).
+    |> assign(:quests, Quests.active_for(player_id))
+    |> assign(:completed_quests, Quests.history_for(player_id))
+    |> assign(:presence, presence)
+    |> assign(:selected_quest, 0)
+    |> assign(:tweaks, build_tweaks(socket.assigns.current_player))
+  end
+
+  # ════════════════════════════════════════════════════════════
+  # handle_event — character creation (feature 021)
+  # ════════════════════════════════════════════════════════════
+  #
+  # Every clause below updates the draft in socket assigns and nothing else.
+  # World state is touched exactly once, by `creation_confirm`.
+  #
+  # The wire parameters are decoded against what `Srd.Character.choices/1`
+  # actually offered rather than converted blindly, so a forged parameter finds
+  # no match and the clause is a no-op instead of creating an atom or a bogus
+  # pick. The validator would catch it either way; this stops it earlier.
+
+  @impl true
+  def handle_event("creation_name", %{"name" => name}, socket) do
+    {:noreply, Creation.name(socket, name)}
+  end
+
+  def handle_event("creation_select", %{"field" => field, "value" => value}, socket)
+      when field in ~w(species class background) do
+    {:noreply, Creation.select(socket, String.to_existing_atom(field), presence_or_nil(value))}
+  end
+
+  def handle_event("creation_assign_ability", %{"ability" => a, "value" => v}, socket) do
+    case {Creation.decode_ability(a), Integer.parse(v)} do
+      {{:ok, ability}, {value, ""}} -> {:noreply, Creation.assign_ability(socket, ability, value)}
+      _ -> {:noreply, socket}
+    end
+  end
+
+  def handle_event("creation_spread", %{"spread" => spread}, socket) do
+    case Creation.decode_spread(socket.assigns.draft, spread) do
+      {:ok, decoded} -> {:noreply, Creation.spread(socket, decoded)}
+      :error -> {:noreply, socket}
+    end
+  end
+
+  def handle_event("creation_skill", %{"skill" => skill}, socket) do
+    case Creation.decode_skill(socket.assigns.draft, skill) do
+      {:ok, decoded} -> {:noreply, Creation.toggle_skill(socket, decoded)}
+      :error -> {:noreply, socket}
+    end
+  end
+
+  def handle_event("creation_pick", %{"key" => key, "value" => value}, socket) do
+    case Creation.decode_pick(socket.assigns.draft, key, value) do
+      {:ok, decoded_key, option} ->
+        {:noreply, Creation.toggle_choice(socket, decoded_key, option)}
+
+      :error ->
+        {:noreply, socket}
+    end
+  end
+
+  def handle_event("creation_step", %{"step" => step}, socket) do
+    case Creation.decode_step(step) do
+      {:ok, decoded} -> {:noreply, Creation.step(socket, decoded)}
+      :error -> {:noreply, socket}
+    end
+  end
+
+  def handle_event("creation_confirm", _params, socket) do
+    {:noreply, Creation.confirm(socket, &enter_world/1)}
   end
 
   # ════════════════════════════════════════════════════════════
   # handle_event — UI mode + chrome
   # ════════════════════════════════════════════════════════════
 
-  @impl true
   def handle_event("switch_mode", %{"mode" => mode}, socket) do
     new_mode = String.to_existing_atom(mode)
     # FR-WIZ-3 / FR-WIZ-4 — non-wizards must not be able to enter
@@ -271,12 +370,12 @@ defmodule AgenticRealmsWeb.GameLive do
         %{assigns: %{is_wizard: true, mode: :wizard}} = socket
       ) do
     wizard_id = socket.assigns.current_player.id
-    wizard_username = socket.assigns.current_player.username
+    wizard_name = socket.assigns.stats.name
     room_id = socket.assigns.current_room_id
 
     case socket.assigns.authoring_mode do
       :world ->
-        :ok = AgenticRealms.World.WizardTrance.enter(wizard_id, wizard_username, room_id)
+        :ok = AgenticRealms.World.WizardTrance.enter(wizard_id, wizard_name, room_id)
 
         {:noreply,
          socket
@@ -284,7 +383,7 @@ defmodule AgenticRealmsWeb.GameLive do
          |> assign(:last_spawn, nil)}
 
       :blueprints ->
-        :ok = AgenticRealms.World.WizardTrance.exit(wizard_id, wizard_username, room_id)
+        :ok = AgenticRealms.World.WizardTrance.exit(wizard_id, wizard_name, room_id)
 
         {:noreply,
          socket
@@ -481,7 +580,7 @@ defmodule AgenticRealmsWeb.GameLive do
             :ok =
               AgenticRealms.World.WizardTrance.enter(
                 socket.assigns.current_player.id,
-                socket.assigns.current_player.username,
+                socket.assigns.stats.name,
                 socket.assigns.current_room_id
               )
 
@@ -893,7 +992,7 @@ defmodule AgenticRealmsWeb.GameLive do
         :ok =
           AgenticRealms.World.WizardTrance.enter(
             socket.assigns.current_player.id,
-            socket.assigns.current_player.username,
+            socket.assigns.stats.name,
             room_id
           )
 
@@ -954,7 +1053,7 @@ defmodule AgenticRealmsWeb.GameLive do
         :ok =
           AgenticRealms.World.WizardTrance.enter(
             socket.assigns.current_player.id,
-            socket.assigns.current_player.username,
+            socket.assigns.stats.name,
             room_id
           )
 
@@ -1243,6 +1342,10 @@ defmodule AgenticRealmsWeb.GameLive do
   # ════════════════════════════════════════════════════════════
   # Mount-time helpers
   # ════════════════════════════════════════════════════════════
+
+  # An empty selection means "cleared", not a slug of "".
+  defp presence_or_nil(""), do: nil
+  defp presence_or_nil(value), do: value
 
   defp build_tweaks(player) do
     %{

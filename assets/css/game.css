@@ -3226,3 +3226,411 @@ button { font: inherit; color: inherit; }
   margin-top: 6px;
   letter-spacing: 0.04em;
 }
+
+/* ────────────────────────────────────────────────────────────
+   Character creation (feature 021)
+
+   Shown once, before a player has a world. The pane behind it is
+   deliberately empty — there is no room to dim.
+   ──────────────────────────────────────────────────────────── */
+
+.cc-void {
+  position: fixed;
+  inset: 0;
+  background: var(--bg);
+}
+
+/* Step strip. Reuses the character sheet's tab treatment so the two
+   dialogs read as one family. */
+.cc-steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  border-bottom: 1px solid var(--line-soft);
+  margin-bottom: 20px;
+}
+.cc-step {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  background: none;
+  border: 1px solid transparent;
+  border-bottom: none;
+  color: var(--ink-faint);
+  font-family: inherit;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  padding: 8px 14px;
+  cursor: pointer;
+  border-radius: 3px 3px 0 0;
+}
+.cc-step:hover:not(:disabled) { color: var(--ink); }
+.cc-step:disabled { opacity: 0.4; cursor: default; }
+.cc-step.active {
+  color: var(--ink);
+  border-color: var(--line-soft);
+  background: var(--bg);
+  margin-bottom: -1px;
+  padding-bottom: 9px;
+}
+.cc-step-index {
+  display: inline-grid;
+  place-items: center;
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  font-size: 9px;
+  letter-spacing: 0;
+}
+.cc-step.done .cc-step-index {
+  background: var(--player-bg);
+  border-color: var(--player-dim);
+  color: var(--player);
+}
+
+.cc-errors {
+  margin: 0 0 18px;
+  padding: 10px 14px 10px 16px;
+  list-style: none;
+  border-left: 2px solid var(--danger);
+  background: var(--bg);
+  border-radius: 3px;
+  font-size: 12px;
+  color: var(--ink-dim);
+}
+.cc-errors li + li { margin-top: 4px; }
+
+.cc-field { margin-bottom: 24px; }
+
+.cc-label {
+  display: block;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--ink-faint);
+  margin-bottom: 8px;
+}
+
+.cc-input {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm, 4px);
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 15px;
+  padding: 10px 12px;
+}
+.cc-input:focus {
+  outline: none;
+  border-color: var(--player-dim);
+  box-shadow: 0 0 0 1px var(--player-dim);
+}
+
+.cc-hint {
+  font-size: 11px;
+  color: var(--ink-faint);
+  margin: 6px 0 0;
+}
+.cc-hint.good { color: var(--player); }
+.cc-hint.bad { color: var(--danger); }
+
+.cc-group {
+  border: none;
+  margin: 0 0 24px;
+  padding: 0;
+}
+
+/* The option grid scrolls inside the dialog body rather than growing it,
+   so a ten-lineage dragonborn stays reachable on a small screen. */
+.cc-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 8px;
+  max-height: 260px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.cc-option {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-align: left;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm, 4px);
+  color: var(--ink-dim);
+  font-family: inherit;
+  padding: 10px 12px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s, color 0.15s;
+}
+.cc-option:hover { border-color: var(--line); color: var(--ink); }
+.cc-option.selected {
+  border-color: var(--player-dim);
+  background: var(--player-bg);
+  color: var(--ink);
+  box-shadow: 0 0 0 1px var(--player-dim);
+}
+
+.cc-option-name { font-size: 14px; font-weight: 600; color: var(--ink); }
+.cc-option-meta { font-size: 11px; color: var(--ink-faint); }
+.cc-option-traits {
+  font-size: 10px;
+  color: var(--ink-ghost);
+  line-height: 1.45;
+}
+
+.cc-deferred {
+  font-size: 11px;
+  color: var(--ink-faint);
+  font-style: italic;
+  margin: 0 0 8px;
+}
+
+.cc-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border-top: 1px solid var(--line-soft);
+  margin-top: 8px;
+  padding-top: 18px;
+}
+.cc-footer-hint { font-size: 11px; color: var(--ink-faint); margin: 0; }
+
+.cc-confirm {
+  background: var(--player-bg);
+  border: 1px solid var(--player-dim);
+  border-radius: var(--radius-sm, 4px);
+  color: var(--player);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  padding: 10px 20px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.cc-confirm:hover:not(:disabled) { box-shadow: 0 0 0 1px var(--player-dim); }
+.cc-confirm:disabled {
+  opacity: 0.35;
+  cursor: default;
+  color: var(--ink-faint);
+  border-color: var(--line);
+  background: none;
+}
+
+/* Abilities step (feature 021 US2) */
+
+.cc-lead {
+  font-size: 12px;
+  color: var(--ink-faint);
+  line-height: 1.55;
+  margin: 0 0 14px;
+}
+
+.cc-abilities {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 24px;
+}
+
+.cc-ability {
+  display: grid;
+  grid-template-columns: minmax(150px, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  background: var(--bg);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-sm, 4px);
+  padding: 8px 12px;
+}
+
+.cc-ability-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.cc-ability-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.cc-ability-total {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.cc-ability-score {
+  font-family: var(--mono);
+  font-size: 16px;
+  color: var(--ink);
+}
+.cc-ability-mod {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--player);
+}
+.cc-ability-bump {
+  font-size: 10px;
+  color: var(--ink-ghost);
+  letter-spacing: 0.02em;
+}
+
+.cc-array {
+  display: flex;
+  gap: 4px;
+}
+.cc-array-value {
+  min-width: 34px;
+  background: none;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  color: var(--ink-faint);
+  font-family: var(--mono);
+  font-size: 13px;
+  padding: 5px 0;
+  cursor: pointer;
+  transition: color 0.12s, background 0.12s, border-color 0.12s;
+}
+.cc-array-value:hover { color: var(--ink); border-color: var(--ink-ghost); }
+.cc-array-value.selected {
+  background: var(--player-bg);
+  border-color: var(--player-dim);
+  color: var(--player);
+  font-weight: 600;
+}
+
+.cc-spreads {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 6px;
+}
+.cc-spread {
+  text-align: left;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm, 4px);
+  color: var(--ink-dim);
+  font-family: inherit;
+  font-size: 12px;
+  padding: 9px 12px;
+  cursor: pointer;
+}
+.cc-spread:hover { color: var(--ink); }
+.cc-spread.selected {
+  border-color: var(--player-dim);
+  background: var(--player-bg);
+  color: var(--ink);
+  box-shadow: 0 0 0 1px var(--player-dim);
+}
+
+/* Skills step (feature 021 US3) */
+
+.cc-skills {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 6px;
+  max-height: 300px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.cc-skill {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: baseline;
+  gap: 8px;
+  text-align: left;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm, 4px);
+  color: var(--ink-dim);
+  font-family: inherit;
+  padding: 8px 11px;
+  cursor: pointer;
+  transition: color 0.12s, background 0.12s, border-color 0.12s;
+}
+.cc-skill:hover { color: var(--ink); border-color: var(--ink-ghost); }
+.cc-skill.selected {
+  border-color: var(--player-dim);
+  background: var(--player-bg);
+  color: var(--ink);
+  box-shadow: 0 0 0 1px var(--player-dim);
+}
+
+/* Granted skills are shown, not offered — they read as settled rather than
+   as something the player failed to pick. */
+.cc-skill.held {
+  cursor: default;
+  opacity: 0.72;
+  border-style: dashed;
+}
+.cc-skill.held:hover { color: var(--ink-dim); border-color: var(--line); }
+
+.cc-skill-name { font-size: 13px; color: inherit; }
+.cc-skill-meta {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--ink-faint);
+  white-space: nowrap;
+}
+.cc-skill-note {
+  grid-column: 1 / -1;
+  font-size: 10px;
+  color: var(--ink-ghost);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* Specializations step (feature 021 US4) — every choice the content carries,
+   rendered by kind. Reuses the identity step's option cards. */
+
+.cc-option.held {
+  cursor: default;
+  opacity: 0.72;
+  border-style: dashed;
+}
+.cc-option.held:hover { color: var(--ink-dim); border-color: var(--line); }
+
+/* A dragonborn offers ten ancestries; the grid scrolls inside the dialog body
+   rather than growing it, so every option stays reachable on a small screen. */
+.cc-group + .cc-group { margin-top: 4px; }
+
+/* Review step (feature 021 US5) */
+
+.cc-review-block { margin-top: 22px; }
+
+.cc-review-rows {
+  display: grid;
+  gap: 4px;
+  margin-top: 8px;
+}
+
+.cc-review-row {
+  display: grid;
+  grid-template-columns: minmax(140px, auto) 1fr;
+  gap: 12px;
+  align-items: baseline;
+  background: var(--bg);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-sm, 4px);
+  padding: 8px 12px;
+}
+
+.cc-review-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.cc-review-value {
+  font-size: 12px;
+  color: var(--ink-dim);
+  line-height: 1.5;
+}

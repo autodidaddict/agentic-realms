@@ -30,6 +30,10 @@ defmodule AgenticRealmsWeb.CharacterSheetRenderTest do
     {:ok, alice} =
       Accounts.register_player(%{username: "sheet_#{suffix}", password: "pw12345678"})
 
+    # Feature 021 — a character before a world. Without one, mounting lands in
+    # the creation dialog rather than the game.
+    AgenticRealms.DataCase.create_character!(alice.id, name: "Sheet#{suffix}")
+
     conn =
       conn
       |> Plug.Test.init_test_session(%{})
