@@ -1,0 +1,162 @@
+name: Nightly
+
+# The per-push CI runs the default suite once. That is the right trade for a
+# pull request, and it leaves three things uncovered:
+#
+#   * One ordering sample. ExUnit already randomizes the seed, so CI does vary
+#     the order — but one draw per push. An order-dependent bug shows up as a
+#     failure on somebody's unrelated PR weeks later, if at all. That is exactly
+#     how the `keys: :atoms!` serializer bug reached main: every run before it
+#     passed by luck, and the one that failed was a merge commit.
+#   * The integration suite. Tagged `:integration` and excluded by default
+#     because it mounts the full LiveView; it has never run in CI.
+#   * The srd_5e package. Its own Mix project, so the root `mix test` does not
+#     reach it. Also never run in CI.
+#
+# None of that belongs on the pull-request path, where the cost is paid by
+# every push. It belongs here.
+
+on:
+  schedule:
+    # 06:00 UTC daily. Scheduled workflows run on the default branch only.
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: true
+
+jobs:
+  seeds:
+    name: Seed ${{ matrix.run }} (app + integration)
+    runs-on: ubuntu-latest
+
+    strategy:
+      # Every seed reports. One bad ordering should not hide the others.
+      fail-fast: false
+      matrix:
+        run: [1, 2, 3, 4, 5]
+
+    env:
+      MIX_ENV: test
+      PGHOST: localhost
+      PGUSER: postgres
+      PGPASSWORD: postgres
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Elixir
+        uses: erlef/setup-beam@v1
+        with:
+          elixir-version: "1.20.0-otp-27"
+          otp-version: "27.0.1"
+
+      - name: Cache deps and _build
+        uses: actions/cache@v4
+        with:
+          path: |
+            deps
+            _build
+          key: ${{ runner.os }}-mix-${{ hashFiles('**/mix.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-mix-
+
+      - name: Install dependencies
+        run: mix deps.get
+
+      - name: Compile (warnings as errors)
+        run: mix compile --warnings-as-errors
+
+      # The seed is chosen here rather than left to ExUnit so it can be surfaced
+      # as an annotation. A failure nobody can reproduce is barely a failure —
+      # the whole point is to hand back the exact ordering that broke.
+      - name: Run the suite with a random seed
+        run: |
+          SEED=$(( (RANDOM << 15) | RANDOM ))
+          echo "::notice title=ExUnit seed::$SEED — reproduce with: mix test --include integration --seed $SEED"
+          mix test --include integration --seed "$SEED"
+
+  extras:
+    name: Package and cluster suites
+    runs-on: ubuntu-latest
+
+    env:
+      MIX_ENV: test
+      PGHOST: localhost
+      PGUSER: postgres
+      PGPASSWORD: postgres
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Elixir
+        uses: erlef/setup-beam@v1
+        with:
+          elixir-version: "1.20.0-otp-27"
+          otp-version: "27.0.1"
+
+      - name: Cache deps and _build
+        uses: actions/cache@v4
+        with:
+          path: |
+            deps
+            _build
+          key: ${{ runner.os }}-mix-${{ hashFiles('**/mix.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-mix-
+
+      - name: Install dependencies
+        run: mix deps.get
+
+      # The rules library is its own Mix project, so the root suite never sees
+      # it. Pure and DB-free, so it needs nothing but a checkout.
+      - name: srd_5e package suite
+        working-directory: packages/srd_5e
+        run: |
+          mix deps.get
+          mix test
+
+      # The cluster test starts a second BEAM node, which needs a name, which
+      # needs EPMD. Without this it fails with :nodistribution — the same
+      # prerequisite a clustered deployment has.
+      - name: Start EPMD
+        run: epmd -daemon
+
+      - name: Cluster smoke test
+        run: mix test --include cluster test/agenticrealms/world/cluster_singleton_test.exs
