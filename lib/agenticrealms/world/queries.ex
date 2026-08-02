@@ -396,18 +396,7 @@ defmodule AgenticRealms.World.Queries do
   the same way an offline one is; they are never in a room to begin with.
   """
   @spec list_players_in_room(String.t()) :: [%{id: integer(), name: String.t()}]
-  def list_players_in_room(room_id) when is_binary(room_id) do
-    rows =
-      from(ps in PlayerState,
-        where: ps.current_room_id == ^room_id and not is_nil(ps.character_name),
-        order_by: ps.character_name,
-        select: %{id: ps.player_id, name: ps.character_name}
-      )
-      |> Repo.all()
-
-    online = online_player_ids()
-    Enum.filter(rows, fn %{id: id} -> MapSet.member?(online, id) end)
-  end
+  def list_players_in_room(room_id) when is_binary(room_id), do: online_occupants(room_id, nil)
 
   @doc """
   All players currently in `room_id` except `self_player_id`. Drives the
@@ -463,26 +452,36 @@ defmodule AgenticRealms.World.Queries do
     |> Repo.all()
   end
 
-  defp list_other_players(room_id, self_player_id) do
+  defp list_other_players(room_id, self_player_id),
+    do: online_occupants(room_id, self_player_id)
+
+  # The one room-occupant query. `exclude` drops the asking player, and that is
+  # the only thing that ever differed between the two callers — they had already
+  # drifted, one of them losing the note below.
+  #
+  # Filtered by online presence: a player's persisted `current_room_id` survives
+  # logout (per the 003 design — disconnecting does not unspawn them), but an
+  # offline player MUST NOT appear in the Present HUD card, in `look` output, or
+  # as a valid `whisper` target. `Phoenix.Presence` is the authority on who is
+  # online; it tracks every connected LiveView session and dedupes across tabs.
+  #
+  # A row with no `character_name` is a player who has not created a character
+  # yet. They are never spawned, so they are never in a room to be listed.
+  defp online_occupants(room_id, exclude) do
     rows =
-      from(ps in PlayerState,
-        where:
-          ps.current_room_id == ^room_id and ps.player_id != ^self_player_id and
-            not is_nil(ps.character_name),
-        order_by: ps.character_name,
-        select: %{id: ps.player_id, name: ps.character_name}
-      )
+      PlayerState
+      |> where([ps], ps.current_room_id == ^room_id and not is_nil(ps.character_name))
+      |> exclude_player(exclude)
+      |> order_by([ps], ps.character_name)
+      |> select([ps], %{id: ps.player_id, name: ps.character_name})
       |> Repo.all()
 
-    # Filter by online presence: a player's persisted current_room_id remains
-    # set after they log out (per the 003 design — disconnect does not unspawn
-    # them), but offline players MUST NOT appear in the Present HUD card, in
-    # `look` output, or as a valid `whisper` target. Authoritative truth for
-    # "online" is `Phoenix.Presence`, which tracks every connected LiveView
-    # session and deduplicates across multi-tab.
     online = online_player_ids()
     Enum.filter(rows, fn %{id: id} -> MapSet.member?(online, id) end)
   end
+
+  defp exclude_player(query, nil), do: query
+  defp exclude_player(query, player_id), do: where(query, [ps], ps.player_id != ^player_id)
 
   defp online_player_ids do
     Presence.list(Presence.topic())
