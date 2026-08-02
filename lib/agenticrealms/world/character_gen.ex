@@ -1,23 +1,36 @@
 defmodule AgenticRealms.World.CharacterGen do
   @moduledoc """
-  Feature 020 — deterministic character generation from the configured defaults.
+  Deterministic character generation: the choices nobody made.
 
-  Character creation is not interactive yet, so every new character is built
-  here. The SRD says what a character *may* be; this decides what it *is*, and
-  that division is the whole reason this module lives in the game rather than in
+  The SRD says what a character *may* be; this decides what it *is*, and that
+  division is the whole reason this module lives in the game rather than in
   `srd_5e`. The rules package supplies the raw material — the standard array,
   the background's legal spreads, each class's skill list — and every choice
   among it is made below.
 
-  Pure: a keyword list in, a command payload out. No repository access and no
-  randomness, so two players created with the same configuration are identical
-  (FR-012) and a replayed `CharacterCreated` never disagrees with what was
-  originally recorded.
+  Two callers, and they want different things.
+
+  `complete/1` takes a player's in-progress draft and fills whatever they were
+  not asked, so the facade can hand the validator a whole character. It exists
+  because the creation dialog grows one step per user story: until every story
+  ships, a draft arrives with no ability scores or no skill picks, and that is
+  not something to reject — it is something to finish. It fills **only what is
+  missing**, so a choice the player did make is never overwritten, and once the
+  dialog asks everything it quietly stops having anything to do.
+
+  `default/0` builds a whole character from configuration, with no player
+  involved. It is what seeds and tests use.
+
+  Pure either way: no repository access and no randomness, so two identical
+  inputs produce two identical characters and a replayed `CharacterCreated`
+  never disagrees with what was originally recorded.
 
   Proficiency lists come out as sorted strings, matching what the event carries
   on the wire and what the read model stores.
   """
 
+  alias AgenticRealms.World.CharacterDraft, as: Draft
+  alias Srd.Character
   alias Srd.Content.Background
   alias Srd.Content.Backgrounds
   alias Srd.Content.Classes
@@ -25,6 +38,159 @@ defmodule AgenticRealms.World.CharacterGen do
   alias Srd.Rules.Ability
   alias Srd.Rules.Hitpoints
   alias Srd.Rules.Skill
+
+  @doc """
+  A draft with every open decision settled.
+
+  Fills only what is missing. Species, class, and background are never filled:
+  those are the player's first and only required choices, and a draft without
+  them is a validation error rather than something to guess at.
+
+  Deterministic, so the same draft always completes to the same character.
+  """
+  @spec complete(Draft.t()) :: Draft.t()
+  def complete(%Draft{} = draft) do
+    if draft.species_slug && draft.class_slug && draft.background_slug do
+      draft
+      |> fill_array()
+      |> fill_spread()
+      |> fill_skill_picks()
+      |> fill_choices()
+    else
+      draft
+    end
+  end
+
+  # The standard array dealt down the class's priority order, highest score to
+  # the ability the class cares about most.
+  defp fill_array(%Draft{array: array} = draft) when map_size(array) > 0, do: draft
+
+  defp fill_array(%Draft{} = draft) do
+    class = Classes.get(draft.class_slug)
+
+    class
+    |> ability_priority()
+    |> Enum.zip(Ability.standard_array())
+    |> Enum.reduce(draft, fn {ability, value}, acc ->
+      Draft.assign_ability(acc, ability, value)
+    end)
+  end
+
+  # Of the spreads the SRD allows, take [2, 1] and put the larger increase on
+  # the highest-priority ability the background offers.
+  defp fill_spread(%Draft{spread: spread} = draft) when not is_nil(spread), do: draft
+
+  defp fill_spread(%Draft{} = draft) do
+    background = Backgrounds.get(draft.background_slug)
+    priority = draft.class_slug |> Classes.get() |> ability_priority()
+
+    [larger, smaller] =
+      background.ability_scores
+      |> Enum.sort_by(&Enum.find_index(priority, fn ability -> ability == &1 end))
+      |> Enum.take(2)
+
+    Draft.put_spread(draft, {:split, larger, smaller})
+  end
+
+  # The best-modifier picks the class offers, skipping anything already granted
+  # so a pick is never spent on a proficiency the character already has.
+  defp fill_skill_picks(%Draft{skill_picks: [_ | _]} = draft), do: draft
+
+  defp fill_skill_picks(%Draft{} = draft) do
+    case Enum.find(Draft.open_choices(draft), &(&1.key == :class_skills)) do
+      nil ->
+        draft
+
+      %{choice: choice} ->
+        granted = Draft.grants(draft).skills
+        modifiers = modifiers_of(draft)
+
+        choice.from
+        |> Enum.reject(&(&1 in granted))
+        |> rank(modifiers)
+        |> Enum.take(choice.choose)
+        |> Enum.reduce(draft, &Draft.toggle_skill(&2, &1))
+    end
+  end
+
+  # Everything else the content asks for. Takes options in the order the content
+  # lists them, which is arbitrary but stable — and stability is the property
+  # that matters, because a replay must reproduce the same character.
+  defp fill_choices(%Draft{} = draft) do
+    draft
+    |> Draft.open_choices()
+    |> Enum.reject(&(&1.key == :class_skills))
+    |> Enum.reduce(draft, fn open, acc ->
+      held = acc.choices |> Map.get(open.key, []) |> Enum.map(&option_id/1)
+      wanted = open.choice.choose - length(held)
+
+      if wanted > 0 do
+        open.choice.from
+        |> Enum.map(&option_id/1)
+        |> Enum.reject(&(&1 in held))
+        |> prefer(open.key)
+        |> Enum.take(wanted)
+        |> Enum.reduce(acc, fn option, inner ->
+          Draft.toggle_choice(inner, open.key, option)
+        end)
+      else
+        acc
+      end
+    end)
+  end
+
+  # Content order is arbitrary, and for one choice that shows. A human's sizes
+  # are listed small before medium, so taking the first would quietly make every
+  # unasked human small. Size is the one place the configured default has an
+  # opinion worth honouring; everywhere else the content's own order stands.
+  defp prefer(options, :species_size) do
+    default = configured_size()
+    if default in options, do: [default | List.delete(options, default)], else: options
+  end
+
+  defp prefer(options, _key), do: options
+
+  defp configured_size do
+    :agenticrealms
+    |> Application.get_env(:character_defaults, [])
+    |> Keyword.get(:size, :medium)
+  end
+
+  defp option_id(%{slug: slug}), do: slug
+  defp option_id(option), do: option
+
+  defp modifiers_of(%Draft{} = draft) do
+    scores = Draft.scores(draft)
+    Map.new(Ability.all(), &{&1, Ability.modifier(Map.get(scores, &1, 10))})
+  end
+
+  @doc """
+  The command payload for a completed draft.
+
+  What `CreateCharacter` carries, assembled from the draft so the aggregate
+  still generates nothing, looks nothing up, and defaults nothing.
+  """
+  @spec payload(Draft.t()) :: map()
+  def payload(%Draft{} = draft) do
+    class = Classes.get(draft.class_slug)
+    scores = Draft.scores(draft)
+    con = Ability.modifier(Map.fetch!(scores, :con))
+
+    %{
+      character_name: String.trim(draft.name),
+      species_slug: draft.species_slug,
+      class_slug: draft.class_slug,
+      background_slug: draft.background_slug,
+      size: draft |> Draft.size() |> to_string(),
+      lineage_slug: Draft.lineage_slug(draft),
+      abilities: scores,
+      skill_proficiencies: sorted_strings(Draft.skill_proficiencies(draft)),
+      save_proficiencies: sorted_strings(Character.grants(Draft.selections(draft)).saves),
+      feat_slugs: Draft.feat_slugs(draft),
+      choices: Draft.stored_choices(draft),
+      max_hp: Hitpoints.starting(class.hit_die, con)
+    }
+  end
 
   @doc """
   The default character, from `:agenticrealms, :character_defaults`.
@@ -55,7 +221,10 @@ defmodule AgenticRealms.World.CharacterGen do
     skills = skills(class, background, config.species_skill, modifiers)
 
     %{
+      character_name: Map.get(config, :name, "Adventurer"),
       species_slug: species.slug,
+      lineage_slug: nil,
+      choices: %{},
       class_slug: class.slug,
       background_slug: background.slug,
       size: to_string(config.size),

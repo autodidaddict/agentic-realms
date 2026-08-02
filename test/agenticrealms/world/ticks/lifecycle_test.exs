@@ -26,7 +26,7 @@ defmodule AgenticRealms.World.Ticks.LifecycleTest do
     %RoomPlayerArrived{
       room_id: room_id,
       actor_id: player_id,
-      actor_username: "u",
+      actor_name: "u",
       from_direction: nil,
       carried_object_ids: carried
     }
@@ -36,7 +36,7 @@ defmodule AgenticRealms.World.Ticks.LifecycleTest do
     %RoomPlayerLeft{
       room_id: room_id,
       actor_id: player_id,
-      actor_username: "u",
+      actor_name: "u",
       to_direction: :north,
       carried_object_ids: carried
     }

@@ -17,7 +17,7 @@ defmodule AgenticRealms.World.IntentResolver.ContextSnapshotTest do
           %{direction: "east", target_name: "Corridor"}
         ],
         objects: [%{name: "brass lantern"}, %{name: "leather-bound journal"}],
-        other_players: [%{username: "bob"}],
+        other_players: [%{name: "bob"}],
         npcs: []
       },
       overrides

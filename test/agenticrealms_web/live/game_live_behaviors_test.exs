@@ -44,6 +44,11 @@ defmodule AgenticRealmsWeb.GameLiveBehaviorsTest do
     {:ok, bob} =
       Accounts.register_player(%{username: "bob_b_#{suffix}", password: "pw12345678"})
 
+    # Feature 021 — a character before a world; without one, mounting lands in
+    # the creation dialog rather than the game.
+    AgenticRealms.DataCase.create_character!(alice.id, name: alice.username)
+    AgenticRealms.DataCase.create_character!(bob.id, name: bob.username)
+
     alice_conn =
       conn
       |> Plug.Test.init_test_session(%{})

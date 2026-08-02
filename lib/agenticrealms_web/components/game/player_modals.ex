@@ -114,7 +114,14 @@ defmodule AgenticRealmsWeb.GameComponents.PlayerModals do
 
   attr :stats, :map, required: true
 
-  defp main_panel(assigns) do
+  @doc """
+  The sheet's main tab: vitals, identity, and the derived combat values.
+
+  Public because feature 021's creation review renders it too. The review shows
+  the character that is about to exist, and showing it through anything other
+  than the sheet's own components would let the two drift.
+  """
+  def main_panel(assigns) do
     ~H"""
     <div class="big-bar-block">
       <.hp_bar label="Health" cur={@stats.hp.cur} max={@stats.hp.max} kind="hp" />
@@ -159,7 +166,12 @@ defmodule AgenticRealmsWeb.GameComponents.PlayerModals do
 
   attr :stats, :map, required: true
 
-  defp abilities_panel(assigns) do
+  @doc """
+  The sheet's abilities tab: the six scores, saving throws, and every skill.
+
+  Public for the same reason as `main_panel/1`.
+  """
+  def abilities_panel(assigns) do
     ~H"""
     <div class="sheet-section">
       <div class="sheet-section-title">Ability Scores</div>
@@ -315,9 +327,9 @@ defmodule AgenticRealmsWeb.GameComponents.PlayerModals do
       </div>
       <div :if={@presence != []} class="presence-grid">
         <div :for={p <- @presence} class="presence-card other">
-          <div class="avatar">{String.first(p.username) |> String.upcase()}</div>
+          <div class="avatar">{String.first(p.name) |> String.upcase()}</div>
           <div>
-            <div class="name">{p.username}</div>
+            <div class="name">{p.name}</div>
             <div class="role">Player</div>
           </div>
         </div>

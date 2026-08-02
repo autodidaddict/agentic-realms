@@ -27,7 +27,7 @@ defmodule AgenticRealmsWeb.GameLive.UIEvents do
       clear_room_scoped_wizard_state: 1
     ]
 
-  alias AgenticRealms.Accounts
+  alias AgenticRealms.World.PlayerNames
   alias AgenticRealms.World.{Direction, Queries, Stats}
   alias Srd.Rules.Experience
 
@@ -135,7 +135,7 @@ defmodule AgenticRealmsWeb.GameLive.UIEvents do
       {:noreply,
        socket
        |> append_log(%{kind: :system, text: arrival_text(msg)})
-       |> add_to_presence(actor_id, msg.actor_username)}
+       |> add_to_presence(actor_id, msg.actor_name)}
     end
   end
 
@@ -154,7 +154,7 @@ defmodule AgenticRealmsWeb.GameLive.UIEvents do
   # Wizard trance witness (feature 014 FR-002 / FR-003 / FR-004)
   # ────────────────────────────────────────────────────────────
 
-  def trance_entered(socket, %RoomTranceEntered{wizard_id: wid, wizard_username: name}) do
+  def trance_entered(socket, %RoomTranceEntered{wizard_id: wid, wizard_name: name}) do
     if wid == socket.assigns.current_player.id do
       {:noreply, socket}
     else
@@ -162,7 +162,7 @@ defmodule AgenticRealmsWeb.GameLive.UIEvents do
     end
   end
 
-  def trance_exited(socket, %RoomTranceExited{wizard_id: wid, wizard_username: name}) do
+  def trance_exited(socket, %RoomTranceExited{wizard_id: wid, wizard_name: name}) do
     if wid == socket.assigns.current_player.id do
       {:noreply, socket}
     else
@@ -209,7 +209,7 @@ defmodule AgenticRealmsWeb.GameLive.UIEvents do
       {:noreply,
        append_log(socket, %{
          kind: :system,
-         text: "#{msg.actor_username} takes the #{msg.object_name}."
+         text: "#{msg.actor_name} takes the #{msg.object_name}."
        })}
     end
   end
@@ -223,7 +223,7 @@ defmodule AgenticRealmsWeb.GameLive.UIEvents do
       {:noreply,
        append_log(socket, %{
          kind: :system,
-         text: "#{msg.actor_username} drops the #{msg.object_name}."
+         text: "#{msg.actor_name} drops the #{msg.object_name}."
        })}
     end
   end
@@ -345,19 +345,18 @@ defmodule AgenticRealmsWeb.GameLive.UIEvents do
     if msg.actor_session_id == socket.assigns.session_id do
       {:noreply, socket}
     else
-      {:noreply, append_log(socket, %{kind: :speech, actor: msg.actor_username, text: msg.text})}
+      {:noreply, append_log(socket, %{kind: :speech, actor: msg.actor_name, text: msg.text})}
     end
   end
 
   def room_utterance(socket, %RoomUtterance{kind: :emote} = msg) do
-    {:noreply,
-     append_log(socket, %{kind: :emote_action, actor: msg.actor_username, text: msg.text})}
+    {:noreply, append_log(socket, %{kind: :emote_action, actor: msg.actor_name, text: msg.text})}
   end
 
   def room_utterance(socket, %RoomUtterance{kind: :whisper} = msg) do
     if msg.recipient_id == socket.assigns.current_player.id do
       {:noreply,
-       append_log(socket, %{kind: :private_whisper_in, actor: msg.actor_username, text: msg.text})}
+       append_log(socket, %{kind: :private_whisper_in, actor: msg.actor_name, text: msg.text})}
     else
       {:noreply, socket}
     end
@@ -370,7 +369,7 @@ defmodule AgenticRealmsWeb.GameLive.UIEvents do
   """
   def private_utterance(socket, %PrivateUtterance{kind: :tell} = msg) do
     {:noreply,
-     append_log(socket, %{kind: :private_tell_in, actor: msg.actor_username, text: msg.text})}
+     append_log(socket, %{kind: :private_tell_in, actor: msg.actor_name, text: msg.text})}
   end
 
   # ────────────────────────────────────────────────────────────
@@ -533,25 +532,25 @@ defmodule AgenticRealmsWeb.GameLive.UIEvents do
   # caller since Phoenix.Presence emits the "logged in" message. This
   # clause is kept defensively in case of out-of-order events.
 
-  defp arrival_text(%RoomPlayerArrived{actor_username: name, from_direction: nil}),
+  defp arrival_text(%RoomPlayerArrived{actor_name: name, from_direction: nil}),
     do: "#{name} logged in."
 
-  defp arrival_text(%RoomPlayerArrived{actor_username: name, from_direction: :up}),
+  defp arrival_text(%RoomPlayerArrived{actor_name: name, from_direction: :up}),
     do: "#{name} arrives from above."
 
-  defp arrival_text(%RoomPlayerArrived{actor_username: name, from_direction: :down}),
+  defp arrival_text(%RoomPlayerArrived{actor_name: name, from_direction: :down}),
     do: "#{name} arrives from below."
 
-  defp arrival_text(%RoomPlayerArrived{actor_username: name, from_direction: dir}),
+  defp arrival_text(%RoomPlayerArrived{actor_name: name, from_direction: dir}),
     do: "#{name} arrives from the #{Direction.to_string(dir)}."
 
-  defp departure_text(%RoomPlayerLeft{actor_username: name, to_direction: :up}),
+  defp departure_text(%RoomPlayerLeft{actor_name: name, to_direction: :up}),
     do: "#{name} leaves upward."
 
-  defp departure_text(%RoomPlayerLeft{actor_username: name, to_direction: :down}),
+  defp departure_text(%RoomPlayerLeft{actor_name: name, to_direction: :down}),
     do: "#{name} leaves downward."
 
-  defp departure_text(%RoomPlayerLeft{actor_username: name, to_direction: dir}),
+  defp departure_text(%RoomPlayerLeft{actor_name: name, to_direction: dir}),
     do: "#{name} leaves to the #{Direction.to_string(dir)}."
 
   # Feature 014 US2 — wizard-driven object arrival. Normalizes the
@@ -577,13 +576,13 @@ defmodule AgenticRealmsWeb.GameLive.UIEvents do
   # Presence list mutators
   # ────────────────────────────────────────────────────────────
 
-  defp add_to_presence(socket, actor_id, username) do
+  defp add_to_presence(socket, actor_id, name) do
     current = socket.assigns[:presence] || []
 
     if Enum.any?(current, &(&1.id == actor_id)) do
       socket
     else
-      new = Enum.sort_by([%{id: actor_id, username: username} | current], & &1.username)
+      new = Enum.sort_by([%{id: actor_id, name: name} | current], & &1.name)
       assign(socket, :presence, new)
     end
   end
@@ -603,9 +602,9 @@ defmodule AgenticRealmsWeb.GameLive.UIEvents do
       true ->
         case Queries.current_room_of(player_id) do
           {:ok, ^my_room} ->
-            username = presence_username(meta, player_id)
+            name = presence_name(meta, player_id)
             verb = if type == :login, do: "logged in", else: "logged out"
-            [%{kind: :system, text: "#{username} #{verb}."}]
+            [%{kind: :system, text: "#{name} #{verb}."}]
 
           _ ->
             []
@@ -613,14 +612,12 @@ defmodule AgenticRealmsWeb.GameLive.UIEvents do
     end
   end
 
-  defp presence_username(%{metas: [%{username: u} | _]}, _player_id), do: u
+  # Feature 021 — presence carries the character's name. The fallback reads it
+  # from the projection rather than the account, so a stale meta cannot leak a
+  # login.
+  defp presence_name(%{metas: [%{name: n} | _]}, _player_id) when is_binary(n), do: n
 
-  defp presence_username(_, player_id) do
-    case Accounts.get_player(player_id) do
-      %{username: u} -> u
-      _ -> "someone"
-    end
-  end
+  defp presence_name(_, player_id), do: PlayerNames.get(player_id) || "someone"
 
   # ────────────────────────────────────────────────────────────
   # Inventory list mutator

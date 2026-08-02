@@ -5,7 +5,7 @@ defmodule AgenticRealms.World.Stats do
 
   `for_player/1` is an adapter and nothing more: it reads the `player_state`
   row, hands the facts to `Srd.Character.derive/1`, and merges in the two things
-  the SRD does not own — the player's name and their current hitpoints. Every
+  the SRD does not own — the character's name and their current hitpoints. Every
   number on the sheet comes from the rules package; no SRD arithmetic happens in
   this module or anywhere else in the game.
 
@@ -14,7 +14,6 @@ defmodule AgenticRealms.World.Stats do
   numbers (FR-025), and are unchanged from feature 019.
   """
 
-  alias AgenticRealms.Accounts
   alias AgenticRealms.Repo
   alias AgenticRealms.World.Schemas.PlayerState
   alias Srd.Rules.Ability
@@ -48,18 +47,32 @@ defmodule AgenticRealms.World.Stats do
       missing!(player_id, "player_state row has no character")
     end
 
-    sheet =
-      ps
-      |> facts()
-      |> Map.merge(Map.take(overrides, [:level, :xp]))
-      |> Srd.Character.derive()
+    ps
+    |> facts()
+    |> Map.merge(Map.take(overrides, [:level, :xp]))
+    |> sheet(ps.character_name || "Adventurer", ps.hp)
+  end
 
-    sheet
+  @doc """
+  A character sheet from a set of facts, a name, and current hitpoints.
+
+  The one adapter over `Srd.Character.derive/1`, and the reason feature 021's
+  review cannot disagree with the sheet it previews: both go through here, so
+  "the reviewed character and the created character are identical" is a
+  property of the code rather than of two implementations kept in step.
+
+  `hp` of `nil` means full, which is what a character not yet created has.
+  """
+  @spec sheet(map(), String.t(), integer() | nil) :: map()
+  def sheet(facts, name, hp \\ nil) do
+    derived = Srd.Character.derive(facts)
+
+    derived
     |> Map.delete(:experience)
     |> Map.merge(%{
-      name: player_name(player_id),
-      hp: %{cur: ps.hp, max: sheet.max_hit_points},
-      xp: sheet.experience
+      name: name,
+      hp: %{cur: hp || derived.max_hit_points, max: derived.max_hit_points},
+      xp: derived.experience
     })
   end
 
@@ -135,13 +148,6 @@ defmodule AgenticRealms.World.Stats do
   defp to_known(value, known, kind) do
     Enum.find(known, &(Atom.to_string(&1) == value)) ||
       raise ArgumentError, "player_state holds an unknown #{kind}: #{inspect(value)}"
-  end
-
-  defp player_name(player_id) do
-    case Accounts.get_player(player_id) do
-      nil -> "Adventurer"
-      player -> player.username
-    end
   end
 
   defp missing!(player_id, why) do

@@ -18,14 +18,17 @@ defmodule AgenticRealms.World.PlayerCreateCharacterTest do
   defp cmd do
     %CreateCharacter{
       player_id: 1,
+      character_name: "Gandalf",
       species_slug: "human",
       class_slug: "fighter",
       background_slug: "soldier",
       size: "medium",
+      lineage_slug: nil,
       abilities: @abilities,
       skill_proficiencies: @skills,
       save_proficiencies: @saves,
       feat_slugs: @feats,
+      choices: %{"feature:Fighting Style" => ["defense"]},
       max_hp: 12
     }
   end
@@ -38,6 +41,7 @@ defmodule AgenticRealms.World.PlayerCreateCharacterTest do
     test "a fresh player gets a CharacterCreated carrying the whole character" do
       assert %CharacterCreated{
                player_id: 1,
+               character_name: "Gandalf",
                species_slug: "human",
                class_slug: "fighter",
                background_slug: "soldier",
@@ -146,6 +150,50 @@ defmodule AgenticRealms.World.PlayerCreateCharacterTest do
       assert state.species_slug == "human"
       assert state.str == 17
       assert state.level == 1
+    end
+  end
+
+  describe "feature 021 — the player's own choices" do
+    test "the name, lineage, and keyed choices round-trip onto the event" do
+      event = Player.execute(%Player{}, cmd())
+
+      assert event.character_name == "Gandalf"
+      assert event.lineage_slug == nil
+      assert event.choices == %{"feature:Fighting Style" => ["defense"]}
+    end
+
+    test "a lineage round-trips for a species that offers one" do
+      event = Player.execute(%Player{}, %{cmd() | species_slug: "elf", lineage_slug: "wood-elf"})
+
+      assert event.lineage_slug == "wood-elf"
+    end
+
+    test "the aggregate holds the name and lineage after applying" do
+      state = created()
+
+      assert state.character_name == "Gandalf"
+      assert state.lineage_slug == nil
+    end
+
+    test "the event records finished values, not a reference to configuration" do
+      # FR-031 — changing what the game would generate cannot reach back and
+      # alter a character that already exists, because nothing about the
+      # configuration is stored on the event or read by the aggregate.
+      original = Application.fetch_env!(:agenticrealms, :character_defaults)
+      state = created()
+
+      Application.put_env(
+        :agenticrealms,
+        :character_defaults,
+        Keyword.merge(original, species: "dwarf", class: "wizard", background: "sage")
+      )
+
+      on_exit(fn -> Application.put_env(:agenticrealms, :character_defaults, original) end)
+
+      assert state.species_slug == "human"
+      assert state.class_slug == "fighter"
+      assert state.background_slug == "soldier"
+      assert Player.execute(state, cmd()) == :ok
     end
   end
 end

@@ -51,8 +51,11 @@ defmodule AgenticRealmsWeb.GameLiveCommunicationTest do
       Accounts.register_player(%{username: "carol_#{suffix}", password: "pw12345678"})
 
     starting = Seed.starting_room_id()
+    AgenticRealms.DataCase.create_character!(alice.id, name: alice.username)
     {:ok, _} = Commands.spawn(alice.id, starting)
+    AgenticRealms.DataCase.create_character!(bob.id, name: bob.username)
     {:ok, _} = Commands.spawn(bob.id, starting)
+    AgenticRealms.DataCase.create_character!(carol.id, name: carol.username)
     {:ok, _} = Commands.spawn(carol.id, starting)
 
     %{

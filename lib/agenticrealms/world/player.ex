@@ -27,6 +27,10 @@ defmodule AgenticRealms.World.Player do
             class_slug: nil,
             background_slug: nil,
             size: nil,
+            # Feature 021 — what the player chose to be called, and their
+            # lineage where their species offers one.
+            character_name: nil,
+            lineage_slug: nil,
             skill_proficiencies: [],
             save_proficiencies: [],
             feat_slugs: [],
@@ -158,14 +162,17 @@ defmodule AgenticRealms.World.Player do
   def execute(%__MODULE__{species_slug: nil}, %CreateCharacter{} = cmd) do
     %CharacterCreated{
       player_id: cmd.player_id,
+      character_name: cmd.character_name,
       species_slug: cmd.species_slug,
       class_slug: cmd.class_slug,
       background_slug: cmd.background_slug,
       size: cmd.size,
+      lineage_slug: cmd.lineage_slug,
       abilities: cmd.abilities,
       skill_proficiencies: cmd.skill_proficiencies,
       save_proficiencies: cmd.save_proficiencies,
       feat_slugs: cmd.feat_slugs,
+      choices: cmd.choices,
       hp: cmd.max_hp,
       max_hp: cmd.max_hp
     }
@@ -240,10 +247,12 @@ defmodule AgenticRealms.World.Player do
     %__MODULE__{
       state
       | id: e.player_id,
+        character_name: e.character_name,
         species_slug: e.species_slug,
         class_slug: e.class_slug,
         background_slug: e.background_slug,
         size: e.size,
+        lineage_slug: e.lineage_slug,
         skill_proficiencies: e.skill_proficiencies,
         save_proficiencies: e.save_proficiencies,
         feat_slugs: e.feat_slugs,

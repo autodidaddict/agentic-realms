@@ -48,7 +48,9 @@ defmodule AgenticRealmsWeb.GameLiveNPCTest do
     {:ok, bob} =
       Accounts.register_player(%{username: "bob_n_#{suffix}", password: "pw12345678"})
 
+    AgenticRealms.DataCase.create_character!(alice.id, name: alice.username)
     {:ok, _} = WorldCommands.spawn(alice.id, Seed.starting_room_id())
+    AgenticRealms.DataCase.create_character!(bob.id, name: bob.username)
     {:ok, _} = WorldCommands.spawn(bob.id, Seed.starting_room_id())
 
     alice_conn =

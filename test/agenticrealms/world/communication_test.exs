@@ -14,6 +14,8 @@ defmodule AgenticRealms.World.CommunicationTest do
   """
   use AgenticRealms.DataCase, async: false
 
+  @moduletag :commanded
+
   alias AgenticRealms.Accounts
   alias AgenticRealmsWeb.Topics
   alias AgenticRealms.World.Communication
@@ -26,7 +28,7 @@ defmodule AgenticRealms.World.CommunicationTest do
     Map.merge(
       %{
         id: 42,
-        username: "Alice",
+        name: "Alice",
         session_id: make_ref(),
         room_id: "room-aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
       },
@@ -65,7 +67,7 @@ defmodule AgenticRealms.World.CommunicationTest do
       assert_receive %RoomUtterance{
         room_id: ^sender_room_id,
         actor_id: 42,
-        actor_username: "Alice",
+        actor_name: "Alice",
         actor_session_id: ^session_id,
         kind: :say,
         text: "hello there",
@@ -167,52 +169,63 @@ defmodule AgenticRealms.World.CommunicationTest do
 
       {:ok, bob} = Accounts.register_player(%{username: "bob_#{suffix}", password: "pw12345678"})
 
+      # Feature 021 — players are addressed by their character's name.
+      alice_name = AgenticRealms.DataCase.create_character!(alice.id, name: "Alice#{suffix}")
+      bob_name = AgenticRealms.DataCase.create_character!(bob.id, name: "Bob#{suffix}")
+
       alice_sender = %{
         id: alice.id,
-        username: alice.username,
+        name: alice_name,
         session_id: make_ref(),
         room_id: "room-aaaa"
       }
 
-      %{alice: alice, bob: bob, alice_sender: alice_sender, suffix: suffix}
+      %{
+        alice: alice,
+        bob: bob,
+        alice_name: alice_name,
+        bob_name: bob_name,
+        alice_sender: alice_sender,
+        suffix: suffix
+      }
     end
 
-    test "rejects empty text", %{alice_sender: sender, bob: bob} do
-      assert {:error, :empty} = Communication.tell(sender, bob.username, "")
-      assert {:error, :empty} = Communication.tell(sender, bob.username, "   ")
+    test "rejects empty text", %{alice_sender: sender, bob_name: bob_name} do
+      assert {:error, :empty} = Communication.tell(sender, bob_name, "")
+      assert {:error, :empty} = Communication.tell(sender, bob_name, "   ")
     end
 
-    test "rejects text over 500 characters", %{alice_sender: sender, bob: bob} do
+    test "rejects text over 500 characters", %{alice_sender: sender, bob_name: bob_name} do
       assert {:error, :too_long} =
-               Communication.tell(sender, bob.username, String.duplicate("x", 501))
+               Communication.tell(sender, bob_name, String.duplicate("x", 501))
     end
 
     test "refuses when recipient is not found", %{alice_sender: sender} do
       assert {:error, :not_found} = Communication.tell(sender, "nobody_zz", "hi")
     end
 
-    test "refuses self-target", %{alice_sender: sender, alice: alice} do
-      assert {:error, :self_target} = Communication.tell(sender, alice.username, "hi")
+    test "refuses self-target", %{alice_sender: sender, alice_name: alice_name} do
+      assert {:error, :self_target} = Communication.tell(sender, alice_name, "hi")
     end
 
     test "refuses with :not_deliverable when recipient has no presence-tracked sessions",
-         %{alice_sender: sender, bob: bob} do
+         %{alice_sender: sender, bob_name: bob_name} do
       # No Presence.track has happened for bob → he is "offline".
-      assert {:error, :not_deliverable} = Communication.tell(sender, bob.username, "hi")
+      assert {:error, :not_deliverable} = Communication.tell(sender, bob_name, "hi")
     end
 
     test "broadcasts on player:<recipient_id> when recipient is online",
-         %{alice_sender: sender, bob: bob} do
+         %{alice_sender: sender, bob: bob, bob_name: bob_name} do
       # Track bob's presence from this test process so the online check passes.
-      {:ok, _} = Presence.track_player(self(), bob.id, bob.username)
+      {:ok, _} = Presence.track_player(self(), bob.id, bob_name)
       # Subscribe to bob's topic to capture the broadcast.
       Phoenix.PubSub.subscribe(@pubsub, Topics.player_topic(bob.id))
 
-      assert {:ok, %{recipient_id: rid, recipient_username: rname}} =
-               Communication.tell(sender, bob.username, "psst")
+      assert {:ok, %{recipient_id: rid, recipient_name: rname}} =
+               Communication.tell(sender, bob_name, "psst")
 
       assert rid == bob.id
-      assert rname == bob.username
+      assert rname == bob_name
       assert_receive %PrivateUtterance{kind: :tell, text: "psst", actor_id: actor_id}
       assert actor_id == sender.id
     end
@@ -220,14 +233,15 @@ defmodule AgenticRealms.World.CommunicationTest do
     test "case-insensitive recipient resolution", %{
       alice_sender: sender,
       bob: bob,
+      bob_name: bob_name,
       suffix: suffix
     } do
-      {:ok, _} = Presence.track_player(self(), bob.id, bob.username)
+      {:ok, _} = Presence.track_player(self(), bob.id, bob_name)
       Phoenix.PubSub.subscribe(@pubsub, Topics.player_topic(bob.id))
 
-      # bob.username is "bob_<suffix>" — try the uppercase form.
+      # bob's character is "Bob<suffix>" — try it shouted.
       assert {:ok, %{recipient_id: rid}} =
-               Communication.tell(sender, "BOB_#{suffix}", "yo")
+               Communication.tell(sender, "BOB#{suffix}", "yo")
 
       assert rid == bob.id
       assert_receive %PrivateUtterance{kind: :tell, text: "yo"}
@@ -243,41 +257,50 @@ defmodule AgenticRealms.World.CommunicationTest do
 
       {:ok, bob} = Accounts.register_player(%{username: "bob_#{suffix}", password: "pw12345678"})
 
+      alice_name = AgenticRealms.DataCase.create_character!(alice.id, name: "Alice#{suffix}")
+      bob_name = AgenticRealms.DataCase.create_character!(bob.id, name: "Bob#{suffix}")
+
       alice_sender = %{
         id: alice.id,
-        username: alice.username,
+        name: alice_name,
         session_id: make_ref(),
         # Valid UUID v4 — world_rooms.id is :binary_id.
         room_id: Ecto.UUID.generate()
       }
 
-      %{alice: alice, bob: bob, alice_sender: alice_sender}
+      %{
+        alice: alice,
+        bob: bob,
+        alice_name: alice_name,
+        bob_name: bob_name,
+        alice_sender: alice_sender
+      }
     end
 
-    test "rejects empty text", %{alice_sender: sender, bob: bob} do
-      assert {:error, :empty} = Communication.whisper(sender, bob.username, "")
-      assert {:error, :empty} = Communication.whisper(sender, bob.username, "   ")
+    test "rejects empty text", %{alice_sender: sender, bob_name: bob_name} do
+      assert {:error, :empty} = Communication.whisper(sender, bob_name, "")
+      assert {:error, :empty} = Communication.whisper(sender, bob_name, "   ")
     end
 
-    test "rejects text over 500 characters", %{alice_sender: sender, bob: bob} do
+    test "rejects text over 500 characters", %{alice_sender: sender, bob_name: bob_name} do
       assert {:error, :too_long} =
-               Communication.whisper(sender, bob.username, String.duplicate("x", 501))
+               Communication.whisper(sender, bob_name, String.duplicate("x", 501))
     end
 
     test "refuses when recipient is not found", %{alice_sender: sender} do
       assert {:error, :not_found} = Communication.whisper(sender, "nobody_zz", "hi")
     end
 
-    test "refuses self-target", %{alice_sender: sender, alice: alice} do
-      assert {:error, :self_target} = Communication.whisper(sender, alice.username, "hi")
+    test "refuses self-target", %{alice_sender: sender, alice_name: alice_name} do
+      assert {:error, :self_target} = Communication.whisper(sender, alice_name, "hi")
     end
 
     test "refuses :recipient_not_in_room when neither party occupies the room",
-         %{alice_sender: sender, bob: bob} do
+         %{alice_sender: sender, bob_name: bob_name} do
       # The sender's `room_id` is a freshly-generated UUID with no player_state
       # rows pointing to it, so `other_occupants_of` returns [] and the
       # recipient is correctly not found in scope.
-      assert {:error, :recipient_not_in_room} = Communication.whisper(sender, bob.username, "hi")
+      assert {:error, :recipient_not_in_room} = Communication.whisper(sender, bob_name, "hi")
     end
   end
 end

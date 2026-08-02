@@ -22,7 +22,14 @@ defmodule AgenticRealmsWeb.GameLivePresenceTest do
     {:ok, alice} = Accounts.register_player(%{username: "alice_pres", password: "pw12345678"})
     {:ok, kevin} = Accounts.register_player(%{username: "kevin_pres", password: "pw12345678"})
 
+    # Feature 021 — a character before a world. A player without one mounts
+    # into the creation dialog, not the game.
+    AgenticRealms.DataCase.create_character!(alice.id, name: "Alice")
+    AgenticRealms.DataCase.create_character!(kevin.id, name: "Kevin")
+
+    AgenticRealms.DataCase.create_character!(alice.id, name: alice.username)
     {:ok, _} = Commands.spawn(alice.id, Seed.starting_room_id())
+    AgenticRealms.DataCase.create_character!(kevin.id, name: kevin.username)
     {:ok, _} = Commands.spawn(kevin.id, Seed.starting_room_id())
 
     alice_conn =

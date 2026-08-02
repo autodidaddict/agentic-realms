@@ -9,6 +9,7 @@ defmodule AgenticRealmsWeb.GameComponents do
     * `MiniMap`          — mini_map/1 + colocated MapInteract hook
     * `PlayerModals`     — stats_modal, inventory_modal, quest_modal,
                            presence_modal
+    * `CharacterCreation` — character_creation_modal/1 (feature 021)
     * `PlayerView`       — player_view/1
     * `WizardAuthoring`  — wizard_authoring_view/1 + draft forms +
                            commit-error formatter
@@ -23,6 +24,7 @@ defmodule AgenticRealmsWeb.GameComponents do
       import AgenticRealmsWeb.GameComponents.LogEntry
       import AgenticRealmsWeb.GameComponents.MiniMap
       import AgenticRealmsWeb.GameComponents.PlayerModals
+      import AgenticRealmsWeb.GameComponents.CharacterCreation
       import AgenticRealmsWeb.GameComponents.PlayerView
       import AgenticRealmsWeb.GameComponents.WizardAuthoring
     end

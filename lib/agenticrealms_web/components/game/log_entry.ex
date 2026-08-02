@@ -48,7 +48,7 @@ defmodule AgenticRealmsWeb.GameComponents.LogEntry do
           </span>
         </span>
         <span :for={{p, idx} <- Enum.with_index(@entry.room.other_players)}>
-          <span class="entity player-other">{p.username}</span>
+          <span class="entity player-other">{p.name}</span>
           <span :if={idx < length(@entry.room.other_players) - 1}> · </span>
         </span>
       </div>

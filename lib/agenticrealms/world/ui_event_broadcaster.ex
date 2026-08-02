@@ -45,7 +45,7 @@ defmodule AgenticRealms.World.UIEventBroadcaster do
     name: __MODULE__,
     consistency: :eventual
 
-  alias AgenticRealms.Accounts
+  alias AgenticRealms.World.PlayerNames
   alias AgenticRealms.Repo
   alias AgenticRealms.World.Direction
   alias AgenticRealms.World.Quests
@@ -93,13 +93,13 @@ defmodule AgenticRealms.World.UIEventBroadcaster do
   @pubsub AgenticRealms.PubSub
 
   def handle(%PlayerSpawned{player_id: pid, room_id: room_id}, _meta) do
-    actor_username = lookup_username(pid)
+    actor_name = lookup_name(pid)
     carried_ids = lookup_carried_object_ids(pid)
 
     Phoenix.PubSub.broadcast(@pubsub, Topics.room_topic(room_id), %RoomPlayerArrived{
       room_id: room_id,
       actor_id: pid,
-      actor_username: actor_username,
+      actor_name: actor_name,
       from_direction: nil,
       carried_object_ids: carried_ids
     })
@@ -126,7 +126,7 @@ defmodule AgenticRealms.World.UIEventBroadcaster do
         },
         _meta
       ) do
-    actor_username = lookup_username(pid)
+    actor_name = lookup_name(pid)
     {:ok, direction_atom} = Direction.parse(direction)
     carried_ids = lookup_carried_object_ids(pid)
 
@@ -135,7 +135,7 @@ defmodule AgenticRealms.World.UIEventBroadcaster do
     Phoenix.PubSub.broadcast(@pubsub, from_topic, %RoomPlayerLeft{
       room_id: from,
       actor_id: pid,
-      actor_username: actor_username,
+      actor_name: actor_name,
       to_direction: direction_atom,
       carried_object_ids: carried_ids
     })
@@ -143,7 +143,7 @@ defmodule AgenticRealms.World.UIEventBroadcaster do
     Phoenix.PubSub.broadcast(@pubsub, Topics.room_topic(to), %RoomPlayerArrived{
       room_id: to,
       actor_id: pid,
-      actor_username: actor_username,
+      actor_name: actor_name,
       from_direction: Direction.opposite(direction_atom),
       carried_object_ids: carried_ids
     })
@@ -432,13 +432,13 @@ defmodule AgenticRealms.World.UIEventBroadcaster do
          %ContainerRef{type: :player, id: pid},
          oid
        ) do
-    actor_username = lookup_username(pid)
+    actor_name = lookup_name(pid)
     {name, short} = lookup_object(oid)
 
     Phoenix.PubSub.broadcast(@pubsub, Topics.room_topic(rid), %RoomObjectTaken{
       room_id: rid,
       actor_id: pid,
-      actor_username: actor_username,
+      actor_name: actor_name,
       object_id: oid,
       object_name: name
     })
@@ -462,13 +462,13 @@ defmodule AgenticRealms.World.UIEventBroadcaster do
          %ContainerRef{type: :room, id: rid},
          oid
        ) do
-    actor_username = lookup_username(pid)
+    actor_name = lookup_name(pid)
     {name, short} = lookup_object(oid)
 
     Phoenix.PubSub.broadcast(@pubsub, Topics.room_topic(rid), %RoomObjectDropped{
       room_id: rid,
       actor_id: pid,
-      actor_username: actor_username,
+      actor_name: actor_name,
       object_id: oid,
       object_name: name
     })
@@ -600,11 +600,11 @@ defmodule AgenticRealms.World.UIEventBroadcaster do
     end
   end
 
-  defp lookup_username(player_id) do
-    case Accounts.get_player(player_id) do
-      nil -> "unknown player"
-      %{username: u} -> u
-    end
+  # Feature 021 — what a player is called in the world is their character's
+  # name. The fallback survives for a state that no longer arises: a player
+  # without a character is never spawned, so they are never the actor here.
+  defp lookup_name(player_id) do
+    PlayerNames.get(player_id) || "unknown player"
   end
 
   defp lookup_object(object_id) do

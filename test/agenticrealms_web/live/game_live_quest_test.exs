@@ -58,7 +58,9 @@ defmodule AgenticRealmsWeb.GameLiveQuestTest do
     # to drive Blackmire → Hollowvale movement. We use the existing
     # MovePlayer pathway by directly dispatching, since the seed exits
     # are set up.
+    AgenticRealms.DataCase.create_character!(alice.id, name: alice.username)
     {:ok, _} = WorldCommands.spawn(alice.id, Seed.starting_room_id())
+    AgenticRealms.DataCase.create_character!(bob.id, name: bob.username)
     {:ok, _} = WorldCommands.spawn(bob.id, Seed.starting_room_id())
 
     alice_conn =

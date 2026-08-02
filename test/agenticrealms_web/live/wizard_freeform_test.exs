@@ -38,7 +38,9 @@ defmodule AgenticRealmsWeb.WizardFreeformTest do
       Accounts.register_player(%{username: "wit_#{suffix}", password: "pw12345678"})
 
     {:ok, _} = Accounts.promote_to_wizard(wizard.id)
+    AgenticRealms.DataCase.create_character!(wizard.id, name: wizard.username)
     {:ok, _} = Commands.spawn(wizard.id, Seed.starting_room_id())
+    AgenticRealms.DataCase.create_character!(witness.id, name: witness.username)
     {:ok, _} = Commands.spawn(witness.id, Seed.starting_room_id())
 
     %{

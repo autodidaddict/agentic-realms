@@ -7,9 +7,10 @@ defmodule Srd.Content.Choice do
   `from`. Content carries choices rather than prose so a caller can present the
   options without parsing anything.
 
-  What sits in `from` follows the `kind`: skills and abilities are atoms, tools,
-  feats, and weapons are slugs, equipment holds `Srd.Content.Bundle` structs,
-  lineages hold `Srd.Content.Lineage` structs, and features hold option names.
+  What sits in `from` follows the `kind`: skills, abilities, and sizes are
+  atoms, tools, feats, and weapons are slugs, equipment holds
+  `Srd.Content.Bundle` structs, lineages hold `Srd.Content.Lineage` structs, and
+  features hold option names.
 
   Content data can write `from: {:items, category}`, `{:feats, category}`, or
   `{:weapons, filters}` in place of a list, which expands to the matching slugs.
@@ -21,12 +22,21 @@ defmodule Srd.Content.Choice do
   alias Srd.Content.Items
   alias Srd.Content.Weapons
 
-  @kinds ~w(ability equipment feat feature lineage skill tool weapon)a
+  @kinds ~w(ability equipment feat feature lineage size skill tool weapon)a
 
   @enforce_keys [:kind, :choose, :from]
   defstruct [:kind, :choose, :from]
 
-  @type kind :: :ability | :equipment | :feat | :feature | :lineage | :skill | :tool | :weapon
+  @type kind ::
+          :ability
+          | :equipment
+          | :feat
+          | :feature
+          | :lineage
+          | :size
+          | :skill
+          | :tool
+          | :weapon
 
   @typedoc """
   A choice:

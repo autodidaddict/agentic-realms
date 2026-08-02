@@ -56,7 +56,7 @@ defmodule AgenticRealms.World.IntentResolver.ContextSnapshot do
     Exits: #{format_exits(room.exits)}
     Objects here: #{format_names(room.objects)}
     NPCs here: #{format_npcs(room.npcs)}
-    Other players present: #{format_usernames(room.other_players)}
+    Other players present: #{format_names(room.other_players)}
     Your inventory: #{format_inventory(inventory)}
 
     Player typed: #{raw_input}
@@ -80,11 +80,10 @@ defmodule AgenticRealms.World.IntentResolver.ContextSnapshot do
     Enum.map_join(exits, ", ", fn e -> "#{e.direction} (#{e.target_name})" end)
   end
 
+  # Objects and players are both `%{name: ...}` since feature 021, so one
+  # formatter serves both.
   defp format_names([]), do: "(none)"
-  defp format_names(objects), do: Enum.map_join(objects, ", ", & &1.name)
-
-  defp format_usernames([]), do: "(none)"
-  defp format_usernames(players), do: Enum.map_join(players, ", ", & &1.username)
+  defp format_names(entries), do: Enum.map_join(entries, ", ", & &1.name)
 
   defp format_npcs([]), do: "(none)"
 

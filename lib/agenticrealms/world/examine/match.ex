@@ -6,8 +6,8 @@ defmodule AgenticRealms.World.Examine.Match do
     * `:object` — `name` is the object's stored name (`world_objects.name`
       preserved casing); `long_description` is `world_objects.long_description`
       verbatim.
-    * `:player` — `name` is the matched player's display username
-      (`account_players.username` preserved casing); `long_description` is
+    * `:player` — `name` is the matched player's character name
+      (`player_state.character_name`, preserved casing); `long_description` is
       `nil` — the player render branch hard-codes the placeholder body.
     * `:npc` — `name` is the NPC's stored display name; `long_description`
       is `world_npcs.long_description` verbatim. Render contract identical

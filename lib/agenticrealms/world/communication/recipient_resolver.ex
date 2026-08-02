@@ -1,7 +1,11 @@
 defmodule AgenticRealms.World.Communication.RecipientResolver do
   @moduledoc """
-  Resolves a player-typed recipient token to a `%{id, username}` map via
-  case-insensitive exact match against `AgenticRealms.Accounts.Player.username`.
+  Resolves a player-typed recipient token to a `%{id, name}` map via
+  case-insensitive exact match against a character's name.
+
+  Feature 021 — players are addressed by their character's name, not their
+  login. A player with no character has no name to be addressed by, and is never
+  in a room to be whispered at.
 
   Shared by `World.Communication.tell/3` and `World.Communication.whisper/3`.
   Behavior is governed by FR-010 (case-insensitive exact match, ambiguous
@@ -12,10 +16,10 @@ defmodule AgenticRealms.World.Communication.RecipientResolver do
 
   import Ecto.Query
 
-  alias AgenticRealms.Accounts.Player
   alias AgenticRealms.Repo
+  alias AgenticRealms.World.Schemas.PlayerState
 
-  @type resolved :: %{id: integer(), username: binary()}
+  @type resolved :: %{id: integer(), name: binary()}
 
   @spec resolve(name :: binary(), sender_id :: integer()) ::
           {:ok, resolved()}
@@ -23,9 +27,9 @@ defmodule AgenticRealms.World.Communication.RecipientResolver do
           | {:error, :ambiguous}
           | {:error, :self_target}
   def resolve(name, sender_id) when is_binary(name) and is_integer(sender_id) do
-    from(p in Player,
-      where: fragment("LOWER(?) = LOWER(?)", p.username, ^name),
-      select: %{id: p.id, username: p.username}
+    from(ps in PlayerState,
+      where: fragment("LOWER(?) = LOWER(?)", ps.character_name, ^name),
+      select: %{id: ps.player_id, name: ps.character_name}
     )
     |> Repo.all()
     |> case do

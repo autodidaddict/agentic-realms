@@ -32,7 +32,9 @@ defmodule AgenticRealmsWeb.WizardRegistryLiveUpdateTest do
 
     {:ok, _} = Accounts.promote_to_wizard(alice.id)
     {:ok, _} = Accounts.promote_to_wizard(bob.id)
+    AgenticRealms.DataCase.create_character!(alice.id, name: alice.username)
     {:ok, _} = Commands.spawn(alice.id, Seed.starting_room_id())
+    AgenticRealms.DataCase.create_character!(bob.id, name: bob.username)
     {:ok, _} = Commands.spawn(bob.id, Seed.starting_room_id())
 
     %{

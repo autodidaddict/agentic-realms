@@ -29,7 +29,10 @@ defmodule Srd.Character do
   """
 
   alias Srd.Content.Backgrounds
+  alias Srd.Content.Choice
   alias Srd.Content.Classes
+  alias Srd.Content.Feats
+  alias Srd.Content.Feature
   alias Srd.Content.Species
   alias Srd.Rules.Ability
   alias Srd.Rules.ArmorClass
@@ -99,9 +102,7 @@ defmodule Srd.Character do
       max_hit_points: Hitpoints.maximum(class.hit_die, level, modifiers.con),
       hit_dice: Hitpoints.hit_dice(class.hit_die, level),
       armor_class:
-        ArmorClass.compute(Map.get(facts, :armor), modifiers.dex,
-          shield: Map.get(facts, :shield)
-        ),
+        ArmorClass.compute(Map.get(facts, :armor), modifiers.dex, shield: Map.get(facts, :shield)),
       initiative: Initiative.modifier(modifiers.dex),
       passive_perception: Check.passive(modifier_for(skills, :perception)),
       abilities: abilities(scores, modifiers),
@@ -109,6 +110,257 @@ defmodule Srd.Character do
       skills: skills
     }
   end
+
+  @typedoc """
+  What a caller has settled on so far. Every field is optional, so a builder can
+  ask what an elf still has to decide before a class is picked. `:level`
+  defaults to 1.
+  """
+  @type selections :: %{
+          optional(:species) => String.t() | nil,
+          optional(:class) => String.t() | nil,
+          optional(:background) => String.t() | nil,
+          optional(:level) => pos_integer()
+        }
+
+  @typedoc """
+  A decision that is still open:
+
+  * `:key` - a stable identifier, so a caller can address the answer
+  * `:source` - which of the three offered it
+  * `:label` - what to call it, taken from the content
+  * `:text` - the feature's restated mechanics, when it came from a feature
+  * `:choice` - the `Srd.Content.Choice` itself
+  """
+  @type open_choice :: %{
+          key: choice_key(),
+          source: :species | :class | :background,
+          label: String.t(),
+          text: String.t() | nil,
+          choice: Choice.t()
+        }
+
+  @typedoc "How an open choice is addressed."
+  @type choice_key ::
+          :species_size
+          | :species_lineage
+          | :class_skills
+          | :class_tool
+          | :background_tool
+          | {:feature, String.t()}
+
+  @doc """
+  Every decision the selections leave open at their level.
+
+  The counterpart to `derive/1`. That one says what follows from a character's
+  choices; this one says which choices are still to be made, so a builder can
+  ask without knowing what it is asking about.
+
+  A choice comes back only if it is genuinely open. One with no more options
+  than picks is already settled, so it is a grant rather than a question and
+  `grants/1` reports it instead. One the SRD defers to a higher level is not
+  returned until the level reaches it, which is why a level 1 character is never
+  asked for a subclass.
+
+  Selections may be partial: an absent or `nil` species contributes nothing, and
+  `choices(%{})` is `[]`.
+
+  Order is stable and part of the contract — species, then class, then
+  background, and within a source the order the content lists them, with a
+  species' size and lineage ahead of its features. Render the list as given.
+
+      iex> Srd.Character.choices(%{species: "elf"}) |> Enum.map(& &1.key)
+      [:species_lineage, {:feature, "Keen Senses"}]
+
+      iex> Srd.Character.choices(%{class: "fighter"}) |> Enum.map(& &1.key)
+      [:class_skills, {:feature, "Fighting Style"}, {:feature, "Weapon Mastery"}]
+
+      iex> Srd.Character.choices(%{species: "dwarf", class: "wizard", background: "sage"})
+      ...> |> Enum.map(& &1.key)
+      [:class_skills]
+
+  Raises `ArgumentError` for a slug no content matches.
+  """
+  @spec choices(selections()) :: [open_choice()]
+  def choices(%{} = selections) do
+    level = Map.get(selections, :level, 1)
+
+    species_choices(selection(selections, :species, &fetch_species!/1), level) ++
+      class_choices(selection(selections, :class, &fetch_class!/1), level) ++
+      background_choices(selection(selections, :background, &fetch_background!/1))
+  end
+
+  defp species_choices(nil, _level), do: []
+
+  defp species_choices(species, level) do
+    size =
+      offer(:species_size, :species, "Size", nil, %Choice{
+        kind: :size,
+        choose: 1,
+        from: species.sizes
+      })
+
+    lineage =
+      offer(:species_lineage, :species, species.lineage_trait, nil, %Choice{
+        kind: :lineage,
+        choose: 1,
+        from: species.lineages
+      })
+
+    size ++ lineage ++ feature_choices(species.features, :species, level)
+  end
+
+  defp class_choices(nil, _level), do: []
+
+  defp class_choices(class, level) do
+    skills = offer(:class_skills, :class, "Skill Proficiencies", nil, class.skill_choice)
+    tool = offer(:class_tool, :class, "Tool Proficiency", nil, class.tool_proficiency)
+
+    skills ++ tool ++ feature_choices(class.features, :class, level)
+  end
+
+  defp background_choices(nil), do: []
+
+  defp background_choices(background) do
+    offer(:background_tool, :background, "Tool Proficiency", nil, background.tool)
+  end
+
+  # Every feature in force at the level that still asks something. Keyed by the
+  # feature's name, which is how a fighting style is offered without this
+  # module ever learning what one is.
+  defp feature_choices(features, source, level) do
+    features
+    |> Feature.through_level(level)
+    |> Enum.flat_map(fn feature ->
+      offer({:feature, feature.name}, source, feature.name, feature.text, feature.choice)
+    end)
+  end
+
+  # A choice is worth offering only when it is present and not already settled.
+  # Returning a list rather than a nil keeps every caller a flat_map.
+  defp offer(_key, _source, _label, _text, nil), do: []
+
+  defp offer(key, source, label, text, %Choice{} = choice) do
+    if Choice.fixed?(choice) do
+      []
+    else
+      [%{key: key, source: source, label: label, text: text, choice: choice}]
+    end
+  end
+
+  @typedoc """
+  What the selections give outright:
+
+  * `:skills` - skill proficiencies, from the background and any settled choice
+  * `:saves` - the class's saving throw proficiencies
+  * `:feats` - the background's origin feat
+  * `:tools` - tool proficiencies whose choice was already settled
+  * `:features` - every feature in force at the level, granted feats included
+
+  Which abilities a background may raise is deliberately absent. It is not
+  granted — it is the set an increase may be spent on — and
+  `Srd.Content.Backgrounds.get(slug).ability_scores` already says so.
+  """
+  @type grants :: %{
+          skills: [Skill.skill()],
+          saves: [Ability.t()],
+          feats: [String.t()],
+          tools: [String.t()],
+          features: [Feature.t()]
+        }
+
+  @doc """
+  What a species, class, and background grant outright, with nothing to choose.
+
+  The other half of `choices/1`. A choice with no more options than picks is not
+  a question, so it is reported here instead; between the two functions every
+  decision the content carries is either answered or asked, and none is dropped.
+
+  Every list is deduplicated and sorted, so a feat granted by two sources
+  appears once. `:features` keeps content order rather than being sorted,
+  because a feature list reads by level.
+
+      iex> Srd.Character.grants(%{background: "soldier"}).skills
+      [:athletics, :intimidation]
+
+      iex> Srd.Character.grants(%{class: "fighter"}).saves
+      [:con, :str]
+
+  Raises `ArgumentError` for a slug no content matches.
+  """
+  @spec grants(selections()) :: grants()
+  def grants(%{} = selections) do
+    level = Map.get(selections, :level, 1)
+
+    species = selection(selections, :species, &fetch_species!/1)
+    class = selection(selections, :class, &fetch_class!/1)
+    background = selection(selections, :background, &fetch_background!/1)
+
+    feats = sorted(if(background, do: [background.origin_feat], else: []))
+
+    %{
+      skills: sorted(settled(:skill, species, class, background)),
+      saves: sorted(if(class, do: class.saving_throws, else: [])),
+      feats: feats,
+      tools: sorted(settled(:tool, species, class, background)),
+      features: features_in_force(species, class, feats, level)
+    }
+  end
+
+  # Skills a background hands over, plus anything a settled choice of that kind
+  # decided for the character. The `choices/1` side omits exactly these.
+  defp settled(:skill, species, class, background) do
+    granted = if background, do: background.skills, else: []
+    granted ++ settled_options(:skill, species, class, background)
+  end
+
+  defp settled(:tool, species, class, background) do
+    settled_options(:tool, species, class, background)
+  end
+
+  defp settled_options(kind, species, class, background) do
+    [
+      species && species.features,
+      class && class.features,
+      class && class.tool_proficiency,
+      background && background.tool
+    ]
+    |> Enum.flat_map(&settled_from/1)
+    |> Enum.filter(&(&1.kind == kind))
+    |> Enum.flat_map(& &1.from)
+  end
+
+  defp settled_from(nil), do: []
+  defp settled_from(%Choice{} = choice), do: if(Choice.fixed?(choice), do: [choice], else: [])
+
+  defp settled_from(features) when is_list(features) do
+    features
+    |> Enum.map(& &1.choice)
+    |> Enum.flat_map(&settled_from/1)
+  end
+
+  defp features_in_force(species, class, feats, level) do
+    feat_features =
+      feats
+      |> Enum.map(&Feats.get/1)
+      |> Enum.reject(&is_nil/1)
+      |> Enum.flat_map(& &1.features)
+
+    [species && species.features, class && class.features]
+    |> Enum.reject(&is_nil/1)
+    |> Enum.flat_map(&Feature.through_level(&1, level))
+    |> Kernel.++(Feature.through_level(feat_features, level))
+    |> Enum.uniq()
+  end
+
+  defp selection(selections, key, fetch) do
+    case Map.get(selections, key) do
+      nil -> nil
+      slug -> fetch.(slug)
+    end
+  end
+
+  defp sorted(values), do: values |> Enum.uniq() |> Enum.sort()
 
   # --- sections ------------------------------------------------------------
 

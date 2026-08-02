@@ -21,9 +21,9 @@ defmodule AgenticRealms.World.Examine do
   resolve only to the acting player.
   """
 
-  alias AgenticRealms.Accounts
   alias AgenticRealms.Repo
   alias AgenticRealms.World.Examine.Match
+  alias AgenticRealms.World.PlayerNames
   alias AgenticRealms.World.Queries
   alias AgenticRealms.World.Schemas.{NPCClone, PlayerState}
   alias AgenticRealms.World.Stats
@@ -61,9 +61,9 @@ defmodule AgenticRealms.World.Examine do
 
     cond do
       needle in @self_aliases ->
-        case acting_username(player_id) do
-          {:ok, username} ->
-            match = %Match{target_kind: :player, name: username, id: player_id}
+        case acting_name(player_id) do
+          {:ok, name} ->
+            match = %Match{target_kind: :player, name: name, id: player_id}
             {:ok, enrich(match, player_id, player_level(player_id))}
 
           :error ->
@@ -146,8 +146,8 @@ defmodule AgenticRealms.World.Examine do
       inventory = Queries.list_inventory(player_id)
 
       players =
-        case acting_username(player_id) do
-          {:ok, name} -> [%{id: player_id, username: name} | room_view.other_players]
+        case acting_name(player_id) do
+          {:ok, name} -> [%{id: player_id, name: name} | room_view.other_players]
           :error -> room_view.other_players
         end
 
@@ -167,10 +167,13 @@ defmodule AgenticRealms.World.Examine do
     end
   end
 
-  defp acting_username(player_id) do
-    case Accounts.get_player(player_id) do
-      %{username: u} when is_binary(u) -> {:ok, u}
-      _ -> :error
+  # Feature 021 — a player is examined by their character's name, not their
+  # login. `:error` means they have no character yet, which cannot happen for a
+  # player who is in a room.
+  defp acting_name(player_id) do
+    case PlayerNames.get(player_id) do
+      name when is_binary(name) -> {:ok, name}
+      nil -> :error
     end
   end
 
@@ -255,10 +258,10 @@ defmodule AgenticRealms.World.Examine do
     do: Enum.filter(objs, fn o -> String.contains?(String.downcase(o.name), target) end)
 
   defp filter_players_exact(players, target),
-    do: Enum.filter(players, fn p -> String.downcase(p.username) == target end)
+    do: Enum.filter(players, fn p -> String.downcase(p.name) == target end)
 
   defp filter_players_partial(players, target),
-    do: Enum.filter(players, fn p -> String.contains?(String.downcase(p.username), target) end)
+    do: Enum.filter(players, fn p -> String.contains?(String.downcase(p.name), target) end)
 
   defp filter_npcs_exact(npcs, target),
     do: Enum.filter(npcs, fn n -> String.downcase(n.name) == target end)
@@ -272,7 +275,7 @@ defmodule AgenticRealms.World.Examine do
     %Match{target_kind: :object, name: name, long_description: long_description_of(obj)}
   end
 
-  defp player_match(%{id: id, username: name}) do
+  defp player_match(%{id: id, name: name}) do
     %Match{target_kind: :player, name: name, id: id, long_description: nil}
   end
 

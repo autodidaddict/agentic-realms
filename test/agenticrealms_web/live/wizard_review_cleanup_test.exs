@@ -36,6 +36,7 @@ defmodule AgenticRealmsWeb.WizardReviewCleanupTest do
       Accounts.register_player(%{username: "wclean_#{suffix}", password: "pw12345678"})
 
     {:ok, _} = Accounts.promote_to_wizard(wizard.id)
+    AgenticRealms.DataCase.create_character!(wizard.id, name: wizard.username)
     {:ok, _} = Commands.spawn(wizard.id, Seed.starting_room_id())
 
     %{
@@ -182,6 +183,7 @@ defmodule AgenticRealmsWeb.WizardReviewCleanupTest do
       Accounts.register_player(%{username: "bobclean_#{suffix}", password: "pw12345678"})
 
     {:ok, _} = Accounts.promote_to_wizard(bob.id)
+    AgenticRealms.DataCase.create_character!(bob.id, name: bob.username)
     {:ok, _} = Commands.spawn(bob.id, Seed.starting_room_id())
 
     # Sign Bob in first; assign starts as a list of structs from the

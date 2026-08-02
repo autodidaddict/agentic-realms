@@ -127,4 +127,104 @@ defmodule AgenticRealms.World.CharacterGenTest do
       assert CharacterGen.default() == CharacterGen.default(@defaults)
     end
   end
+
+  describe "complete/1 — the hand-over as steps ship (feature 021)" do
+    alias AgenticRealms.World.CharacterDraft, as: Draft
+
+    defp identity_draft do
+      Draft.new()
+      |> Draft.put_name("Handover")
+      |> Draft.put_selection(:species, "human")
+      |> Draft.put_selection(:class, "fighter")
+      |> Draft.put_selection(:background, "soldier")
+    end
+
+    test "US2 shipped: a player-assigned array is left exactly as they set it" do
+      draft =
+        [str: 8, dex: 10, con: 12, int: 13, wis: 14, cha: 15]
+        |> Enum.reduce(identity_draft(), fn {ability, value}, acc ->
+          Draft.assign_ability(acc, ability, value)
+        end)
+
+      assert CharacterGen.complete(draft).array == draft.array
+    end
+
+    test "US2 shipped: a player-chosen spread is left exactly as they set it" do
+      draft = identity_draft() |> Draft.put_spread({:even, [:str, :dex, :con]})
+
+      assert CharacterGen.complete(draft).spread == {:even, [:str, :dex, :con]}
+    end
+
+    test "US3 shipped: player-chosen skills are left exactly as they picked them" do
+      draft =
+        identity_draft()
+        |> Draft.toggle_skill(:acrobatics)
+        |> Draft.toggle_skill(:survival)
+
+      assert CharacterGen.complete(draft).skill_picks == [:acrobatics, :survival]
+    end
+
+    test "US4 shipped: player-chosen lineage, size, and features are left alone" do
+      draft =
+        Draft.new()
+        |> Draft.put_name("Handover")
+        |> Draft.put_selection(:species, "elf")
+        |> Draft.put_selection(:class, "fighter")
+        |> Draft.put_selection(:background, "soldier")
+        |> Draft.toggle_choice(:species_lineage, "wood-elf")
+        |> Draft.toggle_choice({:feature, "Fighting Style"}, "archery")
+
+      completed = CharacterGen.complete(draft)
+
+      assert completed.choices[:species_lineage] == ["wood-elf"]
+      assert completed.choices[{:feature, "Fighting Style"}] == ["archery"]
+    end
+
+    test "a fully-answered draft completes to itself" do
+      # Once every step has shipped, complete/1 has nothing left to do. It is
+      # not removed — `default/0` still needs the fills for seeds and tests.
+      answered =
+        [str: 15, dex: 14, con: 13, int: 12, wis: 10, cha: 8]
+        |> Enum.reduce(identity_draft(), fn {ability, value}, acc ->
+          Draft.assign_ability(acc, ability, value)
+        end)
+        |> Draft.put_spread({:split, :str, :con})
+        |> Draft.toggle_skill(:acrobatics)
+        |> Draft.toggle_skill(:perception)
+
+      answered =
+        answered
+        |> Draft.open_choices()
+        |> Enum.reject(&(&1.key == :class_skills))
+        |> Enum.reduce(answered, fn open, acc ->
+          open.choice.from
+          |> Enum.take(open.choice.choose)
+          |> Enum.reduce(acc, fn option, inner ->
+            value = if is_map(option), do: option.slug, else: option
+            Draft.toggle_choice(inner, open.key, value)
+          end)
+        end)
+
+      assert CharacterGen.complete(answered) == answered
+    end
+
+    test "the fills still exist for a draft that has not been asked" do
+      # Nothing is deleted as a step ships — the fill simply stops firing,
+      # because the dialog no longer leaves a gap. `default/0` still needs it.
+      completed = CharacterGen.complete(identity_draft())
+
+      assert map_size(completed.array) == 6
+      assert completed.spread != nil
+      assert length(completed.skill_picks) == 2
+      assert completed.choices != %{}
+    end
+
+    test "default/0 still generates a whole character for seeds and tests" do
+      character = CharacterGen.default()
+
+      assert character.species_slug
+      assert map_size(character.abilities) == 6
+      assert character.max_hp > 0
+    end
+  end
 end

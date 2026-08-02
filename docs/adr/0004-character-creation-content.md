@@ -281,3 +281,38 @@ The SRD says a fighter picks two skills from a list; it does not say which two.
 Picking is the game's business, and the package supplies only the raw material —
 `Ability.standard_array/0`, `Background.spreads/0`, and each class's
 `skill_choice`.
+
+## Amendment: what is still open (2026-08-02, feature 021)
+
+The package gained two more functions, both on `Srd.Character`:
+
+- `choices/1` takes a species, class, and background and returns every
+  pick-N-of-M decision they leave open at a level — a lineage, a size, a class's
+  skills, a fighting style, a Divine Order — each tagged with a stable key, the
+  source that offered it, a label, and the `Choice` itself.
+- `grants/1` returns what those three give outright, including the tool
+  proficiencies and feats whose choice was already settled.
+
+`Srd.Content.Choice` gained a `:size` kind so a species offering more than one
+size asks for it the same way everything else is asked.
+
+**This needs no amendment to the line above, and the amendment exists to say
+so.** What that section rejected was "an `Srd.Character` that holds choices and
+validates a finished build". Neither function holds anything: selections go in,
+options come out, and no partial build, validation state, or character is
+constructed. It is the ADR's own stated purpose — "'what may be chosen here' is
+the same question in all four places, and it is the question a character builder
+asks over and over" — answered once across all five content types instead of
+field by field.
+
+Nothing was added for validation. Feature 021's consumer validates a submission
+by checking each pick against the options `choices/1` offered, which is set
+membership rather than rules, so the game validates a fighting style without
+knowing what one is. That is why a `validate/1` was considered and left out: it
+would have been the rejected alternative, and it would have bought nothing the
+set comparison does not already give.
+
+The division of labour is unchanged. The package says what may be chosen; the
+consumer does the choosing, holds the draft, and persists the result. Feature
+021's `AgenticRealms.World.CharacterDraft` lives in a LiveView socket, exactly
+where the ADR said a partial build belongs.

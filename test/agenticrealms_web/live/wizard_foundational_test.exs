@@ -36,7 +36,9 @@ defmodule AgenticRealmsWeb.WizardFoundationalTest do
     {:ok, _} = Accounts.promote_to_wizard(wizard.id)
 
     starting = Seed.starting_room_id()
+    AgenticRealms.DataCase.create_character!(wizard.id, name: wizard.username)
     {:ok, _} = Commands.spawn(wizard.id, starting)
+    AgenticRealms.DataCase.create_character!(witness.id, name: witness.username)
     {:ok, _} = Commands.spawn(witness.id, starting)
 
     %{

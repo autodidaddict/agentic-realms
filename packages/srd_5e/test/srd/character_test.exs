@@ -278,7 +278,8 @@ defmodule Srd.CharacterTest do
     end
 
     test "a shield adds its bonus" do
-      sheet = Character.derive(facts(armor: Armors.get("chain-mail"), shield: Armors.get("shield")))
+      sheet =
+        Character.derive(facts(armor: Armors.get("chain-mail"), shield: Armors.get("shield")))
 
       assert sheet.armor_class == 18
     end

@@ -58,7 +58,15 @@ defmodule AgenticRealms.World.Behaviors.InterpreterTest do
     {:ok, player} =
       Accounts.register_player(%{username: "#{label}_#{suffix}", password: "pw12345678"})
 
-    Repo.insert!(%PlayerState{player_id: player.id, current_room_id: room.id})
+    # Feature 021 — a row with no character is not a player in the world, so
+    # room queries skip it. Give them one.
+    Repo.insert!(
+      struct!(
+        PlayerState,
+        [player_id: player.id, current_room_id: room.id] ++
+          AgenticRealms.DataCase.character_columns(character_name: player.username)
+      )
+    )
 
     {:ok, _} = Presence.track_player(self(), player.id, player.username)
     Process.sleep(20)

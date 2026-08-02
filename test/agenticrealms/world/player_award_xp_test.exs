@@ -23,6 +23,7 @@ defmodule AgenticRealms.World.PlayerAwardXpTest do
   defp create_command do
     %CreateCharacter{
       player_id: 1,
+      character_name: "Gandalf",
       species_slug: "human",
       class_slug: "fighter",
       background_slug: "soldier",

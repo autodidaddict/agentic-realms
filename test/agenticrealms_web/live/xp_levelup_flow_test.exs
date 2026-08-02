@@ -43,7 +43,8 @@ defmodule AgenticRealmsWeb.XpLevelupFlowTest do
     {:ok, alice} = Accounts.register_player(%{username: "xp_#{suffix}", password: "pw12345678"})
     # Feature 020 — mount creates the character before spawning; this setup
     # bypasses mount, so it does the same two dispatches in the same order.
-    {:ok, _} = WorldCommands.ensure_character(alice.id)
+    AgenticRealms.DataCase.create_character!(alice.id, name: alice.username)
+    AgenticRealms.DataCase.create_character!(alice.id, name: alice.username)
     {:ok, _} = WorldCommands.spawn(alice.id, Seed.starting_room_id())
 
     conn =

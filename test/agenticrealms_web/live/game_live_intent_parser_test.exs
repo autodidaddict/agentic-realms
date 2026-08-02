@@ -39,6 +39,7 @@ defmodule AgenticRealmsWeb.GameLiveIntentParserTest do
 
     suffix = System.unique_integer([:positive])
     {:ok, player} = Accounts.register_player(%{username: "ip_#{suffix}", password: "pw12345678"})
+    AgenticRealms.DataCase.create_character!(player.id, name: player.username)
     {:ok, _} = Commands.spawn(player.id, Seed.starting_room_id())
 
     player_conn =

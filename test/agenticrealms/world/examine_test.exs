@@ -60,7 +60,8 @@ defmodule AgenticRealms.World.ExamineTest do
     Repo.insert!(
       struct!(
         PlayerState,
-        [player_id: player.id, current_room_id: room.id] ++ DataCase.character_columns()
+        [player_id: player.id, current_room_id: room.id] ++
+          DataCase.character_columns(character_name: player.username)
       )
     )
   end
@@ -258,7 +259,7 @@ defmodule AgenticRealms.World.ExamineTest do
         struct!(
           PlayerState,
           [player_id: offline.id, current_room_id: bob_room_id(bob)] ++
-            DataCase.character_columns()
+            DataCase.character_columns(character_name: offline.username)
         )
       )
 

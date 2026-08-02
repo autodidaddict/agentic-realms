@@ -34,8 +34,9 @@ defmodule AgenticRealms.World.StatsSheetTest do
       %{player: player, sheet: Stats.for_player(player.id)}
     end
 
-    test "carries the player's name", %{player: player, sheet: sheet} do
-      assert sheet.name == player.username
+    test "carries the character's name, not the account's", %{player: player, sheet: sheet} do
+      assert sheet.name == AgenticRealms.World.CharacterGen.default().character_name
+      refute sheet.name == player.username
     end
 
     test "identity comes back resolved, not as slugs", %{sheet: sheet} do

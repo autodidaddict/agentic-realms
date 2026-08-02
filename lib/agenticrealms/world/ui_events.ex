@@ -10,23 +10,23 @@ defmodule AgenticRealms.World.UIEvents do
   """
 
   defmodule RoomObjectTaken do
-    @enforce_keys [:room_id, :actor_id, :actor_username, :object_id, :object_name]
-    defstruct [:room_id, :actor_id, :actor_username, :object_id, :object_name]
+    @enforce_keys [:room_id, :actor_id, :actor_name, :object_id, :object_name]
+    defstruct [:room_id, :actor_id, :actor_name, :object_id, :object_name]
   end
 
   defmodule RoomObjectDropped do
-    @enforce_keys [:room_id, :actor_id, :actor_username, :object_id, :object_name]
-    defstruct [:room_id, :actor_id, :actor_username, :object_id, :object_name]
+    @enforce_keys [:room_id, :actor_id, :actor_name, :object_id, :object_name]
+    defstruct [:room_id, :actor_id, :actor_name, :object_id, :object_name]
   end
 
   defmodule RoomPlayerArrived do
-    @enforce_keys [:room_id, :actor_id, :actor_username]
-    defstruct [:room_id, :actor_id, :actor_username, :from_direction, carried_object_ids: []]
+    @enforce_keys [:room_id, :actor_id, :actor_name]
+    defstruct [:room_id, :actor_id, :actor_name, :from_direction, carried_object_ids: []]
   end
 
   defmodule RoomPlayerLeft do
-    @enforce_keys [:room_id, :actor_id, :actor_username, :to_direction]
-    defstruct [:room_id, :actor_id, :actor_username, :to_direction, carried_object_ids: []]
+    @enforce_keys [:room_id, :actor_id, :actor_name, :to_direction]
+    defstruct [:room_id, :actor_id, :actor_name, :to_direction, carried_object_ids: []]
   end
 
   defmodule RoomNPCLeft do
@@ -118,8 +118,8 @@ defmodule AgenticRealms.World.UIEvents do
     signal, not world state. See
     `specs/014-item-blueprints/research.md` R3.
     """
-    @enforce_keys [:room_id, :wizard_id, :wizard_username]
-    defstruct [:room_id, :wizard_id, :wizard_username]
+    @enforce_keys [:room_id, :wizard_id, :wizard_name]
+    defstruct [:room_id, :wizard_id, :wizard_name]
   end
 
   defmodule RoomTranceExited do
@@ -130,8 +130,8 @@ defmodule AgenticRealms.World.UIEvents do
     per FR-005 by virtue of the LiveView's terminate callback NOT firing
     this event (only an explicit toggle does).
     """
-    @enforce_keys [:room_id, :wizard_id, :wizard_username]
-    defstruct [:room_id, :wizard_id, :wizard_username]
+    @enforce_keys [:room_id, :wizard_id, :wizard_name]
+    defstruct [:room_id, :wizard_id, :wizard_name]
   end
 
   defmodule RoomNPCArrived do
@@ -184,11 +184,11 @@ defmodule AgenticRealms.World.UIEvents do
     subscribers MUST drop it based on `recipient_id`. See
     `specs/004-player-communication/contracts/ui_events.md`.
     """
-    @enforce_keys [:room_id, :actor_id, :actor_username, :actor_session_id, :kind, :text]
+    @enforce_keys [:room_id, :actor_id, :actor_name, :actor_session_id, :kind, :text]
     defstruct [
       :room_id,
       :actor_id,
-      :actor_username,
+      :actor_name,
       :actor_session_id,
       :kind,
       :text,
@@ -204,8 +204,8 @@ defmodule AgenticRealms.World.UIEvents do
     no actor-side filter is needed. See
     `specs/004-player-communication/contracts/ui_events.md`.
     """
-    @enforce_keys [:actor_id, :actor_username, :recipient_id, :kind, :text]
-    defstruct [:actor_id, :actor_username, :recipient_id, :kind, :text]
+    @enforce_keys [:actor_id, :actor_name, :recipient_id, :kind, :text]
+    defstruct [:actor_id, :actor_name, :recipient_id, :kind, :text]
   end
 
   defmodule ChatUtterance do

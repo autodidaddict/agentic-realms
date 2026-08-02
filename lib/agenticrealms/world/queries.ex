@@ -9,7 +9,6 @@ defmodule AgenticRealms.World.Queries do
   import Ecto.Query
 
   alias AgenticRealms.Repo
-  alias AgenticRealms.Accounts.Player, as: AccountPlayer
   alias AgenticRealms.World.RoomView
 
   alias AgenticRealms.World.Schemas.{
@@ -387,20 +386,22 @@ defmodule AgenticRealms.World.Queries do
   end
 
   @doc """
-  Feature 018 — online players currently in `room_id` (id + username), for the
+  Feature 018 — online players currently in `room_id` (id + name), for the
   external NPC surroundings read. Mirrors the online-presence filtering used for
   the player-facing room view, but without any self-exclusion (the caller is a
   service, not a player).
+
+  Feature 021 — the name is the character's, not the account's, and the sort
+  follows it. A player with no character has none to show, so they are excluded
+  the same way an offline one is; they are never in a room to begin with.
   """
-  @spec list_players_in_room(String.t()) :: [%{id: integer(), username: String.t()}]
+  @spec list_players_in_room(String.t()) :: [%{id: integer(), name: String.t()}]
   def list_players_in_room(room_id) when is_binary(room_id) do
     rows =
       from(ps in PlayerState,
-        join: p in AccountPlayer,
-        on: p.id == ps.player_id,
-        where: ps.current_room_id == ^room_id,
-        order_by: p.username,
-        select: %{id: p.id, username: p.username}
+        where: ps.current_room_id == ^room_id and not is_nil(ps.character_name),
+        order_by: ps.character_name,
+        select: %{id: ps.player_id, name: ps.character_name}
       )
       |> Repo.all()
 
@@ -412,7 +413,7 @@ defmodule AgenticRealms.World.Queries do
   All players currently in `room_id` except `self_player_id`. Drives the
   Present HUD card and the `other_players` list in `look_room/1`.
   """
-  @spec other_occupants_of(String.t(), integer()) :: [%{id: integer(), username: String.t()}]
+  @spec other_occupants_of(String.t(), integer()) :: [%{id: integer(), name: String.t()}]
   def other_occupants_of(room_id, self_player_id)
       when is_binary(room_id) and is_integer(self_player_id) do
     list_other_players(room_id, self_player_id)
@@ -425,7 +426,7 @@ defmodule AgenticRealms.World.Queries do
   room/object speech, and by `RoomTicks.Lifecycle` to seed live-occupant
   state on Scheduler init.
 
-  Returns ids only — no usernames — to keep this hot path cheap.
+  Returns ids only — no names — to keep this hot path cheap.
   """
   @spec live_occupants_of(String.t()) :: [integer()]
   def live_occupants_of(room_id) when is_binary(room_id) do
@@ -465,11 +466,11 @@ defmodule AgenticRealms.World.Queries do
   defp list_other_players(room_id, self_player_id) do
     rows =
       from(ps in PlayerState,
-        join: p in AccountPlayer,
-        on: p.id == ps.player_id,
-        where: ps.current_room_id == ^room_id and ps.player_id != ^self_player_id,
-        order_by: p.username,
-        select: %{id: p.id, username: p.username}
+        where:
+          ps.current_room_id == ^room_id and ps.player_id != ^self_player_id and
+            not is_nil(ps.character_name),
+        order_by: ps.character_name,
+        select: %{id: ps.player_id, name: ps.character_name}
       )
       |> Repo.all()
 
