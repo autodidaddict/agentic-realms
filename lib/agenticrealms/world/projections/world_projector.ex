@@ -24,6 +24,7 @@ defmodule AgenticRealms.World.Projections.WorldProjector do
 
   import Ecto.Query
 
+  alias AgenticRealms.World.EventData
   alias AgenticRealms.Repo
   alias AgenticRealms.World.Direction
 
@@ -260,10 +261,10 @@ defmodule AgenticRealms.World.Projections.WorldProjector do
     # Spawn one quest-scoped item per (criterion, spawn_room_id) pair.
     # The contract guarantees `length(spawn_room_ids) == target_count`
     # so each room gets exactly one item.
-    criteria = snapshot_list(snapshot, "criteria")
+    criteria = EventData.list(snapshot, "criteria")
 
     for criterion <- criteria,
-        room_id <- snapshot_list(criterion, "spawn_room_ids") do
+        room_id <- EventData.list(criterion, "spawn_room_ids") do
       spawn_quest_object(criterion, room_id, pid, qid)
     end
 
@@ -271,10 +272,10 @@ defmodule AgenticRealms.World.Projections.WorldProjector do
   end
 
   defp spawn_quest_object(criterion, room_id, player_id, quest_instance_id) do
-    item_name = snapshot_get(criterion, "item_name") || "quest item"
-    item_short = snapshot_get(criterion, "item_short_description") || "a quest item"
-    item_long = snapshot_get(criterion, "item_long_description") || item_short
-    tag = snapshot_get(criterion, "quest_tag")
+    item_name = EventData.get(criterion, "item_name") || "quest item"
+    item_short = EventData.get(criterion, "item_short_description") || "a quest item"
+    item_long = EventData.get(criterion, "item_long_description") || item_short
+    tag = EventData.get(criterion, "quest_tag")
 
     # Idempotency under replay: derive a deterministic entity id from
     # (quest_instance_id, room_id, criterion tag) so a re-run of the same
@@ -324,28 +325,6 @@ defmodule AgenticRealms.World.Projections.WorldProjector do
   end
 
   # Helpers for reading jsonb maps that may have string or atom keys.
-  defp snapshot_get(map, key) when is_map(map) and is_binary(key) do
-    case Map.get(map, key) do
-      nil ->
-        try do
-          Map.get(map, String.to_existing_atom(key))
-        rescue
-          ArgumentError -> nil
-        end
-
-      v ->
-        v
-    end
-  end
-
-  defp snapshot_get(_, _), do: nil
-
-  defp snapshot_list(map, key) do
-    case snapshot_get(map, key) do
-      list when is_list(list) -> list
-      _ -> []
-    end
-  end
 
   # EventStore round-trips `%DateTime{}` through JSON as an ISO 8601 string.
   # The projector accepts either shape so live-dispatched events (struct in

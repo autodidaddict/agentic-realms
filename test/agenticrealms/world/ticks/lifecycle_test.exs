@@ -133,4 +133,96 @@ defmodule AgenticRealms.World.Ticks.LifecycleTest do
       :ok = Supervisor.terminate(room.id)
     end
   end
+
+  describe "rebuilding state on restart" do
+    # The Lifecycle is supervised, so it can crash and come back. Before this
+    # was fixed it came back believing every room was empty and holding no
+    # record of the schedulers it had started — and because the stop path is
+    # guarded on `started_schedulers`, it would never stop them. A scheduler
+    # for an emptied room ticked on until somebody walked back in.
+    test "seeds live occupancy from the read model rather than starting empty" do
+      room = insert_room()
+      player = register_online_player_in(room.id)
+
+      state = restart_lifecycle()
+
+      assert MapSet.member?(state.live_per_room[room.id] || MapSet.new(), player.id)
+    end
+
+    test "seeds the started-scheduler set from the registry" do
+      room = insert_room()
+      register_online_player_in(room.id)
+      {:ok, _pid} = Supervisor.find_or_start(room.id)
+
+      state = restart_lifecycle()
+
+      assert MapSet.member?(state.started_schedulers, room.id),
+             "a scheduler that is already registered must be recognised after a restart"
+    end
+
+    test "an empty room whose scheduler survived the restart is reconciled away" do
+      room = insert_room()
+      # No occupants, but a scheduler is running — the state a crash leaves
+      # behind when the room emptied while the Lifecycle was down.
+      {:ok, _pid} = Supervisor.find_or_start(room.id)
+      assert {:ok, _} = Registry.lookup(room.id)
+
+      restart_lifecycle()
+      Process.sleep(leave_grace() * 3)
+      _ = Lifecycle.get_state()
+
+      assert Registry.lookup(room.id) == :error,
+             "the orphaned scheduler should have been stopped by the restart reconcile"
+    end
+
+    # --- helpers ----------------------------------------------------------
+
+    defp register_online_player_in(room_id) do
+      suffix = System.unique_integer([:positive])
+
+      {:ok, player} =
+        AgenticRealms.Accounts.register_player(%{
+          username: "tick_#{suffix}",
+          password: "pw12345678"
+        })
+
+      Repo.insert!(
+        struct!(
+          AgenticRealms.World.Schemas.PlayerState,
+          [player_id: player.id, current_room_id: room_id] ++
+            AgenticRealms.DataCase.character_columns()
+        )
+      )
+
+      {:ok, _} = AgenticRealmsWeb.Presence.track_player(self(), player.id, player.username)
+      Process.sleep(20)
+      player
+    end
+
+    # Kill it and let the application supervisor bring it back — the same thing
+    # a crash does in production. It lives in the app tree, not the test one,
+    # so `stop_supervised!/1` cannot reach it.
+    defp restart_lifecycle do
+      old = Process.whereis(Lifecycle)
+      ref = Process.monitor(old)
+      Process.exit(old, :kill)
+      assert_receive {:DOWN, ^ref, :process, ^old, :killed}, 2_000
+
+      await_restart(old)
+    end
+
+    defp await_restart(old, attempts \\ 200) do
+      case Process.whereis(Lifecycle) do
+        pid when is_pid(pid) and pid != old ->
+          Lifecycle.get_state()
+
+        _ when attempts > 0 ->
+          Process.sleep(10)
+          await_restart(old, attempts - 1)
+
+        _ ->
+          flunk("Lifecycle did not restart")
+      end
+    end
+  end
 end

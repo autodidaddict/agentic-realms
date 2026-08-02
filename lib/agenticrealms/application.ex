@@ -126,11 +126,21 @@ defmodule AgenticRealms.Application do
         # named Commanded event handler → exclusive cluster-wide subscriber)
         # starts/terminates each NPC's Temporal workflow on spawn/removal.
         AgenticRealms.NpcMinds.LifecycleManager,
-        # Feature 017 — Transient Regions. Singleton that stamps owner presence
-        # and periodically reaps + purges due transient regions. Lives with the
-        # Commanded chain because it dispatches DestroyRegion and reads/writes
-        # the read model.
-        AgenticRealms.World.Transient.Manager,
+        # Feature 017 — Transient Regions. Stamps owner presence and periodically
+        # reaps + purges due transient regions. Lives with the Commanded chain
+        # because it dispatches DestroyRegion and reads/writes the read model.
+        #
+        # A Horde singleton rather than one per node: the reaper hard-deletes
+        # event-store streams, and concurrent sweeps both pass the
+        # "does this region still exist?" check before either purges.
+        AgenticRealms.World.Transient.Registry,
+        AgenticRealms.World.Transient.Supervisor,
+        %{
+          id: AgenticRealms.World.Transient.ManagerStarter,
+          start:
+            {Task, :start_link, [&AgenticRealms.World.Transient.Supervisor.ensure_manager/0]},
+          restart: :transient
+        },
         # Feature 018 — cluster-singleton reconciliation sweep that converges
         # running Temporal minds to the set of live NPCs (backstop for the
         # best-effort handoff). Runs as a Horde singleton: a cluster-wide

@@ -12,9 +12,19 @@ defmodule AgenticRealms.World.Transient.Manager do
       destroys + purges any that are due — owner logged off past the grace, the
       60-minute cap elapsed, or already tombstoned (crash-recovery retry).
 
-  Lives under the supervisor with a fixed name (mirrors `Ticks.Lifecycle`).
+  **Exactly one runs cluster-wide**, placed by `Transient.Supervisor` (a
+  `Horde.DynamicSupervisor`) and named through `Transient.Registry`, which
+  relocates it to a surviving node if its own node leaves.
+
+  That is not decoration. The reaper does not merely observe: it dispatches
+  `DestroyRegion` and then hard-deletes event-store streams via `Purge.run/1`.
+  `Transient.destroy/1` is idempotent across *sequential* calls — a missing
+  region returns `:ok` — but two nodes sweeping at once both pass that check
+  before either reaches the purge. One manager, one sweep.
+
   After a restart the next sweep re-derives "due" from durable state, so
-  regions that became abandoned during downtime are reaped (FR-018).
+  regions that became abandoned during downtime are reaped (FR-018), and a
+  crash midway through a purge is retried by the tombstone clause in `due?/2`.
   """
 
   use GenServer
@@ -24,6 +34,7 @@ defmodule AgenticRealms.World.Transient.Manager do
   alias AgenticRealms.Repo
   alias AgenticRealms.World.Schemas.Region
   alias AgenticRealms.World.Transient
+  alias AgenticRealms.World.Transient.Registry
   alias AgenticRealmsWeb.Presence
 
   @pubsub AgenticRealms.PubSub
@@ -31,7 +42,8 @@ defmodule AgenticRealms.World.Transient.Manager do
   # --- Client -------------------------------------------------------------
 
   @spec start_link(keyword()) :: GenServer.on_start()
-  def start_link(opts \\ []), do: GenServer.start_link(__MODULE__, opts, name: __MODULE__)
+  def start_link(opts \\ []),
+    do: GenServer.start_link(__MODULE__, opts, name: Registry.via_tuple())
 
   @doc """
   Synchronously run a reap sweep and return the list of reaped region ids.
@@ -39,7 +51,7 @@ defmodule AgenticRealms.World.Transient.Manager do
   for the periodic timer.
   """
   @spec sweep_now() :: [String.t()]
-  def sweep_now, do: GenServer.call(__MODULE__, :sweep_now, 30_000)
+  def sweep_now, do: GenServer.call(Registry.via_tuple(), :sweep_now, 30_000)
 
   # --- Server -------------------------------------------------------------
 

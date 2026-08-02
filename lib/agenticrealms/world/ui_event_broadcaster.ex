@@ -45,6 +45,7 @@ defmodule AgenticRealms.World.UIEventBroadcaster do
     name: __MODULE__,
     consistency: :eventual
 
+  alias AgenticRealms.World.EventData
   alias AgenticRealms.World.PlayerNames
   alias AgenticRealms.Repo
   alias AgenticRealms.World.Direction
@@ -303,17 +304,17 @@ defmodule AgenticRealms.World.UIEventBroadcaster do
         },
         _meta
       ) do
-    title = snapshot_get(snapshot, "title")
-    narrative = snapshot_get(snapshot, "narrative")
+    title = EventData.get(snapshot, "title")
+    narrative = EventData.get(snapshot, "narrative")
 
     criteria =
       snapshot
-      |> snapshot_list("criteria")
+      |> EventData.list("criteria")
       |> Enum.map(fn c ->
         %{
-          name: snapshot_get(c, "name"),
+          name: EventData.get(c, "name"),
           count: 0,
-          target: snapshot_get(c, "target_count") || 0
+          target: EventData.get(c, "target_count") || 0
         }
       end)
 
@@ -575,29 +576,6 @@ defmodule AgenticRealms.World.UIEventBroadcaster do
     end
 
     :ok
-  end
-
-  defp snapshot_get(map, key) when is_map(map) and is_binary(key) do
-    case Map.get(map, key) do
-      nil ->
-        try do
-          Map.get(map, String.to_existing_atom(key))
-        rescue
-          ArgumentError -> nil
-        end
-
-      v ->
-        v
-    end
-  end
-
-  defp snapshot_get(_, _), do: nil
-
-  defp snapshot_list(map, key) do
-    case snapshot_get(map, key) do
-      list when is_list(list) -> list
-      _ -> []
-    end
   end
 
   # Feature 021 — what a player is called in the world is their character's
