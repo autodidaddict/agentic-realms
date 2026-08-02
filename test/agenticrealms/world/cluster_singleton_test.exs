@@ -93,7 +93,21 @@ defmodule AgenticRealms.World.ClusterSingletonTest do
     true = Node.connect(node)
     await(fn -> length(Horde.Cluster.members(Transient.Registry)) == 2 end)
 
-    on_exit(fn -> :peer.stop(peer) end)
+    # `start_link` above already ties the peer's lifetime to this setup_all
+    # process, which ExUnit kills once the module's tests finish. So there are
+    # two things trying to stop the node, and they race: this is the tidy path
+    # when it wins, and when the link wins instead `:peer.stop/1` exits —
+    # `normal` if it catches the process mid-shutdown, `noproc` once it is
+    # fully gone. An uncaught exit here fails setup_all and invalidates four
+    # tests that already passed, which is how CI reported it. The node is gone
+    # either way, so the exit is noise.
+    on_exit(fn ->
+      try do
+        :peer.stop(peer)
+      catch
+        :exit, _ -> :ok
+      end
+    end)
 
     %{peer: peer, node: node}
   end
