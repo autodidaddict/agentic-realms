@@ -37,6 +37,78 @@ defmodule AgenticRealms.EventStore.SerializerTest do
       %{room: room}
     end
 
+    test "a data key that is not an existing atom survives deserialization" do
+      # The regression. Deserialization used to run `keys: :atoms!`, which
+      # atomizes keys at every nesting level — so whether a Room snapshot could
+      # be read depended on whether something had already loaded the module
+      # naming that direction. In tests that meant the seed; the suite failed on
+      # 130821 and passed on others.
+      #
+      # This key is deliberately not an atom anywhere in the codebase, so it
+      # fails every time under the old implementation rather than by luck.
+      exotic = "a_direction_no_module_names_#{System.unique_integer([:positive])}"
+
+      room = %Room{
+        id: "room-1",
+        name: "Atrium",
+        description: "A bright atrium.",
+        exits: %{exotic => "room-2"},
+        behaviors: [],
+        region_id: "region-1",
+        map_visible: true,
+        elevation: 0,
+        map_x: 1,
+        map_y: 2
+      }
+
+      decoded =
+        room
+        |> Serializer.serialize()
+        |> Serializer.deserialize(type: "Elixir.AgenticRealms.World.Room")
+
+      assert decoded.exits == %{exotic => "room-2"}
+    end
+
+    test "nested payload keys stay strings rather than becoming atoms" do
+      # The invariant behind the fix: only the struct's own field names are
+      # atomized, and only at the top level. `EventData.get/2` exists because
+      # consumers read these either way, but the serializer should not be the
+      # thing that decides.
+      room = %Room{
+        id: "room-1",
+        name: "Atrium",
+        description: "A bright atrium.",
+        exits: %{"north" => "room-2"},
+        behaviors: [%{"type" => "say", "text" => "hello"}],
+        region_id: "region-1",
+        map_visible: true,
+        elevation: 0,
+        map_x: 1,
+        map_y: 2
+      }
+
+      decoded =
+        room
+        |> Serializer.serialize()
+        |> Serializer.deserialize(type: "Elixir.AgenticRealms.World.Room")
+
+      assert [behavior] = decoded.behaviors
+      assert Map.keys(behavior) |> Enum.all?(&is_binary/1)
+      assert behavior["type"] == "say"
+    end
+
+    test "a key the struct does not declare is dropped rather than atomized" do
+      # An older or newer payload shape must not be able to introduce atoms or
+      # crash the read.
+      binary = ~s({"id":"room-1","name":"Atrium","retired_field_xyz":"ignored"})
+
+      decoded = Serializer.deserialize(binary, type: "Elixir.AgenticRealms.World.Room")
+
+      assert decoded.id == "room-1"
+      assert decoded.name == "Atrium"
+      refute Map.has_key?(decoded, :retired_field_xyz)
+    end
+
     test "AgenticRealms.EventStore.Serializer preserves string-keyed exits",
          %{room: room} do
       binary = Serializer.serialize(room)
