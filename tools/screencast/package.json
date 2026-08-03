@@ -1,0 +1,12 @@
+{
+  "name": "agentic-realms-screencast",
+  "private": true,
+  "type": "module",
+  "description": "Records UI flows against a local dev server as video/GIF.",
+  "scripts": {
+    "record": "node record.mjs"
+  },
+  "devDependencies": {
+    "playwright": "^1.49.0"
+  }
+}
