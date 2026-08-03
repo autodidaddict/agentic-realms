@@ -152,10 +152,87 @@ defmodule AgenticRealms.DataCase do
 
   @doc """
   Sets up the sandbox based on the test tags.
+
+  Background tasks are drained before the owner is stopped. See
+  `await_background_tasks/1` for why.
   """
   def setup_sandbox(tags) do
     pid = Ecto.Adapters.SQL.Sandbox.start_owner!(AgenticRealms.Repo, shared: not tags[:async])
-    on_exit(fn -> Ecto.Adapters.SQL.Sandbox.stop_owner(pid) end)
+
+    on_exit(fn ->
+      await_background_tasks()
+      Ecto.Adapters.SQL.Sandbox.stop_owner(pid)
+    end)
+  end
+
+  # Task supervisors whose tasks read the Repo. Add any new one here.
+  @background_task_supervisors [
+    AgenticRealms.World.NPCChat.TaskSupervisor,
+    AgenticRealms.IntentResolverTaskSupervisor
+  ]
+
+  @doc """
+  Wait for Repo-touching background tasks to finish before the sandbox owner
+  is stopped.
+
+  `NPCChat.Conversation` and the intent resolver reply to their caller
+  immediately and do the real work in a `Task.Supervisor.async_nolink` task.
+  That task reaches the Repo through the sandbox — shared mode for a sync
+  test, `$callers` for an async one — so it is borrowing the connection this
+  test owns. A test that returns without waiting for the reply leaves the task
+  running, `stop_owner/1` then pulls the connection out from under it, and the
+  pooled connection is torn down mid-query.
+
+  The test that caused this does not fail. Some *other* test holding that
+  connection does, with an error naming a process it has never heard of. It is
+  timing-dependent, so it needs pool contention to show up at all — a nightly
+  seed run caught it failing `WizardSpawnTest` in setup, seeding rooms, while
+  the real culprit was an NPC chat task two files away.
+
+  Waiting here fixes every such test at once, including ones not yet written,
+  which is the point: the alternative is remembering to await the reply in
+  each test that sends a message.
+
+  Best-effort — a task that will not finish inside `timeout` is left alone
+  rather than hanging the suite.
+  """
+  def await_background_tasks(timeout \\ 5_000) do
+    deadline = System.monotonic_time(:millisecond) + timeout
+    Enum.each(@background_task_supervisors, &await_supervisor(&1, deadline))
+  end
+
+  defp await_supervisor(supervisor, deadline) do
+    case children(supervisor) do
+      [] ->
+        :ok
+
+      pids ->
+        Enum.each(pids, &await_exit(&1, deadline))
+
+        # Finishing one task can start another, so re-check until the
+        # supervisor is quiet or the deadline passes.
+        if System.monotonic_time(:millisecond) < deadline do
+          await_supervisor(supervisor, deadline)
+        end
+    end
+  end
+
+  # Not every test starts the supervision tree these live under.
+  defp children(supervisor) do
+    if Process.whereis(supervisor), do: Task.Supervisor.children(supervisor), else: []
+  catch
+    :exit, _ -> []
+  end
+
+  defp await_exit(pid, deadline) do
+    ref = Process.monitor(pid)
+    remaining = max(deadline - System.monotonic_time(:millisecond), 0)
+
+    receive do
+      {:DOWN, ^ref, :process, ^pid, _reason} -> :ok
+    after
+      remaining -> Process.demonitor(ref, [:flush])
+    end
   end
 
   @doc """
