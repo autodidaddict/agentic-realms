@@ -81,25 +81,50 @@ defmodule AgenticRealms.World.Ticks.Lifecycle do
     # stop the schedulers it had forgotten — leaving them ticking an empty
     # room until somebody walked back in. Principle VI: a supervised process
     # rebuilds its state rather than relying on never crashing.
-    rooms = Repo.all(Room) |> Enum.map(& &1.id)
+    #
+    # The rebuild reads the database, so it happens in `handle_continue/2`
+    # rather than here. `init/1` must not fail on a database that is briefly
+    # unavailable: this process restarts into the same query that just killed
+    # it, and three of those inside five seconds takes the whole application
+    # supervisor down — the Repo with it. `handle_continue` runs before any
+    # other message, so the state is still seeded before the first event is
+    # handled; it can just retry instead of dying.
+    {:ok, %__MODULE__{}, {:continue, :seed}}
+  end
 
-    state =
-      Enum.reduce(rooms, %__MODULE__{}, fn room_id, st ->
-        st
-        |> ensure_room_subscription(room_id)
-        |> seed_room(room_id)
-      end)
+  @impl true
+  def handle_continue(:seed, state) do
+    {:noreply, seed_from_authority(state)}
+  end
 
-    # Then reconcile what was seeded against what should be running. This is
-    # the same decision the arrival and departure paths make, so a restart
-    # converges in both directions: a room that gained occupants while we were
-    # down gets a scheduler, and one that emptied loses the one it had.
-    {:ok, Enum.reduce(rooms, state, &occupancy_changed(&2, &1))}
+  defp seed_from_authority(state) do
+    case safe_db(fn -> Enum.map(Repo.all(Room), & &1.id) end, :unavailable) do
+      :unavailable ->
+        # Nothing to reconcile against yet. Retry rather than run on state we
+        # know is empty, which would leave orphaned schedulers ticking.
+        Process.send_after(self(), :seed, seed_retry_ms())
+        state
+
+      rooms ->
+        state =
+          Enum.reduce(rooms, state, fn room_id, st ->
+            st
+            |> ensure_room_subscription(room_id)
+            |> seed_room(room_id)
+          end)
+
+        # Then reconcile what was seeded against what should be running. This is
+        # the same decision the arrival and departure paths make, so a restart
+        # converges in both directions: a room that gained occupants while we were
+        # down gets a scheduler, and one that emptied loses the one it had.
+        Enum.reduce(rooms, state, &occupancy_changed(&2, &1))
+    end
   end
 
   # One room's live occupants and whether it already has a Scheduler.
   defp seed_room(state, room_id) do
-    occupants = room_id |> Queries.live_occupants_of() |> MapSet.new()
+    occupants =
+      safe_db(fn -> MapSet.new(Queries.live_occupants_of(room_id)) end, MapSet.new())
 
     state =
       case Registry.lookup(room_id) do
@@ -200,6 +225,9 @@ defmodule AgenticRealms.World.Ticks.Lifecycle do
     end
   end
 
+  # Retry of the startup rebuild, scheduled when the database was unavailable.
+  def handle_info(:seed, state), do: {:noreply, seed_from_authority(state)}
+
   def handle_info(_other, state), do: {:noreply, state}
 
   # --- Internal helpers ---------------------------------------------------
@@ -287,8 +315,11 @@ defmodule AgenticRealms.World.Ticks.Lifecycle do
 
   defp apply_presence_joins(state, joins) do
     Enum.reduce(joins, state, fn {pid_str, _meta}, st ->
+      # `current_room_of/1` returns `:error` for an unknown player, which the
+      # `else` below already absorbs. A database that is down does not return
+      # anything — it exits — so it needs `safe_db/2` rather than a match.
       with {player_id, ""} <- Integer.parse(to_string(pid_str)),
-           {:ok, room_id} <- Queries.current_room_of(player_id) do
+           {:ok, room_id} <- safe_db(fn -> Queries.current_room_of(player_id) end, :error) do
         st
         |> ensure_room_subscription(room_id)
         |> add_to_room(room_id, player_id)
@@ -316,6 +347,36 @@ defmodule AgenticRealms.World.Ticks.Lifecycle do
         _ -> st
       end
     end)
+  end
+
+  # Run a query, and survive the database not being there.
+  #
+  # A failed checkout exits rather than returning, and an exit inside a
+  # `handle_info` kills this process. That matters more than the update it
+  # loses: the restart re-runs the same rebuild, so a database that is down
+  # produces a crash loop, and a crash loop under a `:one_for_one` parent
+  # exceeds `max_restarts` and terminates every sibling — including the Repo.
+  # A nightly run caught exactly that, as 342 tests failing with "could not
+  # lookup Ecto repo" after one torn-down connection.
+  #
+  # Occupancy is derived state, so dropping an update is recoverable: the next
+  # arrival, departure or presence diff reconciles the room, and `:seed`
+  # rebuilds everything from authority.
+  defp safe_db(fun, fallback) do
+    fun.()
+  rescue
+    error ->
+      Logger.warning("Ticks.Lifecycle: query failed (#{Exception.message(error)}); degrading")
+      fallback
+  catch
+    :exit, reason ->
+      Logger.warning("Ticks.Lifecycle: query exited (#{inspect(reason)}); degrading")
+      fallback
+  end
+
+  defp seed_retry_ms do
+    Application.get_env(:agenticrealms, AgenticRealms.World.Ticks, [])
+    |> Keyword.get(:seed_retry_ms, 1_000)
   end
 
   defp join_grace_ms do

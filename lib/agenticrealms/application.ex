@@ -73,9 +73,10 @@ defmodule AgenticRealms.Application do
         # process that watches Phoenix.Presence + room events to detect
         # 0↔1 live-occupancy transitions and start/stop schedulers with
         # configurable grace periods.
-        AgenticRealms.World.Ticks.Registry,
-        AgenticRealms.World.Ticks.Supervisor,
-        AgenticRealms.World.Ticks.Lifecycle
+        # Grouped under their own supervisor so a flapping tick process cannot
+        # spend the restart budget that terminating this supervisor would take
+        # the Repo and the Endpoint down with. See `Ticks.Subsystem`.
+        AgenticRealms.World.Ticks.Subsystem
       ] ++
         commanded_children() ++
         [
