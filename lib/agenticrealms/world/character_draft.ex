@@ -24,7 +24,9 @@ defmodule AgenticRealms.World.CharacterDraft do
   alias Srd.Character
   alias Srd.Content.Background
   alias Srd.Content.Backgrounds
+  alias Srd.Content.Classes
   alias Srd.Rules.Ability
+  alias Srd.Rules.PointBuy
   alias Srd.Rules.Proficiency
   alias Srd.Rules.Skill
 
@@ -48,7 +50,7 @@ defmodule AgenticRealms.World.CharacterDraft do
             species_slug: nil,
             class_slug: nil,
             background_slug: nil,
-            array: %{},
+            bought: %{},
             spread: nil,
             skill_picks: [],
             choices: %{},
@@ -61,7 +63,7 @@ defmodule AgenticRealms.World.CharacterDraft do
           species_slug: String.t() | nil,
           class_slug: String.t() | nil,
           background_slug: String.t() | nil,
-          array: %{Ability.t() => pos_integer()},
+          bought: %{Ability.t() => pos_integer()},
           spread: spread(),
           skill_picks: [atom()],
           choices: %{Character.choice_key() => [term()]},
@@ -134,27 +136,105 @@ defmodule AgenticRealms.World.CharacterDraft do
 
   # --- abilities -----------------------------------------------------------
 
+  # Full-budget shapes, high to low. Deliberately not the min-maxed 15/15/15
+  # that the budget also allows: this is what a character opens as, and three
+  # eights is a worse first impression than a rounded character.
+  @shapes [
+    [15, 14, 13, 12, 10, 8],
+    [15, 15, 13, 12, 8, 8],
+    [14, 14, 14, 12, 10, 8],
+    [15, 14, 14, 10, 10, 8],
+    [14, 14, 13, 12, 12, 8]
+  ]
+
   @doc """
-  Assign one of the standard array's values to an ability.
+  A starting spread for this draft: every point spent, weighted towards what
+  the chosen class actually runs on.
 
-  If another ability already holds that value the two swap, so the assignment
-  is never left with a value used twice or an ability left empty.
+  Players should not have to know that a wizard wants Intelligence before they
+  are allowed to make one. This picks a legal full-budget shape at random and
+  pours it onto the abilities in the order this class cares about them, so the
+  abilities step opens on something playable that can then be adjusted.
+
+  The shapes are all worth exactly `Srd.Rules.PointBuy.budget/0`, so any of
+  them is a complete spend rather than a suggestion the player has to finish.
   """
-  @spec assign_ability(t(), Ability.t(), pos_integer()) :: t()
-  def assign_ability(%__MODULE__{} = draft, ability, value) do
-    array =
-      case Enum.find(draft.array, fn {_key, held} -> held == value end) do
-        {^ability, _} ->
-          draft.array
+  @spec roll(t()) :: t()
+  def roll(%__MODULE__{} = draft) do
+    put_shape(draft, Enum.random(@shapes), Enum.shuffle(spare_abilities(draft)))
+  end
 
-        {other, _} ->
-          draft.array |> Map.put(other, draft.array[ability]) |> Map.put(ability, value)
+  @doc """
+  The same idea without the dice: the canonical shape on the class's priority
+  order, every time.
 
-        nil ->
-          Map.put(draft.array, ability, value)
-      end
+  Generation uses this rather than `roll/1` so that completing the same draft
+  twice produces the same character. Randomness is for the player in front of
+  the dialog, not for seeds and fixtures.
+  """
+  @spec default_bought(t()) :: t()
+  def default_bought(%__MODULE__{} = draft) do
+    put_shape(draft, hd(@shapes), spare_abilities(draft))
+  end
 
-    %{draft | array: Map.reject(array, fn {_key, held} -> is_nil(held) end), errors: []}
+  defp put_shape(%__MODULE__{} = draft, shape, spare) do
+    bought = (ranked_abilities(draft) ++ spare) |> Enum.zip(shape) |> Map.new()
+
+    %{draft | bought: bought, errors: []}
+  end
+
+  # The abilities this class actually wants, best first. Primary, because that
+  # is the whole question the class answers; then Constitution, which every
+  # class wants and no class lists; then its saving throws.
+  defp ranked_abilities(%__MODULE__{} = draft) do
+    case draft.class_slug && Classes.get(draft.class_slug) do
+      nil -> []
+      class -> Enum.uniq(elem(class.primary_ability, 1) ++ [:con] ++ class.saving_throws)
+    end
+  end
+
+  # Everything the class expressed no opinion about.
+  defp spare_abilities(%__MODULE__{} = draft), do: Ability.all() -- ranked_abilities(draft)
+
+  @doc """
+  Raise one ability by a point, if the budget covers the next step.
+
+  A refused increase is a no-op rather than an error: the button that sends it
+  is already disabled, so arriving here means something forged it.
+  """
+  @spec increase(t(), Ability.t()) :: t()
+  def increase(%__MODULE__{} = draft, ability) do
+    if PointBuy.can_increase?(draft.bought, ability) do
+      %{draft | bought: Map.update!(draft.bought, ability, &(&1 + 1)), errors: []}
+    else
+      draft
+    end
+  end
+
+  @doc """
+  Lower one ability by a point, refunding it, unless it is already at the floor.
+  """
+  @spec decrease(t(), Ability.t()) :: t()
+  def decrease(%__MODULE__{} = draft, ability) do
+    if PointBuy.can_decrease?(draft.bought, ability) do
+      %{draft | bought: Map.update!(draft.bought, ability, &(&1 - 1)), errors: []}
+    else
+      draft
+    end
+  end
+
+  @doc """
+  Points left to spend, or `0` before anything has been bought.
+  """
+  @spec points_remaining(t()) :: integer()
+  def points_remaining(%__MODULE__{bought: bought}) when map_size(bought) == 0,
+    do: PointBuy.budget()
+
+  def points_remaining(%__MODULE__{} = draft) do
+    case PointBuy.remaining(draft.bought) do
+      {:ok, left} -> left
+      :error -> 0
+    end
   end
 
   @doc """
@@ -169,7 +249,7 @@ defmodule AgenticRealms.World.CharacterDraft do
   proficient.
 
   Returns `nil` until the ability scores exist, because a modifier computed
-  from a half-assigned array would be wrong rather than merely incomplete.
+  from a half-bought spread would be wrong rather than merely incomplete.
   """
   @spec skill_modifier(t(), atom(), keyword()) :: integer() | nil
   def skill_modifier(%__MODULE__{} = draft, skill, opts \\ []) do
@@ -188,17 +268,18 @@ defmodule AgenticRealms.World.CharacterDraft do
   end
 
   @doc """
-  The six ability scores the draft comes to: the assigned array plus the
+  The six ability scores the draft comes to: what was bought, plus the
   background's increases.
 
-  Returns `%{}` when the array is not yet assigned, because a partial score is
-  more misleading than none.
+  Returns `%{}` before anything is bought, because a partial score is more
+  misleading than none. Background increases are not subject to the point-buy
+  ceiling, so these can and should exceed it.
   """
   @spec scores(t()) :: %{Ability.t() => pos_integer()}
-  def scores(%__MODULE__{array: array}) when map_size(array) == 0, do: %{}
+  def scores(%__MODULE__{bought: bought}) when map_size(bought) == 0, do: %{}
 
   def scores(%__MODULE__{} = draft) do
-    Enum.reduce(increases(draft), draft.array, fn {ability, bump}, scores ->
+    Enum.reduce(increases(draft), draft.bought, fn {ability, bump}, scores ->
       Map.update(scores, ability, bump, &(&1 + bump))
     end)
   end
@@ -357,8 +438,27 @@ defmodule AgenticRealms.World.CharacterDraft do
   """
   @spec put_step(t(), step()) :: t()
   def put_step(%__MODULE__{} = draft, step) when step in @steps do
-    if reachable?(draft, step), do: %{draft | step: step, errors: []}, else: draft
+    if reachable?(draft, step) do
+      %{draft | step: step, errors: []} |> roll_if_unbought(step)
+    else
+      draft
+    end
   end
+
+  # The abilities step opens on a spread rather than on six eights and a bill.
+  # Only when nothing has been bought, so stepping back to it keeps whatever
+  # the player adjusted.
+  #
+  # Changing class afterwards deliberately does *not* re-roll. The spread stays
+  # legal whatever the class, and discarding it would make the abilities step
+  # incomplete and every step after it unreachable, which is a worse thing to
+  # do to someone than leaving them a spread weighted for their previous idea.
+  # "Roll again" re-weights on demand.
+  defp roll_if_unbought(%__MODULE__{bought: bought} = draft, :abilities)
+       when map_size(bought) == 0,
+       do: roll(draft)
+
+  defp roll_if_unbought(draft, _step), do: draft
 
   @doc """
   Whether a step can be shown yet: every step before it is complete.
@@ -383,7 +483,7 @@ defmodule AgenticRealms.World.CharacterDraft do
   end
 
   def complete?(%__MODULE__{} = draft, :abilities) do
-    map_size(draft.array) == length(Ability.all()) and draft.spread != nil
+    PointBuy.legal?(draft.bought) and draft.spread != nil
   end
 
   def complete?(%__MODULE__{} = draft, :skills) do

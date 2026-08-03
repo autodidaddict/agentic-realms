@@ -9,6 +9,11 @@ defmodule AgenticRealms.World.CharacterDraftTest do
 
   alias AgenticRealms.World.CharacterDraft, as: Draft
   alias Srd.Rules.Ability
+  alias Srd.Rules.PointBuy
+
+  # A fixed spread rather than a rolled one, because most of these assert on
+  # exact modifiers. Costs exactly the budget: 9 + 7 + 5 + 4 + 2 + 0.
+  @spread %{str: 15, dex: 14, con: 13, int: 12, wis: 10, cha: 8}
 
   defp identity(species \\ "human", class \\ "fighter", background \\ "soldier") do
     Draft.new()
@@ -25,7 +30,7 @@ defmodule AgenticRealms.World.CharacterDraftTest do
       assert draft.step == :identity
       assert draft.name == ""
       assert draft.species_slug == nil
-      assert draft.array == %{}
+      assert draft.bought == %{}
       assert draft.choices == %{}
       assert draft.skill_picks == []
     end
@@ -118,53 +123,90 @@ defmodule AgenticRealms.World.CharacterDraftTest do
     end
   end
 
-  describe "assign_ability/3" do
-    test "assigns a value to an ability" do
-      draft = Draft.new() |> Draft.assign_ability(:str, 15)
-      assert draft.array == %{str: 15}
+  describe "roll/1" do
+    test "spends the whole budget" do
+      rolled = Draft.new() |> Draft.put_selection(:class, "wizard") |> Draft.roll()
+
+      assert PointBuy.fully_spent?(rolled.bought)
+      assert map_size(rolled.bought) == 6
     end
 
-    test "assigning a value another ability holds swaps the two" do
-      draft =
-        Draft.new()
-        |> Draft.assign_ability(:str, 15)
-        |> Draft.assign_ability(:dex, 14)
-        |> Draft.assign_ability(:dex, 15)
+    test "puts the highest score on what the class runs on" do
+      # Every shape has a unique highest score, so this is a statement about
+      # priority rather than about which shape came up.
+      for _ <- 1..25 do
+        rolled = Draft.new() |> Draft.put_selection(:class, "wizard") |> Draft.roll()
+        best = rolled.bought |> Map.values() |> Enum.max()
 
-      assert draft.array == %{dex: 15, str: 14}
+        assert rolled.bought.int == best,
+               "a wizard's Intelligence should be its highest score, got #{inspect(rolled.bought)}"
+      end
     end
 
-    test "swapping into an empty ability leaves the other one empty rather than duplicated" do
-      draft =
-        Draft.new()
-        |> Draft.assign_ability(:str, 15)
-        |> Draft.assign_ability(:dex, 15)
+    test "works before a class is chosen, so the step is never empty" do
+      rolled = Draft.roll(Draft.new())
 
-      assert draft.array == %{dex: 15}
+      assert PointBuy.fully_spent?(rolled.bought)
     end
 
-    test "re-assigning the value an ability already holds changes nothing" do
-      draft = Draft.new() |> Draft.assign_ability(:str, 15) |> Draft.assign_ability(:str, 15)
-      assert draft.array == %{str: 15}
+    test "does not always produce the same spread" do
+      spreads =
+        for _ <- 1..40 do
+          Draft.new()
+          |> Draft.put_selection(:class, "fighter")
+          |> Draft.roll()
+          |> Map.get(:bought)
+        end
+
+      assert length(Enum.uniq(spreads)) > 1, "rolling should vary"
+    end
+  end
+
+  describe "increase/2 and decrease/2" do
+    test "a point is spent and refunded" do
+      draft = %{Draft.new() | bought: %{@spread | cha: 8}}
+
+      raised = Draft.increase(draft, :cha)
+      assert raised.bought.cha == 8, "the budget is already fully spent"
+
+      freed = draft |> Draft.decrease(:str) |> Draft.increase(:cha)
+      assert freed.bought.str == 14
+      assert freed.bought.cha == 9
     end
 
-    test "a full array stays full through any number of swaps" do
-      full =
-        [str: 15, dex: 14, con: 13, int: 12, wis: 10, cha: 8]
-        |> Enum.reduce(Draft.new(), fn {ability, value}, acc ->
-          Draft.assign_ability(acc, ability, value)
-        end)
+    test "refuses to go above the ceiling or below the floor" do
+      draft = %{Draft.new() | bought: Map.new(Ability.all(), &{&1, 8})}
 
-      swapped =
-        full
-        |> Draft.assign_ability(:cha, 15)
-        |> Draft.assign_ability(:wis, 14)
-        |> Draft.assign_ability(:str, 13)
+      assert Draft.decrease(draft, :str).bought.str == 8
 
-      # Six abilities, six values, each used once — the invariant the swap
-      # exists to hold.
-      assert map_size(swapped.array) == 6
-      assert swapped.array |> Map.values() |> Enum.sort() == Enum.sort(Ability.standard_array())
+      maxed = %{draft | bought: %{draft.bought | str: 15}}
+      assert Draft.increase(maxed, :str).bought.str == 15
+    end
+
+    test "refuses an increase the remaining points will not cover" do
+      # 26 of 27 spent; 13 -> 14 costs 2.
+      tight = %{Draft.new() | bought: %{@spread | wis: 9, cha: 8}}
+
+      assert Draft.points_remaining(tight) == 1
+      assert Draft.increase(tight, :con).bought.con == 13, "cannot afford the double step"
+      assert Draft.increase(tight, :cha).bought.cha == 9, "can afford a single step"
+    end
+
+    test "an unknown ability is a no-op rather than a crash" do
+      draft = %{Draft.new() | bought: @spread}
+
+      assert Draft.increase(draft, :luck) == draft
+      assert Draft.decrease(draft, :luck) == draft
+    end
+  end
+
+  describe "points_remaining/1" do
+    test "is the whole budget before anything is bought" do
+      assert Draft.points_remaining(Draft.new()) == PointBuy.budget()
+    end
+
+    test "is zero for a spread that spends it all" do
+      assert Draft.points_remaining(%{Draft.new() | bought: @spread}) == 0
     end
   end
 
@@ -465,23 +507,9 @@ defmodule AgenticRealms.World.CharacterDraftTest do
 
   # --- helpers -------------------------------------------------------------
 
-  defp full_array do
-    Draft.new()
-    |> Draft.assign_ability(:str, 15)
-    |> Draft.assign_ability(:dex, 14)
-    |> Draft.assign_ability(:con, 13)
-    |> Draft.assign_ability(:int, 12)
-    |> Draft.assign_ability(:wis, 10)
-    |> Draft.assign_ability(:cha, 8)
-  end
+  defp full_array, do: with_array(Draft.new())
 
-  defp with_array(draft) do
-    Enum.reduce(
-      [str: 15, dex: 14, con: 13, int: 12, wis: 10, cha: 8],
-      draft,
-      fn {ability, value}, acc -> Draft.assign_ability(acc, ability, value) end
-    )
-  end
+  defp with_array(draft), do: %{draft | bought: @spread}
 
   defp with_abilities(draft), do: draft |> with_array() |> Draft.put_spread({:split, :str, :con})
 

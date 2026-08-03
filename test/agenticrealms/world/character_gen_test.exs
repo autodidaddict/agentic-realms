@@ -139,14 +139,11 @@ defmodule AgenticRealms.World.CharacterGenTest do
       |> Draft.put_selection(:background, "soldier")
     end
 
-    test "US2 shipped: a player-assigned array is left exactly as they set it" do
+    test "US2 shipped: a player-bought spread is left exactly as they set it" do
       draft =
-        [str: 8, dex: 10, con: 12, int: 13, wis: 14, cha: 15]
-        |> Enum.reduce(identity_draft(), fn {ability, value}, acc ->
-          Draft.assign_ability(acc, ability, value)
-        end)
+        %{identity_draft() | bought: %{str: 8, dex: 10, con: 12, int: 13, wis: 14, cha: 15}}
 
-      assert CharacterGen.complete(draft).array == draft.array
+      assert CharacterGen.complete(draft).bought == draft.bought
     end
 
     test "US2 shipped: a player-chosen spread is left exactly as they set it" do
@@ -184,10 +181,7 @@ defmodule AgenticRealms.World.CharacterGenTest do
       # Once every step has shipped, complete/1 has nothing left to do. It is
       # not removed — `default/0` still needs the fills for seeds and tests.
       answered =
-        [str: 15, dex: 14, con: 13, int: 12, wis: 10, cha: 8]
-        |> Enum.reduce(identity_draft(), fn {ability, value}, acc ->
-          Draft.assign_ability(acc, ability, value)
-        end)
+        %{identity_draft() | bought: %{str: 15, dex: 14, con: 13, int: 12, wis: 10, cha: 8}}
         |> Draft.put_spread({:split, :str, :con})
         |> Draft.toggle_skill(:acrobatics)
         |> Draft.toggle_skill(:perception)
@@ -213,7 +207,7 @@ defmodule AgenticRealms.World.CharacterGenTest do
       # because the dialog no longer leaves a gap. `default/0` still needs it.
       completed = CharacterGen.complete(identity_draft())
 
-      assert map_size(completed.array) == 6
+      assert map_size(completed.bought) == 6
       assert completed.spread != nil
       assert length(completed.skill_picks) == 2
       assert completed.choices != %{}

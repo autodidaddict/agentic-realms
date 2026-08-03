@@ -3483,28 +3483,80 @@ button { font: inherit; color: inherit; }
   letter-spacing: 0.02em;
 }
 
-.cc-array {
+/* Point-buy header: what is left to spend, and a way to start over. */
+.cc-points {
   display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+.cc-points .cc-lead { margin-bottom: 6px; }
+.cc-points-budget {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--ink-faint);
+  margin: 0;
+}
+.cc-points-budget strong {
+  font-size: 15px;
+  color: var(--ink);
+}
+/* Unspent points are a nudge, not an error: the spread is still legal. */
+.cc-points-unspent strong { color: var(--player); }
+
+.cc-reroll {
+  flex: none;
+  background: none;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  color: var(--ink-faint);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 7px 12px;
+  cursor: pointer;
+  transition: color 0.12s, border-color 0.12s;
+}
+.cc-reroll:hover { color: var(--ink); border-color: var(--ink-ghost); }
+
+/* − 15 + */
+.cc-stepper {
+  display: flex;
+  align-items: center;
   gap: 4px;
 }
-.cc-array-value {
-  min-width: 34px;
+.cc-stepper button {
+  width: 30px;
+  height: 30px;
   background: none;
   border: 1px solid var(--line);
   border-radius: 3px;
   color: var(--ink-faint);
   font-family: var(--mono);
-  font-size: 13px;
-  padding: 5px 0;
+  font-size: 15px;
+  line-height: 1;
   cursor: pointer;
   transition: color 0.12s, background 0.12s, border-color 0.12s;
 }
-.cc-array-value:hover { color: var(--ink); border-color: var(--ink-ghost); }
-.cc-array-value.selected {
-  background: var(--player-bg);
-  border-color: var(--player-dim);
+.cc-stepper button:hover:not(:disabled) {
   color: var(--player);
-  font-weight: 600;
+  border-color: var(--player-dim);
+  background: var(--player-bg);
+}
+/* Disabled means the budget or the bounds refuse it, which is worth showing
+   rather than letting the click fail silently. */
+.cc-stepper button:disabled {
+  opacity: 0.28;
+  cursor: not-allowed;
+}
+
+.cc-stepper-value {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  min-width: 62px;
+  gap: 6px;
 }
 
 .cc-spreads {

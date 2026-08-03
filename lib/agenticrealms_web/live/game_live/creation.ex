@@ -64,11 +64,22 @@ defmodule AgenticRealmsWeb.GameLive.Creation do
   end
 
   @doc """
-  One of the standard array's values was assigned to an ability, swapping with
-  whichever ability held it.
+  A point was spent on an ability, or refunded from it. The draft refuses
+  either when the budget or the bounds say so.
   """
-  def assign_ability(socket, ability, value) do
-    assign(socket, :draft, Draft.assign_ability(socket.assigns.draft, ability, value))
+  def raise_ability(socket, ability) do
+    assign(socket, :draft, Draft.increase(socket.assigns.draft, ability))
+  end
+
+  def lower_ability(socket, ability) do
+    assign(socket, :draft, Draft.decrease(socket.assigns.draft, ability))
+  end
+
+  @doc """
+  Throw the current spread away and roll another.
+  """
+  def reroll(socket) do
+    assign(socket, :draft, Draft.roll(socket.assigns.draft))
   end
 
   @doc """

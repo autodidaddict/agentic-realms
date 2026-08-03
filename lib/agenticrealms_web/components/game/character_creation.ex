@@ -31,6 +31,7 @@ defmodule AgenticRealmsWeb.GameComponents.CharacterCreation do
   alias Srd.Content.Species
   alias Srd.Content.Weapons
   alias Srd.Rules.Ability
+  alias Srd.Rules.PointBuy
   alias Srd.Rules.Skill
 
   # The steps that have shipped, in order. Adding one here is what makes a later
@@ -202,39 +203,63 @@ defmodule AgenticRealmsWeb.GameComponents.CharacterCreation do
       |> assign(:scores, Draft.scores(assigns.draft))
       |> assign(:increases, Draft.increases(assigns.draft))
       |> assign(:offered, Draft.raisable_abilities(assigns.draft))
-      |> assign(:array, Ability.standard_array())
+      |> assign(:remaining, Draft.points_remaining(assigns.draft))
 
     ~H"""
-    <p class="cc-lead">
-      The standard array, spread across the six abilities. Each score is used
-      once; assigning one an ability already holds swaps the two.
-    </p>
+    <div class="cc-points">
+      <div>
+        <p class="cc-lead">
+          A spread suited to your class, already paid for. Adjust it if you like:
+          raising a score costs points, and the last two steps cost double.
+        </p>
+        <p class={["cc-points-budget", @remaining > 0 && "cc-points-unspent"]}>
+          <strong>{@remaining}</strong> of {PointBuy.budget()} points left
+        </p>
+      </div>
+      <button class="cc-reroll" type="button" phx-click="creation_reroll">
+        Roll again
+      </button>
+    </div>
 
     <div class="cc-abilities">
       <div :for={ability <- Ability.all()} class="cc-ability">
         <div class="cc-ability-head">
           <span class="cc-ability-name">{Ability.name(ability)}</span>
-          <span class="cc-ability-total">
+          <span :if={Map.get(@increases, ability)} class="cc-ability-bump">
+            {signed(Map.fetch!(@increases, ability))} from background
+          </span>
+        </div>
+
+        <div class="cc-stepper">
+          <button
+            class="cc-step-down"
+            type="button"
+            disabled={not PointBuy.can_decrease?(@draft.bought, ability)}
+            aria-label={"Lower #{Ability.name(ability)}"}
+            phx-click="creation_ability_down"
+            phx-value-ability={ability}
+          >
+            −
+          </button>
+
+          <span class="cc-stepper-value">
             <span class="cc-ability-score">{Map.get(@scores, ability, "—")}</span>
+            <%!-- The modifier is what actually gets rolled with, so it sits
+                  with the score rather than off beside the name. --%>
             <span :if={Map.get(@scores, ability)} class="cc-ability-mod">
               {signed(Srd.Rules.Ability.modifier(Map.fetch!(@scores, ability)))}
             </span>
-            <span :if={Map.get(@increases, ability)} class="cc-ability-bump">
-              {signed(Map.fetch!(@increases, ability))} from background
-            </span>
           </span>
-        </div>
-        <div class="cc-array">
+
           <button
-            :for={value <- @array}
-            class={["cc-array-value", @draft.array[ability] == value && "selected"]}
+            class="cc-step-up"
             type="button"
-            aria-pressed={to_string(@draft.array[ability] == value)}
-            phx-click="creation_assign_ability"
+            disabled={not PointBuy.can_increase?(@draft.bought, ability)}
+            aria-label={"Raise #{Ability.name(ability)}"}
+            phx-click="creation_ability_up"
             phx-value-ability={ability}
-            phx-value-value={value}
           >
-            {value}
+            +
           </button>
         </div>
       </div>
@@ -407,7 +432,7 @@ defmodule AgenticRealmsWeb.GameComponents.CharacterCreation do
           aria-pressed={to_string(option.value in held(@draft, choice))}
           phx-click="creation_pick"
           phx-value-key={Draft.storage_key(choice.key)}
-          phx-value-value={option.value}
+          phx-value-option={option.value}
         >
           <span class="cc-option-name">{option.name}</span>
           <span :if={option.detail} class="cc-option-traits">{option.detail}</span>
@@ -657,7 +682,7 @@ defmodule AgenticRealmsWeb.GameComponents.CharacterCreation do
           aria-pressed={to_string(@selected == option.slug)}
           phx-click="creation_select"
           phx-value-field={@field}
-          phx-value-value={option.slug}
+          phx-value-slug={option.slug}
         >
           <span class="cc-option-name">{option.name}</span>
           <span class="cc-option-meta">{option.meta}</span>

@@ -52,7 +52,7 @@ defmodule AgenticRealms.World.CharacterGen do
   def complete(%Draft{} = draft) do
     if draft.species_slug && draft.class_slug && draft.background_slug do
       draft
-      |> fill_array()
+      |> fill_bought()
       |> fill_spread()
       |> fill_skill_picks()
       |> fill_choices()
@@ -61,20 +61,12 @@ defmodule AgenticRealms.World.CharacterGen do
     end
   end
 
-  # The standard array dealt down the class's priority order, highest score to
-  # the ability the class cares about most.
-  defp fill_array(%Draft{array: array} = draft) when map_size(array) > 0, do: draft
-
-  defp fill_array(%Draft{} = draft) do
-    class = Classes.get(draft.class_slug)
-
-    class
-    |> ability_priority()
-    |> Enum.zip(Ability.standard_array())
-    |> Enum.reduce(draft, fn {ability, value}, acc ->
-      Draft.assign_ability(acc, ability, value)
-    end)
-  end
+  # A point-buy spread weighted to the class. Deliberately the deterministic
+  # one: completing the same draft twice has to produce the same character, and
+  # the dialog does its own rolling. Only fills when the player bought nothing,
+  # which under the current dialog means they never reached the abilities step.
+  defp fill_bought(%Draft{bought: bought} = draft) when map_size(bought) > 0, do: draft
+  defp fill_bought(%Draft{} = draft), do: Draft.default_bought(draft)
 
   # Of the spreads the SRD allows, take [2, 1] and put the larger increase on
   # the highest-priority ability the background offers.

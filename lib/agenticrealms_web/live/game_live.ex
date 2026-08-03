@@ -260,21 +260,46 @@ defmodule AgenticRealmsWeb.GameLive do
   # no match and the clause is a no-op instead of creating an atom or a bogus
   # pick. The validator would catch it either way; this stops it earlier.
 
+  # `phx-keyup` sends `%{"key" => <key pressed>, "value" => <input value>}`. It
+  # does not send the input's `name` attribute — that is a form-event thing —
+  # so matching on "name" here never fired in a browser and crashed the
+  # LiveView instead. Every keystroke took the modal down and remounted it, so
+  # the field could not be filled at all. `render_keyup/3` sends whatever
+  # payload the test hands it, and the test was handing it a shape the browser
+  # does not produce, which is why 1078 passing tests said nothing.
   @impl true
-  def handle_event("creation_name", %{"name" => name}, socket) do
+  def handle_event("creation_name", %{"value" => name}, socket) do
     {:noreply, Creation.name(socket, name)}
   end
 
-  def handle_event("creation_select", %{"field" => field, "value" => value}, socket)
+  # `phx-value-value` is a trap on a clickable element: the browser also sends
+  # the element's own `value` property, which for a <button> is "", and it wins.
+  # Every one of these used to send `"value" => ""`, so nothing could be
+  # selected, an ability score assigned, or a specialization picked. The names
+  # below avoid the collision. The tests did not catch it because
+  # `render_click/3` sends the payload the test writes rather than the one the
+  # DOM would produce.
+  def handle_event("creation_select", %{"field" => field, "slug" => value}, socket)
       when field in ~w(species class background) do
     {:noreply, Creation.select(socket, String.to_existing_atom(field), presence_or_nil(value))}
   end
 
-  def handle_event("creation_assign_ability", %{"ability" => a, "value" => v}, socket) do
-    case {Creation.decode_ability(a), Integer.parse(v)} do
-      {{:ok, ability}, {value, ""}} -> {:noreply, Creation.assign_ability(socket, ability, value)}
-      _ -> {:noreply, socket}
+  def handle_event("creation_ability_up", %{"ability" => a}, socket) do
+    case Creation.decode_ability(a) do
+      {:ok, ability} -> {:noreply, Creation.raise_ability(socket, ability)}
+      :error -> {:noreply, socket}
     end
+  end
+
+  def handle_event("creation_ability_down", %{"ability" => a}, socket) do
+    case Creation.decode_ability(a) do
+      {:ok, ability} -> {:noreply, Creation.lower_ability(socket, ability)}
+      :error -> {:noreply, socket}
+    end
+  end
+
+  def handle_event("creation_reroll", _params, socket) do
+    {:noreply, Creation.reroll(socket)}
   end
 
   def handle_event("creation_spread", %{"spread" => spread}, socket) do
@@ -291,7 +316,7 @@ defmodule AgenticRealmsWeb.GameLive do
     end
   end
 
-  def handle_event("creation_pick", %{"key" => key, "value" => value}, socket) do
+  def handle_event("creation_pick", %{"key" => key, "option" => value}, socket) do
     case Creation.decode_pick(socket.assigns.draft, key, value) do
       {:ok, decoded_key, option} ->
         {:noreply, Creation.toggle_choice(socket, decoded_key, option)}

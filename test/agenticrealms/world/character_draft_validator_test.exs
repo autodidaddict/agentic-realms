@@ -48,7 +48,7 @@ defmodule AgenticRealms.World.CharacterDraft.ValidatorTest do
     test "an empty one names every missing field" do
       assert :name in fields(Draft.new())
       assert :species_slug in fields(Draft.new())
-      assert :array in fields(Draft.new())
+      assert :bought in fields(Draft.new())
     end
 
     test "the validator has no skip-if-empty clause" do
@@ -62,7 +62,7 @@ defmodule AgenticRealms.World.CharacterDraft.ValidatorTest do
         |> Draft.put_selection(:background, "soldier")
 
       assert {:error, _} = Validator.validate(identity_only)
-      assert :array in fields(identity_only)
+      assert :bought in fields(identity_only)
       assert :spread in fields(identity_only)
       assert :skill_picks in fields(identity_only)
     end
@@ -101,27 +101,40 @@ defmodule AgenticRealms.World.CharacterDraft.ValidatorTest do
 
   describe "ability scores" do
     test "every ability needs one" do
-      forged = %{complete() | array: %{str: 15, dex: 14}}
-      assert :array in fields(forged)
+      forged = %{complete() | bought: %{str: 15, dex: 14}}
+      assert :bought in fields(forged)
     end
 
-    test "must be the standard array, not values of the player's choosing" do
-      forged = %{complete() | array: %{str: 18, dex: 18, con: 18, int: 18, wis: 18, cha: 18}}
-      assert :array in fields(forged)
+    test "every score must be one the point-buy table sells" do
+      forged = %{complete() | bought: %{str: 18, dex: 18, con: 18, int: 18, wis: 18, cha: 18}}
+      assert :bought in fields(forged)
     end
 
-    test "must use each standard array value exactly once" do
-      forged = %{complete() | array: %{str: 15, dex: 15, con: 13, int: 12, wis: 10, cha: 8}}
-      assert :array in fields(forged)
+    test "a score below the floor is refused as readily as one above the ceiling" do
+      forged = %{complete() | bought: %{str: 7, dex: 14, con: 13, int: 12, wis: 10, cha: 8}}
+      assert :bought in fields(forged)
+    end
+
+    test "the total must fit the budget" do
+      # Every score is buyable and the shape looks plausible; it just costs 33.
+      forged = %{complete() | bought: %{str: 15, dex: 15, con: 15, int: 12, wis: 8, cha: 8}}
+
+      assert :bought in fields(forged)
+    end
+
+    test "spending under the budget is allowed" do
+      thrifty = %{complete() | bought: %{str: 12, dex: 12, con: 12, int: 10, wis: 10, cha: 10}}
+
+      refute :bought in fields(thrifty)
     end
 
     test "no score may exceed 20" do
-      # Unreachable through the dialog — the array tops out at 15 and the
+      # Unreachable through the dialog — point buy tops out at 15 and the
       # largest increase is +2 — so this is asserted against a forged draft.
-      forged = %{complete() | array: %{str: 15, dex: 14, con: 13, int: 12, wis: 10, cha: 8}}
-      forged = %{forged | array: Map.put(forged.array, :str, 19), spread: {:split, :str, :con}}
+      forged = %{complete() | bought: %{str: 15, dex: 14, con: 13, int: 12, wis: 10, cha: 8}}
+      forged = %{forged | bought: Map.put(forged.bought, :str, 19), spread: {:split, :str, :con}}
 
-      assert :array in fields(forged)
+      assert :bought in fields(forged)
     end
   end
 
@@ -241,10 +254,7 @@ defmodule AgenticRealms.World.CharacterDraft.ValidatorTest do
   # --- helpers -------------------------------------------------------------
 
   defp with_abilities(draft, spread) do
-    [str: 15, dex: 14, con: 13, int: 12, wis: 10, cha: 8]
-    |> Enum.reduce(draft, fn {ability, value}, acc ->
-      Draft.assign_ability(acc, ability, value)
-    end)
+    %{draft | bought: %{str: 15, dex: 14, con: 13, int: 12, wis: 10, cha: 8}}
     |> Draft.put_spread(spread)
   end
 

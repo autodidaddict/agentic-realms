@@ -47,3 +47,12 @@ settings.local.json
 .env
 .env.*
 
+
+# Screencast tooling. Playwright and its browsers are large and machine-local,
+# and the recordings are build artifacts.
+tools/screencast/node_modules/
+tools/screencast/out/
+tools/screencast/*.webm
+tools/screencast/*.mp4
+tools/screencast/*.gif
+tools/screencast/*.png
