@@ -1,6 +1,6 @@
 defmodule AgenticRealmsWeb.WizardNpcAuthoringTest do
   @moduledoc """
-  Feature 015 US1/US2 — the wizard authors an NPC blueprint in trance (lore +
+  The wizard authors an NPC blueprint in trance (lore +
   composable behavior_groups), commits it (unified registry, kind badge), and spawns
   it into the room (witnessed arrival; the clone carries the composed
   behaviors).
@@ -92,7 +92,6 @@ defmodule AgenticRealmsWeb.WizardNpcAuthoringTest do
     await_wizard_unlock(view)
 
     html = render(view)
-    # Draft card populated, incl. the NPC-only lore field + behavior_group picker.
     assert html =~ name
     assert html =~ "Lore"
     assert html =~ "Hates sunlight"
@@ -132,7 +131,6 @@ defmodule AgenticRealmsWeb.WizardNpcAuthoringTest do
 
     render_hook(wizard_view, "switch_mode", %{"mode" => "wizard"})
 
-    # World mode exposes the Spawn here affordance on the npc registry row.
     assert render(wizard_view) =~ "Spawn here"
 
     render_hook(wizard_view, "spawn_here", %{"blueprint_id" => slug})
@@ -140,15 +138,13 @@ defmodule AgenticRealmsWeb.WizardNpcAuthoringTest do
     flush(witness_view)
     assert render(witness_view) =~ "Mossback the Ogre arrives."
 
-    # A real NPC clone exists in the room, referencing the blueprint, with the
-    # behavior_group's greeting folded into its effective behaviors (FR-016).
     clone = Repo.get_by(NPCClone, blueprint_id: slug)
     refute is_nil(clone)
     assert clone.room_id == Seed.starting_room_id()
     assert Enum.any?(clone.behaviors, &(&1["trigger"] == "player_entered"))
   end
 
-  test "direct-behavior editor: add a behavior alongside a behavior_group → both commit (FR-015a)",
+  test "direct-behavior editor: add a behavior alongside a behavior_group → both commit",
        %{wizard_conn: wzc, suffix: suffix} do
     {:ok, view, _} = live(wzc, ~p"/play")
     render_hook(view, "switch_mode", %{"mode" => "wizard"})
@@ -170,10 +166,8 @@ defmodule AgenticRealmsWeb.WizardNpcAuthoringTest do
 
     await_wizard_unlock(view)
 
-    # The direct-behavior editor is present and starts empty.
     assert render(view) =~ "Direct behaviors"
 
-    # Add a row, then fill it via the form-change with the behavior_group preserved.
     render_hook(view, "add_direct_behavior", %{})
 
     render_hook(view, "update_blueprint_draft", %{
@@ -194,7 +188,6 @@ defmodule AgenticRealmsWeb.WizardNpcAuthoringTest do
     slug = name |> String.replace(~r/[^a-z0-9]+/, "_") |> String.trim("_")
     bp = Queries.get_npc_blueprint_row(slug)
 
-    # The blueprint carries BOTH the behavior_group and the individually-added behavior.
     assert bp.behavior_groups == ["greeter"]
 
     assert bp.behaviors == [
@@ -205,12 +198,11 @@ defmodule AgenticRealmsWeb.WizardNpcAuthoringTest do
            ]
   end
 
-  test "extract essence from an in-world NPC → trance + pre-filled npc draft → commit (US6)",
+  test "extract essence from an in-world NPC → trance + pre-filled npc draft → commit",
        %{wizard_conn: wzc, suffix: suffix} do
     {:ok, view, _} = live(wzc, ~p"/play")
     render_hook(view, "switch_mode", %{"mode" => "wizard"})
 
-    # World mode: the NPCs-in-this-room panel lists the seeded Garrick.
     html = render(view)
     assert html =~ "NPCs in"
     assert html =~ "Garrick the Innkeeper"
@@ -218,13 +210,11 @@ defmodule AgenticRealmsWeb.WizardNpcAuthoringTest do
     garrick = Repo.get_by(NPCClone, blueprint_id: "garrick_the_innkeeper")
     render_hook(view, "extract_npc_essence", %{"clone_id" => garrick.id})
 
-    # Flipped into the sanctum with a pre-filled npc draft (lore field present).
     html = render(view)
     assert html =~ "sanctum"
     assert html =~ "Garrick the Innkeeper"
     assert html =~ "Lore"
 
-    # The auto-derived slug collides with the seeded blueprint; rename it.
     new_slug = "garrick_copy_#{suffix}"
     render_hook(view, "update_blueprint_draft", %{"draft" => %{"proposed_slug" => new_slug}})
     render_hook(view, "commit_blueprint_draft", %{})
@@ -233,11 +223,10 @@ defmodule AgenticRealmsWeb.WizardNpcAuthoringTest do
     assert bp.kind == "npc"
     assert bp.revision == 1
     assert bp.name == "Garrick the Innkeeper"
-    # The source clone is unchanged (still references its own blueprint).
     assert Repo.get(NPCClone, garrick.id).blueprint_id == "garrick_the_innkeeper"
   end
 
-  test "edit an npc blueprint's lore via the form → revision bump (US7)",
+  test "edit an npc blueprint's lore via the form → revision bump",
        %{wizard_conn: wzc, suffix: suffix} do
     {:ok, view, _} = live(wzc, ~p"/play")
     render_hook(view, "switch_mode", %{"mode" => "wizard"})
@@ -263,7 +252,6 @@ defmodule AgenticRealmsWeb.WizardNpcAuthoringTest do
     slug = name |> String.replace(~r/[^a-z0-9]+/, "_") |> String.trim("_")
     assert Queries.get_npc_blueprint_row(slug).revision == 1
 
-    # Focus the blueprint from the registry → edit form (expected_revision 1).
     render_hook(view, "focus_blueprint", %{"blueprint_id" => slug})
     render_hook(view, "update_blueprint_draft", %{"draft" => %{"lore" => "v2 lore, much wiser"}})
     render_hook(view, "commit_blueprint_draft", %{})
@@ -273,7 +261,7 @@ defmodule AgenticRealmsWeb.WizardNpcAuthoringTest do
     assert bp.lore == "v2 lore, much wiser"
   end
 
-  test "edit an in-world NPC clone in place; the blueprint is untouched (US7)",
+  test "edit an in-world NPC clone in place; the blueprint is untouched",
        %{wizard_conn: wzc} do
     {:ok, view, _} = live(wzc, ~p"/play")
     render_hook(view, "switch_mode", %{"mode" => "wizard"})
@@ -289,11 +277,10 @@ defmodule AgenticRealmsWeb.WizardNpcAuthoringTest do
     render_hook(view, "commit_npc_edit", %{})
 
     assert Repo.get(NPCClone, garrick.id).long_description == "Now wearing a fresh apron."
-    # The source blueprint is unchanged (no reverse propagation).
     assert Queries.get_npc_blueprint_row("garrick_the_innkeeper").long_description =~ "wiry man"
   end
 
-  test "unified registry shows both kinds with badges; kind filter narrows it (US8)",
+  test "unified registry shows both kinds with badges; kind filter narrows it",
        %{wizard: wizard, wizard_conn: wzc, suffix: suffix} do
     obj_slug = "chest_#{suffix}"
     npc_slug = "ogre_reg_#{suffix}"
@@ -319,27 +306,22 @@ defmodule AgenticRealmsWeb.WizardNpcAuthoringTest do
     {:ok, view, _} = live(wzc, ~p"/play")
     render_hook(view, "switch_mode", %{"mode" => "wizard"})
 
-    # Default :all — both kinds present, each with a kind badge.
     html = render(view)
     assert html =~ "Brass Chest #{suffix}"
     assert html =~ "Registry Ogre #{suffix}"
     assert html =~ ~s(data-testid="blueprint-kind-#{obj_slug}")
     assert html =~ ~s(data-testid="blueprint-kind-#{npc_slug}")
 
-    # Filter → NPCs only.
     render_hook(view, "filter_blueprints", %{"kind" => "npc"})
     html = render(view)
     assert html =~ "Registry Ogre #{suffix}"
     refute html =~ "Brass Chest #{suffix}"
 
-    # Filter → Objects only.
     render_hook(view, "filter_blueprints", %{"kind" => "object"})
     html = render(view)
     assert html =~ "Brass Chest #{suffix}"
     refute html =~ "Registry Ogre #{suffix}"
   end
-
-  # --- Helpers ------------------------------------------------------------
 
   defp conn_for(conn, player_id) do
     conn

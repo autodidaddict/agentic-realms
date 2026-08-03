@@ -5,13 +5,6 @@ defmodule AgenticRealms.World.RoomTest do
   alias AgenticRealms.World.Commands.{CreateRoom, AddExit}
   alias AgenticRealms.World.Events.{RoomCreated, ExitAdded}
 
-  # Feature 016 — object placement / take / drop and the legacy
-  # NPCSpawnedInRoom no-op were removed from the Room aggregate when the
-  # entity lifecycle moved to `World.Entity`. Those behaviors are covered by
-  # `EntityTest` / the entity projector + service tests. This file now covers
-  # only the Room aggregate's remaining responsibilities: rooms, exits, and
-  # behaviors.
-
   @room_id "00000000-0000-0000-0000-000000000001"
   @target_id "00000000-0000-0000-0000-000000000002"
   @region_id "00000000-0000-0000-0000-000000000900"
@@ -98,7 +91,7 @@ defmodule AgenticRealms.World.RoomTest do
     end
   end
 
-  describe "behaviors (feature 009)" do
+  describe "behaviors" do
     @behaviors_payload [
       %{
         "trigger" => "player_entered",

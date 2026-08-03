@@ -60,8 +60,6 @@ defmodule AgenticRealms.World.Commands.SpawnObjectFromBlueprintWrapperTest do
              fixed: false
            } = Repo.get(Object, object_id)
 
-    # FR-013 — the world_objects schema must NOT have gained a
-    # blueprint_id column as part of this milestone.
     refute Map.has_key?(Map.from_struct(Repo.get(Object, object_id)), :blueprint_id)
   end
 
@@ -87,9 +85,6 @@ defmodule AgenticRealms.World.Commands.SpawnObjectFromBlueprintWrapperTest do
 
   test "spawned object reflects the blueprint's CURRENT denormalized payload",
        %{wizard: w, slug: slug, starting_room_id: room_id} do
-    # Verify the wrapper actually stamps the blueprint payload (not the
-    # call-site values). The blueprint was created in setup with
-    # name "test chest" — that's what should appear on the row.
     {:ok, object_id} = Commands.spawn_object_from_blueprint(w.id, slug, room_id)
     obj = Queries.get_object_blueprint(slug)
     row = Repo.get(Object, object_id)

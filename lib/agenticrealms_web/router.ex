@@ -17,14 +17,11 @@ defmodule AgenticRealmsWeb.Router do
     plug :accepts, ["json"]
   end
 
-  # Feature 018 — External NPC Brains. The contract routes accept JSON and are
-  # guarded by the shared-secret bearer token (fail-closed when unset).
   pipeline :npc_service do
     plug :accepts, ["json"]
     plug AgenticRealmsWeb.Plugs.RequireServiceToken
   end
 
-  # Public routes (redirect if already authenticated)
   scope "/", AgenticRealmsWeb do
     pipe_through [:browser, :redirect_if_player_is_authenticated]
 
@@ -37,7 +34,6 @@ defmodule AgenticRealmsWeb.Router do
     post "/login", PlayerSessionController, :create
   end
 
-  # Public routes (no redirect)
   scope "/", AgenticRealmsWeb do
     pipe_through :browser
 
@@ -47,7 +43,6 @@ defmodule AgenticRealmsWeb.Router do
     end
   end
 
-  # Authenticated routes
   scope "/", AgenticRealmsWeb do
     pipe_through [:browser, :require_authenticated_player]
 
@@ -60,8 +55,6 @@ defmodule AgenticRealmsWeb.Router do
     delete "/logout", PlayerSessionController, :delete
   end
 
-  # Feature 018 — External NPC Brains. Authenticated service contract consumed by
-  # the external mind worker: read identity, read surroundings, submit a move.
   scope "/api", AgenticRealmsWeb do
     pipe_through :npc_service
 
@@ -70,7 +63,6 @@ defmodule AgenticRealmsWeb.Router do
     post "/npc/:id/move", NpcServiceController, :move
   end
 
-  # Enable LiveDashboard in development
   if Application.compile_env(:agenticrealms, :dev_routes) do
     import Phoenix.LiveDashboard.Router
 

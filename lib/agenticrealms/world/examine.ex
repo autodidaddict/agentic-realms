@@ -9,10 +9,8 @@ defmodule AgenticRealms.World.Examine do
   Pure read facade. Composes existing reads from `World.Queries`; never
   dispatches commands, never broadcasts.
 
-  The three-stage decision tree (exact > partial; inventory > room;
-  mixed-kind tie → refuse) is documented in
-  `specs/006-examine-objects/data-model.md` §3 and extended for NPCs in
-  `specs/007-static-npcs/data-model.md` §8.
+  The decision tree is three-stage: exact beats partial, inventory beats
+  room, and a mixed-kind tie is refused.
 
   Parser-injected sentinel `"__self__"` short-circuits scope gathering: the
   acting player is always examinable as themselves regardless of room
@@ -84,12 +82,6 @@ defmodule AgenticRealms.World.Examine do
     end
   end
 
-  # --- Feature 019 — health-tier + relative-power enrichment --------------
-  #
-  # Enrich the resolved Match with a qualitative health sentence and a
-  # relative-power phrase. NEVER exposes exact numbers (FR-020). Self-
-  # examination omits the relative-power phrase (FR-021).
-
   defp enrich(%Match{target_kind: :npc, id: npc_id} = match, _examiner_id, examiner_level) do
     case Repo.get(NPCClone, npc_id) do
       %NPCClone{hp: hp, max_hp: max_hp, level: level}
@@ -109,10 +101,6 @@ defmodule AgenticRealms.World.Examine do
 
   defp enrich(%Match{target_kind: :player, id: target_id} = match, examiner_id, examiner_level) do
     case Repo.get(PlayerState, target_id) do
-      # Feature 020 — a row with no character has nothing to describe. Mount
-      # creates one before anybody can look at anything, so this is the replay
-      # window rather than a state a player can reach; falling through leaves
-      # the match un-enriched instead of crashing the look.
       %PlayerState{hp: hp, max_hp: max_hp, level: level}
       when is_integer(hp) and is_integer(max_hp) and is_integer(level) ->
         {_atom, sentence} = Stats.health_tier(hp, max_hp)
@@ -137,8 +125,6 @@ defmodule AgenticRealms.World.Examine do
       _ -> 1
     end
   end
-
-  # --- Scope gathering ----------------------------------------------------
 
   defp gather_scope(player_id) do
     with {:ok, room_id} <- Queries.current_room_of(player_id),
@@ -167,17 +153,12 @@ defmodule AgenticRealms.World.Examine do
     end
   end
 
-  # Feature 021 — a player is examined by their character's name, not their
-  # login. `:error` means they have no character yet, which cannot happen for a
-  # player who is in a room.
   defp acting_name(player_id) do
     case PlayerNames.get(player_id) do
       name when is_binary(name) -> {:ok, name}
       nil -> :error
     end
   end
-
-  # --- Stage 1: exact matching --------------------------------------------
 
   defp resolve(scope, target) do
     exact_room = filter_objects_exact(scope.room_objects, target)
@@ -220,8 +201,6 @@ defmodule AgenticRealms.World.Examine do
   defp from_first_match([], [], [pl], []), do: {:ok, player_match(pl)}
   defp from_first_match([], [], [], [npc]), do: {:ok, npc_match(npc)}
 
-  # --- Stage 2: inventory > room (objects only) ---------------------------
-
   defp resolve_object_tiebreak([], [_ | _] = inv) when length(inv) > 1,
     do: {:error, :ambiguous_in_inventory}
 
@@ -230,8 +209,6 @@ defmodule AgenticRealms.World.Examine do
   defp resolve_object_tiebreak(_room, []), do: {:error, :ambiguous_in_room}
 
   defp resolve_object_tiebreak(_room, [_ | _]), do: {:error, :ambiguous_in_inventory}
-
-  # --- Stage 3: partial / substring matching ------------------------------
 
   defp resolve_partial(scope, target) do
     partial_room = filter_objects_partial(scope.room_objects, target)
@@ -248,8 +225,6 @@ defmodule AgenticRealms.World.Examine do
       _ -> {:error, :ambiguous_partial}
     end
   end
-
-  # --- Filters ------------------------------------------------------------
 
   defp filter_objects_exact(objs, target),
     do: Enum.filter(objs, fn o -> String.downcase(o.name) == target end)
@@ -269,8 +244,6 @@ defmodule AgenticRealms.World.Examine do
   defp filter_npcs_partial(npcs, target),
     do: Enum.filter(npcs, fn n -> String.contains?(String.downcase(n.name), target) end)
 
-  # --- Match builders -----------------------------------------------------
-
   defp object_match(%{name: name} = obj) do
     %Match{target_kind: :object, name: name, long_description: long_description_of(obj)}
   end
@@ -288,9 +261,6 @@ defmodule AgenticRealms.World.Examine do
     }
   end
 
-  # The :objects list from RoomView and the inventory list don't carry
-  # long_description (they include only id/name/short_description). Look it
-  # up by id from the Object schema directly.
   defp long_description_of(%{id: id}) do
     case AgenticRealms.Repo.get(AgenticRealms.World.Schemas.Object, id) do
       %AgenticRealms.World.Schemas.Object{long_description: ld} -> ld
@@ -298,16 +268,12 @@ defmodule AgenticRealms.World.Examine do
     end
   end
 
-  # NPC clones follow the same pattern — RoomView.npcs omits long_description;
-  # look it up by id when we materialize the Match.
   defp npc_long_description(id) do
     case AgenticRealms.Repo.get(AgenticRealms.World.Schemas.NPCClone, id) do
       %AgenticRealms.World.Schemas.NPCClone{long_description: ld} -> ld
       _ -> nil
     end
   end
-
-  # --- Telemetry ----------------------------------------------------------
 
   defp emit_telemetry(player_id, outcome) do
     {result, target_kind, clone_debug_id} =

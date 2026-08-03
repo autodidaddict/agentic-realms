@@ -1,23 +1,20 @@
 defmodule AgenticRealms.World.Exits.Validator do
   @moduledoc """
-  Pre-dispatch validator for `AddExit` — enforces FR-024 (strict direction
-  axis, flexible distance) for exits between two rooms with coordinates.
+  Pre-dispatch validator for `AddExit`: a strict direction axis and a
+  flexible distance, for exits between two rooms with coordinates.
 
   Delegates the geometric check to `Direction.Geometry.consistent?/3` and
   wraps any error into `{:error, {:exit_geometry_violation, reason}}` so
   callers can pattern-match on the violation shape.
 
-  Off-map exits (either room missing coords) are accepted unconditionally
-  per FR-024's "skip check when either room is off-map" clause — this is
-  the supported pattern for wormhole-like exits.
+  Off-map exits (either room missing coords) are accepted unconditionally,
+  which is the supported pattern for wormhole-like exits.
 
   This module does NOT verify room existence, direction-uniqueness on the
   source room, or any aggregate-level invariants. Those are the caller's
   responsibility. The validator only answers one question: do the source's
   coordinates, the target's coordinates, and the exit direction agree
   geometrically?
-
-  Feature 012 — Maps. See `specs/012-maps/contracts/exit-validator.md`.
   """
 
   alias AgenticRealms.World.Direction.Geometry
@@ -34,14 +31,11 @@ defmodule AgenticRealms.World.Exits.Validator do
   visual treatment in the renderer (dashed line + portal glyph) makes the
   semantics of these exits clear to the player.
 
-  Off-map rooms (either side with unset coords) also skip the check, per
-  FR-024's wormhole-pattern clause.
+  Off-map rooms (either side with unset coords) also skip the check, which
+  is what makes wormhole-like exits possible.
   """
   @spec consistent?(atom(), map(), map()) ::
           :ok | {:error, {:exit_geometry_violation, atom()}}
-  # Feature 017 — `:rift` is a non-geographic portal direction (transient
-  # region entry/return). It has no coordinate delta, so geometry consistency
-  # is meaningless; accept unconditionally.
   def consistent?(:rift, _source, _target), do: :ok
 
   def consistent?(direction, source, target) do

@@ -1,6 +1,6 @@
 defmodule AgenticRealmsWeb.WizardRegistryLiveUpdateTest do
   @moduledoc """
-  Feature 014 US6 — global Blueprint registry live-updates: any wizard's
+  Global Blueprint registry live-updates: any wizard's
   create/edit shows up in every other wizard's open registry without a
   manual reload.
   """
@@ -54,8 +54,6 @@ defmodule AgenticRealmsWeb.WizardRegistryLiveUpdateTest do
     slug = "alice_live_chest_#{suffix}"
     refute render(bob_view) =~ slug
 
-    # Alice authors a blueprint via the wrapper (equivalent of clicking
-    # Commit in her own LiveView — same code path the LiveView uses).
     {:ok, ^slug} =
       Commands.create_object_blueprint(%{
         wizard_id: alice.id,
@@ -88,9 +86,6 @@ defmodule AgenticRealmsWeb.WizardRegistryLiveUpdateTest do
 
     assert render(bob_view) =~ "pre-edit chest"
 
-    # Alice edits BOTH the name and the short_description so the
-    # assertion below can verify the row was patched in place rather
-    # than the unchanged short_description matching the old substring.
     {:ok, 2} =
       Commands.edit_object_blueprint(alice.id, slug, %{
         expected_revision: 1,
@@ -108,10 +103,6 @@ defmodule AgenticRealmsWeb.WizardRegistryLiveUpdateTest do
 
   test "non-wizards do not see the blueprints registry at all",
        %{bob: bob, conn: conn} do
-    # Bob was promoted in setup; demote him for this test by writing
-    # is_wizard=false directly via the schema (no Accounts API exists
-    # for demotion in milestone 1 — see Q1 clarification: future
-    # region-based authz will gate this).
     bob
     |> Ecto.Changeset.change(is_wizard: false)
     |> AgenticRealms.Repo.update!()
@@ -122,8 +113,6 @@ defmodule AgenticRealmsWeb.WizardRegistryLiveUpdateTest do
     {:ok, view, _} = live(bob_conn, ~p"/play")
     refute render(view) =~ "blueprints-registry"
   end
-
-  # --- Helpers ------------------------------------------------------------
 
   defp conn_for(conn, player_id) do
     conn
@@ -136,10 +125,6 @@ defmodule AgenticRealmsWeb.WizardRegistryLiveUpdateTest do
     :ok
   end
 
-  # The UIEventBroadcaster runs at :eventual consistency, so the
-  # WizardBlueprintRegistryChanged broadcast lands asynchronously
-  # after the Commands wrapper returns. Poll the rendered HTML until
-  # the expected substring appears or we time out.
   defp wait_for_render(view, needle, timeout_ms \\ 5_000) do
     deadline = System.monotonic_time(:millisecond) + timeout_ms
     do_wait_for_render(view, needle, deadline)

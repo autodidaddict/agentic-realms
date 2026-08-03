@@ -5,8 +5,7 @@ defmodule AgenticRealms.World.IntentResolver.ContextSnapshot do
   and their literal input.
 
   This is the only part of the Anthropic request that varies per call; the
-  system prompt and tool definitions are stable. See
-  `specs/005-llm-intent-parser/contracts/system_prompt.md` for the format.
+  system prompt and tool definitions are stable.
   """
 
   alias AgenticRealms.World.Queries
@@ -80,8 +79,6 @@ defmodule AgenticRealms.World.IntentResolver.ContextSnapshot do
     Enum.map_join(exits, ", ", fn e -> "#{e.direction} (#{e.target_name})" end)
   end
 
-  # Objects and players are both `%{name: ...}` since feature 021, so one
-  # formatter serves both.
   defp format_names([]), do: "(none)"
   defp format_names(entries), do: Enum.map_join(entries, ", ", & &1.name)
 

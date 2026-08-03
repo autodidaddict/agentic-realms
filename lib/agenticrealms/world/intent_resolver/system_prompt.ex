@@ -5,7 +5,7 @@ defmodule AgenticRealms.World.IntentResolver.SystemPrompt do
 
   The content is read at compile time via `@external_resource` so it ships
   with the release; editing the markdown file requires a recompile to take
-  effect. See `specs/005-llm-intent-parser/contracts/system_prompt.md`.
+  effect.
   """
 
   @prompt_path Path.join([:code.priv_dir(:agenticrealms), "intent_resolver", "system_prompt.md"])

@@ -62,7 +62,6 @@ defmodule Srd.Rules.Skill do
   """
   @spec name(skill()) :: String.t()
   def name(skill) do
-    # Fetch first so an unknown skill raises rather than being titlecased.
     _ = Map.fetch!(@skills, skill)
 
     skill

@@ -165,7 +165,6 @@ defmodule Srd.Rules.HitpointsTest do
     end
 
     test "matches a hand-run total at a high level" do
-      # d8 wizard, Constitution +1: 9 at level 1, then 6 per level for 19 more.
       assert Hitpoints.maximum("1d8", 20, 1) == 9 + 19 * 6
     end
 

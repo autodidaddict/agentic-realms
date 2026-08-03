@@ -5,7 +5,6 @@ defmodule AgenticRealms.World.EntityTest do
   alias AgenticRealms.World.Commands.{CloneEntity, MoveEntity, EditEntity}
   alias AgenticRealms.World.Events.{EntityCloned, EntityMoved, EntityEdited}
 
-  # An entity that has been cloned and is currently in room "r1".
   defp in_room(id \\ "e1", room \\ "r1") do
     %Entity{}
     |> Entity.apply(%EntityCloned{entity_id: id, kind: :object, fields: %{}})
@@ -78,7 +77,6 @@ defmodule AgenticRealms.World.EntityTest do
     end
 
     test "stale expected_from → :container_conflict (not silently applied)" do
-      # Entity is actually in r1; a concurrent caller thinks it's in r2.
       cmd = %MoveEntity{
         entity_id: "e1",
         expected_from: ContainerRef.room("r2"),
@@ -100,8 +98,6 @@ defmodule AgenticRealms.World.EntityTest do
     end
 
     test "container_conflict takes precedence only after type + no-op checks" do
-      # to is a valid type and differs from current; expected_from mismatches →
-      # conflict (proves ordering: type ok, not no-op, then conflict).
       cmd = %MoveEntity{
         entity_id: "e1",
         expected_from: ContainerRef.void(),

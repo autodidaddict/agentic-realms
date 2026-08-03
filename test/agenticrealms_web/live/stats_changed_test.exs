@@ -1,6 +1,6 @@
 defmodule AgenticRealmsWeb.StatsChangedTest do
   @moduledoc """
-  Feature 020 — how the open character sheet reacts to progression.
+  How the open character sheet reacts to progression.
 
   An xp-only change is patched from the broadcast payload with no database
   read. A level change re-derives the whole sheet, because level moves the
@@ -26,8 +26,6 @@ defmodule AgenticRealmsWeb.StatsChangedTest do
     p
   end
 
-  # A socket carrying just enough for the handler: the current sheet, the
-  # acting player, and a log to append notices to.
   defp socket_for(player) do
     %Phoenix.LiveView.Socket{}
     |> Phoenix.Component.assign(:current_player, player)
@@ -59,7 +57,6 @@ defmodule AgenticRealmsWeb.StatsChangedTest do
       player = player_with_character()
       socket = socket_for(player)
 
-      # Delete the row: a patch that touched the database would now raise.
       Repo.delete_all(PlayerState)
 
       {:noreply, socket} =
@@ -97,8 +94,6 @@ defmodule AgenticRealmsWeb.StatsChangedTest do
       assert socket.assigns.stats.proficiency_bonus == 2
       assert socket.assigns.stats.hp.max == 12
 
-      # The projector has already written the new level by the time the
-      # broadcast lands.
       Repo.update_all(PlayerState, set: [level: 5, xp: 6_500])
 
       {:noreply, socket} =

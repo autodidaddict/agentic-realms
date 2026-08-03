@@ -1,6 +1,6 @@
 defmodule AgenticRealms.World.Transient.Manager do
   @moduledoc """
-  Feature 017 — singleton lifecycle manager for transient regions. Two duties,
+  Singleton lifecycle manager for transient regions. Two duties,
   both driven off durable `regions` columns so there is nothing to rehydrate
   after a crash:
 
@@ -23,7 +23,7 @@ defmodule AgenticRealms.World.Transient.Manager do
   before either reaches the purge. One manager, one sweep.
 
   After a restart the next sweep re-derives "due" from durable state, so
-  regions that became abandoned during downtime are reaped (FR-018), and a
+  regions that became abandoned during downtime are reaped, and a
   crash midway through a purge is retried by the tombstone clause in `due?/2`.
   """
 
@@ -39,8 +39,6 @@ defmodule AgenticRealms.World.Transient.Manager do
 
   @pubsub AgenticRealms.PubSub
 
-  # --- Client -------------------------------------------------------------
-
   @spec start_link(keyword()) :: GenServer.on_start()
   def start_link(opts \\ []),
     do: GenServer.start_link(__MODULE__, opts, name: Registry.via_tuple())
@@ -52,8 +50,6 @@ defmodule AgenticRealms.World.Transient.Manager do
   """
   @spec sweep_now() :: [String.t()]
   def sweep_now, do: GenServer.call(Registry.via_tuple(), :sweep_now, 30_000)
-
-  # --- Server -------------------------------------------------------------
 
   @impl true
   def init(_opts) do
@@ -72,17 +68,12 @@ defmodule AgenticRealms.World.Transient.Manager do
     {:noreply, state}
   end
 
-  # A login/logout flipped someone's online state — promptly reconcile the
-  # offline stamps (so the grace clock starts/stops), but defer the actual
-  # reaping to the periodic sweep so destruction timing stays predictable.
   def handle_info(%{event: "presence_diff"}, state) do
     _ = do_reconcile()
     {:noreply, state}
   end
 
   def handle_info(_other, state), do: {:noreply, state}
-
-  # --- sweep --------------------------------------------------------------
 
   defp do_sweep do
     now = DateTime.utc_now()
@@ -106,8 +97,6 @@ defmodule AgenticRealms.World.Transient.Manager do
 
   defp transient_regions, do: Repo.all(from(r in Region, where: r.kind == "transient"))
 
-  # Keep owner_offline_since aligned with current presence: clear it when the
-  # owner is online, stamp `now` when they first appear offline.
   defp reconcile_offline(%Region{} = region, online, now) do
     online? = MapSet.member?(online, region.provision_owner_id)
 
@@ -125,7 +114,6 @@ defmodule AgenticRealms.World.Transient.Manager do
     end
   end
 
-  # Tombstoned (teardown began, purge unfinished) → always retry.
   defp due?(%Region{destroyed_at: destroyed_at}, _now) when not is_nil(destroyed_at), do: true
   defp due?(%Region{} = region, now), do: logoff_due?(region, now) or cap_due?(region, now)
 

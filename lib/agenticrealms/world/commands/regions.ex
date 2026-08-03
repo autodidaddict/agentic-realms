@@ -1,6 +1,6 @@
 defmodule AgenticRealms.World.Commands.Regions do
   @moduledoc """
-  Write-side facade for world authoring (feature 012): regions, rooms, and the
+  Write-side facade for world authoring: regions, rooms, and the
   exits between them.
 
   Split out of `AgenticRealms.World.Commands`, which had grown to cover every
@@ -15,8 +15,6 @@ defmodule AgenticRealms.World.Commands.Regions do
   alias AgenticRealms.World.Commands.{AddExit, CreateRegion, CreateRoom}
   alias AgenticRealms.World.Exits.Validator, as: ExitsValidator
   alias AgenticRealms.World.Schemas.{Region, Room}
-
-  # --- Region authoring (feature 012) -------------------------------------
 
   @doc """
   Create a new region with the given `region_id` and friendly display
@@ -44,8 +42,6 @@ defmodule AgenticRealms.World.Commands.Regions do
       _ -> {:error, :region_name_taken}
     end
   end
-
-  # --- Room authoring (feature 012) ---------------------------------------
 
   @doc """
   Create a room with map metadata. `opts` may include `:behaviors` (default
@@ -99,7 +95,7 @@ defmodule AgenticRealms.World.Commands.Regions do
 
   @doc """
   Add a directional exit from `source_room_id` to `target_room_id`.
-  Validates direction-coordinate consistency per FR-024 via
+  Validates direction-coordinate consistency via
   `Exits.Validator`. Off-map rooms (either side missing coords) skip the
   geometric check — supports wormhole-like patterns.
   """

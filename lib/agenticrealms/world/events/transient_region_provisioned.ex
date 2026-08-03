@@ -1,6 +1,6 @@
 defmodule AgenticRealms.World.Events.TransientRegionProvisioned do
   @moduledoc """
-  Feature 017 — emitted when a transient region is provisioned. The event
+  Emitted when a transient region is provisioned. The event
   type itself is the `kind: :transient` discriminator; the projector inserts
   the `regions` row with the owner + lifetime anchor + source/origin rooms.
   """

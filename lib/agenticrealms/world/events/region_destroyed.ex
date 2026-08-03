@@ -1,6 +1,6 @@
 defmodule AgenticRealms.World.Events.RegionDestroyed do
   @moduledoc """
-  Feature 017 — a transient region was destroyed. Triggers aggregate eviction
+  A transient region was destroyed. Triggers aggregate eviction
   (via `RegionLifespan` → `:stop`); the projector stamps `regions.destroyed_at`
   as a tombstone. Actual data removal is done by `Transient.Purge`.
   """

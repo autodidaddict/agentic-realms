@@ -1,8 +1,6 @@
 defmodule AgenticRealms.World.NPCChat.ContextTest do
   @moduledoc """
-  Unit tests for the chat context-builder (feature 010).
-
-  See `specs/010-npc-conversations/contracts/context.md`.
+  Unit tests for the chat context-builder.
   """
 
   use ExUnit.Case, async: true
@@ -44,9 +42,6 @@ defmodule AgenticRealms.World.NPCChat.ContextTest do
       assert u1["content"] == "Hi"
       assert a["role"] == "assistant"
 
-      # Assistant speech turns are passed as raw text (the model's own prior
-      # reply) — no "Garrick says, '...'" wrapper. Wrapping distances the LLM
-      # from its own memory and degrades follow-up recall.
       assert a["content"] == "Hello, friend."
       assert u2["content"] == "Tell me more."
     end
@@ -59,8 +54,6 @@ defmodule AgenticRealms.World.NPCChat.ContextTest do
 
       req = Context.build_request(snapshot(), turns, "Are you ok?")
       [_u, a, _u2] = req["messages"]
-      # Emote turns get a parenthetical tag so the model knows it was a
-      # gesture, not spoken words.
       assert a["content"] == "(emote: looks puzzled)"
     end
 

@@ -1,12 +1,12 @@
 defmodule AgenticRealms.World.Blueprint do
   @moduledoc """
-  Unified Blueprint aggregate (feature 015) — the authored template for a
+  Unified Blueprint aggregate — the authored template for a
   kind of world entity (`kind` ∈ {`"object"`, `"npc"`}). Owns the shared core
   (name/descriptions/fixed) plus the NPC-flavored fields (behaviors/lore/
   behavior_groups/quests) and the monotonic `revision` that secures optimistic-lock
   edits.
 
-  Identified by `:blueprint_id` (the human-typable slug, FR-004) with stream
+  Identified by `:blueprint_id` (the human-typable slug) with stream
   prefix `"blueprint-"`. UUIDs are disallowed by the slug shape.
 
   Replaces the structurally-identical `ObjectBlueprint` (014) + `NPCBlueprint`
@@ -31,8 +31,6 @@ defmodule AgenticRealms.World.Blueprint do
   alias AgenticRealms.World.Events.{BlueprintCreated, BlueprintEdited}
 
   @editable_fields ~w(name short_description long_description fixed lore behavior_groups behaviors)a
-
-  # --- CreateBlueprint ----------------------------------------------------
 
   @spec execute(%__MODULE__{}, %CreateBlueprint{} | %EditBlueprint{}) ::
           %BlueprintCreated{} | %BlueprintEdited{} | :ok | {:error, atom()}
@@ -78,8 +76,6 @@ defmodule AgenticRealms.World.Blueprint do
   def execute(%__MODULE__{}, %CreateBlueprint{}),
     do: {:error, :blueprint_already_exists}
 
-  # --- EditBlueprint ------------------------------------------------------
-
   def execute(%__MODULE__{id: nil}, %EditBlueprint{}),
     do: {:error, :blueprint_not_found}
 
@@ -92,16 +88,12 @@ defmodule AgenticRealms.World.Blueprint do
       )
       when is_map(fields_changed) do
     cond do
-      # Optimistic lock at the aggregate boundary (FR-020a). The wrapper
-      # re-reads the read model to surface the current revision in the error
-      # tuple the LiveView consumes (Commanded only allows 2-tuple errors).
       expected_revision != current_revision ->
         {:error, :stale_revision}
 
       not Enum.all?(Map.keys(fields_changed), &(&1 in @editable_fields)) ->
         {:error, :invalid_field}
 
-      # No-op diff → :ok, no event (no revision bump).
       no_changes?(state, fields_changed) ->
         :ok
 
@@ -123,8 +115,6 @@ defmodule AgenticRealms.World.Blueprint do
     |> Enum.reject(fn {k, v} -> Map.get(state, k) == v end)
     |> Map.new()
   end
-
-  # --- apply/2 ------------------------------------------------------------
 
   @spec apply(%__MODULE__{}, %BlueprintCreated{} | %BlueprintEdited{}) :: %__MODULE__{}
   def apply(%__MODULE__{} = state, %BlueprintCreated{} = e) do

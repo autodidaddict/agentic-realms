@@ -1,8 +1,8 @@
 defmodule AgenticRealmsWeb.CharacterCreationTest do
   @moduledoc """
-  Feature 021 US1 — a new player is asked who they are before they get a world.
+  A new player is asked who they are before they get a world.
 
-  This file previously asserted the opposite: that feature 020's generated
+  This file previously asserted the opposite: that the generated
   character arrived with no prompt at all. That is the behaviour this feature
   removes, so the assertions are inverted rather than extended.
 
@@ -50,11 +50,7 @@ defmodule AgenticRealmsWeb.CharacterCreationTest do
     |> live(~p"/play")
   end
 
-  # Walk the identity step: a name and one of each selection.
   defp fill_identity(view, name, species \\ "elf", class \\ "wizard", background \\ "sage") do
-    # Exactly what `phx-keyup` puts on the wire: the key pressed plus the
-    # input's current value. Sending a friendlier shape here is what let a
-    # crash-on-every-keystroke bug ship.
     render_keyup(view, "creation_name", %{"key" => "r", "value" => name})
     select(view, "species", species)
     select(view, "class", class)
@@ -74,8 +70,6 @@ defmodule AgenticRealmsWeb.CharacterCreationTest do
 
   defp reroll(view), do: render_click(view, "creation_reroll", %{})
 
-  # The draft as the LiveView holds it. Scores are rolled, so a test that needs
-  # to know them has to ask rather than assume.
   defp draft_of(view), do: :sys.get_state(view.pid).socket.assigns.draft
 
   defp spread(view, param), do: render_click(view, "creation_spread", %{"spread" => param})
@@ -86,7 +80,6 @@ defmodule AgenticRealmsWeb.CharacterCreationTest do
   defp pick(view, key, value),
     do: render_click(view, "creation_pick", %{"key" => key, "option" => to_string(value)})
 
-  # Walk to the specializations step for a given species/class/background.
   defp at_specializations(conn, species, class, background) do
     player = register("spec")
     {:ok, view, _} = play_as(conn, player)
@@ -95,8 +88,6 @@ defmodule AgenticRealmsWeb.CharacterCreationTest do
     roll_abilities(view)
     spread(view, "even")
 
-    # The specializations step is only reachable once skills are done. Ask the
-    # draft what this class offers rather than hardcoding a list per case.
     probe =
       Draft.new()
       |> Draft.put_selection(:species, species)
@@ -115,8 +106,6 @@ defmodule AgenticRealmsWeb.CharacterCreationTest do
 
   defp step(view, name), do: render_click(view, "creation_step", %{"step" => to_string(name)})
 
-  # Visiting the abilities step is what rolls a spread, so anything downstream
-  # of it has to go through the step rather than assigning scores directly.
   defp roll_abilities(view) do
     step(view, :abilities)
     view
@@ -130,7 +119,6 @@ defmodule AgenticRealmsWeb.CharacterCreationTest do
       {:ok, _view, html} = play_as(conn, player)
 
       assert html =~ "Create Your Character"
-      # No world behind it — the player has not been spawned.
       assert Repo.get(PlayerState, player.id) == nil
     end
 
@@ -166,8 +154,6 @@ defmodule AgenticRealmsWeb.CharacterCreationTest do
 
       html = fill_identity(view, "Elrond") |> render()
 
-      # Identity is done, so the footer moves on to the next shipped step
-      # rather than declaring the character ready.
       assert html =~ "Assign your ability scores."
       assert html =~ "disabled"
     end
@@ -231,7 +217,6 @@ defmodule AgenticRealmsWeb.CharacterCreationTest do
       assert ps.hp == ps.max_hp
       assert ps.current_room_id == Seed.starting_room_id()
 
-      # And the dialog is gone.
       refute html =~ "Create Your Character"
       assert html =~ "Elrond"
     end
@@ -244,9 +229,6 @@ defmodule AgenticRealmsWeb.CharacterCreationTest do
 
       ps = Repo.get(PlayerState, player.id)
 
-      # Generation bought a spread, so the exact numbers vary. What has to hold
-      # is that they are reachable: nothing below the floor, and nothing above
-      # the ceiling plus the largest increase a background can give.
       scores = [ps.str, ps.dex, ps.con, ps.int, ps.wis, ps.cha]
 
       assert length(scores) == 6
@@ -256,7 +238,6 @@ defmodule AgenticRealmsWeb.CharacterCreationTest do
         assert score <= PointBuy.max_score() + 2
       end
 
-      # Story 3 has not shipped, so generation picked the class' skills.
       assert length(ps.skill_proficiencies) > 0
       assert ps.save_proficiencies == ["int", "wis"]
       assert ps.size == "medium"
@@ -276,7 +257,6 @@ defmodule AgenticRealmsWeb.CharacterCreationTest do
 
       assert html =~ "That name is taken"
       assert html =~ "Create Your Character"
-      # The choices survive so only the name has to change.
       assert html =~ ~s(aria-pressed="true")
       assert Repo.get(PlayerState, second.id) == nil
     end
@@ -289,14 +269,13 @@ defmodule AgenticRealmsWeb.CharacterCreationTest do
 
       fill_identity(view, "Ghost")
 
-      # Walk away without confirming.
       GenServer.stop(view.pid)
 
       assert Repo.get(PlayerState, player.id) == nil
     end
   end
 
-  describe "the abilities step (US2)" do
+  describe "the abilities step" do
     setup %{conn: conn} do
       player = register("abilities")
       {:ok, view, _} = play_as(conn, player)
@@ -315,7 +294,6 @@ defmodule AgenticRealmsWeb.CharacterCreationTest do
     end
 
     test "puts the highest score on what the class runs on", %{conn: conn} do
-      # fill_identity/2 defaults to a wizard.
       for _ <- 1..10 do
         player = register("primary")
         {:ok, view, _} = play_as(conn, player)
@@ -337,7 +315,6 @@ defmodule AgenticRealmsWeb.CharacterCreationTest do
     end
 
     test "+ spends a point and - refunds one", %{view: view} do
-      # Make room first: the opening spread has nothing left over.
       before = draft_of(view).bought
 
       lowered_from =
@@ -358,7 +335,6 @@ defmodule AgenticRealmsWeb.CharacterCreationTest do
     end
 
     test "refuses to go below the floor", %{view: view} do
-      # Drive one ability all the way down, then once more.
       for _ <- 1..10, do: lower_ability(view, :cha)
 
       assert draft_of(view).bought.cha == PointBuy.min_score()
@@ -371,7 +347,6 @@ defmodule AgenticRealmsWeb.CharacterCreationTest do
       for _ <- 1..10, do: lower_ability(view, :cha)
       html = render(view)
 
-      # Charisma is at the floor, so its minus is dead.
       assert html =~ ~r|disabled[^>]*phx-click="creation_ability_down" phx-value-ability="cha"|s or
                html =~ ~r|phx-click="creation_ability_down" phx-value-ability="cha"[^>]*disabled|s
     end
@@ -403,20 +378,20 @@ defmodule AgenticRealmsWeb.CharacterCreationTest do
     test "shows each ability's final score including the background increase",
          %{view: view} do
       roll_abilities(view)
-      # Sage raises con, int, or wis.
       select(view, "background", "sage")
       html = spread(view, "split:int:con")
 
-      # int 13 + 2 = 15 (modifier +2), con 12 + 1 = 13 (modifier +1).
-      assert html =~ "15"
-      assert html =~ "+2"
+      draft = draft_of(view)
+
       assert html =~ "from background"
+      assert Draft.scores(draft)[:int] == draft.bought[:int] + 2
+      assert Draft.scores(draft)[:con] == draft.bought[:con] + 1
+      assert html =~ to_string(Draft.scores(draft)[:int])
     end
 
     test "offers only the three abilities the background names", %{view: view} do
       html = select(view, "background", "sage")
 
-      # Sage: con, int, wis. Charisma is not on offer.
       assert html =~ "split:int:con"
       refute html =~ "split:cha:"
       refute html =~ ":cha\"" |> String.replace("\\", "")
@@ -427,7 +402,6 @@ defmodule AgenticRealmsWeb.CharacterCreationTest do
       html = spread(view, "even")
 
       assert html =~ ~s(aria-pressed="true")
-      # All three of the background's abilities gained +1.
       assert html =~ "from background"
     end
 
@@ -438,7 +412,6 @@ defmodule AgenticRealmsWeb.CharacterCreationTest do
 
       html = select(view, "background", "soldier")
 
-      # No spread is selected any more, but the array survives.
       refute html =~ "from background"
       assert html =~ ~s(phx-value-ability="cha")
     end
@@ -447,8 +420,6 @@ defmodule AgenticRealmsWeb.CharacterCreationTest do
       select(view, "background", "sage")
       spread(view, "split:int:con")
 
-      # Rolled, so the expected numbers come from the draft rather than from a
-      # constant. What matters is that what was reviewed is what was created.
       expected = view |> draft_of() |> Draft.scores()
 
       render_click(view, "creation_confirm", %{})
@@ -462,13 +433,11 @@ defmodule AgenticRealmsWeb.CharacterCreationTest do
     end
   end
 
-  describe "the skills step (US3)" do
+  describe "the skills step" do
     setup %{conn: conn} do
       player = register("skills")
       {:ok, view, _} = play_as(conn, player)
 
-      # A fighter: two picks from nine, with soldier granting athletics and
-      # intimidation outright.
       fill_identity(
         view,
         "Skiller#{System.unique_integer([:positive])}",
@@ -488,10 +457,8 @@ defmodule AgenticRealmsWeb.CharacterCreationTest do
       html = render(view)
 
       assert html =~ "Choose 2 Skills"
-      # On the fighter's list.
       assert html =~ ~s(phx-value-skill="acrobatics")
       assert html =~ ~s(phx-value-skill="survival")
-      # Not on it.
       refute html =~ ~s(phx-value-skill="arcana")
       refute html =~ ~s(phx-value-skill="stealth")
     end
@@ -504,7 +471,6 @@ defmodule AgenticRealmsWeb.CharacterCreationTest do
       assert html =~ "Athletics"
       assert html =~ "Intimidation"
 
-      # Athletics is on the fighter's list too, but it is never a pick.
       refute html =~ ~s(phx-value-skill="athletics")
       refute html =~ ~s(phx-value-skill="intimidation")
     end
@@ -516,8 +482,6 @@ defmodule AgenticRealmsWeb.CharacterCreationTest do
       assert html =~ "DEX"
       assert html =~ "WIS"
 
-      # Scores are rolled now, so the modifier itself varies. What has to hold
-      # is that every offered skill shows one, signed, beside its ability.
       assert html =~ ~r|cc-skill-meta">\s*[A-Z]{3}\s*[+-]\d|
     end
 
@@ -528,7 +492,6 @@ defmodule AgenticRealmsWeb.CharacterCreationTest do
 
       assert html =~ "All chosen."
 
-      # Acrobatics was released to make room; the two most recent are held.
       assert html =~
                ~s(aria-pressed="false" phx-click="creation_skill" phx-value-skill="acrobatics")
 
@@ -549,7 +512,6 @@ defmodule AgenticRealmsWeb.CharacterCreationTest do
     test "a granted skill cannot be picked even by a crafted event", %{view: view} do
       before = render(view)
 
-      # Athletics is granted by soldier and is not offered.
       pick_skill(view, :athletics)
       pick_skill(view, :nonsense)
 
@@ -564,7 +526,6 @@ defmodule AgenticRealmsWeb.CharacterCreationTest do
       select(view, "class", "wizard")
       html = step(view, :skills)
 
-      # Wizard offers neither of the fighter's picks, so both are gone.
       assert html =~ "2 more to choose."
       assert html =~ ~s(phx-value-skill="arcana")
       refute html =~ ~s(phx-value-skill="acrobatics")
@@ -579,13 +540,12 @@ defmodule AgenticRealmsWeb.CharacterCreationTest do
 
       assert "perception" in ps.skill_proficiencies
       assert "survival" in ps.skill_proficiencies
-      # And the granted ones are still there, exactly once.
       assert "athletics" in ps.skill_proficiencies
       assert ps.skill_proficiencies == Enum.uniq(ps.skill_proficiencies)
     end
   end
 
-  describe "the specializations step (US4)" do
+  describe "the specializations step" do
     test "an elf is asked for a lineage, named after the trait", %{conn: conn} do
       {_player, view} = at_specializations(conn, "elf", "wizard", "sage")
       html = render(view)
@@ -646,14 +606,12 @@ defmodule AgenticRealmsWeb.CharacterCreationTest do
     end
 
     test "a feat the background granted is shown as held, not offered", %{conn: conn} do
-      # Criminal grants Alert; a human's Versatile offers any origin feat.
       {_player, view} = at_specializations(conn, "human", "wizard", "criminal")
       html = render(view)
 
       assert html =~ "Versatile"
       assert html =~ "Alert"
       assert html =~ "already granted by your background"
-      # And Alert is not among the pickable options.
       refute html =~ ~s(phx-value-option="alert")
     end
 
@@ -670,8 +628,6 @@ defmodule AgenticRealmsWeb.CharacterCreationTest do
       render_click(view, "creation_confirm", %{})
       ps = Repo.get(PlayerState, player.id)
 
-      # Lineage has a column; a skill chosen through a feature joins the skill
-      # array; a feat joins the feat array; the rest lands in `choices`.
       assert ps.lineage_slug == "wood-elf"
       assert "perception" in ps.skill_proficiencies
       assert "archery" in ps.feat_slugs
@@ -706,8 +662,7 @@ defmodule AgenticRealmsWeb.CharacterCreationTest do
     end
   end
 
-  describe "the review step (US5)" do
-    # A complete elf fighter, sitting on the review.
+  describe "the review step" do
     defp at_review(conn) do
       {player, view} = at_specializations(conn, "elf", "fighter", "soldier")
 
@@ -735,14 +690,12 @@ defmodule AgenticRealmsWeb.CharacterCreationTest do
       assert html =~ "Perception"
     end
 
-    test "the created character is the one that was reviewed (FR-029)", %{conn: conn} do
+    test "the created character is the one that was reviewed", %{conn: conn} do
       {player, view} = at_review(conn)
 
       reviewed = render(view)
       render_click(view, "creation_confirm", %{})
 
-      # The sheet the player will now see, built by the same Stats.sheet/3 the
-      # review went through.
       created = AgenticRealms.World.Stats.for_player(player.id)
 
       assert reviewed =~ created.name
@@ -752,7 +705,6 @@ defmodule AgenticRealmsWeb.CharacterCreationTest do
       assert reviewed =~ ~s(<span class="v">#{signed(created.proficiency_bonus)}</span>)
       assert reviewed =~ "#{created.hp.max} / #{created.hp.max}"
 
-      # Every ability score and modifier the sheet shows was in the review.
       for ability <- created.abilities do
         assert reviewed =~ "#{ability.score}"
         assert reviewed =~ signed(ability.modifier)
@@ -767,8 +719,6 @@ defmodule AgenticRealmsWeb.CharacterCreationTest do
       {player, view} = at_review(conn)
       render_click(view, "creation_confirm", %{})
 
-      # Not a comparison of two renderings — the same adapter, given the same
-      # facts, returns the same sheet.
       created = AgenticRealms.World.Stats.for_player(player.id)
       ps = Repo.get(PlayerState, player.id)
 
@@ -830,8 +780,6 @@ defmodule AgenticRealmsWeb.CharacterCreationTest do
       step(view, :identity)
       select(view, "class", "wizard")
 
-      # The skills and specializations were re-asked, so the review is not
-      # reachable until they are answered again.
       assert render(view) =~ "Choose 2 Skills" or step(view, :skills) =~ "Choose 2 Skills"
 
       pick_skill(view, :arcana)
@@ -840,7 +788,6 @@ defmodule AgenticRealmsWeb.CharacterCreationTest do
 
       assert html =~ "Level 1 Elf Wizard"
       refute html =~ "Level 1 Elf Fighter"
-      # A wizard's d6 hit die gives fewer hitpoints than a fighter's d10.
       refute html == before
     end
 
@@ -853,8 +800,6 @@ defmodule AgenticRealmsWeb.CharacterCreationTest do
       roll_abilities(view)
       spread(view, "even")
 
-      # Skills untouched. The review is not reachable, so confirm stays shut
-      # and the footer names the step rather than saying something is wrong.
       html = step(view, :review)
 
       assert html =~ "Choose your skills."
@@ -866,8 +811,6 @@ defmodule AgenticRealmsWeb.CharacterCreationTest do
   describe "the character name is the public identity" do
     test "another player sees the character, and never the account username",
          %{conn: conn} do
-      # SC-012. The two names are deliberately different: if the fixture named
-      # the character after the login, this test could not tell them apart.
       alice = register("alice_login")
       bob = register("bob_login")
 
@@ -880,21 +823,16 @@ defmodule AgenticRealmsWeb.CharacterCreationTest do
       {:ok, _alice_view, _} = play_as(conn, alice)
       {:ok, bob_view, _} = play_as(conn, bob)
 
-      # Give Presence a beat, then look at what Bob is shown.
       Process.sleep(50)
       html = render(bob_view)
 
       assert html =~ "Aragorn"
       refute html =~ alice.username
 
-      # Bob's own sheet shows his character.
       sheet = render_click(bob_view, "open_modal", %{"modal" => "stats"})
       assert sheet =~ "Legolas"
       refute sheet =~ alice.username
 
-      # Bob's own login still appears in his account dropdown, and should: the
-      # username is a credential its owner may see. SC-012 is about what OTHER
-      # players are shown, which the assertions above cover.
       assert html =~ ~s(class="ar-nav-username")
       assert html =~ bob.username
     end
@@ -929,7 +867,6 @@ defmodule AgenticRealmsWeb.CharacterCreationTest do
 
       first |> fill_identity("Radagast") |> render_click("creation_confirm", %{})
 
-      # The second session confirms against a player who now has a character.
       second |> fill_identity("Radagast the Brown") |> render_click("creation_confirm", %{})
 
       ps = Repo.get(PlayerState, player.id)

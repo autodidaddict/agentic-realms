@@ -46,7 +46,6 @@ defmodule AgenticRealms.World.Commands.EditObjectSecurityTest do
           long_description: "A pot we'll try to edit from a different room."
         })
 
-      # Walk the wizard east; the seed has an east exit out of Stone Atrium.
       {:ok, _new_room_id} = Commands.move(w.id, :east)
 
       assert {:error, :object_not_editable_here} =
@@ -54,7 +53,6 @@ defmodule AgenticRealms.World.Commands.EditObjectSecurityTest do
                  short_description: "should be refused"
                })
 
-      # The Object's persisted short_description is unchanged.
       row = Repo.get(Object, object_id)
       assert row.short_description == "a cross-room test pot"
     end
@@ -66,8 +64,6 @@ defmodule AgenticRealms.World.Commands.EditObjectSecurityTest do
 
       {:ok, _} = Accounts.promote_to_wizard(ghost.id)
 
-      # Spawn a separate wizard and freeform an object so we have one to
-      # target. We don't spawn the ghost.
       {:ok, other} =
         Accounts.register_player(%{username: "other_#{suffix}", password: "pw12345678"})
 
@@ -96,8 +92,6 @@ defmodule AgenticRealms.World.Commands.EditObjectSecurityTest do
           long_description: "A target that's about to be quest-scoped."
         })
 
-      # Quest-scope the row via a real quest_instances row so the DB
-      # check + FK constraints are satisfied.
       qi_id = insert_quest_instance(w.id)
 
       {1, _} =
@@ -134,22 +128,15 @@ defmodule AgenticRealms.World.Commands.EditObjectSecurityTest do
 
       slug = "quest_extract_attempt_#{suffix}"
 
-      # A quest-scoped object is not extractable (filtered out → unknown entity).
       assert {:error, :unknown_entity} =
                Commands.extract_essence(w.id, object_id, slug)
 
-      # No blueprint persisted.
       assert is_nil(Repo.get(Blueprint, slug))
     end
   end
 
-  # --- Helpers ------------------------------------------------------------
-
   import Ecto.Query
 
-  # Seeds a minimal quest_instances row anchored to the seeded
-  # innkeeper blueprint, so we can quest-scope a world Object via raw
-  # Repo writes without going through the full AcceptQuest flow.
   defp insert_quest_instance(player_id) do
     id = Ecto.UUID.generate()
     now = DateTime.utc_now() |> DateTime.truncate(:second)

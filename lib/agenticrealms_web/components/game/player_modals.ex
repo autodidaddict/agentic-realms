@@ -13,10 +13,6 @@ defmodule AgenticRealmsWeb.GameComponents.PlayerModals do
 
   alias Phoenix.LiveView.JS
 
-  # ────────────────────────────────────────────────────────────
-  # Stats Modal
-  # ────────────────────────────────────────────────────────────
-
   attr :stats, :map, required: true
 
   @doc """
@@ -25,7 +21,7 @@ defmodule AgenticRealmsWeb.GameComponents.PlayerModals do
   Tab switching is client-side. Which tab is showing is not authoritative, not
   persisted, and not broadcast, so sending it to the server would buy nothing —
   all three panels render into the DOM and `JS.show/JS.hide` swaps them
-  (Principle III). Reopening the sheet therefore always lands on Main, because
+  Reopening the sheet therefore always lands on Main, because
   the modal is unmounted on close.
   """
   def stats_modal(assigns) do
@@ -92,8 +88,6 @@ defmodule AgenticRealmsWeb.GameComponents.PlayerModals do
     """
   end
 
-  # Show the chosen panel, hide the other two, and move the selected state
-  # across the tab strip. No server round trip.
   defp select_tab(tab) do
     Enum.reduce(~w(main abilities spells), %JS{}, fn other, js ->
       if other == tab do
@@ -110,14 +104,12 @@ defmodule AgenticRealmsWeb.GameComponents.PlayerModals do
     end)
   end
 
-  # --- Main tab ------------------------------------------------------------
-
   attr :stats, :map, required: true
 
   @doc """
   The sheet's main tab: vitals, identity, and the derived combat values.
 
-  Public because feature 021's creation review renders it too. The review shows
+  Public because the creation review renders it too. The review shows
   the character that is about to exist, and showing it through anything other
   than the sheet's own components would let the two drift.
   """
@@ -161,8 +153,6 @@ defmodule AgenticRealmsWeb.GameComponents.PlayerModals do
     </div>
     """
   end
-
-  # --- Abilities tab -------------------------------------------------------
 
   attr :stats, :map, required: true
 
@@ -211,8 +201,6 @@ defmodule AgenticRealmsWeb.GameComponents.PlayerModals do
   attr :proficient?, :boolean, required: true
   attr :what, :string, required: true
 
-  # Proficiency is carried by the filled/hollow glyph and the label both, never
-  # by colour alone.
   defp proficiency_mark(assigns) do
     ~H"""
     <span
@@ -224,8 +212,6 @@ defmodule AgenticRealmsWeb.GameComponents.PlayerModals do
     """
   end
 
-  # --- Spells tab ----------------------------------------------------------
-
   defp spells_panel(assigns) do
     ~H"""
     <div class="sheet-empty">
@@ -233,10 +219,6 @@ defmodule AgenticRealmsWeb.GameComponents.PlayerModals do
     </div>
     """
   end
-
-  # ────────────────────────────────────────────────────────────
-  # Inventory Modal
-  # ────────────────────────────────────────────────────────────
 
   attr :inventory, :list, required: true
 
@@ -261,14 +243,6 @@ defmodule AgenticRealmsWeb.GameComponents.PlayerModals do
     </.modal>
     """
   end
-
-  # ────────────────────────────────────────────────────────────
-  # Quest Modal (feature 013)
-  # ────────────────────────────────────────────────────────────
-  #
-  # Active section: every active quest with per-criterion progress
-  # lines. Completed section: every completed quest with title, reward
-  # name, and completion timestamp.
 
   attr :quests, :list, required: true
   attr :completed_quests, :list, required: true
@@ -308,10 +282,6 @@ defmodule AgenticRealmsWeb.GameComponents.PlayerModals do
     </.modal>
     """
   end
-
-  # ────────────────────────────────────────────────────────────
-  # Presence Modal
-  # ────────────────────────────────────────────────────────────
 
   attr :presence, :list, required: true
 

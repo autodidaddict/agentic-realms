@@ -1,6 +1,6 @@
 defmodule AgenticRealms.World.Stats do
   @moduledoc """
-  Feature 020 — the character-sheet read, plus the qualitative banding examine
+  The character-sheet read, plus the qualitative banding examine
   uses.
 
   `for_player/1` is an adapter and nothing more: it reads the `player_state`
@@ -11,7 +11,7 @@ defmodule AgenticRealms.World.Stats do
 
   `health_tier/2` and `relative_power/2` are pure banding helpers used by
   `Examine`. They surface only qualitative bands, never the target's exact
-  numbers (FR-025), and are unchanged from feature 019.
+  numbers, and are unchanged.
   """
 
   alias AgenticRealms.Repo
@@ -56,7 +56,7 @@ defmodule AgenticRealms.World.Stats do
   @doc """
   A character sheet from a set of facts, a name, and current hitpoints.
 
-  The one adapter over `Srd.Character.derive/1`, and the reason feature 021's
+  The one adapter over `Srd.Character.derive/1`, and the reason the creation
   review cannot disagree with the sheet it previews: both go through here, so
   "the reviewed character and the created character are identical" is a
   property of the code rather than of two implementations kept in step.
@@ -95,9 +95,6 @@ defmodule AgenticRealms.World.Stats do
       skill_proficiencies: Enum.map(ps.skill_proficiencies, &to_known(&1, Skill.all(), "skill")),
       save_proficiencies:
         Enum.map(ps.save_proficiencies, &to_known(&1, Ability.all(), "ability")),
-      # Equipment does not affect armor class this milestone, so every character
-      # is unarmored. The derived layer takes these explicitly rather than
-      # assuming, so combat can start passing real armor without changing this.
       armor: nil,
       shield: nil
     }
@@ -139,12 +136,6 @@ defmodule AgenticRealms.World.Stats do
     end
   end
 
-  # The read model stores the SRD's vocabulary as strings. Resolving them
-  # against the known set rather than `String.to_existing_atom/1` is deliberate:
-  # that function depends on the atom already being in the table, which in turn
-  # depends on whether the rules module happens to have been loaded yet. Looking
-  # the value up in a list we just asked for both forces the load and rejects
-  # anything that is not real vocabulary.
   defp to_known(value, known, kind) do
     Enum.find(known, &(Atom.to_string(&1) == value)) ||
       raise ArgumentError, "player_state holds an unknown #{kind}: #{inspect(value)}"

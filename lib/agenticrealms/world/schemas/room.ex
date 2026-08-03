@@ -7,8 +7,6 @@ defmodule AgenticRealms.World.Schemas.Room do
     field :description, :string
     field :behaviors, {:array, :map}, default: []
 
-    # Feature 012 — Maps. region_id becomes NOT NULL post-migration; the
-    # other four fields default per FR-019 / FR-021 / FR-022.
     field :region_id, :binary_id
     field :map_visible, :boolean, default: true
     field :elevation, :integer, default: 0
@@ -21,8 +19,6 @@ defmodule AgenticRealms.World.Schemas.Room do
       define_field: false
 
     has_many :exits, AgenticRealms.World.Schemas.Exit, foreign_key: :source_room_id
-    # Feature 016 — objects are no longer joined by room_id; an object's room
-    # is its container (container_type "room" / container_id). Query directly.
 
     timestamps(type: :utc_datetime)
   end

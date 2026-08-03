@@ -1,7 +1,7 @@
 defmodule AgenticRealms.World.Transient.Registry do
   @moduledoc """
   Cluster-wide unique registry for the singleton `Transient.Manager`
-  (feature 017; same `Horde.Registry` pattern as `NpcMinds.Registry` /
+  (same `Horde.Registry` pattern as `NpcMinds.Registry` /
   `Ticks.Registry`). A single fixed key (`:manager`) maps to exactly one
   manager pid across the BEAM cluster.
 
@@ -10,7 +10,7 @@ defmodule AgenticRealms.World.Transient.Registry do
   `DestroyRegion` and then **hard-deletes event-store streams**, and two nodes
   sweeping concurrently both pass the "does this region still exist?" check
   before either finishes. Making it a cluster singleton is what stops that,
-  and it removes the duplicated sweep work as well (Constitution Principle I).
+  and it removes the duplicated sweep work as well.
   """
 
   @singleton_key :manager

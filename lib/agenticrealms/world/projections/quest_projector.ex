@@ -1,6 +1,6 @@
 defmodule AgenticRealms.World.Projections.QuestProjector do
   @moduledoc """
-  Projector for the four finalize-side quest events (feature 013).
+  Projector for the four finalize-side quest events.
 
   Handler clauses:
     * `QuestItemsConsumed`     → delete consumed objects from `world_objects`
@@ -13,8 +13,6 @@ defmodule AgenticRealms.World.Projections.QuestProjector do
   Each handler is idempotent under replay: `delete_all` over a closed
   id-set is a no-op the second time, `update_all` to a final value is
   idempotent, `insert(on_conflict: :nothing)` is idempotent.
-
-  See `specs/013-quest-system/contracts/projector-quest.md`.
   """
 
   use Commanded.Event.Handler,
@@ -56,9 +54,6 @@ defmodule AgenticRealms.World.Projections.QuestProjector do
         },
         _meta
       ) do
-    # Feature 016 — the reward is cloned into existence then moved into the
-    # player's inventory, so it is a real entity they can drop. Deterministic
-    # id (the reward_object_id) keeps this replay-safe.
     WorldApp.dispatch(%CloneEntity{
       entity_id: oid,
       kind: :object,
@@ -80,9 +75,6 @@ defmodule AgenticRealms.World.Projections.QuestProjector do
       cause: :spawned
     })
 
-    # Back-reference the reward on the quest instance row so future
-    # detail-rendering code (US3 Completed view) can show it without
-    # parsing the snapshot.
     from(q in QuestInstance, where: q.id == ^qid)
     |> Repo.update_all(set: [reward_object_id: oid])
 

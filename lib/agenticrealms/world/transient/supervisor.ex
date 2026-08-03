@@ -1,12 +1,12 @@
 defmodule AgenticRealms.World.Transient.Supervisor do
   @moduledoc """
   Cluster-wide dynamic supervisor for the singleton `Transient.Manager`
-  (feature 017; same `Horde.DynamicSupervisor` pattern as `NpcMinds.Supervisor`
+  (same `Horde.DynamicSupervisor` pattern as `NpcMinds.Supervisor`
   / `Ticks.Supervisor`).
 
   Horde places the manager on one node and **redistributes it to a surviving
   node** if that node leaves, so the reaper keeps running after node loss
-  without a `:global` single-point dependency (Constitution Principle I).
+  without a `:global` single-point dependency.
   """
 
   alias AgenticRealms.World.Transient.{Manager, Registry}

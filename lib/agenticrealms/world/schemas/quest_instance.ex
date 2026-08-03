@@ -8,7 +8,7 @@ defmodule AgenticRealms.World.Schemas.QuestInstance do
   schema should treat `definition_snapshot`'s nested keys as atoms — the
   eventstore JsonSerializer atomizes JSON keys at deserialize time, and
   every read path goes through projected state populated via that
-  deserialization. See `specs/013-quest-system/data-model.md` § 2.
+  deserialization.
   """
 
   use Ecto.Schema

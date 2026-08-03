@@ -1,7 +1,6 @@
 defmodule AgenticRealms.World.Behaviors.ValidatorTest do
   @moduledoc """
-  Unit tests for the behavior list validator (feature 009).
-  See `specs/009-npc-behaviors/contracts/validator.md`.
+  Unit tests for the behavior list validator.
   """
 
   use ExUnit.Case, async: true
@@ -81,8 +80,6 @@ defmodule AgenticRealms.World.Behaviors.ValidatorTest do
     end
 
     test "unknown action type is rejected" do
-      # Feature 011 added `emote` to the action vocabulary, so use a
-      # type that is still unrecognized.
       assert {:error, {:unknown_action_type, "teleport"}} =
                Validator.validate([
                  %{
@@ -144,8 +141,6 @@ defmodule AgenticRealms.World.Behaviors.ValidatorTest do
     end
 
     test "fails fast on first invalid entry" do
-      # First behavior is valid; second has unknown trigger. Should report
-      # only the unknown trigger.
       assert {:error, {:unknown_trigger, "bogus"}} =
                Validator.validate([
                  %{
@@ -160,8 +155,7 @@ defmodule AgenticRealms.World.Behaviors.ValidatorTest do
     end
   end
 
-  # Feature 011 — tick trigger + interval_ms validation.
-  describe "tick trigger validation (feature 011)" do
+  describe "tick trigger validation" do
     defp say_action, do: %{"type" => "say", "text" => "tick"}
 
     setup do
@@ -320,7 +314,6 @@ defmodule AgenticRealms.World.Behaviors.ValidatorTest do
                  }
                ])
 
-      # 100 is not a multiple of 250
       put_base_rate(250)
 
       assert {:error, {:invalid_tick_interval, %{reason: :non_multiple, value: 100}}} =
@@ -389,8 +382,6 @@ defmodule AgenticRealms.World.Behaviors.ValidatorTest do
     test "interval_ms validation does NOT apply to non-tick triggers" do
       put_base_rate(1_000)
 
-      # A player_entered behavior with a (meaningless here) interval_ms field
-      # should still validate — the field is just ignored.
       assert :ok =
                Validator.validate([
                  %{

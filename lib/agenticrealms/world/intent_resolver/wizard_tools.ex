@@ -1,8 +1,8 @@
 defmodule AgenticRealms.World.IntentResolver.WizardTools do
   @moduledoc """
-  Feature 014 — Anthropic tool schemas exposed to wizards. Separate from
+  Anthropic tool schemas exposed to wizards. Separate from
   the player-facing `Tools` module because the wizard's tool surface is
-  intentionally narrow per FR-022 / FR-024 / FR-025 — creation verbs
+  intentionally narrow — creation verbs
   only, no edit verbs, mode-dependent.
 
   `:blueprints` mode (authoring archetypes) tools:
@@ -10,17 +10,14 @@ defmodule AgenticRealms.World.IntentResolver.WizardTools do
       (NOT a dispatched command). The LiveView populates the Interpreted
       Data card and the wizard refines + commits via form. The model picks
       the npc tool for a character/creature, the object tool otherwise.
-    * `list_behavior_groups` (feature 015) — a read tool returning the named
+    * `list_behavior_groups` — a read tool returning the named
       behavior groups, so `draft_npc_blueprint` behavior_group proposals are
-      grounded in real registered names (FR-020a). Unknown names are
-      dropped before commit (FR-018).
+      grounded in real registered names. Unknown names are
+      dropped before commit.
     * `refuse` — the escape hatch when the prompt is not an archetype.
 
   `:world` mode (manifesting one-offs) tools: `manifest_object_freeform`
-  (feature 014), `manifest_npc_freeform` (feature 015 US5), `refuse`.
-
-  See `specs/014-item-blueprints/contracts/intent_tools.md` and
-  `specs/015-npc-blueprints/`.
+  `manifest_npc_freeform`, `refuse`.
   """
 
   @doc "Set of recognized tool names in :blueprints mode."

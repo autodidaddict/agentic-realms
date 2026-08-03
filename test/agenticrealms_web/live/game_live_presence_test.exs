@@ -22,8 +22,6 @@ defmodule AgenticRealmsWeb.GameLivePresenceTest do
     {:ok, alice} = Accounts.register_player(%{username: "alice_pres", password: "pw12345678"})
     {:ok, kevin} = Accounts.register_player(%{username: "kevin_pres", password: "pw12345678"})
 
-    # Feature 021 — a character before a world. A player without one mounts
-    # into the creation dialog, not the game.
     AgenticRealms.DataCase.create_character!(alice.id, name: "Alice")
     AgenticRealms.DataCase.create_character!(kevin.id, name: "Kevin")
 
@@ -48,14 +46,8 @@ defmodule AgenticRealmsWeb.GameLivePresenceTest do
   test "alice's Present HUD updates when kevin moves out of and back into the atrium",
        %{alice_conn: conn, kevin_conn: kconn, kevin: kevin} do
     {:ok, view, _html} = live(conn, ~p"/play")
-    # Mount kevin's LiveView too so Phoenix.Presence tracks him as online.
-    # Without this, the Present HUD's online-only filter (Queries.list_other_players)
-    # correctly excludes him — he's spawned in the world but not connected.
     {:ok, _kevin_view, _} = live(kconn, ~p"/play")
 
-    # Give the LiveView a beat to finish post-mount setup (PubSub
-    # subscriptions complete inside mount but the test process can race
-    # against the broadcast otherwise).
     Process.sleep(50)
     _ = :sys.get_state(view.pid)
 

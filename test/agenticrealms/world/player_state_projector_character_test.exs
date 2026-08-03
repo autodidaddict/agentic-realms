@@ -1,6 +1,6 @@
 defmodule AgenticRealms.World.PlayerStateProjectorCharacterTest do
   @moduledoc """
-  Feature 020 — the `CharacterCreated` projector clause.
+  The `CharacterCreated` projector clause.
 
   It upserts, so it must work whether or not `PlayerSpawned` has already
   created the row: a replay from position 0 can deliver the two in either
@@ -126,7 +126,6 @@ defmodule AgenticRealms.World.PlayerStateProjectorCharacterTest do
       :ok = PlayerStateProjector.handle(event, %{})
       Repo.update_all(PlayerState, set: [level: 7, xp: 23_000])
 
-      # A redelivered CharacterCreated must not knock the player back to 1.
       :ok = PlayerStateProjector.handle(event, %{})
 
       ps = row(player.id)
@@ -183,7 +182,7 @@ defmodule AgenticRealms.World.PlayerStateProjectorCharacterTest do
     end
   end
 
-  describe "feature 021 — the player's own choices reach the row" do
+  describe "the player's own choices reach the row" do
     test "the name, lineage, and choices map round-trip through the event" do
       player = register_player()
 

@@ -1,14 +1,14 @@
 defmodule AgenticRealms.NpcMinds.Config do
   @moduledoc """
-  Feature 018 — configuration accessors for the external NPC-mind lifecycle.
+  Configuration accessors for the external NPC-mind lifecycle.
 
   Reads the `:agenticrealms, AgenticRealms.NpcMinds` keyword list (compile-time
   defaults in `config/config.exs`, runtime env in `config/runtime.exs`). The
   shared `service_secret` has no compile-time default — when unset the contract
   API fails closed (`RequireServiceToken` rejects every request).
 
-  The agreed lifecycle constants (workflow type/id scheme, task queue) must match
-  `agentic-realms-npc` feature 001.
+  The lifecycle constants (workflow type/id scheme, task queue) must match
+  those in `agentic-realms-npc`.
   """
 
   @default_base_url "http://localhost:7243"

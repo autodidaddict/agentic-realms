@@ -1,6 +1,6 @@
 defmodule AgenticRealms.World.Schemas.Blueprint do
   @moduledoc """
-  Feature 015 — the unified authored template (`blueprints` read model),
+  The unified authored template (`blueprints` read model),
   keyed by slug, discriminated by `kind` (`"object" | "npc"`). Replaces the
   former `object_blueprints` (014) + `npc_blueprints` (008/013) tables.
 
@@ -10,8 +10,7 @@ defmodule AgenticRealms.World.Schemas.Blueprint do
   supports them; the object authoring UI doesn't expose them yet).
 
   Spawned instances are freestanding: a blueprint stamps a clone's frozen
-  fields at spawn and is never consulted at render time (see
-  `specs/015-npc-blueprints/data-model.md` §0).
+  fields at spawn and is never consulted at render time.
   """
 
   use Ecto.Schema
@@ -24,16 +23,11 @@ defmodule AgenticRealms.World.Schemas.Blueprint do
     field :long_description, :string
     field :fixed, :boolean, default: false
     field :revision, :integer, default: 1
-    # Direct behaviors (feature 009). Effective set = union(behavior_groups) ++ these,
-    # composed at spawn time.
     field :behaviors, {:array, :map}, default: []
     field :lore, :string, default: ""
     field :behavior_groups, {:array, :string}, default: []
-    # Feature 013 — per-NPC FetchQuest catalog.
     field :quests, {:array, :map}, default: []
 
-    # Feature 019 — Real Stats. Base authoring stats for NPC-kind blueprints
-    # (frozen onto each clone at spawn); ignored for object kind.
     field :str, :integer, default: 12
     field :dex, :integer, default: 12
     field :con, :integer, default: 12

@@ -4,8 +4,6 @@ defmodule AgenticRealms.World.Behaviors.Validator do
   seed before dispatching CreateRoom / CreateNPCBlueprint with behaviors,
   and (in a future feature) by the wizard tab before persisting any
   user-authored behaviors.
-
-  See `specs/009-npc-behaviors/contracts/validator.md`.
   """
 
   @valid_triggers ~w(player_entered player_left tick)
@@ -63,8 +61,6 @@ defmodule AgenticRealms.World.Behaviors.Validator do
 
   defp validate_behavior(_), do: {:error, :invalid_behavior_shape}
 
-  # Feature 011 — `tick` requires `interval_ms`: present, positive
-  # integer, positive multiple of the configured base tick rate.
   defp validate_trigger_specific("tick", behavior) do
     base_rate = base_tick_rate_ms()
 
@@ -132,9 +128,6 @@ defmodule AgenticRealms.World.Behaviors.Validator do
     end
   end
 
-  # Feature 011 — `emote` action. Third-person narration attributed to
-  # the speaker (room → ambient, no attribution; NPC/object → prefixed
-  # by name). Same shape and length constraints as `say`.
   defp validate_action(%{"type" => "emote"} = action) do
     case Map.get(action, "text") do
       nil -> {:error, :missing_emote_text}

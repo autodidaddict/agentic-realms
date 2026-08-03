@@ -8,13 +8,13 @@ defmodule AgenticRealms.World.Commands do
   bounded concern the world has. It is now the front door, and the concerns
   live behind it:
 
-    * `Commands.Entities`  — the entity lifecycle (feature 016), plus `take`
+    * `Commands.Entities`  — the entity lifecycle, plus `take`
                              and `drop`
     * `Commands.Authoring` — what a wizard authors and spawns: blueprints,
                              freeform spawns, essence extraction, in-world
                              edits (features 008, 014, 015)
-    * `Commands.Quests`    — accept, progress, finalize (feature 013)
-    * `Commands.Regions`   — regions, rooms, exits (feature 012)
+    * `Commands.Quests`    — accept, progress, finalize
+    * `Commands.Regions`   — regions, rooms, exits
 
   What stays here is the player themselves: spawning into the world, moving
   through it, creating a character, earning experience, and recording a room as
@@ -73,7 +73,7 @@ defmodule AgenticRealms.World.Commands do
   end
 
   @doc """
-  Create a player's character from the choices they made (feature 021).
+  Create a player's character from the choices they made.
 
   Three steps:
 
@@ -149,7 +149,7 @@ defmodule AgenticRealms.World.Commands do
   end
 
   @doc """
-  Award experience to a player (feature 019). Players only; idempotent per
+  Award experience to a player. Players only; idempotent per
   `award_id` (a redelivered/replayed source event cannot double-award).
   Dispatched `:strong` so the `player_state` read model reflects the new
   xp/level before this returns.
@@ -172,7 +172,7 @@ defmodule AgenticRealms.World.Commands do
   Move the player one step in the given direction.
 
   Returns `{:ok, to_room_id}` on success; `{:error, :no_exit_in_direction}`
-  when the player's current room has no exit in that direction (FR-007);
+  when the player's current room has no exit in that direction;
   `{:error, :no_current_room}` if the player has never spawned.
   """
   @spec move(integer(), atom()) ::
@@ -197,10 +197,6 @@ defmodule AgenticRealms.World.Commands do
     end
   end
 
-  # --- Entity lifecycle (feature 016) -------------------------------------
-  #
-  # Moved to `Commands.Entities`.
-
   defdelegate clone_entity(kind, fields), to: __MODULE__.Entities
   defdelegate clone_entity(kind, entity_id, fields), to: __MODULE__.Entities
   defdelegate move_entity(entity_id, expected_from, to, cause), to: __MODULE__.Entities
@@ -211,7 +207,6 @@ defmodule AgenticRealms.World.Commands do
   defdelegate take(player_id, name), to: __MODULE__.Entities
   defdelegate drop(player_id, name), to: __MODULE__.Entities
 
-  # `resolve_exit/3` stays with `move/2`, the only caller.
   defp resolve_exit(from_room_id, direction, viewer_player_id) do
     dir_str = Direction.to_string(direction)
 
@@ -228,18 +223,12 @@ defmodule AgenticRealms.World.Commands do
     end
   end
 
-  # --- World authoring (feature 012) --------------------------------------
-  #
-  # Moved to `Commands.Regions`.
-
   defdelegate create_region(region_id, name), to: __MODULE__.Regions
 
   defdelegate create_room(room_id, name, description, region_id, opts \\ []),
     to: __MODULE__.Regions
 
   defdelegate add_exit(source_room_id, direction, target_room_id), to: __MODULE__.Regions
-
-  # --- Discovery (feature 012) --------------------------------------------
 
   @doc """
   Dispatches a `RecordRoomDiscovery` command to the World.Player aggregate.
@@ -265,17 +254,9 @@ defmodule AgenticRealms.World.Commands do
     WorldApp.dispatch(%RecordRoomDiscovery{player_id: player_id, room_id: room_id})
   end
 
-  # --- Quests (feature 013) -----------------------------------------------
-  #
-  # Moved to `Commands.Quests`. This module stays the one place a caller looks.
-
   defdelegate accept_quest(player_id, npc_blueprint_id, slug), to: __MODULE__.Quests
   defdelegate check_progress(player_id, quest_id), to: __MODULE__.Quests
   defdelegate finalize_quest(player_id, quest_id), to: __MODULE__.Quests
-
-  # --- Wizard authoring (features 008, 014, 015) --------------------------
-  #
-  # Moved to `Commands.Authoring`.
 
   defdelegate spawn_npc_clone(blueprint_id, room_id, clone_id), to: __MODULE__.Authoring
   defdelegate create_blueprint(attrs, opts \\ []), to: __MODULE__.Authoring

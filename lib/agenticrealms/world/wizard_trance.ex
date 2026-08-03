@@ -1,21 +1,20 @@
 defmodule AgenticRealms.World.WizardTrance do
   @moduledoc """
-  Feature 014 — wizard trance broadcast helper. Translates an
+  Wizard trance broadcast helper. Translates an
   `authoring_mode` toggle on a wizard's LiveView socket into a co-present
-  player-facing log entry per FR-002 / FR-003.
+  player-facing log entry.
 
   Why this is not a Commanded aggregate / event: trance is a UI signal,
   not world state. Putting it through the event store would mean
   introducing an aggregate just to emit a transient broadcast, when
-  Phoenix.PubSub already covers the live-witness path. See
-  `specs/014-item-blueprints/research.md` R3.
+  Phoenix.PubSub already covers the live-witness path.
 
   Subscribers (`GameLive.handle_info/2` clauses for `RoomTranceEntered`
-  and `RoomTranceExited`) are responsible for actor-exclusion (FR-004
-  wording: "every *other* player session"). The broadcaster fans out
+  and `RoomTranceExited`) are responsible for actor-exclusion: every *other*
+  player session. The broadcaster fans out
   unconditionally; no Presence check is performed here, matching the
-  existing `RoomPlayerArrived` / `RoomNPCArrived` broadcast pattern from
-  feature 003 / 007 where subscribers filter on the receiving end.
+  existing `RoomPlayerArrived` / `RoomNPCArrived` broadcast pattern, where
+  subscribers filter on the receiving end.
   """
 
   alias AgenticRealms.World.UIEvents.{RoomTranceEntered, RoomTranceExited}

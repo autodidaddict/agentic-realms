@@ -1,7 +1,7 @@
 defmodule AgenticRealms.World.ExamineTest do
   @moduledoc """
   Unit tests for `AgenticRealms.World.Examine` — the target resolution facade
-  introduced in feature 006. Tests insert read-model rows directly via
+  Tests insert read-model rows directly via
   `Repo.insert!/1`, sidestepping Commanded — Examine is a pure read against
   the projected world state, so the event-source path is incidental.
   """
@@ -68,17 +68,11 @@ defmodule AgenticRealms.World.ExamineTest do
 
   defp track_online(player) do
     {:ok, _} = Presence.track_player(self(), player.id, player.username)
-    # Presence track is async — give it a moment to register before queries
-    # that filter by online presence run.
     Process.sleep(20)
     :ok
   end
 
-  # ──────────────────────────────────────────────────────────────────────
-  # US1 — Room objects
-  # ──────────────────────────────────────────────────────────────────────
-
-  describe "examine/2 — room objects (US1)" do
+  describe "examine/2 — room objects" do
     setup do
       alice = register_player("alice")
       room = insert_room()
@@ -135,18 +129,13 @@ defmodule AgenticRealms.World.ExamineTest do
     end
 
     test "examining when player has no current room returns :no_current_room" do
-      # Player exists but no PlayerState row was inserted.
       stranger = register_player("stranger")
 
       assert {:error, :no_current_room} = Examine.examine(stranger.id, "anything")
     end
   end
 
-  # ──────────────────────────────────────────────────────────────────────
-  # US2 — Inventory objects
-  # ──────────────────────────────────────────────────────────────────────
-
-  describe "examine/2 — inventory objects (US2)" do
+  describe "examine/2 — inventory objects" do
     setup do
       alice = register_player("alice")
       room = insert_room()
@@ -204,11 +193,7 @@ defmodule AgenticRealms.World.ExamineTest do
     end
   end
 
-  # ──────────────────────────────────────────────────────────────────────
-  # US3 — Players and self
-  # ──────────────────────────────────────────────────────────────────────
-
-  describe "examine/2 — players and self (US3)" do
+  describe "examine/2 — players and self" do
     setup do
       alice = register_player("alice")
       bob = register_player("bob")
@@ -252,7 +237,6 @@ defmodule AgenticRealms.World.ExamineTest do
     end
 
     test "offline players are not examinable", %{alice: alice, bob: bob, room: _room} do
-      # Re-register Alice but DO NOT track her in presence
       offline = register_player("ghost")
 
       Repo.insert!(
@@ -269,12 +253,10 @@ defmodule AgenticRealms.World.ExamineTest do
 
     test "object + player exact-name collision returns :ambiguous_mixed_kind",
          %{alice: alice, room: room} do
-      # Register a player whose username happens to match an object's name
       twin = register_player("Lantern")
       place_in_room(twin, room)
       track_online(twin)
 
-      # Object of the same name (lowercased) in the room
       insert_object(room.id, String.downcase(twin.username), "An object.")
 
       assert {:error, :ambiguous_mixed_kind} =
@@ -282,14 +264,9 @@ defmodule AgenticRealms.World.ExamineTest do
     end
   end
 
-  # Helper for the offline test — fetches the bob_room_id from his PlayerState
   defp bob_room_id(bob) do
     Repo.get!(PlayerState, bob.id).current_room_id
   end
-
-  # ──────────────────────────────────────────────────────────────────────
-  # Feature 007 — Static NPCs
-  # ──────────────────────────────────────────────────────────────────────
 
   defp insert_npc(room_id, name, long_description) do
     blueprint_id = "test_blueprint_#{System.unique_integer([:positive])}"
@@ -312,7 +289,7 @@ defmodule AgenticRealms.World.ExamineTest do
     })
   end
 
-  describe "examine/2 — NPCs (feature 007)" do
+  describe "examine/2 — NPCs" do
     setup do
       alice = register_player("alice")
       room = insert_room()
@@ -366,10 +343,6 @@ defmodule AgenticRealms.World.ExamineTest do
 
     test "NPC + same-named player in the same room → :ambiguous_mixed_kind",
          %{room: room} do
-      # Player usernames are constrained to letters/numbers/hyphens/underscores,
-      # AND register_player suffixes the username for uniqueness. Set up the
-      # collision by inserting an NPC whose name equals the twin's actual
-      # registered username.
       alice = register_player("alice_obs")
       place_in_room(alice, room)
       track_online(alice)
@@ -386,7 +359,6 @@ defmodule AgenticRealms.World.ExamineTest do
     test "self-aliases never resolve to an NPC", %{alice: alice, room: room} do
       insert_npc(room.id, "me", "An NPC literally named 'me'.")
 
-      # `me` short-circuits to the acting player, NOT the NPC.
       assert {:ok, %Match{target_kind: :player, name: name}} =
                Examine.examine(alice.id, "me")
 
@@ -395,9 +367,6 @@ defmodule AgenticRealms.World.ExamineTest do
     end
 
     test "exact-matching inventory object wins over partially-matching NPC", %{alice: alice} do
-      # The NPC's full name "Garrick the Innkeeper" only PARTIALLY matches
-      # the input "garrick". The inventory object's name exact-matches.
-      # Stage-1 exact resolution returns the inventory object — no NPC tie.
       insert_inventory_object(alice.id, "garrick", "An inventory item named garrick.")
 
       assert {:ok, %Match{target_kind: :object, name: "garrick", long_description: ld}} =
@@ -406,7 +375,7 @@ defmodule AgenticRealms.World.ExamineTest do
       assert ld =~ "inventory item"
     end
 
-    test "telemetry emits clone_debug_id on successful NPC match (FR-011)",
+    test "telemetry emits clone_debug_id on successful NPC match",
          %{alice: alice, garrick: garrick} do
       handler_id = "examine-debug-id-watcher-#{System.unique_integer([:positive])}"
       ref = make_ref()

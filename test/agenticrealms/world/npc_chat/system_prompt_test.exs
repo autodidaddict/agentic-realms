@@ -1,11 +1,9 @@
 defmodule AgenticRealms.World.NPCChat.SystemPromptTest do
   @moduledoc """
-  Unit tests for the chat system prompt (feature 010).
+  Unit tests for the chat system prompt.
 
-  Verifies every clause of FR-008 (a–f) appears in the rendered prompt
-  via substring assertions, plus the empty-lore fallback (FR-013).
-
-  See `specs/010-npc-conversations/contracts/system_prompt.md`.
+  Verifies every clause appears in the rendered prompt
+  via substring assertions, plus the empty-lore fallback.
   """
 
   use ExUnit.Case, async: true
@@ -28,36 +26,36 @@ defmodule AgenticRealms.World.NPCChat.SystemPromptTest do
   end
 
   describe "text/1" do
-    test "names the NPC in the opening line (FR-008a)" do
+    test "names the NPC in the opening line" do
       prompt = SystemPrompt.text(base_snapshot())
       assert prompt =~ "You are Garrick the Innkeeper"
     end
 
-    test "includes the lore content (FR-008a)" do
+    test "includes the lore content" do
       prompt = SystemPrompt.text(base_snapshot())
       assert prompt =~ "A former bridge-guard from Riverford."
     end
 
-    test "rule against meta-references is present (FR-008d)" do
+    test "rule against meta-references is present" do
       prompt = SystemPrompt.text(base_snapshot())
       assert prompt =~ "NEVER reference being an AI"
       assert prompt =~ "as an AI"
       assert prompt =~ "as a language model"
     end
 
-    test "rule against reciting lore on demand is present (FR-008e)" do
+    test "rule against reciting lore on demand is present" do
       prompt = SystemPrompt.text(base_snapshot())
       assert prompt =~ ~r/do not recite, paraphrase/i
       assert prompt =~ "what's your lore"
     end
 
-    test "rule for in-theme refusal is present and prefers emote (FR-008c, FR-021)" do
+    test "rule for in-theme refusal is present and prefers emote" do
       prompt = SystemPrompt.text(base_snapshot())
       assert prompt =~ "in-theme refusal"
       assert prompt =~ "Prefer an `emote` reply"
     end
 
-    test "rule for structured speech-or-emote output is present (FR-008f, FR-021)" do
+    test "rule for structured speech-or-emote output is present" do
       prompt = SystemPrompt.text(base_snapshot())
       assert prompt =~ "exactly one tool call"
       assert prompt =~ "`say`"
@@ -97,7 +95,6 @@ defmodule AgenticRealms.World.NPCChat.SystemPromptTest do
       assert SystemPrompt.text(snap) == SystemPrompt.text(snap)
     end
 
-    # US3 — environmental grounding in the system prompt.
     test "with two other_players, both names appear" do
       prompt = SystemPrompt.text(base_snapshot(%{other_players: ["Bob", "Carol"]}))
       assert prompt =~ "Also present: Bob, Carol."
@@ -120,17 +117,12 @@ defmodule AgenticRealms.World.NPCChat.SystemPromptTest do
       assert prompt =~ "oil lamp (a sputtering oil lamp)"
     end
 
-    # US4 — out-of-lore refusal rule explicitly mentions emote preference.
-    test "out-of-scope refusal rule contains both 'in-theme refusal' and 'emote' (US4)" do
+    test "out-of-scope refusal rule contains both 'in-theme refusal' and 'emote'" do
       prompt = SystemPrompt.text(base_snapshot())
       assert prompt =~ "in-theme refusal"
       assert prompt =~ "Prefer an `emote` reply"
     end
 
-    # Conversational-memory rule MUST be present so the NPC remembers what
-    # the player said earlier in the chat (regression: Garrick was issuing
-    # an emote refusal on follow-up questions that referenced things the
-    # player had told him in a prior turn).
     test "system prompt includes a conversational-memory rule that distinguishes lore-dump from follow-up questions" do
       prompt = SystemPrompt.text(base_snapshot())
       assert prompt =~ "CONVERSATIONAL MEMORY"
@@ -142,11 +134,6 @@ defmodule AgenticRealms.World.NPCChat.SystemPromptTest do
              "the system prompt must explicitly state that conversational follow-ups are NOT out-of-scope refusals"
     end
 
-    # The birthday regression: Haiku was treating "is today my birthday?" as
-    # a real-world fact question (needing a calendar) rather than a callback
-    # to what the player just said. The prompt must explicitly tell the model
-    # that first-person claims by the player are TRUE within the chat and
-    # don't require external verification.
     test "system prompt instructs the LLM to treat player-supplied facts as true" do
       prompt = SystemPrompt.text(base_snapshot())
 

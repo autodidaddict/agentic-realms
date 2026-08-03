@@ -59,8 +59,6 @@ defmodule AgenticRealms.World.RegionTest do
     end
   end
 
-  # ── Feature 017 — Transient Regions ──────────────────────────────────
-
   describe "execute/2 — ProvisionTransientRegion" do
     test "fresh aggregate emits TransientRegionProvisioned" do
       cmd = %ProvisionTransientRegion{

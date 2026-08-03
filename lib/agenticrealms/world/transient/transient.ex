@@ -1,6 +1,6 @@
 defmodule AgenticRealms.World.Transient do
   @moduledoc """
-  Feature 017 — Transient Regions context. The programmatic provisioning
+  Transient Regions context. The programmatic provisioning
   surface (there is no player-facing command in the MVP): `provision/2`
   orchestrates the generate → guard → dispatch → place-owner flow, and
   `destroy/1` (added with the teardown lifecycle) force-destroys + purges a
@@ -36,7 +36,7 @@ defmodule AgenticRealms.World.Transient do
   (which must be the owner's current room). Returns `{:ok, region_id}`.
 
   Refusals: `:owner_not_spawned`, `:owner_not_in_source_room`,
-  `:already_provisioned` (FR-021 — one active transient region per owner),
+  `:already_provisioned` (one active transient region per owner),
   or any dispatch error.
   """
   @spec provision(integer(), String.t()) :: {:ok, String.t()} | {:error, atom()}
@@ -45,9 +45,6 @@ defmodule AgenticRealms.World.Transient do
     with :ok <- ensure_owner_in_source_room(owner_id, source_room_id),
          :ok <- ensure_not_already_provisioned(owner_id) do
       spec = Generator.generate(owner_id, source_room_id)
-      # Microsecond precision: `provisioned_at` projects into a
-      # `:utc_datetime_usec` column, and the event round-trips through the
-      # JSON serializer (so the projector receives an ISO string).
       provisioned_at = DateTime.utc_now()
 
       result =
@@ -69,9 +66,6 @@ defmodule AgenticRealms.World.Transient do
           {:ok, spec.region_id}
 
         {:error, reason} ->
-          # FR-020 — leave no partial/orphan region: roll back whatever was
-          # already created. `destroy/1` is idempotent and no-ops if the
-          # region row was never written.
           Logger.warning(
             "Transient region #{spec.region_id} provisioning failed (#{inspect(reason)}); rolling back"
           )
@@ -108,10 +102,6 @@ defmodule AgenticRealms.World.Transient do
     end
   end
 
-  # Move any player whose current room is inside the region back to the source
-  # room BEFORE its rooms are deleted (`player_state.current_room_id` is a
-  # `:restrict` FK). Works whether or not the player is online; given the
-  # owner-only entry exit, in practice this is just the provision-owner.
   defp relocate_occupants(_room_ids, nil), do: :ok
   defp relocate_occupants([], _source), do: :ok
 
@@ -132,10 +122,6 @@ defmodule AgenticRealms.World.Transient do
         consistency: :strong
       )
 
-      # FR-019 — notify any online occupant that the region has ended (offline
-      # players, e.g. a logged-off owner, have no live session and are simply
-      # relocated). Best-effort broadcast on the player's topic; GameLive
-      # appends a system log entry.
       Phoenix.PubSub.broadcast(
         AgenticRealms.PubSub,
         AgenticRealmsWeb.Topics.player_topic(pid),
@@ -145,8 +131,6 @@ defmodule AgenticRealms.World.Transient do
 
     :ok
   end
-
-  # --- provisioning steps -------------------------------------------------
 
   defp ensure_owner_in_source_room(owner_id, source_room_id) do
     case Queries.current_room_of(owner_id) do
@@ -199,9 +183,6 @@ defmodule AgenticRealms.World.Transient do
     end)
   end
 
-  # Exits between transient rooms (and the `:rift` return exit) are global
-  # exits on transient room streams — dispatched directly (strong) so the read
-  # model is populated immediately; they are purged with their room streams.
   defp add_intra_exits(spec) do
     Enum.reduce_while(spec.intra_exits, :ok, fn ex, :ok ->
       case WorldApp.dispatch(

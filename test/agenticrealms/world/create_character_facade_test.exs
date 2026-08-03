@@ -1,6 +1,6 @@
 defmodule AgenticRealms.World.CreateCharacterFacadeTest do
   @moduledoc """
-  Feature 021 — `Commands.create_character/2`: complete, validate, check the
+  `Commands.create_character/2`: complete, validate, check the
   name, create.
 
   The first step is the one worth testing hardest. A draft only carries the
@@ -26,8 +26,6 @@ defmodule AgenticRealms.World.CreateCharacterFacadeTest do
     p.id
   end
 
-  # The US1 shape: a name and three selections, nothing else. This is what the
-  # dialog produces until stories 2 through 4 ship.
   defp identity_draft(name, species \\ "human", class \\ "fighter", background \\ "soldier") do
     Draft.new()
     |> Draft.put_name(name)
@@ -38,7 +36,6 @@ defmodule AgenticRealms.World.CreateCharacterFacadeTest do
 
   defp row(player_id), do: Repo.get(PlayerState, player_id)
 
-  # Error keys may be tuples (a feature choice), so `Keyword.has_key?/2` is out.
   defp error_on?(errors, field), do: Enum.any?(errors, fn {key, _} -> key == field end)
 
   describe "completion" do
@@ -54,10 +51,6 @@ defmodule AgenticRealms.World.CreateCharacterFacadeTest do
       assert ps.class_slug == "fighter"
       assert ps.background_slug == "soldier"
 
-      # Everything the player was not asked, filled in and legal.
-      # Generation buys a spread rather than dealing a fixed array, so assert
-      # what has to hold: six reachable scores. Reproducibility is asserted by
-      # the determinism test below rather than by hard-coding the numbers here.
       scores = [ps.str, ps.dex, ps.con, ps.int, ps.wis, ps.cha]
 
       assert length(scores) == 6
@@ -114,8 +107,6 @@ defmodule AgenticRealms.World.CreateCharacterFacadeTest do
 
       ps = row(player_id)
 
-      # Soldier raises str and dex or con; the base 8 in Strength is the
-      # player's, not generation's.
       assert ps.str < 12
       assert ps.cha == 15
     end
@@ -219,7 +210,6 @@ defmodule AgenticRealms.World.CreateCharacterFacadeTest do
       assert {:ok, :created} = Commands.create_character(player_id, identity_draft("First"))
       first = row(player_id)
 
-      # The aggregate's guard: a character is made once.
       Commands.create_character(player_id, identity_draft("Second"))
 
       assert row(player_id).character_name == first.character_name

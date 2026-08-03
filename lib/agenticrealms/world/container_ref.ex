@@ -3,7 +3,7 @@ defmodule AgenticRealms.World.ContainerRef do
   A typed reference to the place an entity is contained: the void, a room,
   a player's inventory, or an NPC's inventory. Replaces the ad-hoc
   `room_id`/`player_id` + XOR location model with a single `(type, id)`
-  value (feature 016, FR-006/FR-012b).
+  value.
 
   The **void** is the null container — `%ContainerRef{type: :void, id: nil}`
   — holding entities that exist but are placed nowhere.
@@ -11,8 +11,6 @@ defmodule AgenticRealms.World.ContainerRef do
   Serializes to/from a plain map (`%{"type" => ..., "id" => ...}`) for event
   payloads. `from_map/1` is tolerant of struct passthrough and of both
   string- and atom-keyed maps (events come back string-keyed after replay).
-
-  See `specs/016-entity-containment/data-model.md` §1.
   """
 
   @types ~w(void room player npc)a
@@ -82,9 +80,6 @@ defmodule AgenticRealms.World.ContainerRef do
     na.type == nb.type and na.id == nb.id
   end
 
-  # The type atoms are all referenced statically in this module, so they are
-  # guaranteed to exist by decode time — `to_existing_atom/1` is safe and
-  # rejects unknown junk.
   defp to_type(type) when is_atom(type), do: type
   defp to_type(type) when is_binary(type), do: String.to_existing_atom(type)
 end

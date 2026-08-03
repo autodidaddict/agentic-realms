@@ -79,9 +79,8 @@ defmodule AgenticRealms.Accounts do
   @doc """
   Promote a player to wizard status. Idempotent on already-wizard accounts.
 
-  Intended invocation: `iex` during local development. No UI for promotion
-  ships in feature 014 milestone 1 — see
-  `specs/014-item-blueprints/spec.md` Clarifications + FR-WIZ-2.
+  Intended invocation: `iex` during local development. There is no UI for
+  promotion.
   """
   @spec promote_to_wizard(integer()) ::
           {:ok, %Player{}} | {:error, :not_found}
@@ -103,7 +102,7 @@ defmodule AgenticRealms.Accounts do
   @doc """
   Delete a player's account.
 
-  Per FR-023, any objects the player is carrying are returned to the room
+  Any objects the player is carrying are returned to the room
   they were in at the time of deletion. If the player has no current room
   (never played, or their last room is gone), carried objects fall back to
   the seeded starting room so they remain reachable.
@@ -124,12 +123,6 @@ defmodule AgenticRealms.Accounts do
         _ -> Seed.starting_room_id()
       end
 
-    # Short-circuit on any DropObject failure. If we just `Enum.each`'d
-    # and ignored errors, a partial cleanup would leave objects in a
-    # half-state (some dropped to the room, others still carrying the
-    # deleted player_id) AND the `Repo.delete(player)` call would then
-    # fail on the `world_objects.player_id` FK constraint, leaving the
-    # account half-deleted and the world half-cleaned.
     with :ok <- drop_carried_objects(player.id, target_room_id),
          {:ok, deleted} <- Repo.delete(player) do
       {:ok, deleted}
@@ -141,9 +134,6 @@ defmodule AgenticRealms.Accounts do
     alias AgenticRealms.World.ContainerRef
     alias AgenticRealms.World.Queries
 
-    # Feature 016 — relocate each carried object from the player's inventory
-    # into the target room via the entity move pathway, so a deleted player
-    # leaves no objects orphaned in a now-gone container.
     Queries.list_inventory(player_id)
     |> Enum.reduce_while(:ok, fn item, _acc ->
       case WorldCommands.move_entity(

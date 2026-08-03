@@ -1,5 +1,5 @@
 defmodule AgenticRealms.World.QueriesGlobalExitsTest do
-  @moduledoc "Feature 018 — list_global_exits/1 returns only global exits with target_room_id."
+  @moduledoc "List_global_exits/1 returns only global exits with target_room_id."
   use AgenticRealms.DataCase, async: true
 
   alias AgenticRealms.World.Queries
@@ -22,7 +22,6 @@ defmodule AgenticRealms.World.QueriesGlobalExitsTest do
 
     Repo.insert!(%Exit{direction: "north", source_room_id: src, target_room_id: north})
 
-    # An owner-scoped (transient) exit must be excluded.
     Repo.insert!(%Exit{
       direction: "rift",
       source_room_id: src,

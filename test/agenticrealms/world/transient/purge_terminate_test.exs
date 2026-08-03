@@ -1,5 +1,5 @@
 defmodule AgenticRealms.World.Transient.PurgeTerminateTest do
-  @moduledoc "Feature 018 — the transient-region purge terminates the minds of NPCs it removes."
+  @moduledoc "The transient-region purge terminates the minds of NPCs it removes."
   use AgenticRealms.DataCase, async: false
 
   alias AgenticRealms.World.Transient.Purge

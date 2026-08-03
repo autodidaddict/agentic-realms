@@ -5,7 +5,6 @@ defmodule AgenticRealms.World.CommunicationTest do
   These tests subscribe to PubSub topics directly and assert on broadcast
   payloads, bypassing both the parser and `GameLive`. They cover validation
   rules and the broadcast contract per
-  `specs/004-player-communication/contracts/communication_api.md`.
 
   See the LiveView integration tests for end-to-end multi-session behavior.
 
@@ -169,7 +168,6 @@ defmodule AgenticRealms.World.CommunicationTest do
 
       {:ok, bob} = Accounts.register_player(%{username: "bob_#{suffix}", password: "pw12345678"})
 
-      # Feature 021 — players are addressed by their character's name.
       alice_name = AgenticRealms.DataCase.create_character!(alice.id, name: "Alice#{suffix}")
       bob_name = AgenticRealms.DataCase.create_character!(bob.id, name: "Bob#{suffix}")
 
@@ -210,15 +208,12 @@ defmodule AgenticRealms.World.CommunicationTest do
 
     test "refuses with :not_deliverable when recipient has no presence-tracked sessions",
          %{alice_sender: sender, bob_name: bob_name} do
-      # No Presence.track has happened for bob → he is "offline".
       assert {:error, :not_deliverable} = Communication.tell(sender, bob_name, "hi")
     end
 
     test "broadcasts on player:<recipient_id> when recipient is online",
          %{alice_sender: sender, bob: bob, bob_name: bob_name} do
-      # Track bob's presence from this test process so the online check passes.
       {:ok, _} = Presence.track_player(self(), bob.id, bob_name)
-      # Subscribe to bob's topic to capture the broadcast.
       Phoenix.PubSub.subscribe(@pubsub, Topics.player_topic(bob.id))
 
       assert {:ok, %{recipient_id: rid, recipient_name: rname}} =
@@ -239,7 +234,6 @@ defmodule AgenticRealms.World.CommunicationTest do
       {:ok, _} = Presence.track_player(self(), bob.id, bob_name)
       Phoenix.PubSub.subscribe(@pubsub, Topics.player_topic(bob.id))
 
-      # bob's character is "Bob<suffix>" — try it shouted.
       assert {:ok, %{recipient_id: rid}} =
                Communication.tell(sender, "BOB#{suffix}", "yo")
 
@@ -264,7 +258,6 @@ defmodule AgenticRealms.World.CommunicationTest do
         id: alice.id,
         name: alice_name,
         session_id: make_ref(),
-        # Valid UUID v4 — world_rooms.id is :binary_id.
         room_id: Ecto.UUID.generate()
       }
 
@@ -297,9 +290,6 @@ defmodule AgenticRealms.World.CommunicationTest do
 
     test "refuses :recipient_not_in_room when neither party occupies the room",
          %{alice_sender: sender, bob_name: bob_name} do
-      # The sender's `room_id` is a freshly-generated UUID with no player_state
-      # rows pointing to it, so `other_occupants_of` returns [] and the
-      # recipient is correctly not found in scope.
       assert {:error, :recipient_not_in_room} = Communication.whisper(sender, bob_name, "hi")
     end
   end

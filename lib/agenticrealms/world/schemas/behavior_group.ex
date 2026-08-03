@@ -2,7 +2,7 @@ defmodule AgenticRealms.World.Schemas.BehaviorGroup do
   @moduledoc """
   A named, reusable group of behaviors (feature-009 `(trigger, [action])`
   tuples) applicable to items, NPCs, or rooms (cross-entity). Composed via
-  union onto a blueprint (feature 015). Seed-populated only this milestone.
+  union onto a blueprint. Seed-populated only this milestone.
   """
   use Ecto.Schema
 

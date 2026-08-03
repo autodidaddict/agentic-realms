@@ -16,8 +16,6 @@ defmodule AgenticRealms.Anthropic do
     * `:timeout_ms` — receive timeout, defaults to 5000
     * `:req_options` — extra options merged into the Req request (tests inject
       a `Req.Test` plug here so no request leaves the BEAM)
-
-  See `specs/005-llm-intent-parser/contracts/intent_resolver_api.md`.
   """
 
   require Logger
@@ -88,9 +86,6 @@ defmodule AgenticRealms.Anthropic do
     end
   end
 
-  # Req decodes JSON automatically when the response content-type is JSON; a
-  # map body is the success shape. A binary body means decoding didn't happen
-  # (unexpected content-type or malformed JSON).
   defp parse_body(body) when is_map(body), do: {:ok, body}
   defp parse_body(_), do: {:error, :malformed_response}
 

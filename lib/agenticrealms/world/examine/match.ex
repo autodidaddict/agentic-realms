@@ -12,9 +12,6 @@ defmodule AgenticRealms.World.Examine.Match do
     * `:npc` — `name` is the NPC's stored display name; `long_description`
       is `world_npcs.long_description` verbatim. Render contract identical
       in shape to `:object`.
-
-  See `specs/006-examine-objects/data-model.md` §1 and
-  `specs/007-static-npcs/data-model.md` §7.
   """
 
   @enforce_keys [:target_kind, :name]
@@ -24,10 +21,7 @@ defmodule AgenticRealms.World.Examine.Match do
           target_kind: :object | :player | :npc,
           name: String.t(),
           long_description: String.t() | nil,
-          # NPC clone entity id (telemetry debug identity) OR target player id
-          # (feature 019 health/power lookup); nil for objects.
           id: String.t() | integer() | nil,
-          # Feature 019 — examine surfaces only qualitative bands, never numbers.
           health_tier: String.t() | nil,
           power_phrase: String.t() | nil
         }

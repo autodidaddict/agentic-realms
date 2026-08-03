@@ -1,9 +1,9 @@
 defmodule AgenticRealms.World.Commands.ExtractNpcEssenceTest do
   @moduledoc """
-  Feature 015 US6 — extract a new NPC Blueprint from an in-world clone: the
+  Extract a new NPC Blueprint from an in-world clone: the
   extracted blueprint copies the clone's name/short/long/lore/fixed + its
   behavior_groups + DIRECT behaviors at revision 1, and the source clone is left
-  byte-for-byte unchanged (FR-012 / SC-005).
+  byte-for-byte unchanged.
   """
 
   use AgenticRealms.DataCase, async: false
@@ -60,7 +60,6 @@ defmodule AgenticRealms.World.Commands.ExtractNpcEssenceTest do
       updated_at: now
     })
 
-    # Author + spawn a clone to extract from.
     src_slug = "src_troll_#{suffix}"
 
     {:ok, ^src_slug} =
@@ -96,11 +95,9 @@ defmodule AgenticRealms.World.Commands.ExtractNpcEssenceTest do
     assert bp.long_description == "A troll behind a counter."
     assert bp.lore == "Hoards shiny coins." or bp.lore == "Hoards shiny coins"
     assert bp.fixed == true
-    # The clone's DIRECT behaviors + behavior_group names carry over (not the frozen union).
     assert bp.behavior_groups == [orc]
     assert bp.behaviors == [@direct]
 
-    # Source clone is byte-for-byte unchanged.
     after_edit = Repo.get(NPCClone, clone_id)
     assert after_edit.name == before.name
     assert after_edit.lore == before.lore

@@ -1,13 +1,11 @@
 defmodule AgenticRealms.World.NPCChat.SystemPrompt do
   @moduledoc """
-  Builds the chat system prompt for an NPC (feature 010).
+  Builds the chat system prompt for an NPC.
 
   This module is the developer-discoverable home for "what does the LLM
   see when an NPC speaks". Grep for `SystemPrompt` to find it. Every
-  clause of FR-008 (a–f) is enforced as inline text — modifications
+  clause is enforced as inline text — modifications
   here are the right place to tune NPC voice / refusal posture / etc.
-
-  See `specs/010-npc-conversations/contracts/system_prompt.md`.
   """
 
   @type snapshot :: %{
@@ -49,8 +47,6 @@ defmodule AgenticRealms.World.NPCChat.SystemPrompt do
       other_players_line(other_players),
       objects_line(objects),
       "",
-      # Feature 013 — quest section, omitted when this player has no
-      # offerable / active / completed quests with this NPC.
       quests_section(Map.get(snapshot, :quest_context)),
       rules_section()
     ]
@@ -92,8 +88,6 @@ defmodule AgenticRealms.World.NPCChat.SystemPrompt do
 
     "\nNearby you can see: #{rendered}."
   end
-
-  # ── Feature 013 — quest section rendering ─────────────────────────────
 
   defp quests_section(nil), do: nil
 

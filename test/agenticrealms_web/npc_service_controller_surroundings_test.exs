@@ -1,5 +1,5 @@
 defmodule AgenticRealmsWeb.NpcServiceControllerSurroundingsTest do
-  @moduledoc "Feature 018 — GET /api/npc/:id/surroundings."
+  @moduledoc "GET /api/npc/:id/surroundings."
   use AgenticRealmsWeb.ConnCase, async: true
 
   alias AgenticRealms.Repo

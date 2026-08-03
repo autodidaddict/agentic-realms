@@ -1,6 +1,6 @@
 defmodule AgenticRealmsWeb.GameLiveCommunicationTest do
   @moduledoc """
-  End-to-end LiveView tests for feature 004 (player communication).
+  End-to-end LiveView tests for player communication.
 
   This file is intentionally structured as a single comprehensive test
   exercising all US1 scenarios in sequence, sharing one `Seed.run`
@@ -16,12 +16,6 @@ defmodule AgenticRealmsWeb.GameLiveCommunicationTest do
 
   use AgenticRealmsWeb.ConnCase, async: false
 
-  # Tagged :integration and excluded from the default `mix test` run because
-  # this test depends on a fresh in-memory event store — when the full suite
-  # runs prior aggregates accumulate state and `Commands.spawn` hits
-  # `:consistency_timeout`. Run in isolation with
-  #   mix test test/agenticrealms_web/live/game_live_communication_test.exs
-  # or explicitly include with `mix test --include integration`.
   @moduletag :integration
   @moduletag :commanded
 
@@ -31,9 +25,6 @@ defmodule AgenticRealmsWeb.GameLiveCommunicationTest do
   alias AgenticRealms.World.{Commands, Seed}
 
   setup %{conn: conn} do
-    # Defensive: Seed.run's read-model count check can disagree with the
-    # in-memory event store state when prior tests in the suite have already
-    # seeded the aggregates. Catch the MatchError and treat as already-seeded.
     try do
       Seed.run()
     rescue
@@ -70,8 +61,6 @@ defmodule AgenticRealmsWeb.GameLiveCommunicationTest do
 
   test "US1 say: full scenario sweep — witness, actor confirmation, multi-session, escape, refusals",
        %{alice_conn: ac, bob_conn: bc, carol_conn: cc, carol: carol} do
-    # Move Carol to a different room before mounting any LiveView so the
-    # cross-room assertions can use her as the "different room" witness.
     {:ok, _} = Commands.move(carol.id, :east)
 
     {:ok, alice_view, _} = live(ac, ~p"/play")
@@ -84,7 +73,6 @@ defmodule AgenticRealmsWeb.GameLiveCommunicationTest do
     flush(bob_view)
     flush(carol_view)
 
-    # --- Scenario 1: Alice says hello → Bob (same room) sees witness entry
     submit(alice_view, "say hello there")
     flush(bob_view)
     flush(alice_view)
@@ -98,7 +86,6 @@ defmodule AgenticRealmsWeb.GameLiveCommunicationTest do
     assert bob_html =~ ~s|class="log-entry speech"|,
            "Bob's render should have a :speech log entry"
 
-    # --- Scenario 2: Alice's originating tab sees the actor-side confirmation
     alice_html = render(alice_view)
 
     assert alice_html =~ ~s|class="log-entry speech speech-self"|,
@@ -106,7 +93,6 @@ defmodule AgenticRealmsWeb.GameLiveCommunicationTest do
 
     assert alice_html =~ "hello there"
 
-    # --- Scenario 3: Alice's OTHER tab (multi-session) sees the witness entry, not the confirmation
     alice_tab2_html = render(alice_tab2)
     assert alice_tab2_html =~ ~s|class="log-entry speech"|
 
@@ -115,22 +101,17 @@ defmodule AgenticRealmsWeb.GameLiveCommunicationTest do
 
     assert alice_tab2_html =~ "hello there"
 
-    # --- Scenario 4: Carol (different room) sees nothing
     carol_html = render(carol_view)
     refute carol_html =~ "hello there", "Carol in a different room should NOT see Alice's say"
 
-    # --- Scenario 5: empty say from Alice → "Say what?" refusal, no broadcast
     submit(alice_view, "say")
     flush(alice_view)
     flush(bob_view)
 
     assert render(alice_view) =~ "Say what?"
-    # Bob should not see anything new — assert his render still doesn't contain
-    # "hello there" only once (no new utterance to add).
     bob_html_after = render(bob_view)
     assert utterance_count(bob_html_after, "hello there") == 1
 
-    # --- Scenario 6: HTML-tagged say → escaped on render
     submit(alice_view, "say <script>alert(1)</script>")
     flush(bob_view)
     bob_html_xss = render(bob_view)
@@ -141,13 +122,10 @@ defmodule AgenticRealmsWeb.GameLiveCommunicationTest do
     refute Regex.match?(~r/<script[^>]*>alert\(1\)<\/script>/, bob_html_xss),
            "Bob's render must not contain an unescaped <script> element"
 
-    # --- Scenario 7: 501-char say → "too long" refusal
     submit(alice_view, "say " <> String.duplicate("x", 501))
     flush(alice_view)
     assert render(alice_view) =~ "too long"
   end
-
-  # --- Helpers ------------------------------------------------------------
 
   defp conn_for(conn, player_id) do
     conn

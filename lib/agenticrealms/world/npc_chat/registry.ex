@@ -1,7 +1,6 @@
 defmodule AgenticRealms.World.NPCChat.Registry do
   @moduledoc """
-  Cluster-wide unique registry for `NPCChat.Conversation` processes
-  (feature 010).
+  Cluster-wide unique registry for `NPCChat.Conversation` processes.
 
   Wraps `Horde.Registry` so that a `(player_id, npc_clone_id)` pair maps
   to exactly one Conversation pid across the BEAM cluster. CRDT-backed,

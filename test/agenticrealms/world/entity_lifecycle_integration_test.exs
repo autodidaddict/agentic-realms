@@ -1,7 +1,7 @@
 defmodule AgenticRealms.World.EntityLifecycleIntegrationTest do
   @moduledoc """
-  Feature 016 Phases 5–7 — end-to-end entity lifecycle: relocation between
-  containers (US3), the void state (US4), and container-type uniformity (US5).
+  End-to-end entity lifecycle: relocation between
+  containers, the void state, and container-type uniformity.
   Asserts read-model container transitions through the live clone/move service.
   """
 
@@ -54,10 +54,8 @@ defmodule AgenticRealms.World.EntityLifecycleIntegrationTest do
       {:ok, oid} = Commands.clone_entity(:object, fields)
 
       assert {"void", nil} = container(oid)
-      # Absent from every room listing.
       refute oid in Enum.map(AgenticRealms.World.Queries.list_objects_in_room(room), & &1.id)
 
-      # Then moving it into a room makes it appear.
       assert :ok =
                Commands.move_entity(oid, ContainerRef.void(), ContainerRef.room(room), :relocated)
 
@@ -89,19 +87,15 @@ defmodule AgenticRealms.World.EntityLifecycleIntegrationTest do
                Commands.move_entity(oid, ContainerRef.room(a), ContainerRef.room(b), :relocated)
 
       assert {"room", ^b} = container(oid)
-      # Exactly one container: gone from A, present in B.
       ids_a = Enum.map(AgenticRealms.World.Queries.list_objects_in_room(a), & &1.id)
       ids_b = Enum.map(AgenticRealms.World.Queries.list_objects_in_room(b), & &1.id)
       refute oid in ids_a
       assert oid in ids_b
     end
 
-    test "a stale-origin relocation is refused (FR-005)", %{fields: fields, room_a: a, room_b: b} do
+    test "a stale-origin relocation is refused", %{fields: fields, room_a: a, room_b: b} do
       {:ok, oid} = Commands.clone_into(:object, fields, ContainerRef.room(a), :spawned)
 
-      # The entity is in A; a caller who believes it is in B (stale origin)
-      # and tries to move it into the void is refused — the actual current
-      # container is authoritative.
       assert {:error, :container_conflict} =
                Commands.move_entity(oid, ContainerRef.room(b), ContainerRef.void(), :relocated)
 
@@ -115,7 +109,6 @@ defmodule AgenticRealms.World.EntityLifecycleIntegrationTest do
       {:ok, oid} = Commands.clone_into(:object, fields, ContainerRef.room(room), :spawned)
       assert {"room", ^room} = container(oid)
 
-      # Same move op, different container type tag → player inventory.
       assert :ok =
                Commands.move_entity(
                  oid,
@@ -132,8 +125,6 @@ defmodule AgenticRealms.World.EntityLifecycleIntegrationTest do
          %{fields: fields, room_a: room} do
       {:ok, oid} = Commands.clone_into(:object, fields, ContainerRef.room(room), :spawned)
 
-      # An NPC container is a valid destination the model accepts, even though
-      # no NPC-inventory read surface exists yet (R8).
       assert :ok =
                Commands.move_entity(
                  oid,

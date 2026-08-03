@@ -52,8 +52,6 @@ defmodule Srd.CharacterGrantsTest do
     end
 
     test "does not report which abilities it can raise" do
-      # Not a grant: it is the set an increase may be spent on, and the
-      # background itself already says which three those are.
       refute Map.has_key?(Character.grants(%{background: "soldier"}), :abilities)
       assert Backgrounds.get("soldier").ability_scores == [:str, :dex, :con]
     end
@@ -125,9 +123,6 @@ defmodule Srd.CharacterGrantsTest do
 
   describe "fixed choices become grants" do
     test "a fixed skill choice is granted rather than asked" do
-      # Nothing in the current content set has a fixed skill choice, so this
-      # asserts the invariant rather than a specific grant: every choice the
-      # content carries is either in grants/1 or in choices/1, never neither.
       for species <- Species.all(), class <- Classes.all(), background <- Backgrounds.all() do
         selections = %{species: species.slug, class: class.slug, background: background.slug}
 
@@ -148,8 +143,6 @@ defmodule Srd.CharacterGrantsTest do
 
   describe "deduplication" do
     test "a feat granted by two sources appears once" do
-      # Constructed rather than found: no two content sources grant the same
-      # feat today, and the property has to hold when one day they do.
       grants = Character.grants(%{background: "criminal"})
       assert grants.feats == Enum.uniq(grants.feats)
       assert length(grants.feats) == 1

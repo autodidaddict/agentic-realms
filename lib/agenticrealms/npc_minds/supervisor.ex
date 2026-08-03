@@ -1,11 +1,11 @@
 defmodule AgenticRealms.NpcMinds.Supervisor do
   @moduledoc """
-  Feature 018 — cluster-wide dynamic supervisor for the singleton
+  Cluster-wide dynamic supervisor for the singleton
   `NpcMinds.Reconciler` (same `Horde.DynamicSupervisor` pattern as
   `Ticks.Supervisor` / `NPCChat.Supervisor`). Horde places the reconciler on one
   node and **redistributes it to a surviving node** if that node leaves, so the
   reconciliation backstop keeps running after node loss — with no `:global`
-  single-point dependency (Constitution Principle I).
+  single-point dependency.
   """
 
   alias AgenticRealms.NpcMinds.{Registry, Reconciler}

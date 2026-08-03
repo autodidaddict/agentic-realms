@@ -1,6 +1,6 @@
 defmodule AgenticRealms.World.Commands.SpawnNpcFreeformTest do
   @moduledoc """
-  Feature 015 US5 — a freeform one-off NPC is cloned straight into a room with
+  A freeform one-off NPC is cloned straight into a room with
   no blueprint behind it: a real `npc_clones` row (null `blueprint_id`) carrying
   the authored lore, observationally identical to a blueprint-spawned clone, and
   NO `blueprints` row added.
@@ -65,7 +65,6 @@ defmodule AgenticRealms.World.Commands.SpawnNpcFreeformTest do
     assert clone.room_id == room_id
     assert clone.lore == "Carries a sealed letter he must not lose."
 
-    # No archetype was registered.
     assert Repo.aggregate(Blueprint, :count) == blueprints_before
     assert [] = Repo.all(from(b in Blueprint, where: b.name == ^"courier #{suffix}"))
   end
@@ -79,7 +78,7 @@ defmodule AgenticRealms.World.Commands.SpawnNpcFreeformTest do
              })
   end
 
-  test "refuses a per-room name collision (FR-001a)",
+  test "refuses a per-room name collision",
        %{wizard: wizard, room_id: room_id, suffix: suffix} do
     name = "twin #{suffix}"
 

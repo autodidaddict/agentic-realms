@@ -2,10 +2,9 @@ defmodule AgenticRealms.World.CommandParser do
   @moduledoc """
   Parse the player's raw text input into a structured command sentinel.
 
-  Pure function: no DB, no aggregates, no dispatch. Owns FR-006 (movement
-  aliases), FR-014 (inventory aliases), FR-017 (case/whitespace tolerance),
-  FR-018 (unknown commands), and FR-019 (empty input) from feature 003 plus
-  the four communication verbs from feature 004 (say, emote, tell, whisper).
+  Pure function: no DB, no aggregates, no dispatch. Owns movement aliases,
+  inventory aliases, case and whitespace tolerance, unknown commands, empty
+  input, and the four communication verbs (say, emote, tell, whisper).
 
   Case-handling contract:
 
@@ -17,9 +16,6 @@ defmodule AgenticRealms.World.CommandParser do
     * **Communication-verb payloads** (`<text>` for say/emote/tell/whisper,
       `<recipient>` for tell/whisper) preserve the original casing from the
       input.
-
-  See `specs/003-persisted-world/contracts/parser.md` and
-  `specs/004-player-communication/contracts/parser.md`.
   """
 
   alias AgenticRealms.World.Direction
@@ -55,11 +51,6 @@ defmodule AgenticRealms.World.CommandParser do
   @say_aliases ~w(say)
   @emote_aliases ~w(emote me)
   @tell_aliases ~w(tell t)
-  # Note: 003's parser already uses `w` as the cardinal direction "west" alias.
-  # The 004 spec originally listed `w` as a whisper alias too, but the conflict
-  # was caught during implementation and resolved in 003's favor (movement
-  # shortcuts are deeply muscle-memory for MUD players). Use the full word
-  # `whisper` instead. See FR-004 and contracts/parser.md.
   @whisper_aliases ~w(whisper)
   @chat_aliases ~w(chat)
 
@@ -71,12 +62,9 @@ defmodule AgenticRealms.World.CommandParser do
       trimmed == "" ->
         {:empty}
 
-      # Apostrophe shortcut for `say` — checked BEFORE the verb-word table so
-      # that `'hello` parses as say even though `'` is not a word boundary.
       String.starts_with?(trimmed, "'") ->
         parse_prefix_shortcut(trimmed, "'", &say_sentinel/1)
 
-      # Colon shortcut for `emote`.
       String.starts_with?(trimmed, ":") ->
         parse_prefix_shortcut(trimmed, ":", &emote_sentinel/1)
 
@@ -86,8 +74,6 @@ defmodule AgenticRealms.World.CommandParser do
   end
 
   def parse(_), do: {:unknown, ""}
-
-  # --- Verb dispatch ------------------------------------------------------
 
   defp parse_verb(trimmed) do
     {first_original, rest_original} = split_first_word(trimmed)
@@ -136,8 +122,6 @@ defmodule AgenticRealms.World.CommandParser do
     end
   end
 
-  # --- Communication-verb sentinels --------------------------------------
-
   defp say_sentinel(text) do
     case String.trim(text) do
       "" -> {:say_empty}
@@ -173,8 +157,6 @@ defmodule AgenticRealms.World.CommandParser do
   defp no_text(:tell, recipient), do: {:tell_no_text, recipient}
   defp no_text(:whisper, recipient), do: {:whisper_no_text, recipient}
 
-  # Feature 010 — `chat <npc> <message>` parsing. Same recipient/message split
-  # as `tell`, but produces chat-specific sentinels.
   defp chat_sentinel(rest) do
     case String.split(rest, ~r/\s+/, parts: 2) do
       [""] ->
@@ -191,10 +173,7 @@ defmodule AgenticRealms.World.CommandParser do
     end
   end
 
-  # --- Prefix shortcut handling ------------------------------------------
-
   defp parse_prefix_shortcut(trimmed, prefix, sentinel_fn) do
-    # Consume the prefix character and at most one separator space.
     rest =
       trimmed
       |> String.replace_prefix(prefix, "")
@@ -203,11 +182,6 @@ defmodule AgenticRealms.World.CommandParser do
     sentinel_fn.(rest)
   end
 
-  # --- Helpers -----------------------------------------------------------
-
-  # Split off the first whitespace-delimited word; return both halves with
-  # their ORIGINAL casing intact. Callers downcase the first word for verb
-  # matching; rest casing is decided per-verb.
   defp split_first_word(s) do
     case String.split(s, ~r/\s+/, parts: 2) do
       [first] -> {first, ""}

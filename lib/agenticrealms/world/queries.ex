@@ -2,8 +2,6 @@ defmodule AgenticRealms.World.Queries do
   @moduledoc """
   Read-side API for the world. Every query is a pure Ecto read against the
   read models in `AgenticRealms.Repo` — no Commanded dispatch, no events.
-
-  See `specs/003-persisted-world/data-model.md` §4 for the contract.
   """
 
   import Ecto.Query
@@ -42,8 +40,6 @@ defmodule AgenticRealms.World.Queries do
          name: room.name,
          description: room.description,
          exits: list_exits(room_id, player_id),
-         # Feature 013 — viewer-aware object listing. Quest-scoped items
-         # are visible only to their owning player.
          objects: list_objects_in_room_for_viewer(room_id, player_id),
          other_players: list_other_players(room_id, player_id),
          npcs: list_npcs_in_room(room_id)
@@ -57,7 +53,7 @@ defmodule AgenticRealms.World.Queries do
   @doc """
   All NPC clones currently located in `room_id`, ordered alphabetically by
   display name. Returns each clone's id, name, and short description — the
-  room view does NOT need long descriptions (FR-005 in feature 007). Clone
+  room view does NOT need long descriptions. Clone
   data is fully denormalized, so no join to the blueprint is needed.
   """
   @spec list_npcs_in_room(String.t()) ::
@@ -85,7 +81,7 @@ defmodule AgenticRealms.World.Queries do
   end
 
   @doc """
-  Fetch the behaviors list attached to a room (feature 009).
+  Fetch the behaviors list attached to a room.
 
   Returns `{:ok, behaviors_list}` (which may be `[]`) or
   `{:error, :no_such_room}` if the room id is unknown.
@@ -101,7 +97,7 @@ defmodule AgenticRealms.World.Queries do
 
   @doc """
   List NPC clones in a room together with their behaviors list, ordered by
-  the per-blueprint serial counter (feature 009). Returns an empty list
+  the per-blueprint serial counter. Returns an empty list
   when the room contains no NPCs.
   """
   @spec list_npc_clones_in_room_with_behaviors(String.t()) :: [
@@ -185,7 +181,7 @@ defmodule AgenticRealms.World.Queries do
   end
 
   @doc """
-  Feature 015 US6 — fetch a full NPC clone row by id (for extract-essence,
+  Fetch a full NPC clone row by id (for extract-essence,
   which reads its lore/behavior_groups/direct_behaviors). Returns `nil` if unknown.
   """
   @spec get_npc_clone_row(String.t()) :: %NPCClone{} | nil
@@ -196,7 +192,7 @@ defmodule AgenticRealms.World.Queries do
   @doc """
   Find a clone in a given room by its display name (case-insensitive,
   whitespace-normalized). Used by the pre-dispatch per-room name-collision
-  check (preserves feature 007 FR-001a at the clone level).
+  check.
   """
   @spec find_clone_in_room_by_name(String.t(), String.t()) ::
           {:ok, %{id: String.t(), name: String.t()}}
@@ -232,7 +228,7 @@ defmodule AgenticRealms.World.Queries do
 
   @doc """
   Resolve an object name within a room's current contents to its object_id,
-  filtered for the given viewer per feature 013's per-viewer item
+  filtered for the given viewer's per-viewer item
   visibility (quest-scoped items are invisible to non-owners).
 
   Case-insensitive; whitespace-collapsed. Returns `:ambiguous` if more than
@@ -286,8 +282,7 @@ defmodule AgenticRealms.World.Queries do
   @doc """
   Resolve an NPC display name within a room's current contents to its npc_id.
   Mirrors `resolve_object_in_room/2`. Used by `World.Commands.take/2` to
-  refuse takes against NPCs via the existing fixed-object refusal path
-  (feature 007 FR-015).
+  refuse takes against NPCs via the existing fixed-object refusal path.
   """
   @spec resolve_npc_in_room(String.t(), String.t()) ::
           {:ok, String.t()} | {:error, :no_such_npc | :ambiguous}
@@ -310,7 +305,7 @@ defmodule AgenticRealms.World.Queries do
 
   @doc """
   Read the `fixed` flag for an object. Used by `World.Commands.take` to
-  refuse fixed objects at the pre-dispatch layer (FR-010).
+  refuse fixed objects at the pre-dispatch layer.
   """
   @spec object_fixed?(String.t()) :: {:ok, boolean()} | {:error, :no_such_object}
   def object_fixed?(object_id) when is_binary(object_id) do
@@ -320,9 +315,6 @@ defmodule AgenticRealms.World.Queries do
     end
   end
 
-  # Feature 017 — viewer-aware exit listing. A global exit
-  # (`visible_to_user_id IS NULL`) is shown to everyone; an owner-scoped exit
-  # (the transient region's `:rift` entry) is shown only to its owner.
   defp list_exits(room_id, viewer_player_id) do
     from(e in Exit,
       join: t in Room,
@@ -339,7 +331,7 @@ defmodule AgenticRealms.World.Queries do
   @doc """
   All objects currently in `room_id`, ordered alphabetically.
 
-  **WARNING — unsafe for rendering as of feature 013.** This function does
+  **WARNING — unsafe for rendering.** This function does
   not honor quest-scoped item visibility (`quest_player_id`). Use
   `list_objects_in_room_for_viewer/2` for any path that renders objects
   to a specific player. Retained for tick-behavior scope assembly
@@ -359,7 +351,7 @@ defmodule AgenticRealms.World.Queries do
   end
 
   @doc """
-  Viewer-aware variant of `list_objects_in_room/1` (feature 013). Objects
+  Viewer-aware variant of `list_objects_in_room/1`. Objects
   carrying a `quest_player_id` are visible only to the player whose id
   matches; objects without a `quest_player_id` are visible to everyone.
 
@@ -382,7 +374,7 @@ defmodule AgenticRealms.World.Queries do
   end
 
   @doc """
-  Feature 018 — global (non-owner-scoped) exits of `room_id` with their
+  Global (non-owner-scoped) exits of `room_id` with their
   destination room ids. Unlike `list_exits/2`, this returns `target_room_id`
   (not the display name) and includes ONLY exits with `visible_to_user_id IS
   NULL`, so an external NPC mind never sees or traverses another actor's
@@ -399,12 +391,12 @@ defmodule AgenticRealms.World.Queries do
   end
 
   @doc """
-  Feature 018 — online players currently in `room_id` (id + name), for the
+  Online players currently in `room_id` (id + name), for the
   external NPC surroundings read. Mirrors the online-presence filtering used for
   the player-facing room view, but without any self-exclusion (the caller is a
   service, not a player).
 
-  Feature 021 — the name is the character's, not the account's, and the sort
+  The name is the character's, not the account's, and the sort
   follows it. A player with no character has none to show, so they are excluded
   the same way an offline one is; they are never in a room to begin with.
   """
@@ -423,7 +415,7 @@ defmodule AgenticRealms.World.Queries do
 
   @doc """
   Returns the list of player ids whose `current_room_id == room_id` AND
-  who appear in `Phoenix.Presence`'s online set (feature 011). Used by
+  who appear in `Phoenix.Presence`'s online set. Used by
   `RoomTicks.Scheduler` to compute fan-out recipients for tick-driven
   room/object speech, and by `RoomTicks.Lifecycle` to seed live-occupant
   state on Scheduler init.
@@ -444,7 +436,7 @@ defmodule AgenticRealms.World.Queries do
 
   @doc """
   Returns all objects currently held by any player whose `current_room_id
-  == room_id` (feature 011). Used by `RoomTicks.Scope` to include carried
+  == room_id`. Used by `RoomTicks.Scope` to include carried
   objects in the tick-behavior scope set for the carrier's current room.
 
   The caller is responsible for filtering by online presence if needed
@@ -468,18 +460,6 @@ defmodule AgenticRealms.World.Queries do
   defp list_other_players(room_id, self_player_id),
     do: online_occupants(room_id, self_player_id)
 
-  # The one room-occupant query. `exclude` drops the asking player, and that is
-  # the only thing that ever differed between the two callers — they had already
-  # drifted, one of them losing the note below.
-  #
-  # Filtered by online presence: a player's persisted `current_room_id` survives
-  # logout (per the 003 design — disconnecting does not unspawn them), but an
-  # offline player MUST NOT appear in the Present HUD card, in `look` output, or
-  # as a valid `whisper` target. `Phoenix.Presence` is the authority on who is
-  # online; it tracks every connected LiveView session and dedupes across tabs.
-  #
-  # A row with no `character_name` is a player who has not created a character
-  # yet. They are never spawned, so they are never in a room to be listed.
   defp online_occupants(room_id, exclude) do
     rows =
       PlayerState
@@ -509,25 +489,6 @@ defmodule AgenticRealms.World.Queries do
     |> String.split(~r/\s+/, trim: true)
     |> Enum.join(" ")
   end
-
-  # ------------------------------------------------------------------------
-  # Feature 012 — Maps: read helpers for World.MapView
-  # ------------------------------------------------------------------------
-  #
-  # Performance posture: these queries are called every time the player's
-  # map needs to re-render (every move, every newly-discovered room). All
-  # five are constant-or-bounded-work given:
-  #   * `discovered_room_ids_for/1` — composite-PK index scan, no JOIN.
-  #   * `rooms_in_region_at_elevation_within_viewport/4` — bounded to the
-  #     viewport_cells² window via x/y BETWEEN clauses; uses the
-  #     `(region_id, elevation)` btree index plus the partial unique index
-  #     on `(region_id, elevation, map_x, map_y)`. Preloads exits + targets
-  #     in one round-trip to avoid N+1 when MapView builds `has_up?` /
-  #     `has_down?` flags and classifies exits.
-  #   * `exits_for_rooms/1` — single IN-list query against the
-  #     `(source_room_id, direction)` composite key.
-  #   * `has_discovered_rooms_above?/3` / `has_discovered_rooms_below?/3` —
-  #     EXISTS-style queries; Postgres short-circuits on the first match.
 
   @doc """
   Returns the set of room ids that `player_id` has personally discovered.
@@ -616,10 +577,6 @@ defmodule AgenticRealms.World.Queries do
     )
   end
 
-  # ──────────────────────────────────────────────────────────────────────
-  # Feature 014 — Object Blueprints
-  # ──────────────────────────────────────────────────────────────────────
-
   @doc """
   Fetch a single Blueprint (any kind) by its slug id, as a full schema
   struct. Returns `nil` if no such row exists.
@@ -630,7 +587,7 @@ defmodule AgenticRealms.World.Queries do
   end
 
   @doc """
-  Feature 015 — all Blueprint rows (both kinds) as full schema structs,
+  All Blueprint rows (both kinds) as full schema structs,
   ordered by name then id. Backs the wizard's unified registry pane.
   """
   @spec list_blueprint_rows() :: [%Blueprint{}]
@@ -668,7 +625,7 @@ defmodule AgenticRealms.World.Queries do
   @registry_kinds ~w(object npc)
 
   @doc """
-  Feature 015 US8 — unified blueprint registry (FR-024/FR-025). Projects the
+  Unified blueprint registry. Projects the
   `blueprints` table to a uniform display row
   `%{id, kind, name, short_description, revision}`, ordered by name then id.
   """

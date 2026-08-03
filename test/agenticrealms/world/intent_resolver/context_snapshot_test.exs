@@ -88,8 +88,6 @@ defmodule AgenticRealms.World.IntentResolver.ContextSnapshotTest do
     long = String.duplicate("x", 500)
     text = ContextSnapshot.render(room(%{description: long}), [], "look")
 
-    # The description line carries 300 chars + "…"; assert the ellipsis is
-    # present and the full 500-char string is not.
     refute text =~ String.duplicate("x", 500)
     assert text =~ "…"
     assert text =~ String.duplicate("x", 300)

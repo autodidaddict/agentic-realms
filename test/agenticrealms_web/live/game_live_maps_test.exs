@@ -1,13 +1,11 @@
 defmodule AgenticRealmsWeb.GameLiveMapsTest do
   @moduledoc """
-  End-to-end LiveView test exercising US1 through US7 against the seeded
-  Blackmire + Hollowvale world.
+  End-to-end LiveView test for maps against the seeded Blackmire and
+  Hollowvale world.
 
-  Feature 012 — Maps. Tagged `:integration` so it runs alongside the
-  other integration suites (e.g., game_live_behaviors_test.exs). The
-  whole story is a single sequential test so the seed runs exactly once
-  per module — see the moduledoc comment in `World.Seed` for why the
-  Commanded aggregate state persists across sandbox-isolated tests.
+  Tagged `:integration` so it runs alongside the other integration suites.
+  The whole story is a single sequential test so the seed runs exactly once
+  per module.
   """
 
   use AgenticRealmsWeb.ConnCase, async: false
@@ -44,17 +42,12 @@ defmodule AgenticRealmsWeb.GameLiveMapsTest do
   test "US1-US7 sequence against the seeded Blackmire + Hollowvale world", %{conn: conn} do
     {:ok, view, _html} = live(conn, ~p"/play")
 
-    # ----- US1 — region header + current-room highlight -----------------
     html_us1 = render_click(view, "toggle_map", %{})
 
     assert html_us1 =~ "Blackmire", "US1: region header reads Blackmire"
     assert html_us1 =~ "map-cell--current", "US1: current-room highlight present"
     assert html_us1 =~ ~s|data-room-name="Stone Atrium"|, "US1: Atrium glyph rendered"
 
-    # ----- US3 — fog stubs for undiscovered visible neighbors -----------
-    # At spawn time the Atrium's exits to Corridor, Library, Border-via-
-    # Library, etc. lead to undiscovered visible rooms. They render as
-    # fog stubs with NO data-room-name.
     assert html_us1 =~ "map-fog-stub", "US3: at least one fog stub renders"
     assert html_us1 =~ "map-fog-cloud", "US3: hatched cloud at fog endpoint"
 
@@ -62,7 +55,6 @@ defmodule AgenticRealmsWeb.GameLiveMapsTest do
       refute chunk =~ "data-room-name", "US3: fog stub line carries no data-room-name"
     end
 
-    # ----- US4 — Up icon on Atrium; switch elevation -------------------
     assert html_us1 =~ "map-icon-up", "US4: Atrium has Up icon"
 
     html_in_loft = render_submit(view, "submit_command", %{"text" => "up"})
@@ -72,12 +64,10 @@ defmodule AgenticRealmsWeb.GameLiveMapsTest do
     assert html_in_loft =~ "map-affordance--below", "US4: below-rooms pip"
 
     refute html_in_loft =~ ~r/elevation[\s:="]*\d/i,
-           "FR-012 / SC-008: no integer elevation in markup"
+           "no integer elevation in markup"
 
-    # Back to ground.
     _ = render_submit(view, "submit_command", %{"text" => "down"})
 
-    # ----- US2 — moving updates the map --------------------------------
     html_after_n = render_submit(view, "submit_command", %{"text" => "north"})
 
     assert html_after_n =~ ~s|data-room-name="North Corridor"|, "US2: Corridor newly rendered"
@@ -86,10 +76,8 @@ defmodule AgenticRealmsWeb.GameLiveMapsTest do
     currents = Regex.scan(~r/map-cell--current/, html_after_n)
     assert length(currents) == 1, "US2: exactly one current-room highlight"
 
-    # Walk back south.
     _ = render_submit(view, "submit_command", %{"text" => "south"})
 
-    # ----- US5 — hidden Vault blanks the map --------------------------
     _ = render_submit(view, "submit_command", %{"text" => "east"})
     html_in_vault = render_submit(view, "submit_command", %{"text" => "east"})
 
@@ -99,11 +87,9 @@ defmodule AgenticRealmsWeb.GameLiveMapsTest do
     refute html_in_vault =~ ~s|data-room-name="Hidden Vault"|,
            "US5: Vault never appears as a glyph"
 
-    # Walk back west to the Library, then south to the Border.
     _ = render_submit(view, "submit_command", %{"text" => "west"})
     html_at_border = render_submit(view, "submit_command", %{"text" => "south"})
 
-    # ----- US6 — cross-region affordance and region swap --------------
     assert html_at_border =~ "Blackmire"
 
     assert html_at_border =~ "map-line--cross-region",
@@ -118,16 +104,10 @@ defmodule AgenticRealmsWeb.GameLiveMapsTest do
     assert html_in_hollowvale =~ "Hollowvale", "US6: header swaps to Hollowvale"
     assert html_in_hollowvale =~ ~s|data-room-name="Hollowvale Outskirts"|
 
-    # ----- US7 — hover tooltip plumbing (client-side) ------------------
-    # The tooltip is rendered entirely by the .MapTooltip ColocatedHook
-    # in the browser; the LiveView is not involved per-hover. Verify the
-    # data-room-name + aria-label primitives that the hook reads are
-    # present on the rendered cells.
     assert html_in_hollowvale =~ ~s|data-room-name="Hollowvale Outskirts"|
     assert html_in_hollowvale =~ ~s|aria-label="Hollowvale Outskirts"|
 
-    # ----- Cross-cutting audits ---------------------------------------
-    refute html_in_hollowvale =~ "marker-end", "SC-003: no arrowheads"
-    refute html_in_hollowvale =~ "marker-start", "SC-003: no arrowheads"
+    refute html_in_hollowvale =~ "marker-end", "no arrowheads"
+    refute html_in_hollowvale =~ "marker-start", "no arrowheads"
   end
 end

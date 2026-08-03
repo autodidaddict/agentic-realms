@@ -8,8 +8,6 @@ defmodule AgenticRealms.World.Ticks.Lifecycle do
   NOT under Horde — in multi-node deployments, each node observes
   Presence independently and `find_or_start/1` is idempotent across
   registry calls (Horde.Registry enforces uniqueness).
-
-  See `specs/011-room-tick-timers/contracts/lifecycle.md`.
   """
 
   use GenServer
@@ -38,8 +36,6 @@ defmodule AgenticRealms.World.Ticks.Lifecycle do
             started_schedulers: MapSet.new(),
             subscribed_rooms: MapSet.new()
 
-  # --- Client -------------------------------------------------------------
-
   @doc false
   @spec start_link(keyword()) :: GenServer.on_start()
   def start_link(opts \\ []) do
@@ -57,38 +53,10 @@ defmodule AgenticRealms.World.Ticks.Lifecycle do
   @spec notify(term()) :: term()
   def notify(event), do: send(__MODULE__, event)
 
-  # --- Server -------------------------------------------------------------
-
   @impl true
   def init(_opts) do
-    # Subscribe to the global "connected_players" Presence topic so we
-    # learn about online/offline transitions.
     Phoenix.PubSub.subscribe(@pubsub, AgenticRealmsWeb.Presence.topic())
 
-    # Eagerly subscribe to every existing room's topic. We need this so
-    # cross-room MOVES (which emit RoomPlayerArrived on the destination
-    # room_topic without firing a Presence diff) reach the Lifecycle.
-    # Lazy subscription on first-arrival doesn't work for moves: the
-    # first arrival event IS the signal that's broadcast on a topic we
-    # haven't subscribed to yet.
-    #
-    # Occupancy and the started-scheduler set are rebuilt from authority
-    # rather than accumulated from zero. Both are derived state: who is live
-    # in a room comes from `Queries.live_occupants_of/1` (read model ∩
-    # Presence) and which rooms already tick comes from the Horde registry.
-    # Without this a restarted Lifecycle believes every room is empty, and
-    # since the stop path is guarded on `started_schedulers` it would never
-    # stop the schedulers it had forgotten — leaving them ticking an empty
-    # room until somebody walked back in. Principle VI: a supervised process
-    # rebuilds its state rather than relying on never crashing.
-    #
-    # The rebuild reads the database, so it happens in `handle_continue/2`
-    # rather than here. `init/1` must not fail on a database that is briefly
-    # unavailable: this process restarts into the same query that just killed
-    # it, and three of those inside five seconds takes the whole application
-    # supervisor down — the Repo with it. `handle_continue` runs before any
-    # other message, so the state is still seeded before the first event is
-    # handled; it can just retry instead of dying.
     {:ok, %__MODULE__{}, {:continue, :seed}}
   end
 
@@ -100,8 +68,6 @@ defmodule AgenticRealms.World.Ticks.Lifecycle do
   defp seed_from_authority(state) do
     case safe_db(fn -> Enum.map(Repo.all(Room), & &1.id) end, :unavailable) do
       :unavailable ->
-        # Nothing to reconcile against yet. Retry rather than run on state we
-        # know is empty, which would leave orphaned schedulers ticking.
         Process.send_after(self(), :seed, seed_retry_ms())
         state
 
@@ -113,15 +79,10 @@ defmodule AgenticRealms.World.Ticks.Lifecycle do
             |> seed_room(room_id)
           end)
 
-        # Then reconcile what was seeded against what should be running. This is
-        # the same decision the arrival and departure paths make, so a restart
-        # converges in both directions: a room that gained occupants while we were
-        # down gets a scheduler, and one that emptied loses the one it had.
         Enum.reduce(rooms, state, &occupancy_changed(&2, &1))
     end
   end
 
-  # One room's live occupants and whether it already has a Scheduler.
   defp seed_room(state, room_id) do
     occupants =
       safe_db(fn -> MapSet.new(Queries.live_occupants_of(room_id)) end, MapSet.new())
@@ -145,8 +106,6 @@ defmodule AgenticRealms.World.Ticks.Lifecycle do
   @impl true
   def handle_call(:get_state, _from, state), do: {:reply, state, state}
 
-  # --- 0 → ≥1 path (T031, US1) -------------------------------------------
-
   @impl true
   def handle_info(%RoomPlayerArrived{room_id: room_id, actor_id: player_id}, state) do
     state =
@@ -158,8 +117,6 @@ defmodule AgenticRealms.World.Ticks.Lifecycle do
     {:noreply, state}
   end
 
-  # --- ≥1 → 0 path (T037, US2) -------------------------------------------
-
   def handle_info(%RoomPlayerLeft{room_id: room_id, actor_id: player_id}, state) do
     state =
       state
@@ -169,16 +126,8 @@ defmodule AgenticRealms.World.Ticks.Lifecycle do
     {:noreply, state}
   end
 
-  # Cross-room move — handled the same way as a paired Left/Arrived; the
-  # broadcaster already emits those, but PlayerCurrentRoomChanged is also
-  # broadcast to the player's player_topic. We do NOT subscribe to that
-  # topic (not our concern), but if the message ever arrives here we
-  # tolerate it gracefully.
   def handle_info(%PlayerCurrentRoomChanged{}, state), do: {:noreply, state}
 
-  # Phoenix.Presence diff for the global "connected_players" topic.
-  # Online → add player_id to their `current_room_id` set if known.
-  # Offline → remove player_id from any room set they're in.
   def handle_info(%{event: "presence_diff", payload: %{joins: joins, leaves: leaves}}, state) do
     state =
       state
@@ -188,8 +137,6 @@ defmodule AgenticRealms.World.Ticks.Lifecycle do
     {:noreply, state}
   end
 
-  # Self-message: join grace expired — start the scheduler if still
-  # occupied.
   def handle_info({:start_scheduler, room_id}, state) do
     state = clear_pending_join(state, room_id)
 
@@ -211,8 +158,6 @@ defmodule AgenticRealms.World.Ticks.Lifecycle do
     end
   end
 
-  # Self-message: leave grace expired — stop the scheduler if still
-  # empty.
   def handle_info({:stop_scheduler, room_id}, state) do
     state = clear_pending_leave(state, room_id)
 
@@ -225,12 +170,9 @@ defmodule AgenticRealms.World.Ticks.Lifecycle do
     end
   end
 
-  # Retry of the startup rebuild, scheduled when the database was unavailable.
   def handle_info(:seed, state), do: {:noreply, seed_from_authority(state)}
 
   def handle_info(_other, state), do: {:noreply, state}
-
-  # --- Internal helpers ---------------------------------------------------
 
   defp ensure_room_subscription(state, room_id) do
     if MapSet.member?(state.subscribed_rooms, room_id) do
@@ -270,8 +212,6 @@ defmodule AgenticRealms.World.Ticks.Lifecycle do
   defp schedule_start(state, room_id) do
     state = clear_pending_leave(state, room_id)
 
-    # If a join is already pending, leave it in place — it'll fire when
-    # the timer expires.
     if Map.has_key?(state.pending_join, room_id) do
       state
     else
@@ -315,9 +255,6 @@ defmodule AgenticRealms.World.Ticks.Lifecycle do
 
   defp apply_presence_joins(state, joins) do
     Enum.reduce(joins, state, fn {pid_str, _meta}, st ->
-      # `current_room_of/1` returns `:error` for an unknown player, which the
-      # `else` below already absorbs. A database that is down does not return
-      # anything — it exits — so it needs `safe_db/2` rather than a match.
       with {player_id, ""} <- Integer.parse(to_string(pid_str)),
            {:ok, room_id} <- safe_db(fn -> Queries.current_room_of(player_id) end, :error) do
         st
@@ -333,8 +270,6 @@ defmodule AgenticRealms.World.Ticks.Lifecycle do
   defp apply_presence_leaves(state, leaves) do
     Enum.reduce(leaves, state, fn {pid_str, _meta}, st ->
       with {player_id, ""} <- Integer.parse(to_string(pid_str)) do
-        # Walk every room set and remove the player; trigger occupancy
-        # checks for each room they were in.
         rooms_with_player =
           Enum.filter(st.live_per_room, fn {_room_id, set} -> MapSet.member?(set, player_id) end)
 
@@ -349,19 +284,6 @@ defmodule AgenticRealms.World.Ticks.Lifecycle do
     end)
   end
 
-  # Run a query, and survive the database not being there.
-  #
-  # A failed checkout exits rather than returning, and an exit inside a
-  # `handle_info` kills this process. That matters more than the update it
-  # loses: the restart re-runs the same rebuild, so a database that is down
-  # produces a crash loop, and a crash loop under a `:one_for_one` parent
-  # exceeds `max_restarts` and terminates every sibling — including the Repo.
-  # A nightly run caught exactly that, as 342 tests failing with "could not
-  # lookup Ecto repo" after one torn-down connection.
-  #
-  # Occupancy is derived state, so dropping an update is recoverable: the next
-  # arrival, departure or presence diff reconciles the room, and `:seed`
-  # rebuilds everything from authority.
   defp safe_db(fun, fallback) do
     fun.()
   rescue

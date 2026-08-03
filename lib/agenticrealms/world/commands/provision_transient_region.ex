@@ -1,6 +1,6 @@
 defmodule AgenticRealms.World.Commands.ProvisionTransientRegion do
   @moduledoc """
-  Feature 017 — provision a transient region on behalf of a provision-owner.
+  Provision a transient region on behalf of a provision-owner.
   Carries the generated region id + name, the owner, the provisioning
   timestamp (set by the dispatcher; the lifetime cap is measured from it),
   the permanent source room the owner provisions from, and the generated

@@ -1,6 +1,6 @@
 defmodule AgenticRealmsWeb.GameLive.Creation do
   @moduledoc """
-  Feature 021 — the creation dialog's event handlers.
+  The creation dialog's event handlers.
 
   Every one of these updates the draft in socket assigns and re-renders. None
   touches world state until `confirm/1`, so abandoning creation leaves nothing
@@ -8,9 +8,8 @@ defmodule AgenticRealmsWeb.GameLive.Creation do
 
   ## Why these are round trips
 
-  Principle III asks for the reason whenever an interaction could plausibly be
-  local, and feature 020 deliberately kept the character sheet's tabs off the
-  server, so the difference is worth stating.
+  The character sheet's tabs are deliberately kept off the server, so the
+  difference is worth stating.
 
   A sheet tab shows a panel that is already in the DOM; the server has nothing
   to add, so it must not be asked. A creation selection changes *which questions
@@ -148,13 +147,6 @@ defmodule AgenticRealmsWeb.GameLive.Creation do
 
     assign(socket, :draft, draft)
   end
-
-  # --- parameter decoding ---------------------------------------------------
-  #
-  # Choice keys and options cross the wire as strings, and they come back from a
-  # client that can send anything. Each of these resolves against what the
-  # package actually offered rather than converting blindly, so a forged
-  # parameter finds no match instead of creating an atom or a bogus pick.
 
   @doc """
   Resolve a choice key and option from their wire forms, against the choices the

@@ -1,7 +1,7 @@
 defmodule AgenticRealms.World.Schemas.NPCCloneTest do
   @moduledoc """
   Unit tests for the `Schemas.NPCClone.debug_id/1` LPMud-style identity
-  helper (feature 008 FR-011). Since feature 015 dropped `serial`, the debug
+  helper. Since `serial` was dropped, the debug
   identity is `<name>#<entity_id>`.
   """
 

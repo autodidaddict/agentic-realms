@@ -1,6 +1,6 @@
 defmodule AgenticRealms.World.Quest do
   @moduledoc """
-  Quest aggregate (feature 013). One aggregate instance per accepted
+  Quest aggregate. One aggregate instance per accepted
   FetchQuest, identified by `quest_id` (binary_id).
 
   State machine:
@@ -10,9 +10,7 @@ defmodule AgenticRealms.World.Quest do
   All state changes emit one event in `:active` direction, and four events
   in `:completed` direction. Refusals return `{:error, atom}` to the
   command-dispatch wrapper, which translates them to the uniform
-  `{ok: false, reason: ...}` tool result envelope (FR-011a).
-
-  See `specs/013-quest-system/contracts/quest-aggregate.md`.
+  `{ok: false, reason: ...}` tool result envelope.
   """
 
   defstruct quest_id: nil,
@@ -33,8 +31,6 @@ defmodule AgenticRealms.World.Quest do
     QuestCompleted,
     QuestItemsCleanedUp
   }
-
-  # --- AcceptQuest --------------------------------------------------------
 
   @spec execute(%__MODULE__{}, %AcceptQuest{} | %FinalizeQuest{}) ::
           %QuestAccepted{}
@@ -68,8 +64,6 @@ defmodule AgenticRealms.World.Quest do
 
   def execute(%__MODULE__{state: :completed}, _cmd),
     do: {:error, :already_completed}
-
-  # --- FinalizeQuest ------------------------------------------------------
 
   def execute(%__MODULE__{state: :initial}, %FinalizeQuest{}),
     do: {:error, :unknown_instance}
@@ -113,8 +107,6 @@ defmodule AgenticRealms.World.Quest do
     ]
   end
 
-  # --- apply/2 ------------------------------------------------------------
-
   @spec apply(
           %__MODULE__{},
           %QuestAccepted{}
@@ -148,8 +140,6 @@ defmodule AgenticRealms.World.Quest do
     %__MODULE__{state | state: :completed, completed_at: at}
   end
 
-  # The other three finalize events do not change aggregate state — they
-  # carry side effects projected into the read model.
   def apply(%__MODULE__{} = state, %QuestItemsConsumed{}), do: state
   def apply(%__MODULE__{} = state, %QuestRewardMinted{}), do: state
   def apply(%__MODULE__{} = state, %QuestItemsCleanedUp{}), do: state

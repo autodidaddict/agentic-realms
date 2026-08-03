@@ -1,14 +1,13 @@
 defmodule AgenticRealms.NpcMinds.Reconciler do
   @moduledoc """
-  Feature 018 — cluster-singleton reconciliation sweep. The event-driven lifecycle
+  Cluster-singleton reconciliation sweep. The event-driven lifecycle
   handoff (`LifecycleManager`) is best-effort, so a start/terminate issued while
   Temporal is unreachable is lost. This periodic sweep converges the set of
   running minds to the set of live NPCs: it starts a mind for any live NPC that
-  has none and terminates any running mind whose NPC no longer exists (FR-029a,
-  SC-013). Every operation is idempotent (Temporal `USE_EXISTING` start /
+  has none and terminates any running mind whose NPC no longer exists. Every operation is idempotent (Temporal `USE_EXISTING` start /
   tolerant terminate), so the sweep is safe to repeat.
 
-  **Cluster semantics (Principle I).** Runs as a Horde cluster singleton: started
+  **Cluster semantics.** Runs as a Horde cluster singleton: started
   under `NpcMinds.Supervisor` (a `Horde.DynamicSupervisor`) and named via
   `NpcMinds.Registry` (a `Horde.Registry`), so exactly one instance runs
   cluster-wide and Horde **relocates it to a surviving node** if the owning node

@@ -1,5 +1,5 @@
 defmodule AgenticRealms.World.EntityRemoveTest do
-  @moduledoc "Feature 018 — RemoveEntity execute/apply on the Entity aggregate."
+  @moduledoc "RemoveEntity execute/apply on the Entity aggregate."
   use ExUnit.Case, async: true
 
   alias AgenticRealms.World.{Entity, ContainerRef}

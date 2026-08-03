@@ -19,12 +19,10 @@ defmodule AgenticRealmsWeb.ConnCase do
 
   using do
     quote do
-      # The default endpoint for testing
       @endpoint AgenticRealmsWeb.Endpoint
 
       use AgenticRealmsWeb, :verified_routes
 
-      # Import conveniences for testing with connections
       import Plug.Conn
       import Phoenix.ConnTest
       import AgenticRealmsWeb.ConnCase

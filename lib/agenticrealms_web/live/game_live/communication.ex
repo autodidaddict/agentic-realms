@@ -1,7 +1,7 @@
 defmodule AgenticRealmsWeb.GameLive.Communication do
   @moduledoc """
-  Communication verb handlers (feature 004 + feature 010 NPC chat) —
-  `say`, `whisper`, `tell`, `emote`, `chat`. Same shape as the player
+  Communication verb handlers: `say`, `whisper`, `tell`, `emote`, `chat`.
+  Same shape as the player
   command handlers: take socket + raw input + verb-specific args,
   return `{:noreply, socket}`.
 
@@ -10,7 +10,7 @@ defmodule AgenticRealmsWeb.GameLive.Communication do
     * `:say` → actor-side `:speech_self` entry rendered inline; the
       witness broadcast it produces is self-filtered downstream.
     * `:emote` → no inline entry; the actor renders the same
-      `:emote_action` broadcast every witness sees (FR-008).
+      `:emote_action` broadcast every witness sees.
     * `:tell` / `:whisper` → actor-side outgoing entry rendered inline;
       the incoming broadcast renders for recipients only.
     * `:chat` → no inline entry; the conversation GenServer broadcasts
@@ -132,10 +132,6 @@ defmodule AgenticRealmsWeb.GameLive.Communication do
 
     case Communication.emote(sender, said) do
       :ok ->
-        # No separate actor-side confirmation — the actor reads the
-        # same broadcast every other room subscriber gets (FR-008).
-        # The :emote_action log entry is appended in handle_info/2
-        # just like for any witness.
         {:noreply, socket}
 
       {:error, :empty} ->
@@ -147,7 +143,7 @@ defmodule AgenticRealmsWeb.GameLive.Communication do
   end
 
   @doc """
-  NPC chat (feature 010). Routes to `NPCChat.send/3` which (a)
+  NPC chat. Routes to `NPCChat.send/3` which (a)
   validates input, (b) resolves the NPC token, (c) finds-or-starts
   the Conversation GenServer (cluster-aware via Horde.Registry),
   (d) returns the new-vs-continuing indicator synchronously. The
@@ -160,10 +156,6 @@ defmodule AgenticRealmsWeb.GameLive.Communication do
 
     case AgenticRealms.World.NPCChat.send(player_id, npc_token, message) do
       {:ok, :new} ->
-        # The :chat_new system message is broadcast by the
-        # Conversation itself; we just leave the input cleared and
-        # wait for it on player_topic. The reply will follow when
-        # the LLM call lands.
         {:noreply, socket}
 
       {:ok, :continuing} ->
@@ -195,9 +187,6 @@ defmodule AgenticRealmsWeb.GameLive.Communication do
          })}
 
       {:error, :still_thinking} ->
-        # Defensive — the Conversation should broadcast its own
-        # :chat_in_flight_rejection message; this is a fallback in
-        # case the GenServer call path produced the error directly.
         {:noreply, socket}
     end
   end

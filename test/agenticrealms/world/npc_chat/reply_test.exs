@@ -1,8 +1,6 @@
 defmodule AgenticRealms.World.NPCChat.ReplyTest do
   @moduledoc """
-  Unit tests for the chat reply parser (feature 010).
-
-  See `specs/010-npc-conversations/contracts/reply.md`.
+  Unit tests for the chat reply parser.
   """
 
   use ExUnit.Case, async: true
@@ -67,7 +65,7 @@ defmodule AgenticRealms.World.NPCChat.ReplyTest do
       assert Reply.parse(response) == {:error, :malformed}
     end
 
-    test "two tool_use blocks → :malformed (FR-021 forbids mixing)" do
+    test "two tool_use blocks → :malformed" do
       response = %{
         "content" => [
           %{"type" => "tool_use", "name" => "say", "input" => %{"text" => "A"}},

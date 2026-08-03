@@ -1,6 +1,6 @@
 defmodule AgenticRealms.World.CharacterDraft.ValidatorTest do
   @moduledoc """
-  Feature 021 — the guard on the write side.
+  The guard on the write side.
 
   The dialog is a client, so these tests care most about what a forged
   submission can get past. Pure and DB-free.
@@ -52,8 +52,6 @@ defmodule AgenticRealms.World.CharacterDraft.ValidatorTest do
     end
 
     test "the validator has no skip-if-empty clause" do
-      # The US1 shape: identity only. It is not a legal character, and the
-      # validator says so — completing it is the facade's job, not this one's.
       identity_only =
         Draft.new()
         |> Draft.put_name("Gandalf")
@@ -116,7 +114,6 @@ defmodule AgenticRealms.World.CharacterDraft.ValidatorTest do
     end
 
     test "the total must fit the budget" do
-      # Every score is buyable and the shape looks plausible; it just costs 33.
       forged = %{complete() | bought: %{str: 15, dex: 15, con: 15, int: 12, wis: 8, cha: 8}}
 
       assert :bought in fields(forged)
@@ -129,8 +126,6 @@ defmodule AgenticRealms.World.CharacterDraft.ValidatorTest do
     end
 
     test "no score may exceed 20" do
-      # Unreachable through the dialog — point buy tops out at 15 and the
-      # largest increase is +2 — so this is asserted against a forged draft.
       forged = %{complete() | bought: %{str: 15, dex: 14, con: 13, int: 12, wis: 10, cha: 8}}
       forged = %{forged | bought: Map.put(forged.bought, :str, 19), spread: {:split, :str, :con}}
 
@@ -149,7 +144,6 @@ defmodule AgenticRealms.World.CharacterDraft.ValidatorTest do
     end
 
     test "may only raise abilities the background names" do
-      # Soldier raises str, dex, or con. Charisma is not on offer.
       forged = %{complete() | spread: {:split, :cha, :str}}
       assert :spread in fields(forged)
     end
@@ -176,13 +170,11 @@ defmodule AgenticRealms.World.CharacterDraft.ValidatorTest do
     end
 
     test "must come from the class' own list" do
-      # Arcana is not on the fighter's list.
       forged = %{complete() | skill_picks: [:athletics, :arcana]}
       assert :skill_picks in fields(forged)
     end
 
     test "may not be spent on a skill the background already granted" do
-      # Soldier grants athletics and intimidation.
       forged = %{complete() | skill_picks: [:athletics, :intimidation]}
       assert :skill_picks in fields(forged)
     end
@@ -233,7 +225,6 @@ defmodule AgenticRealms.World.CharacterDraft.ValidatorTest do
 
   describe "it carries no SRD rules of its own" do
     test "a choice it has never heard of validates by membership alone" do
-      # Divine Order is a cleric feature this module names nowhere.
       draft =
         Draft.new()
         |> Draft.put_name("Elrond")
@@ -251,15 +242,11 @@ defmodule AgenticRealms.World.CharacterDraft.ValidatorTest do
     end
   end
 
-  # --- helpers -------------------------------------------------------------
-
   defp with_abilities(draft, spread) do
     %{draft | bought: %{str: 15, dex: 14, con: 13, int: 12, wis: 10, cha: 8}}
     |> Draft.put_spread(spread)
   end
 
-  # A human fighter: size, Skillful, Versatile, Fighting Style, Weapon Mastery,
-  # and soldier's gaming set. Everything answered.
   defp complete do
     Draft.new()
     |> Draft.put_name("Gandalf")

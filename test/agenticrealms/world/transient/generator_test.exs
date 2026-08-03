@@ -18,18 +18,15 @@ defmodule AgenticRealms.World.Transient.GeneratorTest do
       room_ids = Enum.map(spec.rooms, & &1.room_id)
       assert spec.origin_room_id in room_ids
 
-      # Owner-only rift entry: source -> origin, scoped to the owner.
       assert spec.entry_exit.direction == :rift
       assert spec.entry_exit.source_room_id == source
       assert spec.entry_exit.target_room_id == spec.origin_room_id
       assert spec.entry_exit.visible_to_user_id == owner
 
-      # A rift return exit leads out of the origin back to the source room.
       assert Enum.any?(spec.intra_exits, fn e ->
                e.from == spec.origin_room_id and e.direction == :rift and e.to == source
              end)
 
-      # Every intra exit references a known room (or the source, for the return).
       known = MapSet.new([source | room_ids])
 
       assert Enum.all?(spec.intra_exits, fn e ->
@@ -44,7 +41,6 @@ defmodule AgenticRealms.World.Transient.GeneratorTest do
 
       assert a.region_id != b.region_id
       assert a.origin_room_id != b.origin_room_id
-      # Region names carry a unique index — must differ per region.
       assert a.name != b.name
     end
   end

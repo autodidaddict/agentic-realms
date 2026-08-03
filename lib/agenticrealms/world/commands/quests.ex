@@ -1,6 +1,6 @@
 defmodule AgenticRealms.World.Commands.Quests do
   @moduledoc """
-  Write-side facade for quests (feature 013): accepting one from an NPC's
+  Write-side facade for quests: accepting one from an NPC's
   catalog, checking progress, and finalizing.
 
   Split out of `AgenticRealms.World.Commands`, which had grown to cover every
@@ -16,16 +16,14 @@ defmodule AgenticRealms.World.Commands.Quests do
   alias AgenticRealms.World.Quests
   alias AgenticRealms.World.Schemas.{Blueprint, Object, QuestInstance}
 
-  # --- Quest acceptance (feature 013) -------------------------------------
-
   @doc """
   Accept the FetchQuest with slug `slug` from `npc_blueprint_id` on behalf
-  of `player_id`. Pre-dispatch validation enforces FR-009:
+  of `player_id`. Pre-dispatch validation refuses:
 
     * `:unknown_npc` — blueprint doesn't exist
     * `:unknown_slug` — slug is not in the NPC's catalog
     * `:already_completed` — this player has already finished this quest
-      with this NPC (FR-012, sticky completion)
+      with this NPC (sticky completion)
     * `{:already_active, existing_quest_id}` — this player already has
       this quest in flight with this NPC
 
@@ -34,7 +32,7 @@ defmodule AgenticRealms.World.Commands.Quests do
   aggregate, and returns `{:ok, quest_id}`. The projector handler for
   `QuestAccepted` then inserts the `quest_instances` row and clones a
   quest-scoped item into each criterion's spawn rooms via the entity
-  lifecycle (feature 016).
+  lifecycle.
   """
   @spec accept_quest(integer(), String.t(), String.t()) ::
           {:ok, String.t()}
@@ -113,8 +111,6 @@ defmodule AgenticRealms.World.Commands.Quests do
     Map.put(catalog_entry, "criteria", rewritten_criteria)
   end
 
-  # --- Quest progress check (feature 013) ---------------------------------
-
   @doc """
   Read-only progress check for an active quest. Returns the per-criterion
   count + target list, computed from current inventory. Refuses
@@ -133,8 +129,6 @@ defmodule AgenticRealms.World.Commands.Quests do
         {:error, :unknown_instance}
     end
   end
-
-  # --- Quest finalization (feature 013) -----------------------------------
 
   @doc """
   Finalize an active quest. Pre-dispatch validation reads the player's
@@ -166,7 +160,6 @@ defmodule AgenticRealms.World.Commands.Quests do
       reward = inst.definition_snapshot["reward"] || %{}
       reward_name = reward["name"] || "reward"
       reward_description = reward["description"] || ""
-      # Feature 019 — the authored experience reward (0 when unauthored).
       reward_xp = normalize_xp(reward["xp"])
 
       case WorldApp.dispatch(
@@ -200,7 +193,6 @@ defmodule AgenticRealms.World.Commands.Quests do
     end
   end
 
-  # Feature 019 — coerce an authored quest xp reward to a non-negative integer.
   defp normalize_xp(xp) when is_integer(xp) and xp > 0, do: xp
   defp normalize_xp(_), do: 0
 
@@ -209,9 +201,6 @@ defmodule AgenticRealms.World.Commands.Quests do
          player_id: pid,
          definition_snapshot: snapshot
        }) do
-    # All quest-scoped objects for this instance, partitioned by where
-    # they currently sit. `in_inventory` are the candidates for
-    # consumption; everything else needs cleanup.
     all_objects =
       from(o in Object, where: o.quest_instance_id == ^qid)
       |> Repo.all()

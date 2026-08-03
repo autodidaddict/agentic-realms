@@ -1,6 +1,6 @@
 defmodule AgenticRealms.World.Commands.CloneEntity do
   @moduledoc """
-  Bring a world entity into existence (feature 016, FR-001). A freshly
+  Bring a world entity into existence. A freshly
   cloned entity is born in the void; placement is a separate `MoveEntity`.
 
   `kind` is `:object` or `:npc`. `fields` is the kind-shaped map of frozen

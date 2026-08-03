@@ -1,6 +1,6 @@
 defmodule AgenticRealms.World.PlayerCreateCharacterTest do
   @moduledoc """
-  Feature 020 — Player aggregate CreateCharacter: emits once, then never again.
+  Player aggregate CreateCharacter: emits once, then never again.
 
   Pure — no database, no Commanded.
   """
@@ -153,7 +153,7 @@ defmodule AgenticRealms.World.PlayerCreateCharacterTest do
     end
   end
 
-  describe "feature 021 — the player's own choices" do
+  describe "the player's own choices" do
     test "the name, lineage, and keyed choices round-trip onto the event" do
       event = Player.execute(%Player{}, cmd())
 
@@ -176,9 +176,6 @@ defmodule AgenticRealms.World.PlayerCreateCharacterTest do
     end
 
     test "the event records finished values, not a reference to configuration" do
-      # FR-031 — changing what the game would generate cannot reach back and
-      # alter a character that already exists, because nothing about the
-      # configuration is stored on the event or read by the aggregate.
       original = Application.fetch_env!(:agenticrealms, :character_defaults)
       state = created()
 

@@ -1,7 +1,7 @@
 defmodule AgenticRealms.World.QueriesBlueprintsTest do
   @moduledoc """
-  Feature 015 US8 — the unified blueprint registry query lists both kinds and
-  filters by kind (FR-024/FR-025).
+  The unified blueprint registry query lists both kinds and
+  filters by kind.
   """
 
   use AgenticRealms.DataCase, async: false
@@ -37,7 +37,6 @@ defmodule AgenticRealms.World.QueriesBlueprintsTest do
     assert obj in all_ids
     assert npc in all_ids
 
-    # Each display row carries the kind discriminator (FR-024).
     assert Enum.all?(Queries.list_blueprints(), &(&1.kind in ["object", "npc"]))
 
     object_ids = Queries.list_blueprints("object") |> Enum.map(& &1.id)

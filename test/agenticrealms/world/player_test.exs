@@ -88,8 +88,6 @@ defmodule AgenticRealms.World.PlayerTest do
     end
   end
 
-  # --- Feature 012 — discovery ---
-
   describe "RecordRoomDiscovery" do
     test "first call on a fresh aggregate emits PlayerDiscoveredRoom" do
       cmd = %RecordRoomDiscovery{player_id: 1, room_id: @atrium}

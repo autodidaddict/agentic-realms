@@ -49,8 +49,6 @@ defmodule AgenticRealms.World.Exits.ValidatorTest do
     end
 
     test "cross-region skip — different region_ids bypass geometry" do
-      # Geographically nonsensical (east from (3, 2) to (0, 0)) but the
-      # validator skips because regions differ.
       assert :ok =
                Validator.consistent?(
                  :east,

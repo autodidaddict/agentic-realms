@@ -1,11 +1,11 @@
 defmodule AgenticRealms.World.CharacterDraft do
   @moduledoc """
-  Feature 021 — a character being made, before it exists.
+  A character being made, before it exists.
 
   Held in the creating player's LiveView socket and nowhere else. Never
   persisted, never broadcast, never in a registry: a draft belongs to one
   player's one session and is meaningless to any other process on any other
-  node, which is the node-local state Principle I permits. Abandoning creation
+  node. Abandoning creation
   therefore leaves nothing behind, and no half-made character can ever be
   mistaken for a real one.
 
@@ -78,8 +78,6 @@ defmodule AgenticRealms.World.CharacterDraft do
   @spec steps() :: [step()]
   def steps, do: @steps
 
-  # --- selections ----------------------------------------------------------
-
   @doc """
   Set the character's name. Clears nothing: the name has no dependents.
   """
@@ -115,9 +113,6 @@ defmodule AgenticRealms.World.CharacterDraft do
   defp clear_spread_if(draft, false), do: draft
   defp clear_spread_if(draft, true), do: %{draft | spread: nil}
 
-  # Keep only what the current selections still offer. Skill picks go with the
-  # class that offered them; keyed choices go with whichever source offered
-  # each one.
   defp prune(%__MODULE__{} = draft) do
     open = draft |> open_choices() |> MapSet.new(& &1.key)
 
@@ -134,11 +129,6 @@ defmodule AgenticRealms.World.CharacterDraft do
     }
   end
 
-  # --- abilities -----------------------------------------------------------
-
-  # Full-budget shapes, high to low. Deliberately not the min-maxed 15/15/15
-  # that the budget also allows: this is what a character opens as, and three
-  # eights is a worse first impression than a rounded character.
   @shapes [
     [15, 14, 13, 12, 10, 8],
     [15, 15, 13, 12, 8, 8],
@@ -183,9 +173,6 @@ defmodule AgenticRealms.World.CharacterDraft do
     %{draft | bought: bought, errors: []}
   end
 
-  # The abilities this class actually wants, best first. Primary, because that
-  # is the whole question the class answers; then Constitution, which every
-  # class wants and no class lists; then its saving throws.
   defp ranked_abilities(%__MODULE__{} = draft) do
     case draft.class_slug && Classes.get(draft.class_slug) do
       nil -> []
@@ -193,7 +180,6 @@ defmodule AgenticRealms.World.CharacterDraft do
     end
   end
 
-  # Everything the class expressed no opinion about.
   defp spare_abilities(%__MODULE__{} = draft), do: Ability.all() -- ranked_abilities(draft)
 
   @doc """
@@ -292,8 +278,6 @@ defmodule AgenticRealms.World.CharacterDraft do
   def increases(%__MODULE__{spread: {:split, larger, smaller}}), do: %{larger => 2, smaller => 1}
   def increases(%__MODULE__{spread: {:even, abilities}}), do: Map.new(abilities, &{&1, 1})
 
-  # --- picks ---------------------------------------------------------------
-
   @doc """
   Toggle a skill among the class' picks, never holding more than it allows.
 
@@ -306,9 +290,6 @@ defmodule AgenticRealms.World.CharacterDraft do
       skill in draft.skill_picks ->
         %{draft | skill_picks: List.delete(draft.skill_picks, skill), errors: []}
 
-      # A skill the character already has is not a pick to spend. The dialog
-      # does not offer one, and the validator refuses one; this is the third
-      # guard, so a stray event cannot waste an allowance either.
       skill in grants(draft).skills ->
         draft
 
@@ -367,8 +348,6 @@ defmodule AgenticRealms.World.CharacterDraft do
       %{choice: choice} -> choice.choose
     end
   end
-
-  # --- content -------------------------------------------------------------
 
   @doc """
   The selections in the shape `Srd.Character` takes.
@@ -430,8 +409,6 @@ defmodule AgenticRealms.World.CharacterDraft do
   def spreads(%__MODULE__{background_slug: nil}), do: []
   def spreads(%__MODULE__{}), do: Background.spreads()
 
-  # --- steps ---------------------------------------------------------------
-
   @doc """
   Move to a step. Refuses a step whose prerequisites are not met, so the dialog
   cannot be walked out of order.
@@ -445,15 +422,6 @@ defmodule AgenticRealms.World.CharacterDraft do
     end
   end
 
-  # The abilities step opens on a spread rather than on six eights and a bill.
-  # Only when nothing has been bought, so stepping back to it keeps whatever
-  # the player adjusted.
-  #
-  # Changing class afterwards deliberately does *not* re-roll. The spread stays
-  # legal whatever the class, and discarding it would make the abilities step
-  # incomplete and every step after it unreachable, which is a worse thing to
-  # do to someone than leaving them a spread weighted for their previous idea.
-  # "Roll again" re-weights on demand.
   defp roll_if_unbought(%__MODULE__{bought: bought} = draft, :abilities)
        when map_size(bought) == 0,
        do: roll(draft)
@@ -523,8 +491,6 @@ defmodule AgenticRealms.World.CharacterDraft do
   """
   @spec put_name_status(t(), name_status()) :: t()
   def put_name_status(%__MODULE__{} = draft, status), do: %{draft | name_status: status}
-
-  # --- facts ---------------------------------------------------------------
 
   @doc """
   The draft in the shape `Srd.Character.derive/1` takes, so the review is
@@ -658,8 +624,6 @@ defmodule AgenticRealms.World.CharacterDraft do
   defimpl Inspect do
     import Inspect.Algebra
 
-    # The draft is large and mostly empty mid-edit; a full dump buries the
-    # three fields anyone debugging actually wants.
     def inspect(%CharacterDraft{} = draft, opts) do
       concat([
         "#CharacterDraft<",

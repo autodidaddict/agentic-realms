@@ -75,10 +75,6 @@ defmodule AgenticRealms.GameData do
     ]
   end
 
-  # Feature 013 — quests/0 and quest_details/0 removed. Quest log is now
-  # backed by `AgenticRealms.World.Quests.active_for/1` and
-  # `history_for/1`, computed from `quest_instances` + current inventory.
-
   @spec presence() :: [map()]
   def presence do
     [
@@ -88,9 +84,6 @@ defmodule AgenticRealms.GameData do
       %{name: "Vosk", status: "idle", npc: false}
     ]
   end
-
-  # Feature 012 removed `map_nodes/0` and `map_edges/0` — the mini-map
-  # is now driven by `AgenticRealms.World.MapView` over real world state.
 
   @spec starter_prompts() :: map()
   def starter_prompts do

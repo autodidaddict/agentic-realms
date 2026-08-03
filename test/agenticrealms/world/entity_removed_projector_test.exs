@@ -1,5 +1,5 @@
 defmodule AgenticRealms.World.EntityRemovedProjectorTest do
-  @moduledoc "Feature 018 — EntityRemoved deletes the read-model row (end-to-end via the command path)."
+  @moduledoc "EntityRemoved deletes the read-model row (end-to-end via the command path)."
   use AgenticRealms.DataCase, async: false
 
   @moduletag :commanded

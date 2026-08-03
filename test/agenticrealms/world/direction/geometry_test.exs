@@ -3,7 +3,6 @@ defmodule AgenticRealms.World.Direction.GeometryTest do
 
   alias AgenticRealms.World.Direction.Geometry
 
-  # A test "room" is just any map that exposes :map_x, :map_y, :elevation.
   defp room(x, y, elev \\ 0), do: %{map_x: x, map_y: y, elevation: elev}
   defp off_map, do: %{map_x: nil, map_y: nil, elevation: 0}
 
@@ -110,13 +109,11 @@ defmodule AgenticRealms.World.Direction.GeometryTest do
     end
 
     test "off-axis cardinal" do
-      # north requires Δx == 0, but target.x = 1
       assert {:error, :off_axis_for_direction} =
                Geometry.consistent?(:north, room(0, 0), room(1, -1))
     end
 
     test "wrong-sign cardinal" do
-      # north requires target.y < source.y; (0, 1) is south
       assert {:error, :off_axis_for_direction} =
                Geometry.consistent?(:north, room(0, 0), room(0, 1))
     end
@@ -132,7 +129,6 @@ defmodule AgenticRealms.World.Direction.GeometryTest do
     end
 
     test "diagonal with wrong-sign component" do
-      # northeast requires Δx > 0 and Δy < 0; (-1, -1) has Δx < 0
       assert {:error, :off_axis_for_direction} =
                Geometry.consistent?(:northeast, room(0, 0), room(-1, -1))
     end
@@ -145,7 +141,6 @@ defmodule AgenticRealms.World.Direction.GeometryTest do
     end
 
     test "wrong vertical direction" do
-      # up requires target.elevation > source.elevation
       assert {:error, :wrong_vertical_direction} =
                Geometry.consistent?(:up, room(0, 0, 1), room(0, 0, 0))
     end

@@ -22,14 +22,11 @@ defmodule AgenticRealms.World.IntentResolverLiveTest do
   use ExUnit.Case, async: false
 
   @moduletag :live_llm
-  # Real API round-trips are slow; give the whole case generous headroom.
   @moduletag timeout: 120_000
 
   alias AgenticRealms.World.IntentResolver
   alias AgenticRealms.World.IntentResolver.{SystemPrompt, Tools}
 
-  # {player input, expected outcome}.  :refuse means the `refuse` tool;
-  # everything else is the expected action-tuple verb (first element).
   @cases [
     {"grab the brass lantern off the floor", :take},
     {"put down the journal", :drop},
@@ -40,9 +37,6 @@ defmodule AgenticRealms.World.IntentResolverLiveTest do
     {"wave cheerfully at the fire", :emote},
     {"tell alice I will be right back", :tell},
     {"lean in and quietly tell bob to watch out", :whisper},
-    # Examine intent now maps to look-with-target (feature 006) — formerly
-    # refused as near-mapping. The classify/1 helper extracts `:look` for
-    # both `{:look}` and `{:look, target}` action tuples.
     {"examine the brass lantern very closely", :look},
     {"study the journal carefully", :look},
     {"take the lantern and then head north", :refuse},
@@ -54,7 +48,6 @@ defmodule AgenticRealms.World.IntentResolverLiveTest do
       key when is_binary(key) and key != "" ->
         original = Application.get_env(:agenticrealms, AgenticRealms.Anthropic)
 
-        # Point at the real API: real key, drop the Req.Test plug.
         Application.put_env(
           :agenticrealms,
           AgenticRealms.Anthropic,
@@ -71,7 +64,6 @@ defmodule AgenticRealms.World.IntentResolverLiveTest do
         :ok
 
       _ ->
-        # No key — skip the whole case.
         {:ok, skip: true}
     end
   end
@@ -100,8 +92,6 @@ defmodule AgenticRealms.World.IntentResolverLiveTest do
     end
   end
 
-  # Build a real Anthropic request for `input`, call the API, and reduce the
-  # response to the chosen verb atom (`:refuse` for the refuse tool).
   defp classify(input) do
     request = %{
       "max_tokens" => 256,

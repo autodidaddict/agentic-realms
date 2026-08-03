@@ -4,7 +4,6 @@ defmodule Srd.Rules.AttackTest do
   alias Srd.Dice.Roll
   alias Srd.Rules.Attack
 
-  # A plain d20 showing `nat` on the die, with a flat `mod`.
   defp d20(nat, mod \\ 0) do
     %Roll{count: 1, sides: 20, modifier: mod, dice: [nat], reduce: :sum, total: nat + mod}
   end
@@ -47,7 +46,6 @@ defmodule Srd.Rules.AttackTest do
     end
 
     test "detects a crit through the kept die under advantage" do
-      # 2d20 keep-highest [20, 5], +7 -> total 27, kept die 20
       adv = %Roll{count: 2, sides: 20, modifier: 7, dice: [20, 5], reduce: :max, total: 27}
       result = Attack.resolve(adv, target_ac: 15)
       assert result.hit?

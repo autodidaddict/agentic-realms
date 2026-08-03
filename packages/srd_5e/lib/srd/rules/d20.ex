@@ -26,7 +26,6 @@ defmodule Srd.Rules.D20 do
   """
   @spec test(Roll.t(), integer()) :: t()
   def test(%Roll{sides: 20} = roll, target) do
-    # the kept die; works with advantage too
     natural = roll.total - roll.modifier
 
     %__MODULE__{

@@ -1,6 +1,6 @@
 defmodule AgenticRealms.World.Transient.PurgeTest do
   @moduledoc """
-  Feature 017 — `Transient.Purge` targets the right streams/rows and is
+  `Transient.Purge` targets the right streams/rows and is
   idempotent. Uses direct read-model inserts + the recording event-store stub
   (the in-memory Commanded adapter has no `delete_stream`), so no Commanded
   chain is needed.
@@ -26,9 +26,7 @@ defmodule AgenticRealms.World.Transient.PurgeTest do
     origin = insert_room(tregion, "Origin")
     hollow = insert_room(tregion, "Hollow")
 
-    # owner-only entry exit (permanent source -> transient origin)
     insert_exit(source, "rift", origin, 7)
-    # intra-region exit (transient -> transient)
     insert_exit(origin, "north", hollow, nil)
 
     assert :ok = Purge.run(tregion)
@@ -38,7 +36,6 @@ defmodule AgenticRealms.World.Transient.PurgeTest do
     assert ("room-" <> origin) in streams
     assert ("room-" <> hollow) in streams
 
-    # Read model fully gone for the transient region.
     assert Repo.get(Region, tregion) == nil
     assert Repo.all(from(r in Room, where: r.region_id == ^tregion)) == []
 
@@ -50,7 +47,6 @@ defmodule AgenticRealms.World.Transient.PurgeTest do
              )
            ) == []
 
-    # Permanent region + source room untouched.
     assert Repo.get(Region, perm)
     assert Repo.get(Room, source)
   end
@@ -63,8 +59,6 @@ defmodule AgenticRealms.World.Transient.PurgeTest do
     assert :ok = Purge.run(tregion)
     assert Repo.get(Region, tregion) == nil
   end
-
-  # --- helpers ------------------------------------------------------------
 
   defp insert_region(kind) do
     id = Ecto.UUID.generate()

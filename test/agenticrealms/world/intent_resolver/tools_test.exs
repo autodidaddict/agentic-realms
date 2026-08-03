@@ -63,7 +63,7 @@ defmodule AgenticRealms.World.IntentResolver.ToolsTest do
     assert by_name["inventory"]["input_schema"]["required"] == []
   end
 
-  describe "look tool — optional target property (feature 006)" do
+  describe "look tool — optional target property" do
     test "look exposes an optional 'target' string property" do
       look = Enum.find(Tools.list(), &(&1["name"] == "look"))
       props = look["input_schema"]["properties"]

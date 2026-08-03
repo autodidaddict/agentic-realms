@@ -1,6 +1,6 @@
 defmodule AgenticRealms.World.NPCChat.Context do
   @moduledoc """
-  Assembles the per-turn LLM request for an NPC chat (feature 010).
+  Assembles the per-turn LLM request for an NPC chat.
 
   `snapshot/2` queries the current room state and assembles the context
   map that `SystemPrompt.text/1` consumes — this is impure (DB-bound).
@@ -8,8 +8,6 @@ defmodule AgenticRealms.World.NPCChat.Context do
   `build_request/4` is pure: given a snapshot, the conversation history,
   the current player utterance, and the NPC name (for rendering assistant
   turns), it produces the Anthropic Messages API request body.
-
-  See `specs/010-npc-conversations/contracts/context.md`.
   """
 
   alias AgenticRealms.Repo
@@ -80,9 +78,6 @@ defmodule AgenticRealms.World.NPCChat.Context do
          other_players: Enum.map(room_view.other_players, &display_name/1),
          objects: Enum.map(room_view.objects, &object_entry/1),
          player_name: PlayerNames.get(player_id),
-         # Feature 013 — per-(viewer, NPC) quest context. Empty maps when
-         # the NPC has no catalog and the player has no history with it,
-         # in which case SystemPrompt omits the entire Quests section.
          quest_context: quest_context(player_id, npc_clone.blueprint_id)
        }}
     else
@@ -91,7 +86,7 @@ defmodule AgenticRealms.World.NPCChat.Context do
   end
 
   @doc """
-  Compute per-(viewer, NPC) quest context (feature 013).
+  Compute per-(viewer, NPC) quest context.
 
   Returns a map with three lists:
     * `offerable_quests` — entries from the NPC's catalog that this
@@ -105,8 +100,6 @@ defmodule AgenticRealms.World.NPCChat.Context do
       requests without re-offering.
   """
   @spec quest_context(integer(), String.t() | nil) :: quest_context()
-  # Feature 015 US5 — a freeform NPC has no blueprint (and thus no quest
-  # catalog); the LLM's Quests section is simply omitted.
   def quest_context(_player_id, nil),
     do: %{offerable_quests: [], active_instances: [], completed_slugs: []}
 
@@ -203,14 +196,6 @@ defmodule AgenticRealms.World.NPCChat.Context do
     }
   end
 
-  # NPC turns in `turns` carry the raw text the model produced (the
-  # tool_use input.text). For the API messages array we send the
-  # assistant content as that raw text — wrapping it in "Garrick says,
-  # '...'" or prepending the NPC name distances the model from its own
-  # prior reply and degrades follow-up recall. The mode (speech vs.
-  # emote) is preserved for emotes by tagging with a parenthetical
-  # marker so the model can disambiguate its prior gesture from spoken
-  # words; speech turns are passed through unchanged.
   defp message_history(turns, _npc_name) do
     Enum.map(turns, fn
       %{role: :player, text: text} ->

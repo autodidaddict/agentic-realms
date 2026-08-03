@@ -2,7 +2,7 @@ defmodule AgenticRealms.World.Schemas.PlayerState do
   @moduledoc """
   A player's projected world state: where they are, and who their character is.
 
-  Feature 020 — SRD 5e Character Stats. The character columns carry only what
+  SRD 5e Character Stats. The character columns carry only what
   cannot be recomputed: the choices made at creation, and the two counters that
   change during play. Everything a character sheet shows beyond these —
   modifiers, proficiency bonus, saving throws, skills, armor class, initiative,
@@ -25,21 +25,14 @@ defmodule AgenticRealms.World.Schemas.PlayerState do
 
     belongs_to :current_room, AgenticRealms.World.Schemas.Room, type: :binary_id
 
-    # Feature 021 — what the player is called in the world. Replaces the account
-    # username everywhere another player can see it; the username stays a login
-    # credential. Nullable at the database because either projector clause may
-    # create the row, not because a character may go unnamed.
     field :character_name, :string
 
-    # Who the character is. Slugs into the SRD content catalog.
     field :species_slug, :string
     field :class_slug, :string
     field :background_slug, :string
     field :size, :string
-    # nil for the four species that offer no lineage.
     field :lineage_slug, :string
 
-    # Ability scores, as chosen at creation.
     field :str, :integer
     field :dex, :integer
     field :con, :integer
@@ -47,23 +40,15 @@ defmodule AgenticRealms.World.Schemas.PlayerState do
     field :wis, :integer
     field :cha, :integer
 
-    # Progression and vitals.
     field :level, :integer
     field :xp, :integer
     field :hp, :integer
     field :max_hp, :integer
 
-    # What the class, background, and species granted. Stored as strings; the
-    # derived layer takes atoms.
     field :skill_proficiencies, {:array, :string}, default: []
     field :save_proficiencies, {:array, :string}, default: []
-    # Recorded, not applied — feats have no mechanical effect this milestone.
     field :feat_slugs, {:array, :string}, default: []
 
-    # Feature 021 — the picks with no typed column of their own: tool
-    # proficiencies, weapon masteries, feature options. Keyed by the stable key
-    # `Srd.Character.choices/1` assigns, so a new kind of choice needs no
-    # migration. Recorded, not applied, for the same reason feats are.
     field :choices, :map, default: %{}
 
     timestamps(type: :utc_datetime)

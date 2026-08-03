@@ -2,7 +2,7 @@ defmodule AgenticRealms.World.Behaviors.Interpreter do
   @moduledoc """
   Commanded event handler that processes player-movement domain events
   (`PlayerMoved`) and fires `player_entered` behaviors in the destination
-  room (feature 009).
+  room.
 
   `player_left` is NOT fired from the event handler — it would arrive in
   GameLive's mailbox AFTER the destination room view has rendered, making
@@ -12,12 +12,12 @@ defmodule AgenticRealms.World.Behaviors.Interpreter do
   appended to the log.
 
   Configured with `start_from: :current` so historical events are NEVER
-  replayed through this handler (FR-016a). Configured with
+  replayed through this handler. Configured with
   `consistency: :strong` so the destination-room behaviors fire and
   broadcast before `Commands.move/2` returns.
 
-  Per FR-016, the handler produces only transient PubSub broadcasts — it
-  does NOT emit domain events.
+  The handler produces only transient PubSub broadcasts; it does not emit
+  domain events.
   """
 
   use Commanded.Event.Handler,
@@ -41,9 +41,6 @@ defmodule AgenticRealms.World.Behaviors.Interpreter do
         %PlayerMoved{player_id: pid, to_room_id: to},
         _meta
       ) do
-    # `player_left` is fired INLINE by GameLive.handle_move/3 — see this
-    # module's @moduledoc for ordering rationale. Only fire
-    # `player_entered` in the destination room from the event handler.
     fire_room_then_npcs(to, @player_entered, pid)
     :ok
   end
@@ -87,8 +84,6 @@ defmodule AgenticRealms.World.Behaviors.Interpreter do
       when is_integer(player_id) and is_binary(room_id) do
     inline_for_triggering_player(room_id, @player_left, player_id)
   end
-
-  # --- Core dispatch (broadcast path — used for player_entered) ---------
 
   defp fire_room_then_npcs(room_id, trigger_string, triggering_player_id) do
     case Queries.get_room_behaviors(room_id) do
@@ -142,11 +137,6 @@ defmodule AgenticRealms.World.Behaviors.Interpreter do
     end)
   end
 
-  # --- Inline dispatch (used for player_left) ----------------------------
-  # Returns the list of log-entry maps for the triggering player AND
-  # broadcasts to other players in the source room. Caller appends the
-  # returned entries to its socket assigns inline.
-
   defp inline_for_triggering_player(room_id, trigger_string, triggering_player_id) do
     room_entries =
       case Queries.get_room_behaviors(room_id) do
@@ -176,7 +166,6 @@ defmodule AgenticRealms.World.Behaviors.Interpreter do
         )
       end)
 
-    # FR-008a: room behaviors fire before NPC behaviors.
     room_entries ++ npc_entries
   end
 
@@ -202,9 +191,6 @@ defmodule AgenticRealms.World.Behaviors.Interpreter do
     end)
   end
 
-  # Build the triggering-player log-entry map AND broadcast the same
-  # utterance to other recipients (the bystander path). Returns the log-
-  # entry map(s) for the triggering player.
   defp entry_for_action(speaker_ctx, %{"type" => "say", "text" => text}, room_id, pid)
        when is_binary(text),
        do: do_entry_for_say(speaker_ctx, text, room_id, pid)
@@ -221,8 +207,6 @@ defmodule AgenticRealms.World.Behaviors.Interpreter do
   end
 
   defp do_entry_for_say({:room, _room_id}, text, room_id, pid) do
-    # :room_speech is triggering-player-only (FR-015) — no broadcast to
-    # other players in the room.
     _ = pid
     _ = room_id
     [%{kind: :room_speech, text: text}]
@@ -249,11 +233,6 @@ defmodule AgenticRealms.World.Behaviors.Interpreter do
 
     :ok
   end
-
-  # --- Shared helpers ----------------------------------------------------
-  # Match the trigger key whether the map has string keys (read from
-  # Postgres via Ecto's :map type) or atom keys (deserialized from an
-  # in-memory event by Commanded's Jason :atoms! decoder).
 
   defp matching_behaviors(behaviors, trigger_string) do
     Enum.filter(behaviors, fn b ->

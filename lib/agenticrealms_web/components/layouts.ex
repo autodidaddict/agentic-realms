@@ -18,7 +18,6 @@ defmodule AgenticRealmsWeb.Layouts do
       <Layouts.app flash={@flash} current_player={@current_player}>
         <h1>Content</h1>
       </Layouts.app>
-
   """
   attr :flash, :map, required: true, doc: "the map of flash messages"
 
@@ -34,8 +33,7 @@ defmodule AgenticRealmsWeb.Layouts do
 
   attr :is_wizard, :boolean,
     default: false,
-    doc:
-      "feature 014 FR-WIZ-3 — gates the Wizard/Player top-bar switch. Non-wizards never see the switch."
+    doc: "Gates the Wizard/Player top-bar switch. Non-wizards never see the switch."
 
   slot :inner_block, required: true
 
@@ -91,9 +89,8 @@ defmodule AgenticRealmsWeb.Layouts do
               }
             >
               <%!-- The account menu, so this is the owner reading their own
-                    login. Feature 021 moved the world to character names, and
-                    SC-012 forbids showing a username to any player *other than*
-                    its owner; this is the exception it names. --%>
+                    login. The world uses character names everywhere else; a
+                    username is only ever shown to its owner. --%>
               {@current_player.username}
               <.icon name="hero-chevron-down-mini" class="ar-nav-chevron" />
             </button>

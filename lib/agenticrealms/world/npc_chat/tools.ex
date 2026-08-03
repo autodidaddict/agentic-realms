@@ -1,19 +1,16 @@
 defmodule AgenticRealms.World.NPCChat.Tools do
   @moduledoc """
-  Tool definitions for the chat LLM call (feature 010).
+  Tool definitions for the chat LLM call.
 
   Two tools, `say` and `emote`. With `tool_choice: {type: "any"}` on the
   Anthropic request, the model MUST produce exactly one of them per turn
-  (FR-021). This shape eliminates structured-output ambiguity.
-
-  See `specs/010-npc-conversations/contracts/tools.md`.
+  This shape eliminates structured-output ambiguity.
   """
 
   @doc """
   The set of recognized tool names.
 
-  Feature 013 adds `accept_quest` as a third tool. `check_progress` and
-  `finalize_quest` are deferred to US2/US3 in the implementation plan.
+  Quests add `accept_quest`, `check_progress` and `finalize_quest`.
   """
   @spec names() :: MapSet.t(String.t())
   def names, do: MapSet.new(~w(say emote accept_quest check_progress finalize_quest))
@@ -68,10 +65,6 @@ defmodule AgenticRealms.World.NPCChat.Tools do
           "required" => ["text"]
         }
       },
-      # Feature 013 — quest acceptance. Only available when the player
-      # has expressed clear intent to take on a quest from your catalog
-      # (see the # Quests section of the system prompt). The slug must
-      # be one of the slugs listed in your offerable_quests.
       %{
         "name" => "accept_quest",
         "description" =>

@@ -59,16 +59,6 @@ defmodule AgenticRealmsWeb.GameLive.UIEvents do
 
   @pubsub AgenticRealms.PubSub
 
-  # ── Feature 019/020 — progression notices ─────────────────────
-  #
-  # Two events arrive in order: the xp gain (carries new_total) then, on
-  # level-up, the level notice.
-  #
-  # An xp-only change moves nothing but the bar, so it is patched from the
-  # broadcast payload with no database read. A *level* change moves the
-  # proficiency bonus, the hitpoint maximum, the hit dice, and every proficient
-  # save and skill — far more than the payload carries — so the whole sheet is
-  # re-derived from the read model. That is one indexed read on a rare event.
   def stats_changed(socket, %PlayerStatsChanged{} = msg) do
     socket =
       socket
@@ -99,9 +89,6 @@ defmodule AgenticRealmsWeb.GameLive.UIEvents do
     assign(socket, :stats, stats)
   end
 
-  # A level change re-derives from the read model, but the broadcast's own
-  # level and total win: progression is published by an `:eventual` handler, so
-  # the projector may not have written them yet when this lands.
   defp refresh_stats(socket, %PlayerStatsChanged{} = msg) do
     overrides =
       %{}
@@ -123,10 +110,6 @@ defmodule AgenticRealmsWeb.GameLive.UIEvents do
 
   defp level_notice(socket, level),
     do: append_log(socket, %{kind: :system, text: "You are now level #{level}!"})
-
-  # ────────────────────────────────────────────────────────────
-  # Room player arrival / departure
-  # ────────────────────────────────────────────────────────────
 
   def player_arrived(socket, %RoomPlayerArrived{actor_id: actor_id} = msg) do
     if actor_id == socket.assigns.current_player.id do
@@ -150,10 +133,6 @@ defmodule AgenticRealmsWeb.GameLive.UIEvents do
     end
   end
 
-  # ────────────────────────────────────────────────────────────
-  # Wizard trance witness (feature 014 FR-002 / FR-003 / FR-004)
-  # ────────────────────────────────────────────────────────────
-
   def trance_entered(socket, %RoomTranceEntered{wizard_id: wid, wizard_name: name}) do
     if wid == socket.assigns.current_player.id do
       {:noreply, socket}
@@ -171,17 +150,13 @@ defmodule AgenticRealmsWeb.GameLive.UIEvents do
     end
   end
 
-  # ────────────────────────────────────────────────────────────
-  # Room object events (feature 014)
-  # ────────────────────────────────────────────────────────────
-
   @doc """
-  Feature 014 US2 — wizard-driven object arrival witness. Uses the
+  Wizard-driven object arrival witness. Uses the
   (constrained, short) `name` with an article rather than the
   `short_description` so the entry is always a clean one-liner
   regardless of how verbose the LLM was when extracting fields.
   Also refreshes the wizard's `:room_objects` assign so the
-  Things-in-this-room panel reflects the new clone (feature 014 US4).
+  Things-in-this-room panel reflects the new clone.
   """
   def object_arrived(socket, %RoomObjectArrived{name: name}) do
     {:noreply,
@@ -191,7 +166,7 @@ defmodule AgenticRealmsWeb.GameLive.UIEvents do
   end
 
   @doc """
-  Feature 014 US5 — quiet in-place edit broadcast. No log entry by
+  Quiet in-place edit broadcast. No log entry by
   design (wizard edits don't generate an in-fiction notification).
   Just refresh the wizard's room-objects panel so the row reflects
   the new values.
@@ -228,15 +203,6 @@ defmodule AgenticRealmsWeb.GameLive.UIEvents do
     end
   end
 
-  # ────────────────────────────────────────────────────────────
-  # NPC arrival (feature 007 FR-011 / FR-012 / FR-014)
-  # ────────────────────────────────────────────────────────────
-  # No actor exclusion — NPCs have no acting player. Every subscriber
-  # of the room topic, including every concurrent session of every
-  # player in the room, receives the entry. The subsequent room view
-  # re-queries Queries.look_room/1 and reflects the new NPC in the
-  # "Also here" section.
-
   def npc_arrived(socket, %RoomNPCArrived{npc_name: name}) do
     {:noreply,
      socket
@@ -244,22 +210,12 @@ defmodule AgenticRealmsWeb.GameLive.UIEvents do
      |> refresh_room_objects()}
   end
 
-  # Feature 018 — an NPC leaving the room (mind-driven relocation or removal),
-  # mirroring npc_arrived. No actor exclusion — NPCs have no acting player.
   def npc_left(socket, %RoomNPCLeft{npc_name: name}) do
     {:noreply,
      socket
      |> append_log(%{kind: :system, text: "#{name} leaves."})
      |> refresh_room_objects()}
   end
-
-  # ────────────────────────────────────────────────────────────
-  # Behavior-sourced utterances (feature 009 / 011)
-  # ────────────────────────────────────────────────────────────
-  # The interpreter has already filtered recipients at broadcast time
-  # (`:room_speech` to triggering player only; `:npc_speech` to
-  # triggering player + other room occupants), so we accept every
-  # message that lands on our player-topic.
 
   def behavior_utterance(socket, %BehaviorUtterance{kind: :npc_speech} = msg) do
     {:noreply,
@@ -296,12 +252,6 @@ defmodule AgenticRealmsWeb.GameLive.UIEvents do
      })}
   end
 
-  # ────────────────────────────────────────────────────────────
-  # NPC chat reply (feature 010) — private to the chatting player
-  # ────────────────────────────────────────────────────────────
-  # The Conversation GenServer has already filtered by player_topic so
-  # we accept every message here unconditionally.
-
   def chat_utterance(socket, %ChatUtterance{} = msg) do
     {:noreply,
      append_log(socket, %{
@@ -320,10 +270,6 @@ defmodule AgenticRealmsWeb.GameLive.UIEvents do
      })}
   end
 
-  # ────────────────────────────────────────────────────────────
-  # Player-driven utterances (feature 004)
-  # ────────────────────────────────────────────────────────────
-
   @doc """
   Player-driven room utterances:
 
@@ -331,15 +277,14 @@ defmodule AgenticRealmsWeb.GameLive.UIEvents do
       originating LiveView appends its own actor-side confirmation
       inline and discards the broadcast it receives back. The
       speaker's OTHER sessions in the same room render the broadcast
-      as a witness entry (FR-006).
-    * `:emote` — NO actor exclusion (FR-008). Every room subscriber,
+      as a witness entry.
+    * `:emote` — NO actor exclusion. Every room subscriber,
       sender included, sees the third-person narration.
     * `:whisper` — every room subscriber receives the broadcast, but
-      only the resolved recipient renders it (FR-017). The sender's
+      only the resolved recipient renders it. The sender's
       own sessions also fall through this filter (their
       `current_player.id` is the `sender_id`, not `recipient_id`),
-      which gives us the FR-018 "originating session only" rule for
-      free.
+      which gives us the "originating session only" rule for free.
   """
   def room_utterance(socket, %RoomUtterance{kind: :say} = msg) do
     if msg.actor_session_id == socket.assigns.session_id do
@@ -364,7 +309,7 @@ defmodule AgenticRealmsWeb.GameLive.UIEvents do
 
   @doc """
   `:tell` — no filter needed; only the recipient's sessions subscribe
-  to the `player:<recipient_id>` topic (FR-011, FR-013). The sender's
+  to the `player:<recipient_id>` topic. The sender's
   other sessions are NOT subscribed and never receive this broadcast.
   """
   def private_utterance(socket, %PrivateUtterance{kind: :tell} = msg) do
@@ -372,31 +317,13 @@ defmodule AgenticRealmsWeb.GameLive.UIEvents do
      append_log(socket, %{kind: :private_tell_in, actor: msg.actor_name, text: msg.text})}
   end
 
-  # ────────────────────────────────────────────────────────────
-  # Wizard blueprint registry (feature 014 US6) — delegate to Wizard
-  # ────────────────────────────────────────────────────────────
-
   def blueprint_registry_changed(socket, %WizardBlueprintRegistryChanged{} = msg) do
     {:noreply, AgenticRealmsWeb.GameLive.Wizard.patch_blueprint_registry(socket, msg)}
   end
 
-  # ────────────────────────────────────────────────────────────
-  # Inventory mutations
-  # ────────────────────────────────────────────────────────────
-
   def inventory_changed(socket, %PlayerInventoryChanged{} = msg) do
-    # Mutate :inventory from the broadcast payload — re-querying would
-    # be subject to the same :strong handler-ordering race we hit for
-    # presence (Commanded doesn't order :strong handlers relative to
-    # each other, so the broadcaster can fire before WorldProjector
-    # commits the world_objects update). The payload carries
-    # everything list_inventory would return.
     {:noreply, apply_inventory_change(socket, msg)}
   end
-
-  # ────────────────────────────────────────────────────────────
-  # Quests (feature 013)
-  # ────────────────────────────────────────────────────────────
 
   def quest_finalized(socket, %PlayerQuestFinalized{} = msg) do
     active = Enum.reject(socket.assigns.quests, &(&1.quest_id == msg.quest_id))
@@ -455,10 +382,6 @@ defmodule AgenticRealmsWeb.GameLive.UIEvents do
     end
   end
 
-  # ────────────────────────────────────────────────────────────
-  # Phoenix.Presence diffs (login / logout)
-  # ────────────────────────────────────────────────────────────
-
   def presence_diff(socket, %Phoenix.Socket.Broadcast{event: "presence_diff", payload: payload}) do
     self_id = socket.assigns.current_player.id
     my_room = socket.assigns.current_room_id
@@ -476,10 +399,6 @@ defmodule AgenticRealmsWeb.GameLive.UIEvents do
 
     {:noreply, refresh_presence(socket)}
   end
-
-  # ────────────────────────────────────────────────────────────
-  # Cross-tab current-room sync
-  # ────────────────────────────────────────────────────────────
 
   @doc """
   Our own spawn or move — the originating tab has already updated its
@@ -525,13 +444,6 @@ defmodule AgenticRealmsWeb.GameLive.UIEvents do
     end
   end
 
-  # ────────────────────────────────────────────────────────────
-  # Text formatters
-  # ────────────────────────────────────────────────────────────
-  # nil from_direction is the first-spawn case; we discard it in the
-  # caller since Phoenix.Presence emits the "logged in" message. This
-  # clause is kept defensively in case of out-of-order events.
-
   defp arrival_text(%RoomPlayerArrived{actor_name: name, from_direction: nil}),
     do: "#{name} logged in."
 
@@ -553,12 +465,6 @@ defmodule AgenticRealmsWeb.GameLive.UIEvents do
   defp departure_text(%RoomPlayerLeft{actor_name: name, to_direction: dir}),
     do: "#{name} leaves to the #{Direction.to_string(dir)}."
 
-  # Feature 014 US2 — wizard-driven object arrival. Normalizes the
-  # name (strips any LLM-included article, lowercases) then prepends
-  # the correct indefinite article. Heuristic-only — fine for
-  # "A goblin" vs. "An iron lantern"; ignores edge cases like
-  # "an honor" or "a unicorn" which the LLM's constrained-noun-phrase
-  # outputs are vanishingly unlikely to hit.
   defp object_arrival_text(name) when is_binary(name) do
     cleaned =
       name
@@ -571,10 +477,6 @@ defmodule AgenticRealmsWeb.GameLive.UIEvents do
     article = if String.match?(cleaned, ~r/^[aeiou]/), do: "An", else: "A"
     "#{article} #{cleaned} appears."
   end
-
-  # ────────────────────────────────────────────────────────────
-  # Presence list mutators
-  # ────────────────────────────────────────────────────────────
 
   defp add_to_presence(socket, actor_id, name) do
     current = socket.assigns[:presence] || []
@@ -612,16 +514,9 @@ defmodule AgenticRealmsWeb.GameLive.UIEvents do
     end
   end
 
-  # Feature 021 — presence carries the character's name. The fallback reads it
-  # from the projection rather than the account, so a stale meta cannot leak a
-  # login.
   defp presence_name(%{metas: [%{name: n} | _]}, _player_id) when is_binary(n), do: n
 
   defp presence_name(_, player_id), do: PlayerNames.get(player_id) || "someone"
-
-  # ────────────────────────────────────────────────────────────
-  # Inventory list mutator
-  # ────────────────────────────────────────────────────────────
 
   defp apply_inventory_change(socket, %PlayerInventoryChanged{change: :added} = msg) do
     current = socket.assigns[:inventory] || []

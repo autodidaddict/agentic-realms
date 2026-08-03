@@ -38,13 +38,13 @@ defmodule AgenticRealmsWeb.GameLive.Helpers do
   end
 
   @doc """
-  Feature 012 — recompute the per-player MapView struct. Called every
+  Recompute the per-player MapView struct. Called every
   time the player's current room changes (own move, other-tab swap, or
   any future region/elevation transition). The MapView query is
   bounded by the configured viewport (default 11×11 cells) so this
   stays cheap.
 
-  FR-015 / SC-005: a region transition is just a current-room change
+  A region transition is just a current-room change
   whose destination has a different `region_id`. `MapView.for_player/1`
   reads the region from the destination room — no special-casing here.
   """
@@ -53,7 +53,7 @@ defmodule AgenticRealmsWeb.GameLive.Helpers do
   end
 
   @doc """
-  Feature 014 US4 / feature 015 US6 — wizards see Things-in-this-room and
+  Wizards see Things-in-this-room and
   NPCs-in-this-room panels, each with an Extract essence button. Re-query the
   read model on any event that mutates the current room's object / NPC set.
   """
@@ -81,7 +81,7 @@ defmodule AgenticRealmsWeb.GameLive.Helpers do
   end
 
   @doc """
-  Feature 014 US4/US5 — wizard authoring assigns that refer to a
+  Wizard authoring assigns that refer to a
   specific world Object (Extract source / Edit target) are scoped to
   the room the wizard was in when they focused. Walking into a new
   room invalidates them — the security boundary in

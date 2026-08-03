@@ -1,6 +1,6 @@
 defmodule AgenticRealms.World.EntityLifespan do
   @moduledoc """
-  Feature 018 — aggregate lifespan for the `Entity` aggregate. Evicts the
+  Aggregate lifespan for the `Entity` aggregate. Evicts the
   aggregate process (`:stop`) as soon as the entity is removed (`EntityRemoved`),
   freeing the in-memory GenServer for an entity that no longer exists. All other
   events keep the aggregate resident (`:infinity`), preserving prior behavior for

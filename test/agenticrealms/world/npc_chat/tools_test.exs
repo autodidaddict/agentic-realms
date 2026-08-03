@@ -1,8 +1,6 @@
 defmodule AgenticRealms.World.NPCChat.ToolsTest do
   @moduledoc """
-  Unit tests for the chat tool definitions (feature 010).
-
-  See `specs/010-npc-conversations/contracts/tools.md`.
+  Unit tests for the chat tool definitions.
   """
 
   use ExUnit.Case, async: true
@@ -10,7 +8,7 @@ defmodule AgenticRealms.World.NPCChat.ToolsTest do
   alias AgenticRealms.World.NPCChat.Tools
 
   describe "list/0" do
-    test "returns exactly five tools (feature 013 adds accept_quest, check_progress, finalize_quest)" do
+    test "returns exactly five tools (accept_quest, check_progress, finalize_quest)" do
       assert length(Tools.list()) == 5
     end
 

@@ -36,10 +36,6 @@ defmodule AgenticRealmsWeb.GameLive.PlayerCommands do
 
   @pubsub AgenticRealms.PubSub
 
-  # ────────────────────────────────────────────────────────────
-  # Natural-language fallback (feature 005)
-  # ────────────────────────────────────────────────────────────
-
   @doc """
   Input the fast parser couldn't resolve. Spawn a supervised async
   task to resolve it via the LLM; lock the input and stash the task
@@ -87,10 +83,6 @@ defmodule AgenticRealmsWeb.GameLive.PlayerCommands do
       {:chat, npc_token, message} -> Communication.chat(socket, raw, npc_token, message)
     end
   end
-
-  # ────────────────────────────────────────────────────────────
-  # Command verbs
-  # ────────────────────────────────────────────────────────────
 
   def inventory(socket, raw) do
     player_id = socket.assigns.current_player.id
@@ -201,11 +193,6 @@ defmodule AgenticRealmsWeb.GameLive.PlayerCommands do
 
     case Commands.move(player_id, dir) do
       {:ok, to_room_id} ->
-        # Feature 009 — fire `player_left` behaviors INLINE before
-        # rendering the destination room view. Otherwise the farewell
-        # entries would arrive in the mailbox after move returns and
-        # appear visually AFTER the new room, making it feel like the
-        # NPC followed the player.
         departure_entries =
           AgenticRealms.World.Behaviors.Interpreter.fire_departure_inline(
             player_id,
@@ -262,10 +249,6 @@ defmodule AgenticRealmsWeb.GameLive.PlayerCommands do
         unknown(socket, raw)
 
       {:ok, %{object_name: object_name}} ->
-        # Actor's own confirmation + locally refresh inventory snapshot
-        # (PlayerInventoryChanged broadcast also targets us, but it'd
-        # race the assign here on the originating tab — we just set
-        # inventory directly).
         inventory = Queries.list_inventory(player_id)
 
         {:noreply,

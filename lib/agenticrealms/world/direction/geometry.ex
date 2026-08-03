@@ -4,8 +4,6 @@ defmodule AgenticRealms.World.Direction.Geometry do
   no aggregate references. Operates on direction atoms and Room-shaped maps
   (anything with `:map_x`, `:map_y`, `:elevation` keys).
 
-  Feature 012 — Maps. See `specs/012-maps/contracts/direction.md`.
-
   ## Coordinate convention
 
   Screen coordinates: `y` increases DOWNWARD, so a "north" exit has
@@ -20,8 +18,8 @@ defmodule AgenticRealms.World.Direction.Geometry do
   The unit-step delta for a direction.
 
   Planar directions return `{:planar, {dx_sign, dy_sign}}` — the signs of
-  the coordinate deltas (NOT the magnitudes, since FR-024 allows variable
-  distance along the direction axis).
+  the coordinate deltas, not the magnitudes: distance along the direction
+  axis is free.
 
   Vertical directions return `{:vertical, dz_sign}` — `+1` for `:up`,
   `-1` for `:down`.
@@ -42,7 +40,7 @@ defmodule AgenticRealms.World.Direction.Geometry do
 
   @doc """
   Check whether an exit's direction is geometrically consistent with the
-  source and target rooms' coordinates and elevation, per FR-024.
+  source and target rooms' coordinates and elevation.
 
   Returns `:ok` on consistency, `{:error, reason}` on violation. If EITHER
   room has unset coordinates (`map_x: nil` or `map_y: nil`), the check is
@@ -140,23 +138,17 @@ defmodule AgenticRealms.World.Direction.Geometry do
   def planar?(d) when d in @planar_directions, do: true
   def planar?(_), do: false
 
-  # ------------------------------------------------------------------
-  # Private helpers
-  # ------------------------------------------------------------------
-
   defp on_ray?(s, t, dx_sign, dy_sign) do
     dx = t.map_x - s.map_x
     dy = t.map_y - s.map_y
 
     cond do
-      # Pure-cardinal: one axis is zero, the other has the matching sign.
       dx_sign == 0 ->
         dx == 0 and dy != 0 and sign(dy) == dy_sign
 
       dy_sign == 0 ->
         dy == 0 and dx != 0 and sign(dx) == dx_sign
 
-      # Diagonal: |dx| == |dy|, both non-zero, both signs match.
       true ->
         dx != 0 and abs(dx) == abs(dy) and sign(dx) == dx_sign and sign(dy) == dy_sign
     end

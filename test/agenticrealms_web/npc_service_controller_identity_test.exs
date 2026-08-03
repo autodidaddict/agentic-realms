@@ -1,5 +1,5 @@
 defmodule AgenticRealmsWeb.NpcServiceControllerIdentityTest do
-  @moduledoc "Feature 018 — GET /api/npc/:id/identity."
+  @moduledoc "GET /api/npc/:id/identity."
   use AgenticRealmsWeb.ConnCase, async: true
 
   alias AgenticRealms.Repo

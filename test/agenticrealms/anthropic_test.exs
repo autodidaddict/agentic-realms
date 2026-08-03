@@ -69,7 +69,6 @@ defmodule AgenticRealms.AnthropicTest do
 
   test "maps a non-JSON 200 body to {:error, :malformed_response}" do
     Req.Test.stub(@stub, fn conn ->
-      # Plain-text body — Req won't decode it to a map.
       Plug.Conn.send_resp(conn, 200, "this is not json")
     end)
 

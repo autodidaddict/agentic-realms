@@ -3,15 +3,13 @@ defmodule AgenticRealms.World.Room do
   Room aggregate. Owns a room's display info (name + description), its exit
   set, and map metadata.
 
-  **Feature 016 note**: object presence (`object_ids`) and the object
+  Object presence (`object_ids`) and the object
   spawn / place / take / drop / edit command+event handling were removed
   from this aggregate when the entity lifecycle moved to `World.Entity`
   (clone/move). Objects are now freestanding entities whose container is a
   property of the entity, not of the room. Occupancy and object location
   both live in read models, not on this aggregate.
 
-  See `specs/003-persisted-world/data-model.md` §1.1 and
-  `specs/016-entity-containment/data-model.md`.
   """
 
   defstruct id: nil,
@@ -19,7 +17,6 @@ defmodule AgenticRealms.World.Room do
             description: nil,
             exits: %{},
             behaviors: [],
-            # Feature 012 — Maps
             region_id: nil,
             map_visible: true,
             elevation: 0,
@@ -28,8 +25,6 @@ defmodule AgenticRealms.World.Room do
 
   alias AgenticRealms.World.Commands.{CreateRoom, AddExit}
   alias AgenticRealms.World.Events.{RoomCreated, ExitAdded}
-
-  # --- CreateRoom ---------------------------------------------------------
 
   @spec execute(%__MODULE__{}, %CreateRoom{} | %AddExit{}) ::
           %RoomCreated{} | %ExitAdded{} | :ok | {:error, atom()}
@@ -59,8 +54,6 @@ defmodule AgenticRealms.World.Room do
 
   def execute(%__MODULE__{}, %CreateRoom{}), do: {:error, :room_already_exists}
 
-  # --- AddExit ------------------------------------------------------------
-
   def execute(%__MODULE__{id: nil}, %AddExit{}), do: {:error, :room_not_found}
 
   def execute(%__MODULE__{id: id, exits: exits}, %AddExit{
@@ -75,8 +68,6 @@ defmodule AgenticRealms.World.Room do
       %ExitAdded{room_id: id, direction: direction, target_room_id: target}
     end
   end
-
-  # --- apply/2 ------------------------------------------------------------
 
   @spec apply(%__MODULE__{}, %RoomCreated{} | %ExitAdded{}) :: %__MODULE__{}
   def apply(
@@ -110,9 +101,6 @@ defmodule AgenticRealms.World.Room do
   end
 end
 
-# Snapshot serialization for the Room aggregate (issue #6). `exits` keys are
-# string directions; the Jason :atoms key strategy atomizes them on decode,
-# so we re-stringify to keep `Map.has_key?(exits, "north")` working.
 defimpl Jason.Encoder, for: AgenticRealms.World.Room do
   def encode(%AgenticRealms.World.Room{} = room, opts) do
     room

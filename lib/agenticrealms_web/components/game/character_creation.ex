@@ -1,6 +1,6 @@
 defmodule AgenticRealmsWeb.GameComponents.CharacterCreation do
   @moduledoc """
-  Feature 021 — the character creation dialog.
+  The character creation dialog.
 
   Shown once, before a player has ever entered the world, and there is no way
   out of it except creating a character or leaving the page: the shared modal
@@ -34,8 +34,6 @@ defmodule AgenticRealmsWeb.GameComponents.CharacterCreation do
   alias Srd.Rules.PointBuy
   alias Srd.Rules.Skill
 
-  # The steps that have shipped, in order. Adding one here is what makes a later
-  # user story visible; the strip, the gating, and the footer all read this.
   @shipped [:identity, :abilities, :skills, :specializations, :review]
 
   attr :draft, :map, required: true
@@ -109,8 +107,6 @@ defmodule AgenticRealmsWeb.GameComponents.CharacterCreation do
     </ul>
     """
   end
-
-  # --- Identity -------------------------------------------------------------
 
   attr :draft, :map, required: true
 
@@ -192,8 +188,6 @@ defmodule AgenticRealmsWeb.GameComponents.CharacterCreation do
     </p>
     """
   end
-
-  # --- Abilities ------------------------------------------------------------
 
   attr :draft, :map, required: true
 
@@ -292,9 +286,6 @@ defmodule AgenticRealmsWeb.GameComponents.CharacterCreation do
   defp background_increase_note(_draft, offered),
     do: "Your background raises #{abilities(offered)}. Take +2 and +1, or +1 to all three."
 
-  # Every legal spread as a flat list of buttons: the three-way even split, then
-  # each ordered pair for the +2/+1 form. Six options at most, which is fewer
-  # than a two-step picker would cost the player.
   defp spread_options([]), do: []
 
   defp spread_options(offered) do
@@ -311,8 +302,6 @@ defmodule AgenticRealmsWeb.GameComponents.CharacterCreation do
   defp spread_param(%{spread: nil}), do: nil
   defp spread_param(%{spread: {:even, _}}), do: "even"
   defp spread_param(%{spread: {:split, larger, smaller}}), do: "split:#{larger}:#{smaller}"
-
-  # --- Skills ---------------------------------------------------------------
 
   attr :draft, :map, required: true
 
@@ -366,8 +355,6 @@ defmodule AgenticRealmsWeb.GameComponents.CharacterCreation do
     """
   end
 
-  # The modifier as it stands, so the difference a pick makes is visible before
-  # it is made. `nil` until the ability scores exist.
   defp modifier_label(draft, skill, proficient?) do
     case Draft.skill_modifier(draft, skill, proficient?: proficient?) do
       nil -> ""
@@ -392,14 +379,6 @@ defmodule AgenticRealmsWeb.GameComponents.CharacterCreation do
 
   defp pluralize(word, 1), do: word
   defp pluralize(word, _), do: word <> "s"
-
-  # --- Specializations ------------------------------------------------------
-  #
-  # One renderer for every choice the content carries. Nothing below names a
-  # fighting style, a lineage, or a Divine Order: the list comes from
-  # `Srd.Character.choices/1` and each entry renders from its `kind`. A choice
-  # the SRD content gains tomorrow appears here with no change to this file,
-  # which is FR-009 on the presentation side.
 
   attr :draft, :map, required: true
 
@@ -445,9 +424,6 @@ defmodule AgenticRealmsWeb.GameComponents.CharacterCreation do
   attr :choice, :map, required: true
   attr :grants, :map, required: true
 
-  # A feat or skill the character already has is shown, not offered. Spending a
-  # pick on it would silently buy nothing, and saying so is the spec's
-  # duplicate-feat edge case.
   defp held_options(assigns) do
     assigns = assign(assigns, :already, already_granted(assigns.choice, assigns.grants))
 
@@ -476,7 +452,6 @@ defmodule AgenticRealmsWeb.GameComponents.CharacterCreation do
   defp nothing_to_choose(_draft),
     do: "Your species and class ask nothing more of you at this level."
 
-  # The options that are still worth offering, and the ones already held.
   defp offerable(choice, grants) do
     granted = granted_values(choice, grants)
 
@@ -500,8 +475,6 @@ defmodule AgenticRealmsWeb.GameComponents.CharacterCreation do
 
   defp granted_values(_choice, _grants), do: []
 
-  # How one option of a given kind is shown. The only place in the dialog that
-  # knows the shape of a lineage differs from the shape of a weapon.
   defp option_view(:lineage, lineage) do
     %{
       value: lineage.slug,
@@ -539,18 +512,12 @@ defmodule AgenticRealmsWeb.GameComponents.CharacterCreation do
     %{value: to_string(skill), name: Skill.name(skill), detail: ability_abbrev(skill)}
   end
 
-  # Feature options are plain strings the content already made readable, and a
-  # kind this component has not met renders by its own name rather than
-  # crashing — a new kind is a styling gap, not an outage.
   defp option_view(_kind, option) when is_binary(option),
     do: %{value: option, name: option, detail: nil}
 
   defp option_view(_kind, option),
     do: %{value: to_string(option), name: to_string(option), detail: nil}
 
-  # Every weapon in the current content carries a mastery and every feat a
-  # feature, but neither is guaranteed by the struct, so both read defensively
-  # rather than matching a shape the data happens to have today.
   defp mastery_label(weapon) do
     case Map.get(weapon, :mastery) do
       nil -> nil
@@ -567,13 +534,6 @@ defmodule AgenticRealmsWeb.GameComponents.CharacterCreation do
 
   defp blank_to_nil(""), do: nil
   defp blank_to_nil(value), do: value
-
-  # --- Review ---------------------------------------------------------------
-  #
-  # The character as it will exist, rendered through the character sheet's own
-  # panels. Both this and the sheet go through `Stats.sheet/3`, so "the
-  # reviewed character and the created character are identical" (FR-029) holds
-  # by construction rather than by two renderings agreeing.
 
   attr :draft, :map, required: true
 
@@ -636,9 +596,6 @@ defmodule AgenticRealmsWeb.GameComponents.CharacterCreation do
     """
   end
 
-  # Every decision the player made, labelled by the choice that asked for it.
-  # Reads the same open-choice list the specializations step renders, so a new
-  # kind of choice shows up here too with no change.
   defp review_picks(draft) do
     for open <- Draft.open_choices(draft),
         open.key != :class_skills,
@@ -648,8 +605,6 @@ defmodule AgenticRealmsWeb.GameComponents.CharacterCreation do
     end
   end
 
-  # The draft stores what was picked, not the option it came from, so the
-  # display name is looked back up against the choice's own list.
   defp pick_name(choice, pick) do
     value = to_string(pick)
 
@@ -718,13 +673,6 @@ defmodule AgenticRealmsWeb.GameComponents.CharacterCreation do
     """
   end
 
-  # The first shipped step that is not finished. Steps that have not shipped are
-  # completed for the player by generation, so they never block.
-  #
-  # The validator is not consulted here. It runs on the *completed* draft and
-  # can only fail on something the player entered, which the step checks
-  # already cover; asking it would mean completing the draft on every render to
-  # answer a question the steps have answered.
   defp blocked_by(draft, steps), do: Enum.find(steps, &(not Draft.complete?(draft, &1)))
 
   defp missing_note(:identity), do: "Give your character a name, a species, a class, and a past."
@@ -732,12 +680,6 @@ defmodule AgenticRealmsWeb.GameComponents.CharacterCreation do
   defp missing_note(:skills), do: "Choose your skills."
   defp missing_note(:specializations), do: "A few choices remain."
   defp missing_note(:review), do: "Review your character."
-
-  # --- content helpers ------------------------------------------------------
-  #
-  # These read from the content library and format. None of them holds a list of
-  # anything, which is what keeps a new species or class from needing a change
-  # here.
 
   defp hit_die(%Srd.Dice.Expr{count: count, sides: sides}), do: "#{count}d#{sides}"
 
@@ -761,7 +703,6 @@ defmodule AgenticRealmsWeb.GameComponents.CharacterCreation do
     end
   end
 
-  # FR-007 — a choice the SRD defers is named, not offered.
   defp deferred_note(class_slug) do
     class = Classes.get(class_slug)
     "You will choose your #{class.name} subclass at level #{class.subclass_level}."

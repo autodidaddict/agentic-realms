@@ -1,5 +1,5 @@
 defmodule AgenticRealmsWeb.NpcServiceControllerMoveTest do
-  @moduledoc "Feature 018 — POST /api/npc/:id/move (compare-and-swap, witnessed)."
+  @moduledoc "POST /api/npc/:id/move (compare-and-swap, witnessed)."
   use AgenticRealmsWeb.ConnCase, async: false
 
   @moduletag :commanded
@@ -67,8 +67,6 @@ defmodule AgenticRealmsWeb.NpcServiceControllerMoveTest do
     room_a: a,
     room_c: c
   } do
-    # Relocate the NPC out of A (to C) by another means, so a move that still
-    # expects it in A is stale.
     :ok = Commands.move_entity(npc, ContainerRef.room(a), ContainerRef.room(c), :relocated)
     assert Repo.get(NPCClone, npc).room_id == c
 
@@ -76,7 +74,6 @@ defmodule AgenticRealmsWeb.NpcServiceControllerMoveTest do
       conn |> auth() |> post(~p"/api/npc/#{npc}/move", %{direction: "north", expected_room_id: a})
 
     assert %{"result" => "conflict"} = json_response(conn, 409)
-    # No incorrect relocation — still in C.
     assert Repo.get(NPCClone, npc).room_id == c
   end
 

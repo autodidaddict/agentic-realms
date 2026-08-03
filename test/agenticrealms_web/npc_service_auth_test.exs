@@ -1,5 +1,5 @@
 defmodule AgenticRealmsWeb.NpcServiceAuthTest do
-  @moduledoc "Feature 018 — shared-secret auth across all contract routes + rotation."
+  @moduledoc "Shared-secret auth across all contract routes + rotation."
   use AgenticRealmsWeb.ConnCase, async: false
 
   alias AgenticRealms.Repo

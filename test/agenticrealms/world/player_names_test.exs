@@ -1,6 +1,6 @@
 defmodule AgenticRealms.World.PlayerNamesTest do
   @moduledoc """
-  Feature 021 — the one place the world asks what a player is called.
+  The one place the world asks what a player is called.
 
   Reads `player_state.character_name`, never `accounts.players.username`. A
   `nil` means "no character yet", which is what GameLive's mount branches on.
@@ -21,8 +21,6 @@ defmodule AgenticRealms.World.PlayerNamesTest do
     player.id
   end
 
-  # A projected row for a real account. `player_state.player_id` carries a
-  # foreign key, so the account has to exist first.
   defp player_row(name) do
     id = register_player()
 

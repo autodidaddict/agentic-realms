@@ -1,8 +1,8 @@
 defmodule AgenticRealms.World.Commands.SpawnNpcComposeTest do
   @moduledoc """
-  Feature 015 US4 — behavior_group composition is frozen onto the spawned clone:
-  effective behaviors = union(behavior_groups, attachment order) ++ direct (FR-016),
-  and editing a behavior_group after spawn does NOT mutate an existing clone (FR-017).
+  Behavior_group composition is frozen onto the spawned clone:
+  effective behaviors = union(behavior_groups, attachment order) ++ direct,
+  and editing a behavior_group after spawn does NOT mutate an existing clone.
   """
 
   use AgenticRealms.DataCase, async: false
@@ -94,24 +94,21 @@ defmodule AgenticRealms.World.Commands.SpawnNpcComposeTest do
     slug
   end
 
-  test "effective behaviors = union(behavior_groups, order) ++ direct, nothing dropped (FR-016)",
+  test "effective behaviors = union(behavior_groups, order) ++ direct, nothing dropped",
        ctx do
     slug = author_and_spawn(ctx)
     clone = Repo.get_by(NPCClone, blueprint_id: slug)
 
-    # Two player_entered behaviors from different sources are BOTH retained,
-    # in attachment order, followed by the direct player_left behavior.
     assert clone.behaviors == [@orc_emote, @shop_say, @direct_bye]
     assert clone.behavior_groups == [ctx.orc, ctx.shop]
     assert clone.direct_behaviors == [@direct_bye]
   end
 
-  test "editing a behavior_group after spawn leaves the frozen clone unchanged (FR-017)",
+  test "editing a behavior_group after spawn leaves the frozen clone unchanged",
        %{orc: orc} = ctx do
     slug = author_and_spawn(ctx)
     before = Repo.get_by(NPCClone, blueprint_id: slug)
 
-    # Mutate the orc behavior_group's behaviors at the registry level.
     {1, _} =
       Repo.update_all(
         from(t in BehaviorGroup, where: t.name == ^orc),

@@ -1,12 +1,12 @@
 defmodule AgenticRealms.World.Commands.ConcurrentTakeTest do
   @moduledoc """
-  Feature 016 T031a / analysis finding H2 — the concurrent-"already taken"
+  The concurrent-"already taken"
   regression test that replaces the old `Room`-aggregate `object_ids` guard.
 
   Two players resolve the same object in the room; the first take wins, and
   the second taker — acting on its already-resolved (now stale) view of the
   object being in the room — is refused with `:container_conflict`. The
-  object stays with the first taker and is never stolen (FR-005).
+  object stays with the first taker and is never stolen.
   """
 
   use AgenticRealms.DataCase, async: false
@@ -53,16 +53,11 @@ defmodule AgenticRealms.World.Commands.ConcurrentTakeTest do
 
   test "second concurrent taker is refused and the object is not stolen",
        %{room: room, object_id: oid, name: name, alice: a, bob: b} do
-    # Both takers see the object in the room. Alice's take wins.
     assert {:ok, %{object_id: ^oid}} = Commands.take(a.id, name)
 
-    # Bob, acting on his already-resolved view (the object WAS in the room),
-    # dispatches the move with expected_from = room. The entity aggregate
-    # refuses because the object is now in Alice's inventory.
     assert {:error, :container_conflict} =
              Commands.move_entity(oid, ContainerRef.room(room), ContainerRef.player(b.id), :taken)
 
-    # The object is in Alice's inventory, never relocated to Bob.
     obj = Repo.get(Object, oid)
     assert obj.container_type == "player"
     assert obj.container_id == Integer.to_string(a.id)
@@ -73,8 +68,6 @@ defmodule AgenticRealms.World.Commands.ConcurrentTakeTest do
        %{object_id: oid, name: name, alice: a, bob: b} do
     assert {:ok, %{object_id: ^oid}} = Commands.take(a.id, name)
 
-    # Bob's wrapper re-resolves at dispatch time and simply doesn't find the
-    # object in the room anymore (it's in Alice's inventory).
     assert {:error, :no_such_object} = Commands.take(b.id, name)
 
     assert Repo.get(Object, oid).container_id == Integer.to_string(a.id)

@@ -1,6 +1,6 @@
 defmodule AgenticRealms.World.Transient.PurgeIntegrationTest do
   @moduledoc """
-  Feature 017 US3 — end-to-end teardown: provision a region, then exercise the
+  End-to-end teardown: provision a region, then exercise the
   reaper through logoff/grace/online cases. Asserts full purge, owner
   relocation, and that an empty region with an online owner survives.
   """
@@ -47,22 +47,17 @@ defmodule AgenticRealms.World.Transient.PurgeIntegrationTest do
     tregion: tregion,
     origin: origin
   } do
-    # Owner is inside the region (in the origin room) and has been offline well
-    # past the grace.
     assert {:ok, ^origin} = Queries.current_room_of(owner.id)
     set_offline_since(tregion, minutes_ago(10))
 
     Manager.sweep_now()
 
-    # Region + rooms + exits all gone.
     assert Repo.get(Region, tregion) == nil
     assert Repo.all(from(r in Room, where: r.region_id == ^tregion)) == []
     assert Repo.all(from(e in Exit, where: e.direction == "rift")) == []
 
-    # Owner relocated back to the source room (no one stranded).
     assert {:ok, ^source} = Queries.current_room_of(owner.id)
 
-    # Event streams hard-deleted.
     streams = EventStoreStub.deleted_streams()
     assert ("region-" <> tregion) in streams
     assert ("room-" <> origin) in streams
@@ -73,7 +68,6 @@ defmodule AgenticRealms.World.Transient.PurgeIntegrationTest do
     source: source,
     tregion: tregion
   } do
-    # Owner leaves the region (back out through the rift) but stays logged in.
     assert {:ok, ^source} = Commands.move(owner.id, :rift)
     {:ok, _} = Presence.track_player(self(), owner.id, "owner")
 
@@ -87,11 +81,9 @@ defmodule AgenticRealms.World.Transient.PurgeIntegrationTest do
     owner: owner,
     tregion: tregion
   } do
-    # Fresh logoff: first sweep stamps offline-since but stays within grace.
     refute tregion in Manager.sweep_now()
     assert Repo.get(Region, tregion).owner_offline_since != nil
 
-    # Reconnect before the grace elapses → next sweep clears the stamp.
     {:ok, _} = Presence.track_player(self(), owner.id, "owner")
     Manager.sweep_now()
 

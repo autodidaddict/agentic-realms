@@ -52,7 +52,7 @@ defmodule AgenticRealms.DataCase do
 
   Tests that build Room rows directly via `Repo.insert!(%Room{...})`
   should pass `region_id: AgenticRealms.DataCase.insert_test_region()`
-  to satisfy the NOT NULL FK introduced in feature 012.
+  to satisfy the NOT NULL FK.
   """
   def insert_test_region(name_prefix \\ "TestRegion") do
     alias AgenticRealms.Repo
@@ -71,7 +71,7 @@ defmodule AgenticRealms.DataCase do
   The character columns a `player_state` row carries once `CharacterCreated`
   has been projected, as a keyword list.
 
-  Feature 020 removed the schema's placeholder stat defaults, so a row built
+  The schema has no placeholder stat defaults, so a row built
   straight from `%PlayerState{}` has no character and renders nothing. Tests
   that only need *a* character — examine, presence, the sheet — should splat
   this into their insert rather than restating the default Human Fighter:
@@ -111,7 +111,7 @@ defmodule AgenticRealms.DataCase do
   end
 
   @doc """
-  Give a player a character through the real creation path (feature 021).
+  Give a player a character through the real creation path.
 
   Needed by any test that mounts `/play`: a player with no character now gets
   the creation dialog rather than the world, which is the point of the feature.
@@ -133,8 +133,6 @@ defmodule AgenticRealms.DataCase do
       |> Draft.put_selection(:background, Keyword.get(opts, :background, "soldier"))
 
     case AgenticRealms.World.PlayerNames.get(player_id) do
-      # Idempotent: a fixture that runs twice for one player returns the name
-      # they already have rather than colliding with it.
       existing when is_binary(existing) ->
         existing
 
@@ -196,7 +194,6 @@ defmodule AgenticRealms.DataCase do
 
     :ok
   catch
-    # Not running, or too busy to answer. Neither is worth failing a teardown.
     :exit, _ -> :ok
   end
 
@@ -231,7 +228,6 @@ defmodule AgenticRealms.DataCase do
     :exit, _ -> :ok
   end
 
-  # Task supervisors whose tasks read the Repo. Add any new one here.
   @background_task_supervisors [
     AgenticRealms.World.NPCChat.TaskSupervisor,
     AgenticRealms.IntentResolverTaskSupervisor
@@ -275,15 +271,12 @@ defmodule AgenticRealms.DataCase do
       pids ->
         Enum.each(pids, &await_exit(&1, deadline))
 
-        # Finishing one task can start another, so re-check until the
-        # supervisor is quiet or the deadline passes.
         if System.monotonic_time(:millisecond) < deadline do
           await_supervisor(supervisor, deadline)
         end
     end
   end
 
-  # Not every test starts the supervision tree these live under.
   defp children(supervisor) do
     if Process.whereis(supervisor), do: Task.Supervisor.children(supervisor), else: []
   catch
@@ -320,27 +313,12 @@ defmodule AgenticRealms.DataCase do
     ExUnit.Callbacks.start_supervised!(AgenticRealms.World.Application)
     ExUnit.Callbacks.start_supervised!(AgenticRealms.World.Projections.WorldProjector)
     ExUnit.Callbacks.start_supervised!(AgenticRealms.World.Projections.PlayerStateProjector)
-    # Feature 013 — Quests. Handles the four finalize-side events. Must
-    # be supervised in tests too, otherwise QuestCompleted never lands.
     ExUnit.Callbacks.start_supervised!(AgenticRealms.World.Projections.QuestProjector)
-    # Feature 019 — Real Stats. Awards quest xp; required for any test whose
-    # quest completion should grant experience / level a player up.
     ExUnit.Callbacks.start_supervised!(AgenticRealms.World.Progression.XpAwarder)
-    # Feature 015 — unified Blueprint projector. Required by any test that
-    # dispatches `CreateBlueprint`/`EditBlueprint`, because the wrapper uses
-    # `:strong` consistency and waits for this projector to acknowledge.
     ExUnit.Callbacks.start_supervised!(AgenticRealms.World.Projections.BlueprintProjector)
-    # Feature 016 — entity lifecycle projector (world_objects writes).
     ExUnit.Callbacks.start_supervised!(AgenticRealms.World.Projections.EntityProjector)
     ExUnit.Callbacks.start_supervised!(AgenticRealms.World.UIEventBroadcaster)
     ExUnit.Callbacks.start_supervised!(AgenticRealms.World.Behaviors.Interpreter)
-    # Feature 017 — transient-region reaper. Idle for non-transient tests (its
-    # periodic sweep fires only after the production interval); transient tests
-    # drive it synchronously via `Transient.Manager.sweep_now/0`.
-    #
-    # The registry supplies the manager's cluster-wide name. In production Horde
-    # also places it (one per cluster); a test runs a single node, so supervising
-    # it directly here is enough and keeps the harness flat.
     ExUnit.Callbacks.start_supervised!(AgenticRealms.World.Transient.Registry)
     ExUnit.Callbacks.start_supervised!(AgenticRealms.World.Transient.Manager)
     :ok
@@ -352,7 +330,6 @@ defmodule AgenticRealms.DataCase do
       assert {:error, changeset} = Accounts.create_user(%{password: "short"})
       assert "password is too short" in errors_on(changeset).password
       assert %{password: ["password is too short"]} = errors_on(changeset)
-
   """
   def errors_on(changeset) do
     Ecto.Changeset.traverse_errors(changeset, fn {message, opts} ->

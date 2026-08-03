@@ -1,6 +1,6 @@
 defmodule AgenticRealms.NpcMinds.LifecycleManager do
   @moduledoc """
-  Feature 018 — the NPC-mind lifecycle "process manager". A named
+  The NPC-mind lifecycle "process manager". A named
   `Commanded.Event.Handler` (⇒ a single exclusive cluster-wide subscriber, so
   exactly one node reacts to each event) that starts a Temporal workflow when an
   NPC is spawned and terminates it when the NPC is removed:
@@ -35,7 +35,6 @@ defmodule AgenticRealms.NpcMinds.LifecycleManager do
     :ok
   end
 
-  # `kind` is `:npc` in-process (freshly emitted) or `"npc"` after replay.
   defp npc?(:npc), do: true
   defp npc?("npc"), do: true
   defp npc?(_), do: false

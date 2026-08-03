@@ -1,6 +1,6 @@
 defmodule AgenticRealms.World.Blueprint.Slug do
   @moduledoc """
-  Blueprint slug helpers (FR-004). One namespace across both kinds.
+  Blueprint slug helpers. One namespace across both kinds.
 
   - `derive/1` produces the candidate slug a wizard sees pre-populated in
     the form when authoring a new blueprint: lowercase, non-alphanumeric

@@ -103,7 +103,7 @@ defmodule AgenticRealms.World.IntentResolver.WizardWorldToolsTest do
       assert {:error, _} = IntentResolver.parse_wizard_world_response(response)
     end
 
-    test "extracts a freeform NPC draft (incl. lore) from manifest_npc_freeform (US5)" do
+    test "extracts a freeform NPC draft (incl. lore) from manifest_npc_freeform" do
       response = %{
         "content" => [
           %{

@@ -1,6 +1,6 @@
 defmodule AgenticRealms.World.Commands.EditBlueprint do
   @moduledoc """
-  Feature 015 — edit an existing Blueprint (object or npc).
+  Edit an existing Blueprint (object or npc).
 
   `expected_revision` is the revision the wizard's form was based on; a
   mismatch fires the optimistic lock and the command is refused with no

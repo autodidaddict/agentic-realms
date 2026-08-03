@@ -1,14 +1,12 @@
 defmodule AgenticRealms.World.NPCChat.ConversationTest do
   @moduledoc """
-  Tests for the Conversation GenServer (feature 010).
+  Tests for the Conversation GenServer.
 
   Bypasses the Horde registry by `start_supervised`-ing a Conversation
   with `name: nil` so the same module can be exercised directly without
   cluster registration getting in the way.
 
   Stubs the Anthropic call via `Req.Test` so the test stays hermetic.
-
-  See `specs/010-npc-conversations/contracts/conversation.md`.
   """
 
   use AgenticRealms.DataCase, async: false
@@ -20,8 +18,6 @@ defmodule AgenticRealms.World.NPCChat.ConversationTest do
   alias AgenticRealms.World.UIEvents.{ChatSystemMessage, ChatUtterance}
 
   @pubsub AgenticRealms.PubSub
-
-  # --- Fixtures -----------------------------------------------------------
 
   defp insert_room do
     Repo.insert!(%Room{
@@ -101,8 +97,6 @@ defmodule AgenticRealms.World.NPCChat.ConversationTest do
   end
 
   defp start_conv(player, clone) do
-    # Spawn unregistered so we can exercise the GenServer directly without
-    # touching Horde (Horde is exercised in the public-API test).
     GenServer.start_link(Conversation, {player.id, clone})
   end
 
@@ -115,8 +109,6 @@ defmodule AgenticRealms.World.NPCChat.ConversationTest do
     subscribe(player.id)
     %{room: room, blueprint: blueprint, clone: clone, player: player}
   end
-
-  # --- Tests --------------------------------------------------------------
 
   describe "first :send" do
     setup [:setup_chat_fixture]
@@ -199,12 +191,11 @@ defmodule AgenticRealms.World.NPCChat.ConversationTest do
     end
   end
 
-  describe "in-flight lockout (FR-020)" do
+  describe "in-flight lockout" do
     setup [:setup_chat_fixture]
 
     test "second :send while pending returns {:error, :still_thinking}",
          %{player: player, clone: clone} do
-      # Stub: delay the LLM response so we can race a second send during it.
       Req.Test.stub(AgenticRealms.Anthropic, fn conn ->
         Process.sleep(150)
 
@@ -219,13 +210,10 @@ defmodule AgenticRealms.World.NPCChat.ConversationTest do
 
       {:ok, :new} = GenServer.call(pid, {:send, player.id, "first"})
 
-      # Race a second send during the in-flight call.
       assert {:error, :still_thinking} = GenServer.call(pid, {:send, player.id, "second"})
 
-      # Let the first call complete normally.
       assert_receive %ChatUtterance{kind: :chat_speech}, 2_000
 
-      # After completion, a new send should succeed again.
       Req.Test.stub(AgenticRealms.Anthropic, fn conn ->
         Req.Test.json(conn, %{
           "content" => [
@@ -239,7 +227,7 @@ defmodule AgenticRealms.World.NPCChat.ConversationTest do
     end
   end
 
-  describe "multi-turn history (US2)" do
+  describe "multi-turn history" do
     setup [:setup_chat_fixture]
 
     test "second :send within window returns {:ok, :continuing} and broadcasts :chat_continuing",
@@ -257,7 +245,6 @@ defmodule AgenticRealms.World.NPCChat.ConversationTest do
       assert_receive %ChatUtterance{kind: :chat_speech, text: "Second."}, 2_000
 
       state = GenServer.call(pid, :get_state)
-      # Two full turn-pairs = 4 entries.
       assert length(state.turns) == 4
     end
 
@@ -268,23 +255,19 @@ defmodule AgenticRealms.World.NPCChat.ConversationTest do
 
       for n <- 1..21 do
         {:ok, _} = GenServer.call(pid, {:send, player.id, "turn-#{n}"})
-        # Wait for each reply before sending the next so the pending lockout
-        # doesn't reject the second send.
         assert_receive %ChatUtterance{kind: :chat_speech}, 2_000
       end
 
       state = GenServer.call(pid, :get_state)
-      # 20 pairs * 2 entries each.
       assert length(state.turns) == 40
 
-      # The first turn ("turn-1") MUST have been dropped.
       texts = Enum.map(state.turns, & &1.text)
       refute "turn-1" in texts
       assert "turn-21" in texts
     end
   end
 
-  describe "out-of-lore refusal rendering (US4)" do
+  describe "out-of-lore refusal rendering" do
     setup [:setup_chat_fixture]
 
     test "emote-mode refusal renders without quotes and without meta-references", %{
@@ -303,7 +286,6 @@ defmodule AgenticRealms.World.NPCChat.ConversationTest do
                      } = msg,
                      2_000
 
-      # Render through the game_components and verify no meta-reference leaks.
       assigns = %{entry: %{kind: msg.kind, actor_name: msg.npc_name, text: msg.text}}
 
       rendered =
@@ -314,21 +296,18 @@ defmodule AgenticRealms.World.NPCChat.ConversationTest do
       refute rendered =~ "as an AI"
       refute rendered =~ "as a language model"
       refute rendered =~ "I am a chatbot"
-      # Visible content checks.
       assert rendered =~ "Garrick"
       assert rendered =~ "raises an eyebrow curiously"
-      # Emote rendering MUST NOT add quote marks.
       refute rendered =~ "&ldquo;"
       refute rendered =~ "&rdquo;"
     end
   end
 
-  describe "empty-lore NPC (US5)" do
+  describe "empty-lore NPC" do
     test "chat works and the system prompt uses the empty-lore fallback paragraph" do
       Req.Test.set_req_test_to_shared(%{})
       room = insert_room()
       blueprint = insert_blueprint()
-      # Override the clone's lore to empty.
       clone = insert_clone(blueprint, room, lore: "")
       player = register_and_place("eve", room)
       subscribe(player.id)
@@ -336,7 +315,6 @@ defmodule AgenticRealms.World.NPCChat.ConversationTest do
       test_pid = self()
 
       Req.Test.stub(AgenticRealms.Anthropic, fn conn ->
-        # Capture the request body so we can assert on the system prompt.
         {:ok, body, conn} = Plug.Conn.read_body(conn)
         send(test_pid, {:llm_body, body})
 
@@ -370,7 +348,6 @@ defmodule AgenticRealms.World.NPCChat.ConversationTest do
 
       ref = Process.monitor(pid)
 
-      # Idle timeout is 200ms in test config — give some headroom.
       assert_receive {:DOWN, ^ref, :process, ^pid, :normal}, 1_500
     end
   end

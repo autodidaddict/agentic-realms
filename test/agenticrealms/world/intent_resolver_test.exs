@@ -11,7 +11,6 @@ defmodule AgenticRealms.World.IntentResolverTest do
 
   alias AgenticRealms.World.IntentResolver
 
-  # Build an Anthropic-shaped response containing a single tool_use block.
   defp tool_response(name, input) do
     %{
       "content" => [
@@ -47,7 +46,7 @@ defmodule AgenticRealms.World.IntentResolverTest do
       assert {:ok, {:look}} = IntentResolver.parse_response(tool_response("look", %{}))
     end
 
-    test "look with a target maps to {:look, target} (feature 006)" do
+    test "look with a target maps to {:look, target}" do
       assert {:ok, {:look, "brass lantern"}} =
                IntentResolver.parse_response(
                  tool_response("look", %{"target" => "brass lantern"})
@@ -90,9 +89,6 @@ defmodule AgenticRealms.World.IntentResolverTest do
     end
 
     test "action tuples are shape-compatible with CommandParser sentinels" do
-      # take/drop carry a string; move carries an atom; look/inventory are
-      # bare; say/emote carry a string; tell/whisper carry two strings —
-      # exactly what GameLive's existing case branches expect.
       assert {:ok, {:take, name}} =
                IntentResolver.parse_response(tool_response("take", %{"object" => "x"}))
 
@@ -105,7 +101,7 @@ defmodule AgenticRealms.World.IntentResolverTest do
     end
   end
 
-  describe "parse_response/1 — refusals (US2)" do
+  describe "parse_response/1 — refusals" do
     test "the refuse tool returns the model-authored message verbatim" do
       assert {:error, "Combat isn't supported yet."} =
                IntentResolver.parse_response(
@@ -114,12 +110,6 @@ defmodule AgenticRealms.World.IntentResolverTest do
     end
 
     test "a refuse response never produces a look action (resolver contract)" do
-      # Resolver-level contract: when the model picks `refuse`, the resolver
-      # surfaces the refusal and never substitutes {:look}, regardless of why
-      # the model chose to refuse. (Pre-006 this test guarded the
-      # near-mapping refusal rule; post-006 examine is supported, but the
-      # resolver-level contract — refuse → error, never substitute — is
-      # unchanged.)
       result =
         IntentResolver.parse_response(
           tool_response("refuse", %{
@@ -159,7 +149,7 @@ defmodule AgenticRealms.World.IntentResolverTest do
     end
   end
 
-  describe "parse_response/1 — malformed responses (US3)" do
+  describe "parse_response/1 — malformed responses" do
     test "a response with no tool_use block refuses gracefully" do
       response = %{"content" => [%{"type" => "text", "text" => "hello"}]}
       assert {:error, msg} = IntentResolver.parse_response(response)
@@ -176,7 +166,6 @@ defmodule AgenticRealms.World.IntentResolverTest do
     end
 
     test "a recognized tool with a missing required field refuses gracefully" do
-      # `take` with no `object` — schema violation.
       assert {:error, msg} = IntentResolver.parse_response(tool_response("take", %{}))
       assert msg =~ "not sure what you meant"
     end

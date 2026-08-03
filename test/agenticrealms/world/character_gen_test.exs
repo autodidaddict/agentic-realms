@@ -1,6 +1,6 @@
 defmodule AgenticRealms.World.CharacterGenTest do
   @moduledoc """
-  Feature 020 — deterministic default character generation.
+  Deterministic default character generation.
 
   Generation is policy, not rules: the SRD says a fighter picks two skills from
   a list, and this module decides which two. These tests pin those decisions so
@@ -35,9 +35,6 @@ defmodule AgenticRealms.World.CharacterGenTest do
 
     test "deals the standard array by class priority, then the background's increases",
          %{character: c} do
-      # Priority is primary (Strength), then the saving throws (Constitution),
-      # then canonical order: 15/14/13/12/10/8 lands as STR/CON/DEX/INT/WIS/CHA.
-      # Soldier then adds +2 Strength and +1 Constitution.
       assert c.abilities == %{str: 17, dex: 13, con: 15, int: 12, wis: 10, cha: 8}
     end
 
@@ -46,9 +43,6 @@ defmodule AgenticRealms.World.CharacterGenTest do
     end
 
     test "combines background, species and class skills without waste", %{character: c} do
-      # Soldier grants Athletics and Intimidation, Human's Skillful trait is
-      # configured to Perception, and the Fighter's two picks come from what is
-      # left, best modifier first: Acrobatics (+1 Dex) and History (+1 Int).
       assert c.skill_proficiencies == [
                "acrobatics",
                "athletics",
@@ -64,7 +58,6 @@ defmodule AgenticRealms.World.CharacterGenTest do
     end
 
     test "starts at the level 1 hitpoint maximum", %{character: c} do
-      # d10 hit die, Constitution +2.
       assert c.max_hp == 12
     end
   end
@@ -90,14 +83,10 @@ defmodule AgenticRealms.World.CharacterGenTest do
     end
 
     test "puts the highest score on that class's primary ability", %{character: c} do
-      # Wizard priority: Intelligence, then Wisdom, then canonical order —
-      # so INT 15, WIS 14, STR 13, DEX 12, CON 10, CHA 8. Soldier's increases
-      # go to the highest-priority of Strength, Dexterity and Constitution.
       assert c.abilities == %{int: 15, wis: 14, str: 15, dex: 13, con: 10, cha: 8}
     end
 
     test "uses that class's hit die and saving throws", %{character: c} do
-      # d6 hit die, Constitution +0.
       assert c.max_hp == 6
       assert c.save_proficiencies == ["int", "wis"]
     end
@@ -108,7 +97,6 @@ defmodule AgenticRealms.World.CharacterGenTest do
       assert "athletics" in c.skill_proficiencies
       assert "intimidation" in c.skill_proficiencies
       assert "perception" in c.skill_proficiencies
-      # Two more from the Wizard list, never duplicating what is already held.
       assert length(c.skill_proficiencies) == 5
     end
   end
@@ -128,7 +116,7 @@ defmodule AgenticRealms.World.CharacterGenTest do
     end
   end
 
-  describe "complete/1 — the hand-over as steps ship (feature 021)" do
+  describe "complete/1 — the hand-over as steps ship" do
     alias AgenticRealms.World.CharacterDraft, as: Draft
 
     defp identity_draft do
@@ -178,8 +166,6 @@ defmodule AgenticRealms.World.CharacterGenTest do
     end
 
     test "a fully-answered draft completes to itself" do
-      # Once every step has shipped, complete/1 has nothing left to do. It is
-      # not removed — `default/0` still needs the fills for seeds and tests.
       answered =
         %{identity_draft() | bought: %{str: 15, dex: 14, con: 13, int: 12, wis: 10, cha: 8}}
         |> Draft.put_spread({:split, :str, :con})
@@ -203,8 +189,6 @@ defmodule AgenticRealms.World.CharacterGenTest do
     end
 
     test "the fills still exist for a draft that has not been asked" do
-      # Nothing is deleted as a step ships — the fill simply stops firing,
-      # because the dialog no longer leaves a gap. `default/0` still needs it.
       completed = CharacterGen.complete(identity_draft())
 
       assert map_size(completed.bought) == 6

@@ -12,7 +12,7 @@ defmodule AgenticRealmsWeb.Presence do
   A future administrative `who` command will consume this presence list.
 
   Topic: `"connected_players"`. Key: `to_string(player_id)`. Metadata:
-  `%{name: String.t()}` — the character's name, not the account's (feature 021).
+  `%{name: String.t()}` — the character's name, not the account's.
   """
 
   use Phoenix.Presence,

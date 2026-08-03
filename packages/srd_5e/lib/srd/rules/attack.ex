@@ -27,9 +27,7 @@ defmodule Srd.Rules.Attack do
 
     {hit?, crit?} =
       cond do
-        # nat 20 always hits, and crits
         t.natural == 20 -> {true, true}
-        # nat 1 always misses
         t.natural == 1 -> {false, false}
         true -> {t.success?, false}
       end

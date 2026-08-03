@@ -13,7 +13,7 @@ defmodule AgenticRealms.World.DirectionTest do
       assert {:ok, :down} = Direction.parse("down")
     end
 
-    test "full names — diagonals (feature 012)" do
+    test "full names — diagonals" do
       assert {:ok, :northeast} = Direction.parse("northeast")
       assert {:ok, :northwest} = Direction.parse("northwest")
       assert {:ok, :southeast} = Direction.parse("southeast")
@@ -29,7 +29,7 @@ defmodule AgenticRealms.World.DirectionTest do
       assert {:ok, :down} = Direction.parse("d")
     end
 
-    test "two-letter diagonal aliases (feature 012)" do
+    test "two-letter diagonal aliases" do
       assert {:ok, :northeast} = Direction.parse("ne")
       assert {:ok, :northwest} = Direction.parse("nw")
       assert {:ok, :southeast} = Direction.parse("se")
@@ -74,7 +74,7 @@ defmodule AgenticRealms.World.DirectionTest do
       assert :up = Direction.opposite(:down)
     end
 
-    test "diagonal pairings (feature 012)" do
+    test "diagonal pairings" do
       assert :southwest = Direction.opposite(:northeast)
       assert :northeast = Direction.opposite(:southwest)
       assert :southeast = Direction.opposite(:northwest)

@@ -15,10 +15,6 @@ defmodule AgenticRealmsWeb.GameLiveOfflineFilterTest do
 
   use AgenticRealmsWeb.ConnCase, async: false
 
-  # Tagged :integration and excluded from default `mix test` — see the
-  # equivalent note in `game_live_communication_test.exs`. In-memory event
-  # store state accumulates across the suite; running this in the default
-  # run would conflict with `game_live_presence_test`.
   @moduletag :integration
   @moduletag :commanded
 
@@ -28,7 +24,6 @@ defmodule AgenticRealmsWeb.GameLiveOfflineFilterTest do
   alias AgenticRealms.World.{Commands, Seed}
 
   setup %{conn: conn} do
-    # Defensive seeding for cross-file ordering — see also game_live_presence_test.
     try do
       Seed.run()
     rescue
@@ -54,18 +49,12 @@ defmodule AgenticRealmsWeb.GameLiveOfflineFilterTest do
 
   test "offline players do not appear in the Present HUD or in look output",
        %{alice_conn: conn} do
-    # Only Alice mounts a LiveView. Kevin is spawned in the atrium but has
-    # zero connected sessions, so Phoenix.Presence does not track him —
-    # `Queries.list_other_players/2` must filter him out.
     {:ok, view, _html} = live(conn, ~p"/play")
 
-    # Let the mount finish; Phoenix.Presence's tracked-self join completes
-    # before this returns control here.
     _ = :sys.get_state(view.pid)
     Process.sleep(50)
     _ = :sys.get_state(view.pid)
 
-    # 1. HUD: zero "presence-row" entries (alice excludes herself; kevin is offline)
     rows =
       view
       |> render()
@@ -74,7 +63,6 @@ defmodule AgenticRealmsWeb.GameLiveOfflineFilterTest do
 
     assert rows == 0, "expected zero present rows; kevin has no connected sessions"
 
-    # 2. `look` output: kevin's username must not appear in the rendered room
     view
     |> form("form[phx-submit='submit_command']", %{"text" => "look"})
     |> render_submit()

@@ -1,6 +1,6 @@
 defmodule AgenticRealmsWeb.GameComponents.MiniMap do
   @moduledoc """
-  Feature 012 — region mini-map rendering.
+  Region mini-map rendering.
 
   The SVG viewBox lives in CELL UNITS. A "cell" is the 1x1 unit; room
   rects sit inside their cell with a small padding so connecting lines
@@ -12,20 +12,10 @@ defmodule AgenticRealmsWeb.GameComponents.MiniMap do
 
   use AgenticRealmsWeb, :html
 
-  # Cell-unit constants (NOT module attributes accessed via @ in HEEx
-  # — HEEx ~H treats @-prefixed names as assigns).
   @cell_inner_size 0.86
   @icon_size_cells 0.22
-  # Distance from the room rect's edge to the nearest edge of the icon —
-  # so the arrow never touches the rect border.
   @icon_inset_cells 0.06
-  # The cross-region portal is a rotated diamond; its corner-to-corner
-  # extent on the line of attack is `portal_size * √2 ≈ size * 1.414`,
-  # so it visually "reads" larger than a same-size unrotated square.
   @portal_size_cells 0.06
-  # Fog stubs retreat their visible endpoint inward from the cloud
-  # center so the dashed stroke stops at the cloud's edge instead of
-  # running into its middle.
   @fog_line_retreat 0.18
 
   attr :map_view, :map, required: true
@@ -35,16 +25,8 @@ defmodule AgenticRealmsWeb.GameComponents.MiniMap do
     zoom = map_default_zoom_cells()
     half = zoom / 2.0
 
-    # SVG viewBox lives in CELL UNITS. Default view is `zoom` cells
-    # wide, centered on the player's current room. `.MapInteract`
-    # owns mouse-wheel zoom and click-drag pan from there.
     initial_view_box = "#{cx - half} #{cy - half} #{zoom} #{zoom}"
 
-    # Decoration dedupe: two fog stubs sharing a destination cell
-    # composite to a darker spot; same for converging cross-region
-    # portals. Render one decoration per (kind, to_x, to_y) — the
-    # connector lines still all render in Pass 1 so each known source
-    # visibly points at the cell.
     decorations =
       assigns.map_view.exits
       |> Enum.uniq_by(fn e -> {e.kind, e.to_x, e.to_y} end)
@@ -87,7 +69,7 @@ defmodule AgenticRealmsWeb.GameComponents.MiniMap do
         <div class="map-canvas map-canvas--off-map"></div>
       <% else %>
         <script :type={Phoenix.LiveView.ColocatedHook} name=".MapInteract">
-          // Feature 012 — client-side map interaction. Combines:
+          // Client-side map interaction. Combines:
           //   * styled hover tooltip (reads data-room-name from .map-cell)
           //   * mouse-wheel zoom around the cursor
           //   * click-drag pan
@@ -98,7 +80,7 @@ defmodule AgenticRealmsWeb.GameComponents.MiniMap do
           // pan/zoom is reset on movement, which is the desired UX (we
           // always recenter on the player after they move).
           //
-          // FR-017 information hiding: fog stubs and cross-region portals
+          // Information hiding: fog stubs and cross-region portals
           // do NOT carry data-room-name, so they silently no-op for the
           // tooltip path.
           export default {
@@ -259,10 +241,6 @@ defmodule AgenticRealmsWeb.GameComponents.MiniMap do
     """
   end
 
-  # ────────────────────────────────────────────────────────────
-  # Pass 1: connector lines under everything.
-  # ────────────────────────────────────────────────────────────
-
   attr :exit, :map, required: true
 
   defp map_exit_line(assigns) do
@@ -322,28 +300,17 @@ defmodule AgenticRealmsWeb.GameComponents.MiniMap do
 
   defp fog_line_endpoint(%{to_x: tx, to_y: ty}), do: {tx, ty}
 
-  # ────────────────────────────────────────────────────────────
-  # Pass 2: room glyphs (rect + up/down icons inside).
-  # ────────────────────────────────────────────────────────────
-
   attr :room, :map, required: true
 
   defp map_cell(assigns) do
-    # Cell centered at (room.x, room.y). Rect occupies a square inside
-    # the cell. Up/Down icons sit inside the room rect with clear
-    # padding (@icon_inset_cells) on every side so they never touch
-    # the border.
     inner = @cell_inner_size
     icon = @icon_size_cells
     inset = @icon_inset_cells
 
     rect_x = assigns.room.x - inner / 2
     rect_y = assigns.room.y - inner / 2
-    # Right edge of icon sits @inset cells inside the rect's right edge.
     icon_x = assigns.room.x + inner / 2 - inset - icon
-    # Top edge of UP icon: @inset below the rect's top edge.
     icon_up_y = assigns.room.y - inner / 2 + inset
-    # Bottom edge of DOWN icon: @inset above the rect's bottom edge.
     icon_down_y = assigns.room.y + inner / 2 - inset - icon
 
     assigns =
@@ -418,13 +385,6 @@ defmodule AgenticRealmsWeb.GameComponents.MiniMap do
     """
   end
 
-  # ────────────────────────────────────────────────────────────
-  # Pass 3: endpoint decorations (fog clouds, cross-region portals).
-  # Drawn LAST so they sit above the player's current-room glow when
-  # endpoints coincide. No data-room-name / aria-label per FR-007 /
-  # FR-008 / FR-017 information hiding.
-  # ────────────────────────────────────────────────────────────
-
   attr :exit, :map, required: true
 
   defp map_exit_decoration(assigns) do
@@ -442,7 +402,7 @@ defmodule AgenticRealmsWeb.GameComponents.MiniMap do
       <% :fog_stub -> %>
         <%!-- Soft cloud built from overlapping circles. Reads as a
               fluffy puff at the line endpoint instead of a hatched
-              tile. No title/aria — FR-007 / FR-017 information hiding. --%>
+              tile. No title or aria, for information hiding. --%>
         <g class="map-fog-cloud" transform={"translate(#{@exit.to_x} #{@exit.to_y})"}>
           <circle cx="-0.13" cy="0.02" r="0.08" />
           <circle cx="-0.05" cy="-0.07" r="0.10" />

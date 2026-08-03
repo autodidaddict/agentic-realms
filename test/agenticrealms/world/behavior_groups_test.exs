@@ -31,7 +31,7 @@ defmodule AgenticRealms.World.BehaviorGroupsTest do
       assert {:ok, [[@emote], [@say]]} = BehaviorGroups.resolve(["beta", "alpha"])
     end
 
-    test "rejects an unknown name (FR-018)" do
+    test "rejects an unknown name" do
       put_behavior_group("alpha", [@say])
 
       assert {:error, {:unknown_behavior_group, "ghost"}} =
@@ -39,7 +39,7 @@ defmodule AgenticRealms.World.BehaviorGroupsTest do
     end
   end
 
-  describe "compose/2 — additive, attachment-ordered, lossless (FR-016)" do
+  describe "compose/2 — additive, attachment-ordered, lossless" do
     test "union of two behavior_groups ++ direct, in order, nothing dropped" do
       put_behavior_group("orc", [@emote])
       put_behavior_group("shopkeeper", [@say])
@@ -52,7 +52,6 @@ defmodule AgenticRealms.World.BehaviorGroupsTest do
     test "same-trigger behaviors from different sources are all retained" do
       put_behavior_group("a", [@say])
       put_behavior_group("b", [@emote])
-      # both @say and @emote are player_entered → both kept
       assert {:ok, [@say, @emote]} = BehaviorGroups.compose(["a", "b"], [])
     end
 
@@ -61,7 +60,7 @@ defmodule AgenticRealms.World.BehaviorGroupsTest do
     end
   end
 
-  describe "validate_behaviors/1 (FR-014)" do
+  describe "validate_behaviors/1" do
     test "accepts the feature-009 vocabulary" do
       assert :ok = BehaviorGroups.validate_behaviors([@say, @bye, @emote])
     end
@@ -72,7 +71,7 @@ defmodule AgenticRealms.World.BehaviorGroupsTest do
     end
   end
 
-  describe "list_for/1 — cross-entity (FR-019)" do
+  describe "list_for/1 — cross-entity" do
     test "filters by applies_to" do
       put_behavior_group("npc_only", [@say], ["npc"])
       put_behavior_group("item_room", [@say], ["item", "room"])

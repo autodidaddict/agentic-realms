@@ -53,8 +53,6 @@ defmodule Srd.Rules.PointBuyTest do
     end
 
     test "three 15s is exactly the budget, and is meant to be reachable" do
-      # 9 + 9 + 9 = 27. A punishing build, but the rules allow it, and a
-      # cheaper-looking assertion here would be asserting a house rule.
       assert PointBuy.fully_spent?(spread(str: 15, dex: 15, con: 15))
     end
 
@@ -67,8 +65,6 @@ defmodule Srd.Rules.PointBuyTest do
     end
 
     test "a score outside the range is rejected even when the total would fit" do
-      # 18 costs nothing the table knows about, so a naive sum would call this
-      # cheap and let it through.
       refute PointBuy.legal?(spread(str: 18))
     end
 
@@ -85,7 +81,6 @@ defmodule Srd.Rules.PointBuyTest do
     end
 
     test "an increase is refused when the remaining points will not cover it" do
-      # 26 of 27 spent, and 13 -> 14 costs 2.
       tight = spread(str: 15, dex: 14, con: 13, int: 12, wis: 10, cha: 8)
       one_left = %{tight | cha: 8, wis: 9}
 

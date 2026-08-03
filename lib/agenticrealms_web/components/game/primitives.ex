@@ -7,13 +7,9 @@ defmodule AgenticRealmsWeb.GameComponents.Primitives do
 
   use AgenticRealmsWeb, :html
 
-  # ────────────────────────────────────────────────────────────
-  # HP Bar
-  # ────────────────────────────────────────────────────────────
-
   @doc """
   A modifier with an explicit sign, so `+2` and `-1` are never ambiguous and a
-  zero reads as `+0` rather than a bare `0` (FR-007).
+  zero reads as `+0` rather than a bare `0`.
   """
   @spec signed(integer()) :: String.t()
   def signed(value) when value >= 0, do: "+#{value}"
@@ -49,10 +45,6 @@ defmodule AgenticRealmsWeb.GameComponents.Primitives do
     """
   end
 
-  # ────────────────────────────────────────────────────────────
-  # HUD Card
-  # ────────────────────────────────────────────────────────────
-
   attr :title, :string, required: true
   attr :count, :string, default: nil
   attr :modal_type, :string, required: true
@@ -83,10 +75,6 @@ defmodule AgenticRealmsWeb.GameComponents.Primitives do
     """
   end
 
-  # ────────────────────────────────────────────────────────────
-  # Modal Shell
-  # ────────────────────────────────────────────────────────────
-
   attr :title, :string, required: true
   attr :glyph, :string, default: nil
   attr :foot_hint, :string, default: nil
@@ -95,8 +83,8 @@ defmodule AgenticRealmsWeb.GameComponents.Primitives do
     default: true,
     doc: """
     Whether the modal offers a way out. When false, all three are omitted: the
-    Escape binding, the click-catching backdrop, and the ✕ button. Feature 021's
-    character creation needs this — a character comes before a world, so there
+    Escape binding, the click-catching backdrop, and the ✕ button. Character
+    creation needs this — a character comes before a world, so there
     is nothing to go back to — and leaving the controls rendered would show a
     close button that silently does nothing, since `close_modal` only clears the
     `@modal` assign that dialog does not use.
@@ -157,11 +145,6 @@ defmodule AgenticRealmsWeb.GameComponents.Primitives do
     />
     """
   end
-
-  # ────────────────────────────────────────────────────────────
-  # Stats Panel — the player sidebar with Character / Inventory /
-  # Quest Log / Here HUD cards.
-  # ────────────────────────────────────────────────────────────
 
   attr :stats, :map, required: true
   attr :inventory, :list, required: true
@@ -249,14 +232,6 @@ defmodule AgenticRealmsWeb.GameComponents.Primitives do
     </aside>
     """
   end
-
-  # ────────────────────────────────────────────────────────────
-  # Direction arrow glyph — used by log entries (room view exits)
-  # and by any future component that wants a compact directional
-  # indicator. Accepts either the canonical atom (`:north`,
-  # `:northeast`, …) or its lowercase string form. Up and north
-  # both render as ↑; down and south as ↓.
-  # ────────────────────────────────────────────────────────────
 
   @arrow_by_dir %{
     "north" => "↑",

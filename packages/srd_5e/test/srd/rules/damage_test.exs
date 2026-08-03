@@ -4,7 +4,6 @@ defmodule Srd.Rules.DamageTest do
   alias Srd.Dice.{Expr, Roll}
   alias Srd.Rules.Damage
 
-  # Damage only reads the roll total, so a minimal roll with that total is enough.
   defp roll(total) do
     %Roll{count: 1, sides: 12, modifier: 0, dice: [total], reduce: :sum, total: total}
   end

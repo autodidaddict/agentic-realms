@@ -1,6 +1,6 @@
 defmodule AgenticRealmsWeb.WizardEditTest do
   @moduledoc """
-  Feature 014 US5 — LiveView integration: form-based editing of
+  LiveView integration: form-based editing of
   Blueprints (with optimistic locking) and in-place editing of world
   Objects.
   """
@@ -73,25 +73,15 @@ defmodule AgenticRealmsWeb.WizardEditTest do
     {:ok, view, _} = live(wzc, ~p"/play")
     render_hook(view, "switch_mode", %{"mode" => "wizard"})
 
-    # In trance, the registry rows are clickable as focus_blueprint
-    # affordances.
     render_hook(view, "toggle_authoring_mode", %{})
     render_hook(view, "focus_blueprint", %{"blueprint_id" => slug})
 
-    # The form is now pre-populated with the blueprint's current fields
-    # AND `expected_revision: 1`.
     state = :sys.get_state(view.pid)
     draft = state.socket.assigns.focused_blueprint_draft
     assert draft.expected_revision == 1
     assert draft.name == "edit-loop chest"
 
-    # bug_001 — slug input MUST be read-only in edit mode so the wizard
-    # doesn't silently lose typed-but-discarded slug edits. (Slugs are
-    # immutable after creation per FR-007a.)
     html = render(view)
-    # Attribute order in the rendered HTML isn't fixed; assert the
-    # slug <input> has `readonly` regardless of where it sits relative
-    # to data-testid.
     assert html =~ ~r/<input[^>]*data-testid="blueprint-slug"[^>]*\/>/
     slug_input_match = Regex.run(~r/<input[^>]*data-testid="blueprint-slug"[^>]*\/>/, html)
     assert slug_input_match, "expected to find the slug <input> in the rendered HTML"
@@ -99,7 +89,6 @@ defmodule AgenticRealmsWeb.WizardEditTest do
     assert slug_input =~ "readonly"
     assert html =~ "locked after creation"
 
-    # Edit short_description via the form, commit.
     render_hook(view, "update_blueprint_draft", %{
       "draft" => %{
         "name" => draft.name,
@@ -126,7 +115,6 @@ defmodule AgenticRealmsWeb.WizardEditTest do
 
     rev_before = Queries.get_object_blueprint(slug).revision
 
-    # Commit without changing anything.
     render_hook(view, "commit_blueprint_draft", %{})
 
     assert Queries.get_object_blueprint(slug).revision == rev_before
@@ -141,14 +129,12 @@ defmodule AgenticRealmsWeb.WizardEditTest do
     {:ok, view_a, _} = live(wzc, ~p"/play")
     {:ok, view_b, _} = live(sezc, ~p"/play")
 
-    # Both wizards focus the SAME blueprint at revision 1.
     for v <- [view_a, view_b] do
       render_hook(v, "switch_mode", %{"mode" => "wizard"})
       render_hook(v, "toggle_authoring_mode", %{})
       render_hook(v, "focus_blueprint", %{"blueprint_id" => slug})
     end
 
-    # Wizard A edits and commits first → bumps to revision 2.
     a_state = :sys.get_state(view_a.pid)
     a_draft = a_state.socket.assigns.focused_blueprint_draft
 
@@ -166,7 +152,6 @@ defmodule AgenticRealmsWeb.WizardEditTest do
     assert Queries.get_object_blueprint(slug).revision == 2
     assert Queries.get_object_blueprint(slug).name == "A's name"
 
-    # Wizard B's form is still showing revision 1. They edit and commit.
     b_state = :sys.get_state(view_b.pid)
     b_draft = b_state.socket.assigns.focused_blueprint_draft
     assert b_draft.expected_revision == 1
@@ -183,11 +168,8 @@ defmodule AgenticRealmsWeb.WizardEditTest do
 
     render_hook(view_b, "commit_blueprint_draft", %{})
 
-    # The blueprint still has A's name (B's commit was rejected for
-    # stale revision).
     assert Queries.get_object_blueprint(slug).name == "A's name"
 
-    # B's form has been reloaded with the latest values + a banner.
     b_state_after = :sys.get_state(view_b.pid)
     b_draft_after = b_state_after.socket.assigns.focused_blueprint_draft
 
@@ -197,8 +179,6 @@ defmodule AgenticRealmsWeb.WizardEditTest do
 
     assert render(view_b) =~ "Another wizard edited this blueprint"
 
-    # B reapplies their edit on top of the freshly-reloaded state and
-    # commits — succeeds at revision 3.
     render_hook(view_b, "update_blueprint_draft", %{
       "draft" => %{
         "name" => "B's name v2",
@@ -221,7 +201,6 @@ defmodule AgenticRealmsWeb.WizardEditTest do
     {:ok, view, _} = live(wzc, ~p"/play")
     render_hook(view, "switch_mode", %{"mode" => "wizard"})
 
-    # Things-in-this-room panel has an Edit button per row.
     assert render(view) =~ "Edit"
 
     render_hook(view, "focus_object_for_edit", %{"object_id" => oid})
@@ -245,8 +224,6 @@ defmodule AgenticRealmsWeb.WizardEditTest do
     row = Repo.get(Object, oid)
     assert row.short_description == "an edited clay pot"
   end
-
-  # --- Helpers ------------------------------------------------------------
 
   defp conn_for(conn, player_id) do
     conn

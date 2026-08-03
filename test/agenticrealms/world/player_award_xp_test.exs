@@ -1,9 +1,9 @@
 defmodule AgenticRealms.World.PlayerAwardXpTest do
   @moduledoc """
-  Feature 019/020 — Player aggregate AwardXp: award, level-up, idempotency, and
+  Player aggregate AwardXp: award, level-up, idempotency, and
   the level 20 cap.
 
-  Thresholds are the SRD 5.2 table now, not feature 019's quadratic: level 2 at
+  Thresholds are the SRD 5.2 table, not a quadratic: level 2 at
   300, level 5 at 6,500, level 20 at 355,000.
   """
   use ExUnit.Case, async: true
@@ -36,7 +36,6 @@ defmodule AgenticRealms.World.PlayerAwardXpTest do
     }
   end
 
-  # A character in the world: created, then spawned.
   defp playing do
     %Player{}
     |> then(&Player.apply(&1, Player.execute(&1, create_command())))
@@ -80,11 +79,10 @@ defmodule AgenticRealms.World.PlayerAwardXpTest do
       })
 
     assert :ok = Player.execute(state, cmd(50, "quest:q1"))
-    # A different award_id still awards (70 stays within level 1).
     assert %PlayerXpAwarded{new_total: 70} = Player.execute(state, cmd(20, "quest:q2"))
   end
 
-  describe "the level 20 cap (FR-029)" do
+  describe "the level 20 cap" do
     defp at_level_20 do
       playing()
       |> Player.apply(%PlayerXpAwarded{
@@ -135,8 +133,6 @@ defmodule AgenticRealms.World.PlayerAwardXpTest do
       state = Player.apply(playing(), %PlayerLeveledUp{player_id: 1, from_level: 1, to_level: 3})
 
       assert state.level == 3
-      # max_hp is the creation value; the sheet derives the real maximum from
-      # class, level and Constitution on read.
       assert state.max_hp == 12
       assert state.str == 17
     end

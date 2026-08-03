@@ -1,5 +1,5 @@
 defmodule AgenticRealms.NpcMinds.LifecycleManagerTest do
-  @moduledoc "Feature 018 — the lifecycle 'process manager' event handler."
+  @moduledoc "The lifecycle 'process manager' event handler."
   use ExUnit.Case, async: true
 
   alias AgenticRealms.NpcMinds.LifecycleManager

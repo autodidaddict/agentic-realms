@@ -1,6 +1,6 @@
 defmodule AgenticRealms.World.Ticks.SchedulerTest do
   @moduledoc """
-  Tests for the per-room tick Scheduler GenServer (feature 011).
+  Tests for the per-room tick Scheduler GenServer.
 
   Bypasses the Lifecycle and starts a Scheduler directly via
   `Supervisor.find_or_start/1`, so the GenServer's beat loop can be
@@ -105,7 +105,7 @@ defmodule AgenticRealms.World.Ticks.SchedulerTest do
   defp subscribe_player(player),
     do: Phoenix.PubSub.subscribe(@pubsub, Topics.player_topic(player.id))
 
-  describe "scheduler lifecycle (US1)" do
+  describe "scheduler lifecycle" do
     test "find_or_start returns a pid and registers it" do
       room = insert_room()
       pid = start_scheduler(room)
@@ -132,7 +132,7 @@ defmodule AgenticRealms.World.Ticks.SchedulerTest do
     end
   end
 
-  describe "beat dispatch (US1 / US3)" do
+  describe "beat dispatch" do
     test "a 1-base-rate room tick fires within ~base + dispatch tolerance" do
       base = Application.get_env(:agenticrealms, AgenticRealms.World.Ticks)[:base_tick_rate_ms]
       room = insert_room([tick("hello room", base)])
@@ -142,10 +142,6 @@ defmodule AgenticRealms.World.Ticks.SchedulerTest do
 
       _pid = start_scheduler(room)
 
-      # Wait for a beat. With base_rate=50ms, we expect the first
-      # broadcast within ~100ms (one beat to set scheduler_start_time and
-      # one beat to actually fire — the elapsed-since-start is >= base
-      # after the first beat).
       assert_receive %BehaviorUtterance{kind: :room_speech, text: "hello room"}, 1_000
     end
 
@@ -276,16 +272,12 @@ defmodule AgenticRealms.World.Ticks.SchedulerTest do
 
       _pid = start_scheduler(room)
 
-      # Wait for ~6 base beats (~300ms with 50ms base).
       Process.sleep(base * 7 + 50)
 
-      # Count the fires we received.
       messages = drain_messages([])
       fast_count = Enum.count(messages, &(&1.text == "FAST"))
       slow_count = Enum.count(messages, &(&1.text == "SLOW"))
 
-      # FAST fires every beat; SLOW fires every 3 beats. Over ~7 beats,
-      # FAST should fire 6–7 times, SLOW 2–3 times.
       assert fast_count >= 4
       assert slow_count >= 1
       assert fast_count > slow_count
@@ -331,7 +323,6 @@ defmodule AgenticRealms.World.Ticks.SchedulerTest do
 
       pid = start_scheduler(room)
 
-      # Synthesize arrival with carried obj.
       send(pid, %RoomPlayerArrived{
         room_id: room.id,
         actor_id: player.id,
@@ -367,8 +358,6 @@ defmodule AgenticRealms.World.Ticks.SchedulerTest do
              )
     end
   end
-
-  # Helpers
 
   defp drain_messages(acc) do
     receive do

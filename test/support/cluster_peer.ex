@@ -29,14 +29,6 @@ defmodule AgenticRealms.ClusterPeer do
     {:ok, _} = Application.ensure_all_started(:phoenix_pubsub)
 
     unless Process.whereis(@sup) do
-      # All four Horde pairs, not just the one under test: `Cluster.Check`
-      # inspects every registry, and a peer missing one would look like a real
-      # finding. They are cheap — a registry and a dynamic supervisor each, no
-      # database.
-      #
-      # The primary already runs some of these as application children and the
-      # peer runs none, so filter to what is actually missing. One helper, both
-      # nodes, no special-casing which one we are on.
       children =
         [
           {Phoenix.PubSub, name: AgenticRealms.PubSub},
@@ -53,11 +45,6 @@ defmodule AgenticRealms.ClusterPeer do
 
       {:ok, pid} = Supervisor.start_link(children, strategy: :one_for_one, name: @sup)
 
-      # `Supervisor.start_link/2` links to the caller, and on the peer the
-      # caller is the short-lived process handling `:peer.call/4`. Without this
-      # the whole tree dies the moment the call returns, and the only symptom is
-      # a missing ETS table several assertions later. The peer node is torn down
-      # wholesale by `:peer.stop/1`, so an unlinked supervisor leaks nothing.
       Process.unlink(pid)
     end
 
