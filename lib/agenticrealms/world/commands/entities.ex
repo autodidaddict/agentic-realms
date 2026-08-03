@@ -17,10 +17,6 @@ defmodule AgenticRealms.World.Commands.Entities do
   alias AgenticRealms.World.Queries
   alias AgenticRealms.World.Schemas.Room
 
-  # ──────────────────────────────────────────────────────────────────────
-  # Feature 016 — entity lifecycle world service (clone / move / clone_into)
-  # ──────────────────────────────────────────────────────────────────────
-
   @doc """
   Clone a world entity into existence (in the void). Mints a fresh id, or
   use the 3-arity form to supply a deterministic id (replay-safe; a re-clone
@@ -100,8 +96,6 @@ defmodule AgenticRealms.World.Commands.Entities do
     end
   end
 
-  # Players exist by account FK; NPC-inventory is defined-but-dormant (R8) —
-  # accept both at the service boundary.
   defp ensure_container_exists(%ContainerRef{type: :player}), do: :ok
   defp ensure_container_exists(%ContainerRef{type: :npc}), do: :ok
 
@@ -133,9 +127,6 @@ defmodule AgenticRealms.World.Commands.Entities do
           do_take(room_id, player_id, object_id)
 
         {:error, :no_such_object} ->
-          # Feature 007 FR-015: fall through to NPC scope. If an NPC matches,
-          # refuse via the existing :object_is_fixed path (the LiveView
-          # renders "You can't take that.").
           case Queries.resolve_npc_in_room(room_id, name) do
             {:ok, _npc_id} -> {:error, :object_is_fixed}
             {:error, :no_such_npc} -> {:error, :no_such_object}
@@ -161,8 +152,6 @@ defmodule AgenticRealms.World.Commands.Entities do
       {:ok, %{object_id: object_id, object_name: object_name}}
     else
       {:ok, true} -> {:error, :object_is_fixed}
-      # The object moved out of the room between resolve and dispatch (e.g.
-      # another player took it first) — preserve the legacy race-loser error.
       {:error, :container_conflict} -> {:error, :object_not_in_room}
       {:error, _} = err -> err
     end
@@ -198,8 +187,6 @@ defmodule AgenticRealms.World.Commands.Entities do
     end
   end
 
-  # --- helpers ------------------------------------------------------------
-
   defp check_not_fixed(object_id) do
     case Queries.object_fixed?(object_id) do
       {:ok, fixed} -> {:ok, fixed}
@@ -221,9 +208,4 @@ defmodule AgenticRealms.World.Commands.Entities do
       %{name: name} -> name
     end
   end
-
-  # Feature 017 — viewer-aware traversal. An owner-scoped exit (the transient
-  # region's owner-only `:rift` entry) resolves only for its owner; a
-  # non-owner falls through to `:no_exit_in_direction` ("You can't go that
-  # way.").
 end

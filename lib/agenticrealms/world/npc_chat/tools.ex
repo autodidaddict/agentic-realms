@@ -68,10 +68,6 @@ defmodule AgenticRealms.World.NPCChat.Tools do
           "required" => ["text"]
         }
       },
-      # Feature 013 — quest acceptance. Only available when the player
-      # has expressed clear intent to take on a quest from your catalog
-      # (see the # Quests section of the system prompt). The slug must
-      # be one of the slugs listed in your offerable_quests.
       %{
         "name" => "accept_quest",
         "description" =>

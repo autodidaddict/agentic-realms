@@ -53,14 +53,12 @@ defmodule AgenticRealms.World.Ticks.LifecycleTest do
       room = insert_room()
 
       Lifecycle.notify(synth_arrived(room.id, 1))
-      # Allow the message to be processed.
       _ = Lifecycle.get_state()
 
       state = Lifecycle.get_state()
       assert MapSet.member?(state.live_per_room[room.id] || MapSet.new(), 1)
       assert Map.has_key?(state.pending_join, room.id)
 
-      # Wait past join grace.
       Process.sleep(join_grace() + 50)
 
       assert {:ok, _pid} = Registry.lookup(room.id)
@@ -106,7 +104,6 @@ defmodule AgenticRealms.World.Ticks.LifecycleTest do
       Process.sleep(join_grace() + 30)
 
       Lifecycle.notify(synth_left(room.id, 1))
-      # Re-enter immediately, well within leave_grace_ms.
       Lifecycle.notify(synth_arrived(room.id, 2))
       _ = Lifecycle.get_state()
 
@@ -135,11 +132,6 @@ defmodule AgenticRealms.World.Ticks.LifecycleTest do
   end
 
   describe "rebuilding state on restart" do
-    # The Lifecycle is supervised, so it can crash and come back. Before this
-    # was fixed it came back believing every room was empty and holding no
-    # record of the schedulers it had started — and because the stop path is
-    # guarded on `started_schedulers`, it would never stop them. A scheduler
-    # for an emptied room ticked on until somebody walked back in.
     test "seeds live occupancy from the read model rather than starting empty" do
       room = insert_room()
       player = register_online_player_in(room.id)
@@ -162,8 +154,6 @@ defmodule AgenticRealms.World.Ticks.LifecycleTest do
 
     test "an empty room whose scheduler survived the restart is reconciled away" do
       room = insert_room()
-      # No occupants, but a scheduler is running — the state a crash leaves
-      # behind when the room emptied while the Lifecycle was down.
       {:ok, _pid} = Supervisor.find_or_start(room.id)
       assert {:ok, _} = Registry.lookup(room.id)
 
@@ -174,8 +164,6 @@ defmodule AgenticRealms.World.Ticks.LifecycleTest do
       assert Registry.lookup(room.id) == :error,
              "the orphaned scheduler should have been stopped by the restart reconcile"
     end
-
-    # --- helpers ----------------------------------------------------------
 
     defp register_online_player_in(room_id) do
       suffix = System.unique_integer([:positive])
@@ -199,9 +187,6 @@ defmodule AgenticRealms.World.Ticks.LifecycleTest do
       player
     end
 
-    # Kill it and let the application supervisor bring it back — the same thing
-    # a crash does in production. It lives in the app tree, not the test one,
-    # so `stop_supervised!/1` cannot reach it.
     defp restart_lifecycle do
       old = Process.whereis(Lifecycle)
       ref = Process.monitor(old)

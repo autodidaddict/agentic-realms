@@ -19,8 +19,6 @@ defmodule AgenticRealms.World.Behaviors.InterpreterTest do
 
   @pubsub AgenticRealms.PubSub
 
-  # --- Fixtures -----------------------------------------------------------
-
   defp insert_room(behaviors \\ []) do
     Repo.insert!(%Room{
       id: Ecto.UUID.generate(),
@@ -58,8 +56,6 @@ defmodule AgenticRealms.World.Behaviors.InterpreterTest do
     {:ok, player} =
       Accounts.register_player(%{username: "#{label}_#{suffix}", password: "pw12345678"})
 
-    # Feature 021 — a row with no character is not a player in the world, so
-    # room queries skip it. Give them one.
     Repo.insert!(
       struct!(
         PlayerState,
@@ -81,8 +77,6 @@ defmodule AgenticRealms.World.Behaviors.InterpreterTest do
   defp say_behavior(trigger, text) do
     %{"trigger" => trigger, "actions" => [%{"type" => "say", "text" => text}]}
   end
-
-  # --- Tests --------------------------------------------------------------
 
   describe "fire_for_arrival/2 (player_entered firing on session arrival)" do
     test "empty room + no NPCs → no broadcasts" do
@@ -213,7 +207,6 @@ defmodule AgenticRealms.World.Behaviors.InterpreterTest do
       room = insert_room()
       blueprint = insert_blueprint()
 
-      # Only a player_left behavior; spawning should not fire it.
       _clone =
         insert_clone(blueprint, room, "Garrick", [say_behavior("player_left", "Goodbye.")])
 
@@ -253,9 +246,6 @@ defmodule AgenticRealms.World.Behaviors.InterpreterTest do
     test "fires player_entered behaviors in destination room (broadcast to triggering player)" do
       destination = insert_room([say_behavior("player_entered", "Destination greeting.")])
 
-      # Source room must exist to keep the FK chain happy if the
-      # interpreter were to consult it, even though we don't expect
-      # player_left to fire from PlayerMoved.
       source = insert_room()
 
       alice = register_and_place("alice", source)
@@ -312,14 +302,11 @@ defmodule AgenticRealms.World.Behaviors.InterpreterTest do
 
       entries = Interpreter.fire_departure_inline(alice.id, source.id)
 
-      # Room behavior first, then NPC behavior (FR-008a).
       assert [
                %{kind: :room_speech, text: "Source farewell."},
                %{kind: :npc_speech, actor_name: "Garrick", text: "Farewell, traveler."}
              ] = entries
 
-      # Triggering player does NOT receive a broadcast back (the entries
-      # are returned for inline-appending by the caller).
       refute_receive %BehaviorUtterance{text: "Source farewell."}, 100
       refute_receive %BehaviorUtterance{text: "Farewell, traveler."}, 100
     end
@@ -340,7 +327,6 @@ defmodule AgenticRealms.World.Behaviors.InterpreterTest do
 
       _entries = Interpreter.fire_departure_inline(alice.id, source.id)
 
-      # Bob (other player in source room) receives the farewell via PubSub.
       assert_receive %BehaviorUtterance{
         kind: :npc_speech,
         actor_name: "Garrick",

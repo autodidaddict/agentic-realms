@@ -27,8 +27,6 @@ defmodule AgenticRealms.World.Commands.ExtractObjectEssenceTest do
     {:ok, _} = Commands.spawn(wizard.id, Seed.starting_room_id())
     {:ok, _} = Commands.spawn(non_wizard.id, Seed.starting_room_id())
 
-    # Spawn a source Object via the freeform path — gives us a row to
-    # extract from.
     {:ok, object_id} =
       Commands.spawn_object_freeform(wizard.id, Seed.starting_room_id(), %{
         name: "source pot",

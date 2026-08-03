@@ -44,11 +44,9 @@ defmodule AgenticRealms.World.Seed do
   alias AgenticRealms.World.Commands, as: WorldCommands
   alias AgenticRealms.World.Schemas.{Region, Room}
 
-  # --- regions
   @blackmire_region_id "00000000-0000-4000-8000-000000000010"
   @hollowvale_region_id "00000000-0000-4000-8000-000000000011"
 
-  # --- rooms (UUIDs pinned for test stability)
   @starting_room_id "00000000-0000-4000-8000-000000000001"
   @corridor_room_id "00000000-0000-4000-8000-000000000002"
   @library_room_id "00000000-0000-4000-8000-000000000003"
@@ -57,16 +55,13 @@ defmodule AgenticRealms.World.Seed do
   @border_room_id "00000000-0000-4000-8000-000000000006"
   @outskirts_room_id "00000000-0000-4000-8000-000000000007"
 
-  # --- objects (existing)
   @brass_lantern_id "00000000-0000-4000-8000-100000000001"
   @leather_journal_id "00000000-0000-4000-8000-100000000002"
   @reading_lectern_id "00000000-0000-4000-8000-100000000003"
 
-  # --- NPC (existing — feature 008 clone id preserved verbatim)
   @innkeeper_garrick_clone_id "00000000-0000-4000-8000-200000000001"
   @innkeeper_garrick_blueprint_id "garrick_the_innkeeper"
 
-  # --- Feature 013 — Hollowvale apple orchard + Orchard Keeper
   @cottage_room_id "00000000-0000-4000-8000-000000000008"
   @old_grove_room_id "00000000-0000-4000-8000-000000000009"
   @wild_apple_room_id "00000000-0000-4000-8000-00000000000a"
@@ -98,18 +93,11 @@ defmodule AgenticRealms.World.Seed do
   end
 
   defp do_seed do
-    # ---- regions ----
-    # Tests run Repo inside the SQL sandbox, but Commanded aggregates live
-    # in the application's supervision tree and survive across tests.
-    # Treat "already exists" as idempotent success so a sandbox-cleared
-    # test setup re-running the seed works against a hot aggregate cache.
     :ok = ensure_region(@blackmire_region_id, "Blackmire")
     :ok = ensure_region(@hollowvale_region_id, "Hollowvale")
 
-    # ---- behavior_groups (feature 015) ----
     :ok = seed_behavior_groups()
 
-    # ---- behaviors (carried over from feature 011) ----
     atrium_behaviors = [
       %{
         "trigger" => "player_entered",
@@ -182,7 +170,6 @@ defmodule AgenticRealms.World.Seed do
 
     :ok = validate_behaviors!(lantern_behaviors, "lantern_behaviors")
 
-    # ---- Blackmire rooms ----
     :ok =
       WorldCommands.create_room(
         @starting_room_id,
@@ -228,7 +215,6 @@ defmodule AgenticRealms.World.Seed do
         map_y: 0
       )
 
-    # The Vault is map-hidden — appears nowhere on the map even when discovered.
     :ok =
       WorldCommands.create_room(
         @vault_room_id,
@@ -252,7 +238,6 @@ defmodule AgenticRealms.World.Seed do
         map_y: 2
       )
 
-    # ---- Hollowvale stub ----
     :ok =
       WorldCommands.create_room(
         @outskirts_room_id,
@@ -264,37 +249,24 @@ defmodule AgenticRealms.World.Seed do
         map_y: 0
       )
 
-    # ---- Exits ----
-    # Atrium ↔ Corridor (Δy = 1)
     :ok = WorldCommands.add_exit(@starting_room_id, :north, @corridor_room_id)
     :ok = WorldCommands.add_exit(@corridor_room_id, :south, @starting_room_id)
 
-    # Atrium ↔ Library (Δx = 3 — long-distance "bridge" line)
     :ok = WorldCommands.add_exit(@starting_room_id, :east, @library_room_id)
     :ok = WorldCommands.add_exit(@library_room_id, :west, @starting_room_id)
 
-    # Atrium ↔ Loft (up/down between elev 0 and 1)
     :ok = WorldCommands.add_exit(@starting_room_id, :up, @loft_room_id)
     :ok = WorldCommands.add_exit(@loft_room_id, :down, @starting_room_id)
 
-    # Library ↔ Vault (east/west, distance 1). Vault is map-hidden so
-    # neither line nor fog stub appears on Library's east side.
     :ok = WorldCommands.add_exit(@library_room_id, :east, @vault_room_id)
     :ok = WorldCommands.add_exit(@vault_room_id, :west, @library_room_id)
 
-    # Library ↔ Border (south/north, Δy = 2)
     :ok = WorldCommands.add_exit(@library_room_id, :south, @border_room_id)
     :ok = WorldCommands.add_exit(@border_room_id, :north, @library_room_id)
 
-    # Border → Hollowvale Outskirts (one-way east, cross-region). The
-    # map renders a dashed cross-region affordance from Border's east side.
     :ok = WorldCommands.add_exit(@border_room_id, :east, @outskirts_room_id)
-    # Return path west from Outskirts back to Border (two-way is friendlier;
-    # the cross-region affordance still shows on both sides).
     :ok = WorldCommands.add_exit(@outskirts_room_id, :west, @border_room_id)
 
-    # ---- Objects (existing) — feature 016: cloned into existence then
-    # moved into their rooms via the entity lifecycle. ----
     alias AgenticRealms.World.ContainerRef
 
     {:ok, _} =
@@ -351,7 +323,6 @@ defmodule AgenticRealms.World.Seed do
         :placed
       )
 
-    # ---- NPC (existing) ----
     alias AgenticRealms.World.Application, as: WorldApp
     alias AgenticRealms.World.Commands.CreateBlueprint
 
@@ -377,33 +348,9 @@ defmodule AgenticRealms.World.Seed do
         @innkeeper_garrick_clone_id
       )
 
-    # ---- Feature 013: Hollowvale apple orchard + Orchard Keeper ----
     seed_hollowvale_orchard()
   end
 
-  # ----------------------------------------------------------------------
-  # Feature 013 — Hollowvale apple orchard
-  # ----------------------------------------------------------------------
-  #
-  # The Orchard Keeper lives in her cottage just east of the Hollowvale
-  # Outskirts. The orchard spreads south of the cottage across three
-  # neighboring rooms — the wizard-authored spawn rooms for the
-  # `golden_apples` FetchQuest in her catalog.
-  #
-  # Players are NOT auto-assigned this quest. They must travel to the
-  # cottage, speak with the Keeper, and accept the quest in chat. The
-  # apples then spawn into the three orchard rooms scoped to that player
-  # only — two players on the quest each see their own apples.
-  #
-  # Layout (Hollowvale, elevation 0):
-  #
-  #              map_x =  0          1            2
-  #              ┌───────────────┬───────────┬─────────────┐
-  # map_y =  0  │ Outskirts ──── │ Cottage   │             │
-  #              ├───────────────┼───────────┼─────────────┤
-  # map_y =  1  │ Old Grove ────│ Wild Apple │ Forgotten   │
-  #              │               │            │   Corner    │
-  #              └───────────────┴───────────┴─────────────┘
   defp seed_hollowvale_orchard do
     :ok =
       WorldCommands.create_room(
@@ -449,7 +396,6 @@ defmodule AgenticRealms.World.Seed do
         map_y: 1
       )
 
-    # Exits: Outskirts ↔ Cottage (east/west); orchard ring south of both.
     :ok = WorldCommands.add_exit(@outskirts_room_id, :east, @cottage_room_id)
     :ok = WorldCommands.add_exit(@cottage_room_id, :west, @outskirts_room_id)
 
@@ -465,7 +411,6 @@ defmodule AgenticRealms.World.Seed do
     :ok = WorldCommands.add_exit(@wild_apple_room_id, :east, @forgotten_corner_room_id)
     :ok = WorldCommands.add_exit(@forgotten_corner_room_id, :west, @wild_apple_room_id)
 
-    # ---- Orchard Keeper NPC ----
     alias AgenticRealms.World.Application, as: WorldApp
     alias AgenticRealms.World.Commands.CreateBlueprint
 
@@ -497,10 +442,6 @@ defmodule AgenticRealms.World.Seed do
       |> String.replace("\n", " ")
       |> String.trim()
 
-    # Quest catalog — one FetchQuest. The wizard-authored quest_tag
-    # `quest.orchard.golden_apple` is the template-level tag; the
-    # accept_quest wrapper rewrites it to an instance-scoped tag on
-    # each acceptance so two concurrent quests don't share inventory.
     orchard_quests = [
       %{
         "slug" => "golden_apples",
@@ -527,9 +468,6 @@ defmodule AgenticRealms.World.Seed do
           "name" => "bigger golden apple",
           "description" =>
             "An impossibly large golden apple, warm to the touch, the prize of Amaranth's private cellar.",
-          # Feature 020 — rescaled to the SRD 5.2 table, where level 2 is at
-          # 300. Preserves feature 019's intent that the first quest is worth
-          # exactly one level.
           "xp" => 300
         }
       }
@@ -580,9 +518,6 @@ defmodule AgenticRealms.World.Seed do
     end
   end
 
-  # Feature 015 — seed-only behavior_groups (no wizard authoring surface yet). At
-  # least two distinct named behavior_groups so composition (US4) is demonstrable
-  # from a fresh world. Plain Repo upserts — behavior_groups are not event-sourced.
   defp seed_behavior_groups do
     now = DateTime.utc_now() |> DateTime.truncate(:second)
 

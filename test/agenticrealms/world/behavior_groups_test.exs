@@ -52,7 +52,6 @@ defmodule AgenticRealms.World.BehaviorGroupsTest do
     test "same-trigger behaviors from different sources are all retained" do
       put_behavior_group("a", [@say])
       put_behavior_group("b", [@emote])
-      # both @say and @emote are player_entered → both kept
       assert {:ok, [@say, @emote]} = BehaviorGroups.compose(["a", "b"], [])
     end
 

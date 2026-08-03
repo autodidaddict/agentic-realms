@@ -197,10 +197,6 @@ defmodule AgenticRealms.World.Commands do
     end
   end
 
-  # --- Entity lifecycle (feature 016) -------------------------------------
-  #
-  # Moved to `Commands.Entities`.
-
   defdelegate clone_entity(kind, fields), to: __MODULE__.Entities
   defdelegate clone_entity(kind, entity_id, fields), to: __MODULE__.Entities
   defdelegate move_entity(entity_id, expected_from, to, cause), to: __MODULE__.Entities
@@ -211,7 +207,6 @@ defmodule AgenticRealms.World.Commands do
   defdelegate take(player_id, name), to: __MODULE__.Entities
   defdelegate drop(player_id, name), to: __MODULE__.Entities
 
-  # `resolve_exit/3` stays with `move/2`, the only caller.
   defp resolve_exit(from_room_id, direction, viewer_player_id) do
     dir_str = Direction.to_string(direction)
 
@@ -228,18 +223,12 @@ defmodule AgenticRealms.World.Commands do
     end
   end
 
-  # --- World authoring (feature 012) --------------------------------------
-  #
-  # Moved to `Commands.Regions`.
-
   defdelegate create_region(region_id, name), to: __MODULE__.Regions
 
   defdelegate create_room(room_id, name, description, region_id, opts \\ []),
     to: __MODULE__.Regions
 
   defdelegate add_exit(source_room_id, direction, target_room_id), to: __MODULE__.Regions
-
-  # --- Discovery (feature 012) --------------------------------------------
 
   @doc """
   Dispatches a `RecordRoomDiscovery` command to the World.Player aggregate.
@@ -265,17 +254,9 @@ defmodule AgenticRealms.World.Commands do
     WorldApp.dispatch(%RecordRoomDiscovery{player_id: player_id, room_id: room_id})
   end
 
-  # --- Quests (feature 013) -----------------------------------------------
-  #
-  # Moved to `Commands.Quests`. This module stays the one place a caller looks.
-
   defdelegate accept_quest(player_id, npc_blueprint_id, slug), to: __MODULE__.Quests
   defdelegate check_progress(player_id, quest_id), to: __MODULE__.Quests
   defdelegate finalize_quest(player_id, quest_id), to: __MODULE__.Quests
-
-  # --- Wizard authoring (features 008, 014, 015) --------------------------
-  #
-  # Moved to `Commands.Authoring`.
 
   defdelegate spawn_npc_clone(blueprint_id, room_id, clone_id), to: __MODULE__.Authoring
   defdelegate create_blueprint(attrs, opts \\ []), to: __MODULE__.Authoring

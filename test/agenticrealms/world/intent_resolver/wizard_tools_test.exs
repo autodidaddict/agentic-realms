@@ -106,7 +106,6 @@ defmodule AgenticRealms.World.IntentResolver.WizardToolsTest do
             "input" => %{
               "name" => "x",
               "short_description" => "y"
-              # long_description missing
             }
           }
         ]

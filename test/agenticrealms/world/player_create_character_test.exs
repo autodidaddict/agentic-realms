@@ -176,9 +176,6 @@ defmodule AgenticRealms.World.PlayerCreateCharacterTest do
     end
 
     test "the event records finished values, not a reference to configuration" do
-      # FR-031 — changing what the game would generate cannot reach back and
-      # alter a character that already exists, because nothing about the
-      # configuration is stored on the event or read by the aggregate.
       original = Application.fetch_env!(:agenticrealms, :character_defaults)
       state = created()
 

@@ -51,11 +51,9 @@ defmodule AgenticRealms.World.Commands.SpawnObjectFreeformWrapperTest do
 
     assert name == "freeform pot #{suffix}"
 
-    # FR-011: no blueprint row added.
     blueprint_count_after = length(Queries.list_object_blueprints())
     assert blueprint_count_after == blueprint_count_before
 
-    # Defense in depth — the schema has no blueprint_id column.
     refute Map.has_key?(Map.from_struct(Repo.get(Object, object_id)), :blueprint_id)
   end
 
@@ -132,8 +130,6 @@ defmodule AgenticRealms.World.Commands.SpawnObjectFreeformWrapperTest do
     a = Repo.get(Object, from_bp)
     b = Repo.get(Object, freeform)
 
-    # Same content fields; same room; same schema shape; both lack
-    # blueprint_id columns.
     assert a.name == b.name
     assert a.short_description == b.short_description
     assert a.long_description == b.long_description
@@ -143,8 +139,6 @@ defmodule AgenticRealms.World.Commands.SpawnObjectFreeformWrapperTest do
     assert Map.keys(Map.from_struct(a)) == Map.keys(Map.from_struct(b))
     refute Map.has_key?(Map.from_struct(a), :blueprint_id)
 
-    # Blueprint registry contains exactly one row for this scenario — the
-    # one authored explicitly; the freeform path added none.
     assert %Blueprint{id: ^slug} = Repo.get(Blueprint, slug)
   end
 end

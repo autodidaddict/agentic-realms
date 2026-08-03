@@ -15,10 +15,6 @@ defmodule AgenticRealmsWeb.GameLive.Wizard do
   alias AgenticRealms.World.Blueprint.Slug
   alias AgenticRealms.World.Schemas.Blueprint, as: BlueprintRow
 
-  # ────────────────────────────────────────────────────────────
-  # Blueprint commit pipeline (US1 / US5)
-  # ────────────────────────────────────────────────────────────
-
   @doc """
   Feature 014 US1 commit-create. Dispatches `create_object_blueprint`,
   refreshes the registry on success, surfaces the error otherwise.
@@ -54,13 +50,9 @@ defmodule AgenticRealmsWeb.GameLive.Wizard do
     end
   end
 
-  # `create_blueprint` can return `{:error, {:unknown_behavior_group, name}}`; surface
-  # a flat atom the component's `format_commit_error/1` already understands.
   defp normalize_error({:unknown_behavior_group, _name}), do: :unknown_behavior_group
   defp normalize_error(reason), do: reason
 
-  # US4 — a freshly-added editor row with no text is incomplete; drop it before
-  # the command's feature-009 validation rejects the empty say/emote text.
   defp drop_blank_behaviors(behaviors) when is_list(behaviors) do
     Enum.reject(behaviors, fn b ->
       b
@@ -88,7 +80,6 @@ defmodule AgenticRealmsWeb.GameLive.Wizard do
       fixed: Map.get(draft, :fixed, false)
     }
 
-    # NPC blueprints also edit lore + behavior_groups + direct behaviors.
     fields_changed =
       if Map.get(draft, :kind) == "npc" do
         Map.merge(base, %{
@@ -138,10 +129,6 @@ defmodule AgenticRealmsWeb.GameLive.Wizard do
         {:noreply, assign(socket, :blueprint_commit_error, reason)}
     end
   end
-
-  # ────────────────────────────────────────────────────────────
-  # Resolver task lifecycle
-  # ────────────────────────────────────────────────────────────
 
   @doc """
   Feature 014 US1 / US3 — apply the resolver-task outcome to the
@@ -240,10 +227,6 @@ defmodule AgenticRealmsWeb.GameLive.Wizard do
 
   def cancel_resolver_task(socket), do: socket
 
-  # ────────────────────────────────────────────────────────────
-  # Live blueprint registry patching (US6)
-  # ────────────────────────────────────────────────────────────
-
   @doc """
   Feature 014 US6 — apply a `WizardBlueprintRegistryChanged` payload
   to the wizard's `:object_blueprints` list in place. Insert (with
@@ -261,11 +244,6 @@ defmodule AgenticRealmsWeb.GameLive.Wizard do
     if Enum.any?(list, &(&1.id == bp_id)) do
       socket
     else
-      # Build a real %ObjectBlueprint{} struct so the
-      # :object_blueprints assign stays homogeneous (consumers can
-      # pattern-match on the struct, access timestamps, etc.).
-      # Timestamps are slightly off from the projector's canonical
-      # values but within the same second.
       now = DateTime.utc_now() |> DateTime.truncate(:second)
 
       row = %BlueprintRow{

@@ -17,10 +17,6 @@ defmodule AgenticRealmsWeb.GameComponents.MiniMapTest do
   alias AgenticRealms.World.MapView.{RoomGlyph, ExitLine}
   alias AgenticRealmsWeb.GameComponents.MiniMap
 
-  # ----------------------------------------------------------------
-  # Fixtures
-  # ----------------------------------------------------------------
-
   defp single_room_view do
     %MapView{
       region_id: "r-1",
@@ -203,10 +199,6 @@ defmodule AgenticRealmsWeb.GameComponents.MiniMapTest do
     render_component(&MiniMap.mini_map/1, %{map_view: view})
   end
 
-  # ----------------------------------------------------------------
-  # US1 — single room
-  # ----------------------------------------------------------------
-
   describe "US1 — single discovered room" do
     test "renders the region name in the header" do
       html = render_map(single_room_view())
@@ -226,9 +218,6 @@ defmodule AgenticRealmsWeb.GameComponents.MiniMapTest do
     end
 
     test "the rendered cell carries an aria-label with the room name (a11y)" do
-      # No SVG <title> — the browser would render that as a native
-      # tooltip alongside our styled one (double-tooltip). aria-label on
-      # the <g> is the FR-016-compliant accessibility primitive.
       html = render_map(single_room_view())
       assert html =~ ~s|aria-label="Stone Atrium"|
       refute html =~ "<title>"
@@ -241,17 +230,10 @@ defmodule AgenticRealmsWeb.GameComponents.MiniMapTest do
 
     test "no exit lines for a lone room" do
       html = render_map(single_room_view())
-      # The <defs> block contains a `<line>` inside the hatch pattern (it's
-      # render scaffolding, not an exit). Assert on the exit-specific
-      # classes instead.
       refute html =~ "map-line--normal"
       refute html =~ "map-fog-stub"
     end
   end
-
-  # ----------------------------------------------------------------
-  # US1 / US2 — linear three rooms
-  # ----------------------------------------------------------------
 
   describe "linear three rooms — three glyphs, two undirected lines" do
     test "renders three map-cell groups" do
@@ -270,21 +252,15 @@ defmodule AgenticRealmsWeb.GameComponents.MiniMapTest do
       html = render_map(linear_three_view())
       currents = Regex.scan(~r/map-cell--current/, html)
       assert length(currents) == 1
-      # Verify it's specifically room B
       assert html =~ ~s|data-room-name="B"|
     end
   end
-
-  # ----------------------------------------------------------------
-  # US2 — sequence rendering (single → three → still works)
-  # ----------------------------------------------------------------
 
   describe "US2 — re-render reflects updated MapView (no stale state)" do
     test "rendering single then linear-three produces independent HTML strings" do
       single = render_map(single_room_view())
       linear = render_map(linear_three_view())
 
-      # Both must reference the region header but differ in cell count.
       assert single =~ "Blackmire"
       assert linear =~ "Blackmire"
 
@@ -295,10 +271,6 @@ defmodule AgenticRealmsWeb.GameComponents.MiniMapTest do
       assert length(linear_cells) == 3
     end
   end
-
-  # ----------------------------------------------------------------
-  # US3 — fog-of-war stubs + information hiding at the renderer
-  # ----------------------------------------------------------------
 
   describe "US3 — fog-of-war stub rendering" do
     test "renders a .map-fog-stub line plus a .map-fog-cloud rect" do
@@ -311,15 +283,11 @@ defmodule AgenticRealmsWeb.GameComponents.MiniMapTest do
     test "the fog-stub line element carries NO title and NO data-room-name" do
       html = render_map(fog_stub_view())
 
-      # Find the line tagged map-fog-stub (it may be self-closing or open
-      # depending on Phoenix's renderer; match both).
       assert [stub_chunk] = Regex.run(~r/<line[^>]*map-fog-stub[^>]*>/, html)
       refute stub_chunk =~ "data-room-name"
       refute stub_chunk =~ "data-room-id"
       refute stub_chunk =~ "data-target"
 
-      # And there's no <title> child inside the line (linear element, no
-      # children typically, but assert defensively).
       stub_index = String.split(html, "map-fog-stub") |> length()
       assert stub_index >= 2
     end
@@ -327,10 +295,6 @@ defmodule AgenticRealmsWeb.GameComponents.MiniMapTest do
     test "the fog-cloud group carries NO data-room-name or identifying attribute" do
       html = render_map(fog_stub_view())
 
-      # The fog cloud is rendered as a <g class="map-fog-cloud"> wrapping
-      # overlapping <circle> elements (soft cloud silhouette). Inspect
-      # everything from the opening <g ... map-fog-cloud ...> through its
-      # closing </g> to confirm no identifying attributes leaked.
       assert [cloud_block] =
                Regex.run(
                  ~r/<g[^>]*map-fog-cloud[^>]*>.*?<\/g>/s,
@@ -345,30 +309,17 @@ defmodule AgenticRealmsWeb.GameComponents.MiniMapTest do
     test "fog-stub line renders with the map-fog-stub class" do
       html = render_map(fog_stub_view())
 
-      # Fog stubs use a direction-independent dashed stroke styled via
-      # the .map-fog-stub class — no SVG <defs> required (the prior
-      # linearGradient approach was degenerate on vertical lines).
       assert html =~ ~s|class="map-line map-fog-stub"|
     end
 
     test "an undiscovered destination name is NEVER present in fog-stub markup" do
       html = render_map(fog_stub_view())
 
-      # The fixture has only room A in `rooms`. Any other name appearing
-      # would mean the renderer leaked info. The destination's name in our
-      # fixture doesn't exist (the stub has no destination identity), so
-      # the only room name allowed is "A".
       assert html =~ ~s|data-room-name="A"|
-      # Verify there's no second data-room-name attribute referring to
-      # somewhere we didn't render.
       data_names = Regex.scan(~r/data-room-name="([^"]+)"/, html)
       assert data_names == [["data-room-name=\"A\"", "A"]]
     end
   end
-
-  # ----------------------------------------------------------------
-  # US4 — vertical exits + elevation filtering UI
-  # ----------------------------------------------------------------
 
   describe "US4 — Up/Down icons inside the room glyph" do
     test "has_up?: true renders a .map-icon-up SVG inside the cell" do
@@ -418,8 +369,6 @@ defmodule AgenticRealmsWeb.GameComponents.MiniMapTest do
     test "NO raw integer elevation appears anywhere in the rendered HTML (SC-008)" do
       html = render_map(multi_floor_view(has_above_rooms?: true, has_below_rooms?: true))
 
-      # FR-012: the integer elevation must not leak. The header must not
-      # contain a digit-bearing tag adjacent to the affordances.
       refute html =~ ~r/elevation[\s:="]*\d/i
       refute html =~ ~r/floor\s*\d/i
       refute html =~ ~r/level\s*\d/i
@@ -435,62 +384,35 @@ defmodule AgenticRealmsWeb.GameComponents.MiniMapTest do
                )
 
       assert pip =~ "<path"
-      # The path's `d` attribute may contain numerics (coordinates), but
-      # no integer-looking elevation marker should appear as visible text
-      # inside the span.
       visible_text = Regex.replace(~r/<[^>]+>/, pip, "")
       refute visible_text =~ ~r/\d/
     end
   end
 
-  # ----------------------------------------------------------------
-  # US5 — hidden rooms render as if absent (FR-006)
-  # ----------------------------------------------------------------
-  #
-  # The MapView layer is what actually enforces hidden-room suppression
-  # (its query filter on map_visible == true and its build_exit_lines
-  # cond). The renderer is a pure function of the MapView struct, so
-  # these snapshot tests verify the contract by feeding a MapView that
-  # has ALREADY excluded the hidden room — the renderer must not "make
-  # up" extra content.
-
   describe "US5 — hidden room renders as if absent" do
     test "when the hidden neighbor was suppressed from MapView, no line or fog stub appears" do
-      # Single-room MapView (hidden neighbor pre-suppressed by MapView).
       html = render_map(single_room_view())
 
       refute html =~ "map-line--normal"
       refute html =~ "map-fog-stub"
       refute html =~ "map-fog-cloud"
 
-      # The current room glyph still renders normally — hidden rooms
-      # don't affect the visible room's own appearance.
       assert html =~ ~s|data-room-name="Stone Atrium"|
     end
 
     test "no DOM element names the hidden room or its coordinates" do
       html = render_map(single_room_view())
 
-      # The single_room_view fixture conceptually has a hidden neighbor
-      # that MapView has filtered out. The renderer's job is to not
-      # invent any reference to it. Assert no extra room-name attributes
-      # beyond the single rendered cell.
       data_names = Regex.scan(~r/data-room-name="([^"]+)"/, html)
       assert length(data_names) == 1
     end
 
     test "the rendered HTML does not contain the literal 'Hidden' as a room name" do
-      # Catches a class of regressions where the renderer might leak the
-      # hidden room's name via some forgotten attribute or comment.
       html = render_map(single_room_view())
       refute html =~ "Hidden Vault"
       refute html =~ ~s|name="Hidden|
     end
   end
-
-  # ----------------------------------------------------------------
-  # US6 — cross-region affordance rendering
-  # ----------------------------------------------------------------
 
   describe "US6 — cross-region rendering" do
     test "renders a .map-line--cross-region (dashed) plus a .map-portal" do
@@ -520,10 +442,6 @@ defmodule AgenticRealmsWeb.GameComponents.MiniMapTest do
     end
 
     test "destination region name never appears in cross-region markup" do
-      # cross_region_view source region is Blackmire; the destination
-      # would be Hollowvale or similar. The fixture deliberately does
-      # NOT include the destination's name anywhere. Verify the renderer
-      # doesn't accidentally insert it via title, aria, etc.
       html = render_map(cross_region_view())
 
       refute html =~ "Hollowvale"
@@ -533,7 +451,6 @@ defmodule AgenticRealmsWeb.GameComponents.MiniMapTest do
     test "no <title> elements on cross-region line or portal" do
       html = render_map(cross_region_view())
 
-      # Extract just the cross-region SVG section by finding the line + portal.
       cross_section =
         case Regex.run(
                ~r/(<line[^>]*map-line--cross-region.*?<rect[^>]*map-portal[^>]*>)/s,
@@ -546,16 +463,6 @@ defmodule AgenticRealmsWeb.GameComponents.MiniMapTest do
       refute cross_section =~ "<title>"
     end
   end
-
-  # ----------------------------------------------------------------
-  # US7 — hover tooltip plumbing (data-room-name placement)
-  # ----------------------------------------------------------------
-  #
-  # The ColocatedHook (.MapTooltip) reads the data-room-name attribute
-  # and renders the styled tooltip DIRECTLY on the client — no LiveView
-  # round-trip per mousemove. The renderer's job is to put the attribute
-  # on .map-cell groups ONLY — never on fog stubs or cross-region
-  # portals, where it would leak destination identity per FR-017.
 
   describe "US7 — data-room-name placement" do
     test "every .map-cell carries data-room-name matching the room's display name" do
@@ -574,7 +481,6 @@ defmodule AgenticRealmsWeb.GameComponents.MiniMapTest do
       html = render_map(fog_stub_view())
 
       data_names = Regex.scan(~r/data-room-name="([^"]+)"/, html)
-      # Only the source room ("A") should carry the attribute.
       names = Enum.map(data_names, fn [_, name] -> name end)
       assert names == ["A"]
     end
@@ -583,15 +489,12 @@ defmodule AgenticRealmsWeb.GameComponents.MiniMapTest do
       html = render_map(cross_region_view())
 
       data_names = Regex.scan(~r/data-room-name="([^"]+)"/, html)
-      # Only "Border" — the rendered source — should carry the attribute.
       names = Enum.map(data_names, fn [_, name] -> name end)
       assert names == ["Border"]
     end
 
     test "SVG carries the phx-hook directive for the map-interact hook" do
       html = render_map(linear_three_view())
-      # Phoenix resolves `.MapInteract` (defined in this module's
-      # ColocatedHook script) to the fully-qualified module path.
       assert html =~ "MapInteract"
       assert html =~ "phx-hook"
       assert html =~ ~s|id="map-canvas-svg"|
@@ -605,10 +508,6 @@ defmodule AgenticRealmsWeb.GameComponents.MiniMapTest do
     end
   end
 
-  # ----------------------------------------------------------------
-  # Off-map state (FR-003a)
-  # ----------------------------------------------------------------
-
   describe "off-map state (FR-003a)" do
     test "renders only the region header — no svg canvas, no glyphs" do
       html = render_map(off_map_view())
@@ -619,16 +518,10 @@ defmodule AgenticRealmsWeb.GameComponents.MiniMapTest do
     end
   end
 
-  # ----------------------------------------------------------------
-  # Information-hiding contract (FR-005, FR-017, FR-012)
-  # ----------------------------------------------------------------
-
   describe "information-hiding" do
     test "no <line> element carries data-room-name or data-target-id" do
       html = render_map(linear_three_view())
 
-      # Extract line elements; ensure none has identifying attributes.
-      # Match both self-closing `<line .../>` and opening-tag `<line ...>` forms.
       line_chunks = Regex.scan(~r/<line\b[^>]*>/, html)
       assert line_chunks != [], "expected at least one <line> in the rendered SVG"
 
@@ -640,10 +533,6 @@ defmodule AgenticRealmsWeb.GameComponents.MiniMapTest do
     end
 
     test "the rendered HTML contains no integer elevation in unexpected places" do
-      # The renderer must not display the elevation value (FR-012). The
-      # snapshot HTML should contain no digit sequences flagged as
-      # "elevation" anywhere. (SVG coords carry digits; this assertion
-      # specifically looks for the word "elevation" near any digit.)
       html = render_map(linear_three_view())
       refute html =~ ~r/elevation[\s:=]*\d/i
     end

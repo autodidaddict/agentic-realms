@@ -24,7 +24,6 @@ defmodule AgenticRealms.NpcMinds.TemporalClient do
 
   alias AgenticRealms.NpcMinds.Config
 
-  # base64("json/plain") — Temporal Payload metadata encoding for a JSON value.
   @json_encoding Base.encode64("json/plain")
   @identity "agentic-realms"
 
@@ -66,7 +65,6 @@ defmodule AgenticRealms.NpcMinds.TemporalClient do
       {:ok, status} when status in 200..299 ->
         :ok
 
-      # Already stopped / never started — tolerated per FR-028.
       {:ok, 404} ->
         :ok
 
@@ -89,8 +87,6 @@ defmodule AgenticRealms.NpcMinds.TemporalClient do
     query = "WorkflowType = '#{Config.workflow_type()}' AND ExecutionStatus = 'Running'"
     collect_running(query, nil, [])
   end
-
-  # --- internals ----------------------------------------------------------
 
   defp collect_running(query, page_token, acc) do
     params = [query: query] ++ if(page_token, do: [nextPageToken: page_token], else: [])
@@ -122,8 +118,6 @@ defmodule AgenticRealms.NpcMinds.TemporalClient do
     end
   end
 
-  # Perform a Temporal HTTP request. Returns `{:ok, status}` (or `{:ok, %{status,
-  # body}}` when `decode: true`) or `{:error, reason}`; never raises.
   defp request(method, path, opts) do
     decode = Keyword.get(opts, :decode, false)
 

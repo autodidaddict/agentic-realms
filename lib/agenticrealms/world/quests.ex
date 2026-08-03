@@ -147,13 +147,6 @@ defmodule AgenticRealms.World.Quests do
     end
   end
 
-  # ----- private helpers ---------------------------------------------------
-
-  # The `definition_snapshot` jsonb column comes back from Ecto with string
-  # keys regardless of how it was written (Postgres jsonb -> Elixir map).
-  # We support atom-keyed lookups too for defensive parity in case the
-  # value ever arrives via the eventstore atom-keying path.
-
   defp has_quest_tag?(_, nil), do: false
 
   defp has_quest_tag?(%Object{behaviors: behaviors}, tag) do

@@ -65,7 +65,6 @@ defmodule AgenticRealms.World.Commands.SpawnNpcFreeformTest do
     assert clone.room_id == room_id
     assert clone.lore == "Carries a sealed letter he must not lose."
 
-    # No archetype was registered.
     assert Repo.aggregate(Blueprint, :count) == blueprints_before
     assert [] = Repo.all(from(b in Blueprint, where: b.name == ^"courier #{suffix}"))
   end

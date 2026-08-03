@@ -24,16 +24,11 @@ defmodule AgenticRealms.World.Schemas.Blueprint do
     field :long_description, :string
     field :fixed, :boolean, default: false
     field :revision, :integer, default: 1
-    # Direct behaviors (feature 009). Effective set = union(behavior_groups) ++ these,
-    # composed at spawn time.
     field :behaviors, {:array, :map}, default: []
     field :lore, :string, default: ""
     field :behavior_groups, {:array, :string}, default: []
-    # Feature 013 — per-NPC FetchQuest catalog.
     field :quests, {:array, :map}, default: []
 
-    # Feature 019 — Real Stats. Base authoring stats for NPC-kind blueprints
-    # (frozen onto each clone at spawn); ignored for object kind.
     field :str, :integer, default: 12
     field :dex, :integer, default: 12
     field :con, :integer, default: 12

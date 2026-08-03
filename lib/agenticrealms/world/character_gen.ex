@@ -61,15 +61,9 @@ defmodule AgenticRealms.World.CharacterGen do
     end
   end
 
-  # A point-buy spread weighted to the class. Deliberately the deterministic
-  # one: completing the same draft twice has to produce the same character, and
-  # the dialog does its own rolling. Only fills when the player bought nothing,
-  # which under the current dialog means they never reached the abilities step.
   defp fill_bought(%Draft{bought: bought} = draft) when map_size(bought) > 0, do: draft
   defp fill_bought(%Draft{} = draft), do: Draft.default_bought(draft)
 
-  # Of the spreads the SRD allows, take [2, 1] and put the larger increase on
-  # the highest-priority ability the background offers.
   defp fill_spread(%Draft{spread: spread} = draft) when not is_nil(spread), do: draft
 
   defp fill_spread(%Draft{} = draft) do
@@ -84,8 +78,6 @@ defmodule AgenticRealms.World.CharacterGen do
     Draft.put_spread(draft, {:split, larger, smaller})
   end
 
-  # The best-modifier picks the class offers, skipping anything already granted
-  # so a pick is never spent on a proficiency the character already has.
   defp fill_skill_picks(%Draft{skill_picks: [_ | _]} = draft), do: draft
 
   defp fill_skill_picks(%Draft{} = draft) do
@@ -105,9 +97,6 @@ defmodule AgenticRealms.World.CharacterGen do
     end
   end
 
-  # Everything else the content asks for. Takes options in the order the content
-  # lists them, which is arbitrary but stable — and stability is the property
-  # that matters, because a replay must reproduce the same character.
   defp fill_choices(%Draft{} = draft) do
     draft
     |> Draft.open_choices()
@@ -131,10 +120,6 @@ defmodule AgenticRealms.World.CharacterGen do
     end)
   end
 
-  # Content order is arbitrary, and for one choice that shows. A human's sizes
-  # are listed small before medium, so taking the first would quietly make every
-  # unasked human small. Size is the one place the configured default has an
-  # opinion worth honouring; everywhere else the content's own order stands.
   defp prefer(options, :species_size) do
     default = configured_size()
     if default in options, do: [default | List.delete(options, default)], else: options
@@ -228,8 +213,6 @@ defmodule AgenticRealms.World.CharacterGen do
     }
   end
 
-  # --- ability scores ------------------------------------------------------
-
   @doc """
   The order in which a class's abilities matter, used wherever generation needs
   a deterministic tiebreak: the primary ability first, then the saving throws it
@@ -252,17 +235,12 @@ defmodule AgenticRealms.World.CharacterGen do
     Enum.uniq(primary ++ class.saving_throws ++ Ability.all())
   end
 
-  # Deal the standard array down the priority order: highest score to the
-  # ability the class cares about most.
   defp assign_scores(priority) do
     priority
     |> Enum.zip(Ability.standard_array())
     |> Map.new()
   end
 
-  # The 2024 rules attach ability score increases to the background rather than
-  # the species. Of the spreads the SRD allows, take [2, 1] and put the larger
-  # increase on the highest-priority ability the background offers.
   defp apply_background_increases(abilities, background, priority) do
     [larger, smaller] = Enum.find(Background.spreads(), &(length(&1) == 2))
 
@@ -274,10 +252,6 @@ defmodule AgenticRealms.World.CharacterGen do
     end)
   end
 
-  # --- skills --------------------------------------------------------------
-
-  # Order matters: the fixed grants land first, so the class's free picks are
-  # never spent on something the character already has.
   defp skills(class, background, species_skill, modifiers) do
     granted = background.skills ++ [species_skill]
 
@@ -290,13 +264,9 @@ defmodule AgenticRealms.World.CharacterGen do
     Enum.uniq(granted ++ picks)
   end
 
-  # Best modifier first, ties broken by name so the result never depends on the
-  # order the content happens to list.
   defp rank(skills, modifiers) do
     Enum.sort_by(skills, &{-Map.fetch!(modifiers, Skill.ability(&1)), Skill.name(&1)})
   end
-
-  # --- helpers -------------------------------------------------------------
 
   defp sorted_strings(values) do
     values |> Enum.map(&to_string/1) |> Enum.uniq() |> Enum.sort()

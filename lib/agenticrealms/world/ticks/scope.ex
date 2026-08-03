@@ -43,8 +43,6 @@ defmodule AgenticRealms.World.Ticks.Scope do
     |> sort_per_fr008a()
   end
 
-  # --- Incremental updates -----------------------------------------------
-
   @spec add_npc([behavior_entry()], npc_id :: String.t()) :: [behavior_entry()]
   def add_npc(entries, npc_id) do
     case Repo.get(NPCClone, npc_id) do
@@ -94,8 +92,6 @@ defmodule AgenticRealms.World.Ticks.Scope do
     remove_carried_object(entries, nil, object_id)
   end
 
-  # --- Internal builders -------------------------------------------------
-
   defp room_entries(room_id) do
     case Repo.get(Room, room_id) do
       nil ->
@@ -116,7 +112,6 @@ defmodule AgenticRealms.World.Ticks.Scope do
     |> Enum.flat_map(&npc_entries_for_clone_data/1)
   end
 
-  # The Queries helper returns plain maps (id, name, behaviors).
   defp npc_entries_for_clone_data(%{id: id, name: name, behaviors: behaviors}) do
     (behaviors || [])
     |> filter_tick_behaviors()
@@ -127,8 +122,6 @@ defmodule AgenticRealms.World.Ticks.Scope do
     end)
   end
 
-  # add_npc/2 looks up the full NPCClone struct from Repo; this clause
-  # accepts that shape too for incremental updates.
   defp npc_entries_for_clone(%NPCClone{} = clone) do
     npc_entries_for_clone_data(%{
       id: clone.id,
@@ -137,9 +130,6 @@ defmodule AgenticRealms.World.Ticks.Scope do
     })
   end
 
-  # The query returns plain maps (id, name, short_description) — not full
-  # Object structs. Hydrate the Object struct before building entries so
-  # we can read `behaviors`.
   defp in_room_object_entries(room_id) do
     Queries.list_objects_in_room(room_id)
     |> Enum.flat_map(fn %{id: object_id} ->
@@ -193,7 +183,6 @@ defmodule AgenticRealms.World.Ticks.Scope do
     Map.get(behavior, "actions") || Map.get(behavior, :actions) || []
   end
 
-  # Stable FR-008a sort. Tuple key: kind_rank, target_id, behavior_index.
   defp sort_per_fr008a(entries) do
     Enum.sort_by(entries, fn e ->
       {kind_rank(e.target_kind), e.target_id, e.behavior_index}

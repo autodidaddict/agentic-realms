@@ -6,7 +6,5 @@ defmodule AgenticRealms.World.Events.EntityMoved do
   """
   @derive Jason.Encoder
   @enforce_keys [:entity_id, :from, :to]
-  # `kind` (`:object | :npc`) lets the read-side projector route to the right
-  # table without a lookup; stamped from aggregate state at emit time.
   defstruct [:entity_id, :from, :to, :cause, :kind, version: 1]
 end

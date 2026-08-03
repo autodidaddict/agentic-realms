@@ -53,7 +53,6 @@ defmodule AgenticRealms.World.Transient.EdgeCasesTest do
     {:ok, _} = Commands.spawn(owner.id, source)
     {:ok, tregion} = Transient.provision(owner.id, source)
 
-    # Tear it down (owner offline past grace).
     from(r in Region, where: r.id == ^tregion)
     |> Repo.update_all(
       set: [owner_offline_since: DateTime.add(DateTime.utc_now(), -600, :second)]
@@ -61,7 +60,6 @@ defmodule AgenticRealms.World.Transient.EdgeCasesTest do
 
     Manager.sweep_now()
 
-    # Owner is back in the source room; the entry rift is gone.
     assert {:ok, ^source} = Queries.current_room_of(owner.id)
     assert {:error, :no_exit_in_direction} = Commands.move(owner.id, :rift)
   end

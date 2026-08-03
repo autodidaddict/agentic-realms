@@ -45,15 +45,11 @@ defmodule AgenticRealms.World.Ticks.Scheduler do
     live_occupants: MapSet.new()
   ]
 
-  # --- Client -------------------------------------------------------------
-
   @doc "Start a Scheduler registered for `room_id`."
   @spec start_link(room_id :: String.t()) :: GenServer.on_start()
   def start_link(room_id) when is_binary(room_id) do
     GenServer.start_link(__MODULE__, room_id, name: Registry.via_tuple(room_id))
   end
-
-  # --- Server -------------------------------------------------------------
 
   @impl true
   def init(room_id) do
@@ -69,12 +65,6 @@ defmodule AgenticRealms.World.Ticks.Scheduler do
 
     schedule_next_beat(base)
 
-    # Scope and occupants are read from the database, which happens in
-    # `handle_continue/2` rather than here for the same reason as
-    # `Ticks.Lifecycle`: a process that cannot start on an unavailable database
-    # restarts straight back into the query that stopped it. `handle_continue`
-    # runs before any other message, so the scope is loaded before the first
-    # beat is handled.
     {:ok, state, {:continue, :load_scope}}
   end
 
@@ -124,8 +114,6 @@ defmodule AgenticRealms.World.Ticks.Scheduler do
     {:noreply, state}
   end
 
-  # --- Scope-change events ----------------------------------------------
-
   def handle_info(%RoomPlayerArrived{actor_id: pid, carried_object_ids: ids}, state) do
     state = %{state | live_occupants: MapSet.put(state.live_occupants, pid)}
     state = Enum.reduce(ids || [], state, &add_carried_object_state(&2, pid, &1))
@@ -139,7 +127,6 @@ defmodule AgenticRealms.World.Ticks.Scheduler do
   end
 
   def handle_info(%RoomNPCArrived{npc_id: npc_id}, state) do
-    # Reads the clone's behaviors, so it can fail like any other query.
     scope = safe_db(fn -> Scope.add_npc(state.in_scope, npc_id) end, state.in_scope)
     {:noreply, %{state | in_scope: scope}}
   end
@@ -153,15 +140,10 @@ defmodule AgenticRealms.World.Ticks.Scheduler do
     {:noreply, %{state | in_scope: new_scope, last_fire: new_last_fire}}
   end
 
-  # Object take/drop within the same room don't change scope — the
-  # object is still in this room either way (just changes carrier
-  # annotation, which we don't track in the scope set).
   def handle_info(%RoomObjectTaken{}, state), do: {:noreply, state}
   def handle_info(%RoomObjectDropped{}, state), do: {:noreply, state}
 
   def handle_info(_other, state), do: {:noreply, state}
-
-  # --- Internal helpers --------------------------------------------------
 
   defp filter_due(%__MODULE__{} = state, now) do
     Enum.filter(state.in_scope, fn entry ->
@@ -174,10 +156,6 @@ defmodule AgenticRealms.World.Ticks.Scheduler do
     Process.send_after(self(), :beat, base_rate_ms)
   end
 
-  # Run a query, and survive the database not being there. Same reasoning as
-  # `Ticks.Lifecycle.safe_db/2`: this process is long-lived and supervised, and
-  # an exit here costs a restart into the same query rather than one stale
-  # scope entry. Scope is recomputed on the next `:refresh` or scope event.
   defp safe_db(fun, fallback) do
     fun.()
   rescue

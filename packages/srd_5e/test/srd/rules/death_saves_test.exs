@@ -4,7 +4,6 @@ defmodule Srd.Rules.DeathSavesTest do
   alias Srd.Dice.Roll
   alias Srd.Rules.DeathSaves
 
-  # A straight d20 showing `nat` (death saves take no modifier).
   defp d20(nat) do
     %Roll{count: 1, sides: 20, modifier: 0, dice: [nat], reduce: :sum, total: nat}
   end

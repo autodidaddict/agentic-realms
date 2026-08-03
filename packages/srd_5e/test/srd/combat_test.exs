@@ -1,8 +1,6 @@
 defmodule Srd.CombatTest do
   use ExUnit.Case, async: true
 
-  # Walks the combat round from the `Srd` moduledoc so the example can't rot.
-
   alias Srd.Content.{Armors, Weapons}
   alias Srd.Dice
   alias Srd.Rules.{Attack, Damage, DeathSaves, Hitpoints, Initiative}

@@ -11,8 +11,6 @@ defmodule AgenticRealms.World.CharacterDraftTest do
   alias Srd.Rules.Ability
   alias Srd.Rules.PointBuy
 
-  # A fixed spread rather than a rolled one, because most of these assert on
-  # exact modifiers. Costs exactly the budget: 9 + 7 + 5 + 4 + 2 + 0.
   @spread %{str: 15, dex: 14, con: 13, int: 12, wis: 10, cha: 8}
 
   defp identity(species \\ "human", class \\ "fighter", background \\ "soldier") do
@@ -132,8 +130,6 @@ defmodule AgenticRealms.World.CharacterDraftTest do
     end
 
     test "puts the highest score on what the class runs on" do
-      # Every shape has a unique highest score, so this is a statement about
-      # priority rather than about which shape came up.
       for _ <- 1..25 do
         rolled = Draft.new() |> Draft.put_selection(:class, "wizard") |> Draft.roll()
         best = rolled.bought |> Map.values() |> Enum.max()
@@ -184,7 +180,6 @@ defmodule AgenticRealms.World.CharacterDraftTest do
     end
 
     test "refuses an increase the remaining points will not cover" do
-      # 26 of 27 spent; 13 -> 14 costs 2.
       tight = %{Draft.new() | bought: %{@spread | wis: 9, cha: 8}}
 
       assert Draft.points_remaining(tight) == 1
@@ -246,8 +241,6 @@ defmodule AgenticRealms.World.CharacterDraftTest do
     end
 
     test "never holds more than the class allows, releasing the oldest" do
-      # Fighter chooses 2. Athletics is granted by soldier, so it is refused
-      # rather than held — the two that stick are acrobatics and perception.
       draft =
         identity()
         |> Draft.toggle_skill(:acrobatics)
@@ -258,7 +251,6 @@ defmodule AgenticRealms.World.CharacterDraftTest do
     end
 
     test "a granted skill is refused rather than spent" do
-      # Soldier grants athletics and intimidation.
       draft = identity() |> Draft.toggle_skill(:athletics)
 
       assert draft.skill_picks == []
@@ -294,7 +286,6 @@ defmodule AgenticRealms.World.CharacterDraftTest do
     test "is the keying ability's modifier, plus proficiency when trained" do
       draft = identity() |> with_abilities()
 
-      # Dexterity 14 → +2. Proficiency at level 1 is +2.
       assert Draft.skill_modifier(draft, :acrobatics) == 2
       assert Draft.skill_modifier(draft, :acrobatics, proficient?: true) == 4
     end
@@ -302,14 +293,12 @@ defmodule AgenticRealms.World.CharacterDraftTest do
     test "includes the background increase" do
       draft = identity() |> with_abilities()
 
-      # Strength 15 + 2 from the soldier spread = 17 → +3.
       assert Draft.skill_modifier(draft, :athletics) == 3
     end
   end
 
   describe "toggle_choice/3" do
     test "never holds more than the choice allows" do
-      # Fighter's Weapon Mastery chooses 3.
       draft =
         identity()
         |> Draft.toggle_choice({:feature, "Weapon Mastery"}, "longsword")
@@ -378,8 +367,6 @@ defmodule AgenticRealms.World.CharacterDraftTest do
     end
 
     test "specializations nothing asks for are complete by definition" do
-      # Dwarf offers no lineage and no size, wizard has no level 1 feature
-      # choice and no tool, and sage's tool is settled. Nothing is left to ask.
       assert Draft.open_choices(identity("dwarf", "wizard", "sage"))
              |> Enum.map(& &1.key) == [:class_skills]
 
@@ -387,7 +374,6 @@ defmodule AgenticRealms.World.CharacterDraftTest do
     end
 
     test "a background's tool counts as a specialization when it is a real choice" do
-      # Soldier chooses a gaming set from four.
       refute Draft.complete?(identity("dwarf", "wizard", "soldier"), :specializations)
 
       assert identity("dwarf", "wizard", "soldier")
@@ -452,7 +438,6 @@ defmodule AgenticRealms.World.CharacterDraftTest do
       draft = complete_draft()
       skills = Draft.skill_proficiencies(draft)
 
-      # Soldier grants athletics and intimidation.
       assert :athletics in skills
       assert :intimidation in skills
       assert skills == Enum.uniq(skills)
@@ -504,8 +489,6 @@ defmodule AgenticRealms.World.CharacterDraftTest do
       assert Draft.storage_key(:class_tool) == "class_tool"
     end
   end
-
-  # --- helpers -------------------------------------------------------------
 
   defp full_array, do: with_array(Draft.new())
 

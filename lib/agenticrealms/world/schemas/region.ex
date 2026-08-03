@@ -5,9 +5,6 @@ defmodule AgenticRealms.World.Schemas.Region do
   schema "regions" do
     field :name, :string
 
-    # Feature 017 — Transient Regions. `kind` discriminates permanent regions
-    # (the seeded world) from on-demand transient ones; the remaining fields
-    # are populated only for `kind: "transient"`.
     field :kind, :string, default: "permanent"
     field :provision_owner_id, :integer
     field :provisioned_at, :utc_datetime_usec

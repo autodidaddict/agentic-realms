@@ -84,17 +84,8 @@ defmodule AgenticRealmsWeb.GameLive do
 
   @pubsub AgenticRealms.PubSub
 
-  # ════════════════════════════════════════════════════════════
-  # Mount
-  # ════════════════════════════════════════════════════════════
-
   @impl true
   def mount(_params, _session, socket) do
-    # Feature 021 — a character before a world, and the character is the
-    # player's own. A player without one gets the creation dialog over an inert
-    # pane rather than a world, because there is no world for them yet: nothing
-    # is spawned, no room is loaded, and nothing is subscribed to until they
-    # confirm.
     if Commands.has_character?(socket.assigns.current_player.id) do
       {:ok, enter_world(socket)}
     else
@@ -108,9 +99,6 @@ defmodule AgenticRealmsWeb.GameLive do
     end
   end
 
-  # Everything from spawning onward. Extracted from `mount/3` because the
-  # creation dialog needs the same sequence after the player confirms their
-  # character, and two copies of it would drift.
   defp enter_world(socket) do
     player_id = socket.assigns.current_player.id
     character_name = PlayerNames.get(player_id)
@@ -138,22 +126,12 @@ defmodule AgenticRealmsWeb.GameLive do
       Phoenix.PubSub.subscribe(@pubsub, Topics.room_topic(current_room_id))
       Phoenix.PubSub.subscribe(@pubsub, Presence.topic())
 
-      # Feature 014 US6 — every wizard session subscribes to the global
-      # blueprints topic for live registry updates from other wizards.
       if socket.assigns.current_player.is_wizard do
         Phoenix.PubSub.subscribe(@pubsub, Topics.blueprints_topic())
       end
 
-      # Feature 021 — presence carries the character name, which is what other
-      # players see. The account username is a login credential and nothing more.
       {:ok, _} = Presence.track_player(self(), player_id, character_name)
 
-      # Feature 009 — fire `player_entered` behaviors for this session's
-      # arrival in the player's current room. Behaviors fire on EVERY
-      # connected mount, not just first-time spawn (a re-mounting session
-      # is "arriving" again from the room/NPC's perspective). PlayerMoved
-      # events drive subsequent in-session arrivals via the interpreter's
-      # event-handler clause.
       AgenticRealms.World.Behaviors.Interpreter.fire_for_arrival(
         player_id,
         current_room_id
@@ -163,11 +141,6 @@ defmodule AgenticRealmsWeb.GameLive do
     socket
     |> assign(:phase, :playing)
     |> assign(:mode, :player)
-    # Feature 014 — wizard authorization + trance mode. `:is_wizard`
-    # is the FR-WIZ-1 flag; `:authoring_mode` is the world/blueprints
-    # sub-mode within Wizard view (only meaningful when :is_wizard
-    # and :mode == :wizard). Non-wizards never see the top-bar Wizard
-    # switch (FR-WIZ-3), enforced by the layout.
     |> assign(:is_wizard, socket.assigns.current_player.is_wizard)
     |> assign(
       :authoring_mode,
@@ -175,10 +148,6 @@ defmodule AgenticRealmsWeb.GameLive do
     )
     |> assign(:focused_object_id, nil)
     |> assign(:focused_blueprint_id, nil)
-    # Feature 014 US1 — blueprint authoring state. Populated by the
-    # LLM resolver on submit_wizard_prompt; refined by the wizard via
-    # form fields; committed via commit_blueprint_draft (US1) or
-    # edited in place via the edit flow that lands in US5.
     |> assign(:focused_blueprint_draft, nil)
     |> assign(:focused_object_draft, nil)
     |> assign(:focused_object_edit, nil)
@@ -193,9 +162,7 @@ defmodule AgenticRealmsWeb.GameLive do
       :object_blueprints,
       if(socket.assigns.current_player.is_wizard, do: Queries.list_blueprint_rows(), else: [])
     )
-    # Feature 015 US8 — unified registry kind filter (:all | :object | :npc).
     |> assign(:blueprint_filter, :all)
-    # Feature 015 — behavior_groups available to attach to an NPC blueprint draft.
     |> assign(
       :behavior_groups,
       if(socket.assigns.current_player.is_wizard,
@@ -210,7 +177,6 @@ defmodule AgenticRealmsWeb.GameLive do
         else: []
       )
     )
-    # Feature 015 US6 — in-room NPCs the wizard can extract a blueprint from.
     |> assign(
       :room_npcs,
       if(socket.assigns.current_player.is_wizard,
@@ -225,22 +191,11 @@ defmodule AgenticRealmsWeb.GameLive do
     |> assign(:current_room_id, current_room_id)
     |> assign(:input, "")
     |> assign(:streaming, false)
-    # Per-LiveView opaque id for actor-side self-filtering of own
-    # broadcasts (FR-005: speaker's own session does not render the
-    # witness broadcast it produced). See
-    # specs/004-player-communication/contracts/ui_events.md.
     |> assign(:session_id, make_ref())
-    # Feature 005 — natural-language intent resolution.
-    # `resolver_task` tracks an in-flight async LLM call;
-    # `input_locked` disables the command input while it runs.
     |> assign(:resolver_task, nil)
     |> assign(:input_locked, false)
     |> assign(:stats, Stats.for_player(player_id))
     |> assign(:inventory, inventory)
-    # Feature 013 — Quests. `:quests` is the active-quest list
-    # rendered in the HUD card with per-criterion progress lines;
-    # `:completed_quests` backs the Completed section of the quest
-    # modal and is retained indefinitely (FR-025).
     |> assign(:quests, Quests.active_for(player_id))
     |> assign(:completed_quests, Quests.history_for(player_id))
     |> assign(:presence, presence)
@@ -248,37 +203,11 @@ defmodule AgenticRealmsWeb.GameLive do
     |> assign(:tweaks, build_tweaks(socket.assigns.current_player))
   end
 
-  # ════════════════════════════════════════════════════════════
-  # handle_event — character creation (feature 021)
-  # ════════════════════════════════════════════════════════════
-  #
-  # Every clause below updates the draft in socket assigns and nothing else.
-  # World state is touched exactly once, by `creation_confirm`.
-  #
-  # The wire parameters are decoded against what `Srd.Character.choices/1`
-  # actually offered rather than converted blindly, so a forged parameter finds
-  # no match and the clause is a no-op instead of creating an atom or a bogus
-  # pick. The validator would catch it either way; this stops it earlier.
-
-  # `phx-keyup` sends `%{"key" => <key pressed>, "value" => <input value>}`. It
-  # does not send the input's `name` attribute — that is a form-event thing —
-  # so matching on "name" here never fired in a browser and crashed the
-  # LiveView instead. Every keystroke took the modal down and remounted it, so
-  # the field could not be filled at all. `render_keyup/3` sends whatever
-  # payload the test hands it, and the test was handing it a shape the browser
-  # does not produce, which is why 1078 passing tests said nothing.
   @impl true
   def handle_event("creation_name", %{"value" => name}, socket) do
     {:noreply, Creation.name(socket, name)}
   end
 
-  # `phx-value-value` is a trap on a clickable element: the browser also sends
-  # the element's own `value` property, which for a <button> is "", and it wins.
-  # Every one of these used to send `"value" => ""`, so nothing could be
-  # selected, an ability score assigned, or a specialization picked. The names
-  # below avoid the collision. The tests did not catch it because
-  # `render_click/3` sends the payload the test writes rather than the one the
-  # DOM would produce.
   def handle_event("creation_select", %{"field" => field, "slug" => value}, socket)
       when field in ~w(species class background) do
     {:noreply, Creation.select(socket, String.to_existing_atom(field), presence_or_nil(value))}
@@ -337,16 +266,9 @@ defmodule AgenticRealmsWeb.GameLive do
     {:noreply, Creation.confirm(socket, &enter_world/1)}
   end
 
-  # ════════════════════════════════════════════════════════════
-  # handle_event — UI mode + chrome
-  # ════════════════════════════════════════════════════════════
-
   def handle_event("switch_mode", %{"mode" => mode}, socket) do
     new_mode = String.to_existing_atom(mode)
-    # FR-WIZ-3 / FR-WIZ-4 — non-wizards must not be able to enter
-    # Wizard view, even via a crafted client event. The top-bar
-    # switch is already hidden for them by the layout; this is
-    # defense-in-depth.
+
     if new_mode == :wizard and not socket.assigns.is_wizard do
       {:noreply, socket}
     else
@@ -370,25 +292,12 @@ defmodule AgenticRealmsWeb.GameLive do
     {:noreply, update(socket, :map_open, &(!&1))}
   end
 
-  # Feature 013 — `select_quest` is unused now (the rewritten
-  # quest_modal displays Active and Completed side-by-side without
-  # nav state). Kept as a no-op for forward compatibility with any
-  # stale client payload.
   def handle_event("select_quest", _params, socket), do: {:noreply, socket}
 
   def handle_event("stream_done", _params, socket) do
     {:noreply, assign(socket, :streaming, false)}
   end
 
-  # ────────────────────────────────────────────────────────────
-  # handle_event — wizard authoring (feature 014)
-  # ────────────────────────────────────────────────────────────
-
-  # Feature 014 — wizard authoring mode toggle (FR-001 / FR-002 /
-  # FR-003). Flips `:authoring_mode` between `:world` and
-  # `:blueprints` and side-effects a transient broadcast on the
-  # wizard's current `room:` topic. No verb to type — the toggle IS
-  # the affordance.
   def handle_event(
         "toggle_authoring_mode",
         _params,
@@ -419,22 +328,10 @@ defmodule AgenticRealmsWeb.GameLive do
 
   def handle_event("toggle_authoring_mode", _params, socket), do: {:noreply, socket}
 
-  # Feature 014 US1 — phx-change for the wizard's authoring-mode
-  # prompt textarea. Captures the current text so the wizard can
-  # navigate away and back without losing it within a single trance
-  # session.
   def handle_event("update_wizard_prompt", %{"text" => text}, socket) do
     {:noreply, assign(socket, :wizard_prompt, text)}
   end
 
-  # Feature 014 US1 / US3 — submit the wizard's prompt to the LLM
-  # resolver. Branches on :authoring_mode: :blueprints uses the
-  # wizard-blueprint resolver (extracts archetype fields), :world
-  # uses the freeform Object resolver (extracts one-off Object
-  # fields). Both follow the same supervised-async pattern: lock
-  # input, stash task ref + raw, handle_info finishes. Prompt stays
-  # visible in the textarea so the wizard can compare it against the
-  # extracted draft.
   def handle_event(
         "submit_wizard_prompt",
         %{"text" => raw},
@@ -473,11 +370,6 @@ defmodule AgenticRealmsWeb.GameLive do
 
   def handle_event("submit_wizard_prompt", _, socket), do: {:noreply, socket}
 
-  # Feature 014 US1 — phx-change for the focused-blueprint draft
-  # form. Accepts the whole `draft[...]` form payload so a single
-  # change event captures the wizard's edits across all four fields
-  # plus the slug. Slug auto-derives from name until the wizard
-  # explicitly edits it.
   def handle_event(
         "update_blueprint_draft",
         %{"draft" => params},
@@ -487,10 +379,6 @@ defmodule AgenticRealmsWeb.GameLive do
     new_name = Map.get(params, "name", draft.name) || ""
     slug_input = Map.get(params, "proposed_slug", "") || ""
 
-    # The slug input itself is the source of truth: blank input means
-    # "auto-derive from name", anything else is the wizard's explicit
-    # override. No separate sticky flag — clearing the field and then
-    # renaming the blueprint correctly re-derives.
     proposed_slug =
       if slug_input == "" do
         AgenticRealms.World.Blueprint.Slug.derive(new_name)
@@ -521,9 +409,6 @@ defmodule AgenticRealmsWeb.GameLive do
 
   def handle_event("update_blueprint_draft", _, socket), do: {:noreply, socket}
 
-  # Feature 015 US4 — direct-behavior editor add/remove (FR-015a). The rows
-  # themselves are edited through the form's phx-change; add/remove mutate the
-  # draft's behavior list directly and re-render.
   def handle_event(
         "add_direct_behavior",
         _params,
@@ -554,10 +439,6 @@ defmodule AgenticRealmsWeb.GameLive do
 
   def handle_event("remove_direct_behavior", _, socket), do: {:noreply, socket}
 
-  # Feature 014 US1 + US5 — commit the focused blueprint draft.
-  # Branches on whether the draft carries `:expected_revision`:
-  #   * nil → CREATE path (US1) → Wizard.commit_blueprint_create/2
-  #   * integer → EDIT path (US5) → Wizard.commit_blueprint_edit/3
   def handle_event(
         "commit_blueprint_draft",
         _params,
@@ -572,9 +453,6 @@ defmodule AgenticRealmsWeb.GameLive do
 
   def handle_event("commit_blueprint_draft", _, socket), do: {:noreply, socket}
 
-  # Feature 014 US5 — click a Blueprint registry row to focus it for
-  # editing. If the wizard isn't already in :blueprints mode, flip
-  # there (firing the trance entry as a side effect).
   def handle_event(
         "focus_blueprint",
         %{"blueprint_id" => blueprint_id},
@@ -628,7 +506,6 @@ defmodule AgenticRealmsWeb.GameLive do
 
   def handle_event("focus_blueprint", _, socket), do: {:noreply, socket}
 
-  # Feature 015 US8 — filter the unified registry by kind.
   def handle_event(
         "filter_blueprints",
         %{"kind" => kind},
@@ -646,7 +523,6 @@ defmodule AgenticRealmsWeb.GameLive do
 
   def handle_event("filter_blueprints", _, socket), do: {:noreply, socket}
 
-  # Feature 014 US5 — focus a world Object for in-place editing.
   def handle_event(
         "focus_object_for_edit",
         %{"object_id" => object_id},
@@ -686,7 +562,6 @@ defmodule AgenticRealmsWeb.GameLive do
 
   def handle_event("focus_object_for_edit", _, socket), do: {:noreply, socket}
 
-  # Feature 014 US5 — phx-change for the focused-object edit form.
   def handle_event(
         "update_object_edit",
         %{"edit" => params},
@@ -709,9 +584,6 @@ defmodule AgenticRealmsWeb.GameLive do
 
   def handle_event("update_object_edit", _, socket), do: {:noreply, socket}
 
-  # Feature 014 US5 — commit the focused object edit. Dispatches
-  # Commands.edit_object/3; on success refreshes the room-objects
-  # panel so the (possibly renamed) row reflects the new values.
   def handle_event(
         "commit_object_edit",
         _params,
@@ -758,7 +630,6 @@ defmodule AgenticRealmsWeb.GameLive do
      |> assign(:blueprint_commit_error, nil)}
   end
 
-  # Feature 015 US7 — focus an in-world NPC clone for in-place editing.
   def handle_event(
         "focus_npc_for_edit",
         %{"clone_id" => clone_id},
@@ -863,8 +734,6 @@ defmodule AgenticRealmsWeb.GameLive do
      |> assign(:blueprint_commit_error, nil)}
   end
 
-  # Feature 014 US1 — discard the in-flight blueprint draft. Wizard
-  # stays in :blueprints mode (the trance does not auto-end).
   def handle_event("discard_blueprint_draft", _, socket) do
     {:noreply,
      socket
@@ -873,9 +742,6 @@ defmodule AgenticRealmsWeb.GameLive do
      |> assign(:blueprint_commit_error, nil)}
   end
 
-  # Feature 014 US3 — phx-change for the freeform-object draft form.
-  # Same shape as update_blueprint_draft but only carries the four
-  # Object fields (no slug — Objects don't have slugs).
   def handle_event(
         "update_object_draft",
         %{"draft" => params},
@@ -895,7 +761,6 @@ defmodule AgenticRealmsWeb.GameLive do
       )
       |> Map.put(:fixed, Map.get(params, "fixed") == "true")
 
-    # Feature 015 US5 — a freeform NPC draft also carries lore.
     updated =
       if Map.get(draft, :kind) == "npc" do
         Map.put(updated, :lore, Map.get(params, "lore", Map.get(draft, :lore, "")) || "")
@@ -911,10 +776,6 @@ defmodule AgenticRealmsWeb.GameLive do
 
   def handle_event("update_object_draft", _, socket), do: {:noreply, socket}
 
-  # Feature 014 US3 — commit the focused freeform-object draft.
-  # Spawns the Object into the wizard's current room via the
-  # `spawn_object_freeform` wrapper (clone/move, feature 016) — no Object
-  # Blueprint involvement, no registry change.
   def handle_event(
         "commit_object_draft",
         _params,
@@ -969,7 +830,6 @@ defmodule AgenticRealmsWeb.GameLive do
 
   def handle_event("commit_object_draft", _, socket), do: {:noreply, socket}
 
-  # Feature 014 US3 — discard the in-flight freeform-object draft.
   def handle_event("discard_object_draft", _, socket) do
     {:noreply,
      socket
@@ -978,14 +838,6 @@ defmodule AgenticRealmsWeb.GameLive do
      |> assign(:blueprint_commit_error, nil)}
   end
 
-  # Feature 014 US4 — extract essence from a world Object (FR-015,
-  # FR-016, FR-018). Flips the wizard into :blueprints mode (trance
-  # entries fire via WizardTrance.enter), pre-populates the focused
-  # blueprint draft with a WHOLESALE copy of the source object's
-  # settable fields plus an auto-derived slug. Source object is NOT
-  # modified — the actual blueprint creation happens later when the
-  # wizard clicks Commit through the existing commit_blueprint_draft
-  # path.
   def handle_event(
         "extract_essence",
         %{"object_id" => object_id},
@@ -1031,20 +883,12 @@ defmodule AgenticRealmsWeb.GameLive do
          |> assign(:last_spawn, nil)}
 
       _other_room ->
-        # The object exists but is in a different room (likely
-        # picked up by a player). Can't extract from things not
-        # co-located.
         {:noreply, assign(socket, :blueprint_commit_error, :object_not_in_room)}
     end
   end
 
   def handle_event("extract_essence", _, socket), do: {:noreply, socket}
 
-  # Feature 015 US6 — extract essence from an in-world NPC clone. Flips into
-  # trance and pre-populates the focused npc blueprint draft with a wholesale
-  # copy of the clone's settable fields (lore + behavior_groups + direct behaviors)
-  # plus an auto-derived slug. The source clone is NOT modified — the blueprint
-  # is created later when the wizard clicks Commit.
   def handle_event(
         "extract_npc_essence",
         %{"clone_id" => clone_id},
@@ -1098,13 +942,6 @@ defmodule AgenticRealmsWeb.GameLive do
 
   def handle_event("extract_npc_essence", _, socket), do: {:noreply, socket}
 
-  # Feature 014 US2 — spawn a clone of a registry blueprint into the
-  # wizard's current room. Only valid while in World mode (FR-027).
-  # The arrival broadcast comes back through PubSub as a
-  # RoomObjectArrived UI event which appends a system log entry; the
-  # wizard's wizard-chrome view also gets a transient confirmation
-  # via the :last_spawn assign so the wizard knows the click worked
-  # without having to flip back to the player log.
   def handle_event(
         "spawn_here",
         %{"blueprint_id" => blueprint_id},
@@ -1142,19 +979,10 @@ defmodule AgenticRealmsWeb.GameLive do
 
   def handle_event("spawn_here", _, socket), do: {:noreply, socket}
 
-  # Feature 014 US2 — dismiss the spawn-confirmation notice. Wizard
-  # explicitly closes it via the × button.
   def handle_event("dismiss_last_spawn", _, socket) do
     {:noreply, assign(socket, :last_spawn, nil)}
   end
 
-  # ────────────────────────────────────────────────────────────
-  # handle_event — main command input
-  # ────────────────────────────────────────────────────────────
-
-  # While a natural-language resolver task is in flight the input is
-  # locked; ignore any submit that slips through (e.g. a queued
-  # client event).
   def handle_event("submit_command", _params, %{assigns: %{input_locked: true}} = socket) do
     {:noreply, socket}
   end
@@ -1187,14 +1015,6 @@ defmodule AgenticRealmsWeb.GameLive do
     end
   end
 
-  # ════════════════════════════════════════════════════════════
-  # handle_info — intent resolver task replies (feature 005 / 014)
-  # ════════════════════════════════════════════════════════════
-
-  # The async LLM resolver finished. Demonitor (flushing the trailing
-  # `:DOWN`), unlock the input, and either dispatch the resolved
-  # action or append the refusal. `IntentResolver.resolve/2` never
-  # raises, so this is the path taken for every normal completion.
   @impl true
   def handle_info({ref, result}, %{assigns: %{resolver_task: %{ref: ref}}} = socket) do
     Process.demonitor(ref, [:flush])
@@ -1217,10 +1037,6 @@ defmodule AgenticRealmsWeb.GameLive do
     end
   end
 
-  # Defensive: the resolver task crashed before replying (should not
-  # happen — `resolve/2` rescues internally — but a task can still be
-  # killed). Surface a graceful refusal rather than leaving the input
-  # locked.
   def handle_info(
         {:DOWN, ref, :process, _pid, _reason},
         %{assigns: %{resolver_task: %{ref: ref}}} = socket
@@ -1235,19 +1051,6 @@ defmodule AgenticRealmsWeb.GameLive do
      |> append_log(%{kind: :system, text: "I'm not sure what you meant just now."})}
   end
 
-  # Feature 014 US1 / US3 — the wizard's authoring LLM resolver
-  # finished. Outcome shape depends on the mode the task was launched
-  # in: :draft_blueprint → focused_blueprint_draft (US1),
-  # :freeform_object → focused_object_draft (US3). Refusals surface
-  # via :blueprint_commit_error (reused for both forms).
-  #
-  # If the wizard switched modes between submit and completion
-  # (bug_007 — toggle race within the 1-3s LLM window), the draft is
-  # dropped silently. Surfacing a stale draft in the other mode would
-  # surprise the wizard with a forgotten prompt's output; refusing
-  # the toggle would block them for the LLM call duration. Quietly
-  # discarding respects both. The launching mode is stashed on the
-  # resolver task at submit time so the comparison is exact.
   def handle_info(
         {ref, result},
         %{assigns: %{wizard_resolver_task: %{ref: ref} = task}} = socket
@@ -1263,16 +1066,12 @@ defmodule AgenticRealmsWeb.GameLive do
     current_mode = socket.assigns.authoring_mode
 
     if launching_mode != nil and launching_mode != current_mode do
-      # Orphaned by a mode toggle. Drop the draft; keep input
-      # unlocked.
       {:noreply, socket}
     else
       Wizard.apply_resolver_outcome(socket, result)
     end
   end
 
-  # Feature 014 US1 — defensive: wizard resolver task crashed before
-  # replying. Unlock the input and surface a refusal.
   def handle_info(
         {:DOWN, ref, :process, _pid, _reason},
         %{assigns: %{wizard_resolver_task: %{ref: ref}}} = socket
@@ -1284,8 +1083,6 @@ defmodule AgenticRealmsWeb.GameLive do
      |> assign(:blueprint_commit_error, {:llm_refusal, "I'm not sure what you meant just now."})}
   end
 
-  # Stale task messages (resolver_task already cleared, or a flushed
-  # :DOWN raced this clause) — demonitor defensively and ignore.
   def handle_info({ref, _result}, socket) when is_reference(ref) do
     Process.demonitor(ref, [:flush])
     {:noreply, socket}
@@ -1295,21 +1092,11 @@ defmodule AgenticRealmsWeb.GameLive do
     {:noreply, socket}
   end
 
-  # ════════════════════════════════════════════════════════════
-  # handle_info — PubSub UI events
-  # ════════════════════════════════════════════════════════════
-
-  # First-time spawn: Phoenix.Presence's presence_diff produces the
-  # "logged in" message. Discard this arrival event so witnesses
-  # don't see a duplicate notification.
   def handle_info(%RoomPlayerArrived{from_direction: nil}, socket), do: {:noreply, socket}
 
   def handle_info(%RoomPlayerArrived{} = msg, socket), do: UIEvents.player_arrived(socket, msg)
   def handle_info(%RoomPlayerLeft{} = msg, socket), do: UIEvents.player_left(socket, msg)
 
-  # Feature 017 — a transient region this player was in has ended; they have
-  # already been relocated to their pre-entry room. Only online occupants
-  # receive this (offline players, e.g. a logged-off owner, have no session).
   def handle_info(:transient_region_ended, socket) do
     {:noreply,
      append_log(socket, %{
@@ -1364,11 +1151,6 @@ defmodule AgenticRealmsWeb.GameLive do
   def handle_info(%PlayerCurrentRoomChanged{} = msg, socket),
     do: UIEvents.current_room_changed(socket, msg)
 
-  # ════════════════════════════════════════════════════════════
-  # Mount-time helpers
-  # ════════════════════════════════════════════════════════════
-
-  # An empty selection means "cleared", not a slug of "".
   defp presence_or_nil(""), do: nil
   defp presence_or_nil(value), do: value
 
@@ -1381,9 +1163,6 @@ defmodule AgenticRealmsWeb.GameLive do
     }
   end
 
-  # Feature 015 — npc drafts carry lore + a behavior_group multi-select. Checkboxes
-  # only submit when checked, so an absent `behavior_groups` means "none selected".
-  # Object drafts have no such fields and are left untouched.
   defp put_npc_draft_fields(%{kind: "npc"} = draft, params) do
     draft
     |> Map.put(:lore, Map.get(params, "lore", Map.get(draft, :lore, "")) || "")
@@ -1393,10 +1172,6 @@ defmodule AgenticRealmsWeb.GameLive do
 
   defp put_npc_draft_fields(draft, _params), do: draft
 
-  # Rebuild the direct-behavior list from the form's nested params. Rows are
-  # kept even when blank so a freshly-added row stays editable; blank rows are
-  # dropped at commit time. When the form rendered no rows the key is absent —
-  # keep whatever the draft already held.
   defp parse_direct_behaviors(%{"behaviors" => rows}, _draft) when is_map(rows) do
     rows
     |> Enum.sort_by(fn {k, _v} -> String.to_integer(k) end)

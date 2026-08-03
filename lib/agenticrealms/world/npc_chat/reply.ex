@@ -32,8 +32,6 @@ defmodule AgenticRealms.World.NPCChat.Reply do
 
   def parse(_), do: {:error, :malformed}
 
-  # `say` and `emote` carry an `input.text`. Feature 013 adds quest tools
-  # which carry domain-specific inputs (slug, quest_id, etc.).
   defp parse_block(%{"name" => name, "input" => input}) do
     cond do
       not MapSet.member?(Tools.names(), name) ->

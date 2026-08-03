@@ -34,9 +34,6 @@ defmodule AgenticRealms.World.Communication.RecipientResolver do
     |> Repo.all()
     |> case do
       [] -> {:error, :not_found}
-      # Self-target ordering: checked BEFORE ambiguous so a player typing
-      # their own name resolves to :self_target even if a case-variant of
-      # their name also matches (pathological but possible).
       [%{id: id}] when id == sender_id -> {:error, :self_target}
       [player] -> {:ok, player}
       [_ | _] -> {:error, :ambiguous}

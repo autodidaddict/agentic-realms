@@ -132,10 +132,6 @@ defmodule AgenticRealmsWeb.GameLive.Communication do
 
     case Communication.emote(sender, said) do
       :ok ->
-        # No separate actor-side confirmation — the actor reads the
-        # same broadcast every other room subscriber gets (FR-008).
-        # The :emote_action log entry is appended in handle_info/2
-        # just like for any witness.
         {:noreply, socket}
 
       {:error, :empty} ->
@@ -160,10 +156,6 @@ defmodule AgenticRealmsWeb.GameLive.Communication do
 
     case AgenticRealms.World.NPCChat.send(player_id, npc_token, message) do
       {:ok, :new} ->
-        # The :chat_new system message is broadcast by the
-        # Conversation itself; we just leave the input cleared and
-        # wait for it on player_topic. The reply will follow when
-        # the LLM call lands.
         {:noreply, socket}
 
       {:ok, :continuing} ->
@@ -195,9 +187,6 @@ defmodule AgenticRealmsWeb.GameLive.Communication do
          })}
 
       {:error, :still_thinking} ->
-        # Defensive — the Conversation should broadcast its own
-        # :chat_in_flight_rejection message; this is a fallback in
-        # case the GenServer call path produced the error directly.
         {:noreply, socket}
     end
   end

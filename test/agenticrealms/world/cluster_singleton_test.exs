@@ -41,16 +41,12 @@ defmodule AgenticRealms.World.ClusterSingletonTest do
   use ExUnit.Case, async: false
 
   @moduletag :cluster
-  # Starting a peer node, seeding its code path, and letting Horde's membership
-  # CRDT converge is slow by nature.
   @moduletag timeout: 120_000
 
   alias AgenticRealms.ClusterPeer
   alias AgenticRealms.World.Transient
 
   setup_all do
-    # `mix test` is not distributed. Membership is a property of connected
-    # nodes, so there is nothing to observe until this node has a name.
     unless Node.alive?() do
       case :net_kernel.start([:"primary@127.0.0.1", :longnames]) do
         {:ok, _} ->
@@ -67,9 +63,6 @@ defmodule AgenticRealms.World.ClusterSingletonTest do
       end
     end
 
-    # `connection: :standard_io` gives a control channel independent of BEAM
-    # distribution, so `:peer.call/4` reaches the peer regardless of whether the
-    # nodes are connected — including while we are still setting them up.
     {:ok, peer, node} =
       :peer.start_link(%{
         name: :secondary,
@@ -79,8 +72,6 @@ defmodule AgenticRealms.World.ClusterSingletonTest do
         args: [~c"-setcookie", ~c"cluster_smoke_test"]
       })
 
-    # The peer starts empty: hand it this project's compiled code and the same
-    # application environment, then start what the singleton needs on both.
     :peer.call(peer, :code, :add_paths, [:code.get_path()])
 
     for {key, value} <- Application.get_all_env(:agenticrealms) do
@@ -93,14 +84,6 @@ defmodule AgenticRealms.World.ClusterSingletonTest do
     true = Node.connect(node)
     await(fn -> length(Horde.Cluster.members(Transient.Registry)) == 2 end)
 
-    # `start_link` above already ties the peer's lifetime to this setup_all
-    # process, which ExUnit kills once the module's tests finish. So there are
-    # two things trying to stop the node, and they race: this is the tidy path
-    # when it wins, and when the link wins instead `:peer.stop/1` exits —
-    # `normal` if it catches the process mid-shutdown, `noproc` once it is
-    # fully gone. An uncaught exit here fails setup_all and invalidates four
-    # tests that already passed, which is how CI reported it. The node is gone
-    # either way, so the exit is noise.
     on_exit(fn ->
       try do
         :peer.stop(peer)
@@ -122,8 +105,6 @@ defmodule AgenticRealms.World.ClusterSingletonTest do
   end
 
   test "exactly one manager exists, and both nodes resolve to it", %{peer: peer} do
-    # Ask both nodes to ensure it. Were the cluster not converged, each would
-    # happily start its own — precisely the failure this guards against.
     {:ok, here} = Transient.Supervisor.ensure_manager()
     {:ok, there} = :peer.call(peer, Transient.Supervisor, :ensure_manager, [])
 
@@ -133,8 +114,6 @@ defmodule AgenticRealms.World.ClusterSingletonTest do
            means two processes are eligible to purge the same regions.
            """
 
-    # And a plain lookup from either side agrees, which is the path every
-    # caller goes through.
     await(fn -> :peer.call(peer, Transient.Registry, :lookup, []) == {:ok, here} end)
 
     assert Transient.Registry.lookup() == {:ok, here}
@@ -157,9 +136,6 @@ defmodule AgenticRealms.World.ClusterSingletonTest do
 
   describe "mix cluster.check" do
     test "reports a converged cluster with no problems", %{node: node} do
-      # The checker is the only thing that will ever look at a real deployment,
-      # so it gets exercised against a real cluster here rather than trusted.
-      # Make sure the singleton exists regardless of which order the tests ran.
       {:ok, _} = Transient.Supervisor.ensure_manager()
 
       findings = AgenticRealms.Cluster.Check.check()
@@ -171,22 +147,17 @@ defmodule AgenticRealms.World.ClusterSingletonTest do
       assert peers.status == :ok
       assert peers.detail =~ to_string(node)
 
-      # Every Horde registry should see both nodes.
       for f <- Enum.filter(findings, &(&1.section == "Horde")) do
         assert f.status == :ok, "#{f.label}: #{f.detail}"
         assert f.detail =~ "2 member(s)"
       end
 
-      # And the reaper resolves to one process that every node agrees on.
       reaper = Enum.find(findings, &(&1.label == "Transient.Manager"))
       assert reaper.status == :ok
       assert reaper.detail =~ "agreed by every node"
     end
   end
 
-  # Horde converges rather than replies, so membership assertions are
-  # eventually-true. Polling beats a fixed sleep: fast when it converges fast,
-  # and it fails with a clear message when it does not.
   defp await(fun, attempts \\ 100) do
     cond do
       fun.() -> :ok

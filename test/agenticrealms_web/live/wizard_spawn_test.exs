@@ -68,7 +68,6 @@ defmodule AgenticRealmsWeb.WizardSpawnTest do
 
     render_hook(wizard_view, "switch_mode", %{"mode" => "wizard"})
 
-    # Registry row's Spawn here button only renders in :world mode.
     html = render(wizard_view)
     assert html =~ "Spawn here"
 
@@ -76,16 +75,10 @@ defmodule AgenticRealmsWeb.WizardSpawnTest do
 
     flush(witness_view)
     witness_html = render(witness_view)
-    # Arrival entry uses the (constrained, short) name with article,
-    # not the long short_description — see lib/agenticrealms_web/live/
-    # game_live.ex `object_arrival_text/1`.
     assert witness_html =~ "A spawn chest appears."
 
-    # Wizard's own session shows a transient spawn confirmation toast.
     assert render(wizard_view) =~ "Spawned"
 
-    # The object exists in world_objects, located in the starting room,
-    # carrying the blueprint's denormalized payload — and no blueprint_id.
     row =
       Repo.get_by(Object,
         name: "spawn chest",
@@ -111,15 +104,10 @@ defmodule AgenticRealmsWeb.WizardSpawnTest do
        %{witness_conn: wtc, slug: slug} do
     {:ok, view, _} = live(wtc, ~p"/play")
 
-    # Non-wizards never see Wizard view to begin with — but a crafted
-    # spawn_here event must be refused at the handler entry.
     render_hook(view, "spawn_here", %{"blueprint_id" => slug})
 
-    # No arrival entry generated (handler refused without dispatching).
     refute render(view) =~ "A spawn chest appears."
   end
-
-  # --- Helpers ------------------------------------------------------------
 
   defp conn_for(conn, player_id) do
     conn

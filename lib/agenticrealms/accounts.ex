@@ -124,12 +124,6 @@ defmodule AgenticRealms.Accounts do
         _ -> Seed.starting_room_id()
       end
 
-    # Short-circuit on any DropObject failure. If we just `Enum.each`'d
-    # and ignored errors, a partial cleanup would leave objects in a
-    # half-state (some dropped to the room, others still carrying the
-    # deleted player_id) AND the `Repo.delete(player)` call would then
-    # fail on the `world_objects.player_id` FK constraint, leaving the
-    # account half-deleted and the world half-cleaned.
     with :ok <- drop_carried_objects(player.id, target_room_id),
          {:ok, deleted} <- Repo.delete(player) do
       {:ok, deleted}
@@ -141,9 +135,6 @@ defmodule AgenticRealms.Accounts do
     alias AgenticRealms.World.ContainerRef
     alias AgenticRealms.World.Queries
 
-    # Feature 016 — relocate each carried object from the player's inventory
-    # into the target room via the entity move pathway, so a deleted player
-    # leaves no objects orphaned in a now-gone container.
     Queries.list_inventory(player_id)
     |> Enum.reduce_while(:ok, fn item, _acc ->
       case WorldCommands.move_entity(

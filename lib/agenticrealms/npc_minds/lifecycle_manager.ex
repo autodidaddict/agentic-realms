@@ -35,7 +35,6 @@ defmodule AgenticRealms.NpcMinds.LifecycleManager do
     :ok
   end
 
-  # `kind` is `:npc` in-process (freshly emitted) or `"npc"` after replay.
   defp npc?(:npc), do: true
   defp npc?("npc"), do: true
   defp npc?(_), do: false

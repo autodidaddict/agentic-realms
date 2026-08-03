@@ -36,7 +36,6 @@ defmodule AgenticRealms.World.PlayerAwardXpTest do
     }
   end
 
-  # A character in the world: created, then spawned.
   defp playing do
     %Player{}
     |> then(&Player.apply(&1, Player.execute(&1, create_command())))
@@ -80,7 +79,6 @@ defmodule AgenticRealms.World.PlayerAwardXpTest do
       })
 
     assert :ok = Player.execute(state, cmd(50, "quest:q1"))
-    # A different award_id still awards (70 stays within level 1).
     assert %PlayerXpAwarded{new_total: 70} = Player.execute(state, cmd(20, "quest:q2"))
   end
 
@@ -135,8 +133,6 @@ defmodule AgenticRealms.World.PlayerAwardXpTest do
       state = Player.apply(playing(), %PlayerLeveledUp{player_id: 1, from_level: 1, to_level: 3})
 
       assert state.level == 3
-      # max_hp is the creation value; the sheet derives the real maximum from
-      # class, level and Constitution on read.
       assert state.max_hp == 12
       assert state.str == 17
     end

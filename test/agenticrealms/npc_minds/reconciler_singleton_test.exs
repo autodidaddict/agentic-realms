@@ -14,15 +14,12 @@ defmodule AgenticRealms.NpcMinds.ReconcilerSingletonTest do
     assert {:ok, pid} = Supervisor.ensure_reconciler()
     assert Process.alive?(pid)
 
-    # A second (or concurrent, per-node) ensure resolves to the same instance —
-    # Horde dedupes by the registry via-name; never two reconcilers.
     assert {:ok, ^pid} = Supervisor.ensure_reconciler()
   end
 
   test "the singleton is discoverable via the Horde registry" do
     {:ok, pid} = Supervisor.ensure_reconciler()
 
-    # Allow the Horde.Registry CRDT a moment to converge on the single node.
     assert eventually(fn -> Registry.lookup() == {:ok, pid} end)
   end
 

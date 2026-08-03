@@ -42,8 +42,6 @@ defmodule AgenticRealms.World.Queries do
          name: room.name,
          description: room.description,
          exits: list_exits(room_id, player_id),
-         # Feature 013 — viewer-aware object listing. Quest-scoped items
-         # are visible only to their owning player.
          objects: list_objects_in_room_for_viewer(room_id, player_id),
          other_players: list_other_players(room_id, player_id),
          npcs: list_npcs_in_room(room_id)
@@ -320,9 +318,6 @@ defmodule AgenticRealms.World.Queries do
     end
   end
 
-  # Feature 017 — viewer-aware exit listing. A global exit
-  # (`visible_to_user_id IS NULL`) is shown to everyone; an owner-scoped exit
-  # (the transient region's `:rift` entry) is shown only to its owner.
   defp list_exits(room_id, viewer_player_id) do
     from(e in Exit,
       join: t in Room,
@@ -468,18 +463,6 @@ defmodule AgenticRealms.World.Queries do
   defp list_other_players(room_id, self_player_id),
     do: online_occupants(room_id, self_player_id)
 
-  # The one room-occupant query. `exclude` drops the asking player, and that is
-  # the only thing that ever differed between the two callers — they had already
-  # drifted, one of them losing the note below.
-  #
-  # Filtered by online presence: a player's persisted `current_room_id` survives
-  # logout (per the 003 design — disconnecting does not unspawn them), but an
-  # offline player MUST NOT appear in the Present HUD card, in `look` output, or
-  # as a valid `whisper` target. `Phoenix.Presence` is the authority on who is
-  # online; it tracks every connected LiveView session and dedupes across tabs.
-  #
-  # A row with no `character_name` is a player who has not created a character
-  # yet. They are never spawned, so they are never in a room to be listed.
   defp online_occupants(room_id, exclude) do
     rows =
       PlayerState
@@ -509,25 +492,6 @@ defmodule AgenticRealms.World.Queries do
     |> String.split(~r/\s+/, trim: true)
     |> Enum.join(" ")
   end
-
-  # ------------------------------------------------------------------------
-  # Feature 012 — Maps: read helpers for World.MapView
-  # ------------------------------------------------------------------------
-  #
-  # Performance posture: these queries are called every time the player's
-  # map needs to re-render (every move, every newly-discovered room). All
-  # five are constant-or-bounded-work given:
-  #   * `discovered_room_ids_for/1` — composite-PK index scan, no JOIN.
-  #   * `rooms_in_region_at_elevation_within_viewport/4` — bounded to the
-  #     viewport_cells² window via x/y BETWEEN clauses; uses the
-  #     `(region_id, elevation)` btree index plus the partial unique index
-  #     on `(region_id, elevation, map_x, map_y)`. Preloads exits + targets
-  #     in one round-trip to avoid N+1 when MapView builds `has_up?` /
-  #     `has_down?` flags and classifies exits.
-  #   * `exits_for_rooms/1` — single IN-list query against the
-  #     `(source_room_id, direction)` composite key.
-  #   * `has_discovered_rooms_above?/3` / `has_discovered_rooms_below?/3` —
-  #     EXISTS-style queries; Postgres short-circuits on the first match.
 
   @doc """
   Returns the set of room ids that `player_id` has personally discovered.
@@ -615,10 +579,6 @@ defmodule AgenticRealms.World.Queries do
       )
     )
   end
-
-  # ──────────────────────────────────────────────────────────────────────
-  # Feature 014 — Object Blueprints
-  # ──────────────────────────────────────────────────────────────────────
 
   @doc """
   Fetch a single Blueprint (any kind) by its slug id, as a full schema

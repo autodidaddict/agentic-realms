@@ -54,19 +54,12 @@ defmodule AgenticRealms.World.Transient.Purge do
 
     npc_ids = Repo.all(from(c in NPCClone, where: c.room_id in ^room_ids, select: c.id))
 
-    # Feature 018 — terminate the external mind of every NPC being purged. The
-    # purge hard-deletes the entity stream, so it cannot carry an `EntityRemoved`
-    # event; this out-of-band, best-effort call is how the purge path stops
-    # orphaned minds. `terminate_workflow/1` never raises and a failure is not
-    # allowed to block the purge.
     Enum.each(npc_ids, &TemporalClient.terminate_workflow/1)
 
     purge_event_streams(region_id, room_ids, object_ids ++ npc_ids)
     purge_read_model(region_id, room_ids)
     :ok
   end
-
-  # --- event store --------------------------------------------------------
 
   defp purge_event_streams(region_id, room_ids, entity_ids) do
     Enum.each(entity_ids, fn id -> delete_stream("entity-" <> id) end)
@@ -88,9 +81,6 @@ defmodule AgenticRealms.World.Transient.Purge do
     safe(fn -> @event_store.delete_snapshot(source_uuid) end)
   end
 
-  # Already-deleted streams return `{:error, :stream_not_found | :stream_deleted}`
-  # (or raise on the in-memory adapter) — all treated as success so re-runs are
-  # idempotent.
   defp safe(fun) do
     fun.()
     :ok
@@ -99,8 +89,6 @@ defmodule AgenticRealms.World.Transient.Purge do
   catch
     _, _ -> :ok
   end
-
-  # --- read model (FK-safe, regions last) ---------------------------------
 
   defp purge_read_model(region_id, room_ids) do
     Repo.delete_all(

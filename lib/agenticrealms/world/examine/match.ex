@@ -24,10 +24,7 @@ defmodule AgenticRealms.World.Examine.Match do
           target_kind: :object | :player | :npc,
           name: String.t(),
           long_description: String.t() | nil,
-          # NPC clone entity id (telemetry debug identity) OR target player id
-          # (feature 019 health/power lookup); nil for objects.
           id: String.t() | integer() | nil,
-          # Feature 019 — examine surfaces only qualitative bands, never numbers.
           health_tier: String.t() | nil,
           power_phrase: String.t() | nil
         }

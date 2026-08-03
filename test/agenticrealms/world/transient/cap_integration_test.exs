@@ -31,9 +31,7 @@ defmodule AgenticRealms.World.Transient.CapIntegrationTest do
     {:ok, _} = Commands.spawn(owner.id, source)
     {:ok, tregion} = Transient.provision(owner.id, source)
 
-    # Owner stays logged in, but the region was provisioned long ago.
     {:ok, _} = Presence.track_player(self(), owner.id, "owner")
-    # Online owner should receive the end-of-region notice (FR-019/SC-007).
     Phoenix.PubSub.subscribe(AgenticRealms.PubSub, AgenticRealmsWeb.Topics.player_topic(owner.id))
     set_provisioned_at(tregion, minutes_ago(120))
 
@@ -41,15 +39,11 @@ defmodule AgenticRealms.World.Transient.CapIntegrationTest do
 
     assert Repo.get(Region, tregion) == nil
     assert Repo.all(from(r in Room, where: r.region_id == ^tregion)) == []
-    # Owner relocated out before purge, and notified.
     assert {:ok, ^source} = Queries.current_room_of(owner.id)
     assert_receive :transient_region_ended, 2_000
   end
 
   test "an already-overdue region is reaped on the first sweep (no in-memory state to lose)" do
-    # Simulates recovery: a region that became abandoned while the manager was
-    # absent — owner offline past grace AND cap elapsed — is reaped purely from
-    # durable columns on the next sweep (FR-018).
     owner = System.unique_integer([:positive])
     id = Ecto.UUID.generate()
 

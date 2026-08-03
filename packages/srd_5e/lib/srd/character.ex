@@ -225,9 +225,6 @@ defmodule Srd.Character do
     offer(:background_tool, :background, "Tool Proficiency", nil, background.tool)
   end
 
-  # Every feature in force at the level that still asks something. Keyed by the
-  # feature's name, which is how a fighting style is offered without this
-  # module ever learning what one is.
   defp feature_choices(features, source, level) do
     features
     |> Feature.through_level(level)
@@ -236,8 +233,6 @@ defmodule Srd.Character do
     end)
   end
 
-  # A choice is worth offering only when it is present and not already settled.
-  # Returning a list rather than a nil keeps every caller a flat_map.
   defp offer(_key, _source, _label, _text, nil), do: []
 
   defp offer(key, source, label, text, %Choice{} = choice) do
@@ -307,8 +302,6 @@ defmodule Srd.Character do
     }
   end
 
-  # Skills a background hands over, plus anything a settled choice of that kind
-  # decided for the character. The `choices/1` side omits exactly these.
   defp settled(:skill, species, class, background) do
     granted = if background, do: background.skills, else: []
     granted ++ settled_options(:skill, species, class, background)
@@ -362,8 +355,6 @@ defmodule Srd.Character do
 
   defp sorted(values), do: values |> Enum.uniq() |> Enum.sort()
 
-  # --- sections ------------------------------------------------------------
-
   defp abilities(scores, modifiers) do
     for key <- Ability.all() do
       %{
@@ -412,8 +403,6 @@ defmodule Srd.Character do
     |> Map.delete(:level)
     |> Map.put(:total, max(xp, 0))
   end
-
-  # --- helpers -------------------------------------------------------------
 
   defp modifier_for(skills, key) do
     Enum.find_value(skills, fn

@@ -68,11 +68,6 @@ defmodule AgenticRealmsWeb.GameLiveNPCTest do
 
   test "static NPCs — US1, US2, US3, US4 in sequence",
        %{alice_conn: alice_conn, bob_conn: bob_conn, alice: alice, bob: bob} do
-    # Foundational sanity (covers SC-002 from feature 008 + projection
-    # smoke). After Seed.run/0, the Garrick blueprint exists and one
-    # clone with serial 1 lives in the starting room. Feature 013 also
-    # seeds the Amaranth blueprint + clone in Hollowvale — we filter
-    # this assertion to Garrick specifically.
     assert %Blueprint{id: "garrick_the_innkeeper", kind: "npc"} =
              Repo.get(Blueprint, "garrick_the_innkeeper")
 
@@ -81,12 +76,6 @@ defmodule AgenticRealmsWeb.GameLiveNPCTest do
 
     assert room_id == Seed.starting_room_id()
 
-    # ── Feature 008 — pre-dispatch wrapper coverage (SC-008) ──────────────
-    # Verify the spawn_npc_clone/3 wrapper's error paths before kicking off
-    # the player session. These are pure read-model checks, no LiveView state
-    # involved.
-
-    # Unknown blueprint:
     assert {:error, :blueprint_not_found} =
              WorldCommands.spawn_npc_clone(
                "nonexistent_blueprint",
@@ -94,7 +83,6 @@ defmodule AgenticRealmsWeb.GameLiveNPCTest do
                Ecto.UUID.generate()
              )
 
-    # Unknown room:
     :ok =
       WorldApp.dispatch(
         %CreateBlueprint{
@@ -113,7 +101,6 @@ defmodule AgenticRealmsWeb.GameLiveNPCTest do
                Ecto.UUID.generate()
              )
 
-    # Name collision (Garrick is already in the starting room from seed):
     :ok =
       WorldApp.dispatch(
         %CreateBlueprint{
@@ -132,8 +119,6 @@ defmodule AgenticRealmsWeb.GameLiveNPCTest do
                Ecto.UUID.generate()
              )
 
-    # Same display name in a DIFFERENT room is allowed (preserves the per-
-    # room scope of FR-015):
     corridor_id = "00000000-0000-4000-8000-000000000002"
 
     assert {:ok, %{clone_id: _}} =
@@ -143,8 +128,6 @@ defmodule AgenticRealmsWeb.GameLiveNPCTest do
                Ecto.UUID.generate()
              )
 
-    # The same blueprint can be spawned again into yet another room — clones
-    # are distinguished by their entity id (no per-blueprint serial anymore):
     library_id = "00000000-0000-4000-8000-000000000003"
 
     assert {:ok, %{clone_id: _}} =
@@ -154,15 +137,8 @@ defmodule AgenticRealmsWeb.GameLiveNPCTest do
                Ecto.UUID.generate()
              )
 
-    # Clean up: remove the test fixtures we just added so the rest of the
-    # test (US1 / US2 / US3 / US4 player flows) sees only the seeded world.
-    # Otherwise, the duplicate Garricks in corridor/library would interfere
-    # with the Also-here uniqueness assertions below.
     Repo.delete_all(from(c in NPCClone, where: c.blueprint_id == "duplicate_garrick"))
 
-    # ── Feature 008 US3 — full-copy semantics (SC-003) ────────────────────
-    # Mutate the seeded Garrick blueprint directly via Repo.update_all, then
-    # verify the existing clone's data is unchanged.
     [garrick_clone] =
       Repo.all(from(c in NPCClone, where: c.blueprint_id == "garrick_the_innkeeper"))
 
@@ -175,19 +151,14 @@ defmodule AgenticRealmsWeb.GameLiveNPCTest do
         set: [long_description: "MUTATED — should not appear on existing clones."]
       )
 
-    # Blueprint changed.
     assert Repo.get(Blueprint, "garrick_the_innkeeper").long_description ==
              "MUTATED — should not appear on existing clones."
 
-    # Clone unchanged.
     refreshed_clone = Repo.get(NPCClone, garrick_clone.id)
 
     assert refreshed_clone.long_description == original_long_description,
            "full-copy: existing clone data MUST NOT change when the blueprint is edited (SC-003)"
 
-    # Restore blueprint so subsequent assertions about Garrick's text still
-    # match. Existing clone is already unchanged; this restoration is
-    # purely cosmetic.
     {1, _} =
       Repo.update_all(
         from(b in Blueprint, where: b.id == "garrick_the_innkeeper"),
@@ -199,12 +170,10 @@ defmodule AgenticRealmsWeb.GameLiveNPCTest do
     flush(alice_view)
     flush(bob_view)
 
-    # Let presence settle.
     Process.sleep(80)
     flush(alice_view)
     flush(bob_view)
 
-    # ── US1: room view shows "Also here" with Garrick ─────────────────────
     html = render(alice_view)
 
     assert html =~ ~s(class="room-section also-here"),
@@ -219,9 +188,6 @@ defmodule AgenticRealmsWeb.GameLiveNPCTest do
     assert html =~ "wiry innkeeper",
            "Garrick's short description should appear inline with the name"
 
-    # US1 acceptance scenario 3: moving to a room with zero NPCs renders no
-    # new Also here section. We assert by counting the section across moves —
-    # the corridor entry should not add to the count.
     also_here_count_before = count_occurrences(render(alice_view), "Also here:")
 
     submit(alice_view, "n")
@@ -232,17 +198,14 @@ defmodule AgenticRealmsWeb.GameLiveNPCTest do
     assert also_here_count_corridor == also_here_count_before,
            "moving to a room with zero NPCs must not add a new Also here section"
 
-    # Back to the Atrium.
     submit(alice_view, "s")
     flush(alice_view)
 
-    # And returning to the Atrium re-renders the section.
     also_here_count_after = count_occurrences(render(alice_view), "Also here:")
 
     assert also_here_count_after > also_here_count_corridor,
            "returning to the Atrium should re-render the Also here section"
 
-    # ── US2: examine an NPC via the canonical fast path ───────────────────
     log_count_before = log_count(bob_view)
 
     submit(alice_view, "look garrick")
@@ -261,21 +224,12 @@ defmodule AgenticRealmsWeb.GameLiveNPCTest do
     assert html =~ "wiry man in a stained apron",
            "the NPC's long description should appear in detail-body"
 
-    # Feature 008 FR-011 / SC-006: the `<name>#<serial>` debug identity MUST
-    # NOT leak into any player-facing surface.
     refute html =~ ~r/Garrick the Innkeeper#[0-9a-f]/,
            "FR-011: player-facing HTML must not contain the <name>#<id> debug identity"
 
-    # SC-005: Bob sees no log entry from Alice's examine.
     assert log_count(bob_view) == log_count_before,
            "examining an NPC must not append a witness entry to other players"
 
-    # Cross-room examine refusal is covered by the Examine unit test
-    # "NPC in another room is not findable"; we skip the LiveView-level
-    # subcheck here because it would require stubbing the LLM fallback
-    # (the fast path falls through to the resolver on :no_such_target).
-
-    # ── US3: NPC arrival witness fires live to both sessions ──────────────
     alice_count_before = log_count(alice_view)
     bob_count_before = log_count(bob_view)
 
@@ -298,7 +252,6 @@ defmodule AgenticRealmsWeb.GameLiveNPCTest do
         Ecto.UUID.generate()
       )
 
-    # Give the broadcaster + LiveView a moment to process.
     Process.sleep(80)
     flush(alice_view)
     flush(bob_view)
@@ -315,11 +268,9 @@ defmodule AgenticRealmsWeb.GameLiveNPCTest do
     assert log_count(alice_view) > alice_count_before
     assert log_count(bob_view) > bob_count_before
 
-    # FR-012: the arrival entry uses the directionless form (no "from the X").
     refute alice_html =~ "Maelyn the Bard arrives from",
            "the NPC arrival entry must NOT include 'from the X' (FR-012)"
 
-    # Subsequent room view should list both NPCs in the Also here section.
     submit(alice_view, "look")
     flush(alice_view)
 
@@ -328,11 +279,6 @@ defmodule AgenticRealmsWeb.GameLiveNPCTest do
     assert html =~ "Garrick the Innkeeper"
     assert html =~ "Maelyn the Bard"
 
-    # ── US3 — zero-recipient spawn (FR-013) ───────────────────────────────
-    # Place an NPC in a room neither Alice nor Bob is in (the corridor).
-    # Both Alice and Bob are currently in the Atrium. The corridor's room
-    # topic has no subscribers; the dispatch should succeed but no log
-    # entry should appear on either Alice or Bob.
     alice_count_silent = log_count(alice_view)
     bob_count_silent = log_count(bob_view)
 
@@ -364,7 +310,6 @@ defmodule AgenticRealmsWeb.GameLiveNPCTest do
     assert log_count(bob_view) == bob_count_silent,
            "Bob (not in the corridor) must not receive the arrival entry"
 
-    # But the world state reflects the spawn — going north shows Renn.
     submit(alice_view, "n")
     flush(alice_view)
 
@@ -373,18 +318,12 @@ defmodule AgenticRealmsWeb.GameLiveNPCTest do
     assert html =~ "Renn the Apprentice",
            "the NPC spawned silently into the corridor should be visible on look"
 
-    # Back to the Atrium for US4.
     submit(alice_view, "s")
     flush(alice_view)
 
-    # ── US4: take refusal for an NPC ──────────────────────────────────────
     bob_count_before = log_count(bob_view)
     inventory_before = Queries.list_inventory(alice.id)
 
-    # Use the NPC's full display name — the fast parser requires an exact
-    # name match (consistent with object take resolution). A partial name
-    # like "garrick" would fall through to the LLM resolver (which would
-    # need to be stubbed). Refusal is the same shape either way.
     submit(alice_view, "take Garrick the Innkeeper")
     flush(alice_view)
     Process.sleep(50)
@@ -392,26 +331,21 @@ defmodule AgenticRealmsWeb.GameLiveNPCTest do
 
     html = render(alice_view)
 
-    # HEEx auto-escapes the apostrophe (' → &#39;)
     assert html =~ "You can&#39;t take that." or html =~ "You can't take that.",
            "taking an NPC should produce the same refusal as taking a fixed object (FR-015)"
 
-    # FR-016: world state unchanged.
     assert Queries.list_inventory(alice.id) == inventory_before,
            "the inventory must not change after a failed take"
 
-    # FR-016: no witness entry to Bob.
     assert log_count(bob_view) == bob_count_before,
            "a failed take must not emit a witness entry to other players"
 
-    # Garrick is still listed in the room view.
     submit(alice_view, "look")
     flush(alice_view)
 
     html = render(alice_view)
     assert html =~ "Garrick the Innkeeper"
 
-    # Sanity: prove `take` of an actual takeable object still works (regression).
     submit(alice_view, "take brass lantern")
     flush(alice_view)
 
@@ -422,10 +356,7 @@ defmodule AgenticRealmsWeb.GameLiveNPCTest do
     _ = bob
   end
 
-  # --- Helpers ------------------------------------------------------------
-
   defp corridor_room_id do
-    # The North Corridor's seed id. Mirrors the pinned id in Seed.
     "00000000-0000-4000-8000-000000000002"
   end
 

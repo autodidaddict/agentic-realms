@@ -51,9 +51,6 @@ defmodule AgenticRealmsWeb.WizardReviewCleanupTest do
     {:ok, view, _} = live(wzc, ~p"/play")
     render_hook(view, "switch_mode", %{"mode" => "wizard"})
 
-    # Trigger :unknown_object via a crafted focus_object_for_edit with
-    # a bogus id. The handler sets :blueprint_commit_error to
-    # :unknown_object; rendering must use the friendly clause.
     bogus = Ecto.UUID.generate()
     render_hook(view, "focus_object_for_edit", %{"object_id" => bogus})
 
@@ -69,9 +66,6 @@ defmodule AgenticRealmsWeb.WizardReviewCleanupTest do
     render_hook(view, "switch_mode", %{"mode" => "wizard"})
     render_hook(view, "toggle_authoring_mode", %{})
 
-    # Manually populate a draft via the resolver's success path —
-    # we inject by dispatching a fake task result through the LiveView's
-    # state. Simpler: stub the LLM to return a draft, submit a prompt.
     stub_tool_use("draft_object_blueprint", %{
       "name" => "chest_#{suffix}",
       "short_description" => "a small chest",
@@ -85,12 +79,10 @@ defmodule AgenticRealmsWeb.WizardReviewCleanupTest do
 
     await_wizard_unlock(view)
 
-    # Auto-derived slug.
     state = :sys.get_state(view.pid)
     initial_slug = state.socket.assigns.focused_blueprint_draft.proposed_slug
     assert initial_slug == "chest_#{suffix}"
 
-    # 1. Customize the slug.
     render_hook(view, "update_blueprint_draft", %{
       "draft" => %{
         "name" => "chest_#{suffix}",
@@ -104,7 +96,6 @@ defmodule AgenticRealmsWeb.WizardReviewCleanupTest do
     customized = :sys.get_state(view.pid).socket.assigns.focused_blueprint_draft.proposed_slug
     assert customized == "iron_chest_v1_#{suffix}"
 
-    # 2. Clear the slug input — should re-derive from name.
     render_hook(view, "update_blueprint_draft", %{
       "draft" => %{
         "name" => "chest_#{suffix}",
@@ -118,8 +109,6 @@ defmodule AgenticRealmsWeb.WizardReviewCleanupTest do
     cleared = :sys.get_state(view.pid).socket.assigns.focused_blueprint_draft.proposed_slug
     assert cleared == "chest_#{suffix}"
 
-    # 3. Rename — slug MUST re-derive from the new name (the old sticky
-    # flag would have kept it pinned to "chest_<suffix>").
     render_hook(view, "update_blueprint_draft", %{
       "draft" => %{
         "name" => "iron chest #{suffix}",
@@ -140,11 +129,6 @@ defmodule AgenticRealmsWeb.WizardReviewCleanupTest do
     render_hook(view, "switch_mode", %{"mode" => "wizard"})
     render_hook(view, "toggle_authoring_mode", %{})
 
-    # Stub the LLM with a brief sleep so the wizard can toggle modes
-    # between submit and completion. The stub runs inside the
-    # IntentResolver Task — sleeping there doesn't block the LiveView,
-    # so render_hook("toggle_authoring_mode") gets through before the
-    # task result arrives.
     stub_tool_use_delayed(
       "draft_object_blueprint",
       %{
@@ -160,13 +144,8 @@ defmodule AgenticRealmsWeb.WizardReviewCleanupTest do
     |> form("form[phx-submit='submit_wizard_prompt']", %{"text" => "describe a thing"})
     |> render_submit()
 
-    # Toggle modes IMMEDIATELY — the resolver task is still sleeping
-    # inside the stub. The render_hook returns synchronously after
-    # the toggle handler runs.
     render_hook(view, "toggle_authoring_mode", %{})
 
-    # Authoring mode is :world now; the task is still running in
-    # :blueprints mode. Drain the task message.
     await_wizard_unlock(view)
 
     assigns = :sys.get_state(view.pid).socket.assigns
@@ -186,8 +165,6 @@ defmodule AgenticRealmsWeb.WizardReviewCleanupTest do
     AgenticRealms.DataCase.create_character!(bob.id, name: bob.username)
     {:ok, _} = Commands.spawn(bob.id, Seed.starting_room_id())
 
-    # Sign Bob in first; assign starts as a list of structs from the
-    # initial Queries.list_object_blueprints/0.
     bob_conn =
       build_conn()
       |> Plug.Test.init_test_session(%{})
@@ -196,13 +173,11 @@ defmodule AgenticRealmsWeb.WizardReviewCleanupTest do
     {:ok, bob_view, _} = live(bob_conn, ~p"/play")
     render_hook(bob_view, "switch_mode", %{"mode" => "wizard"})
 
-    # Verify Bob's initial list is all structs.
     initial = :sys.get_state(bob_view.pid).socket.assigns.object_blueprints
 
     assert Enum.all?(initial, &is_struct(&1, ObjectBlueprintSchema)),
            "expected initial :object_blueprints to be all Blueprint structs"
 
-    # Alice authors a blueprint; Bob's broadcast handler patches.
     slug = "homogeneous_chest_#{suffix}"
 
     {:ok, ^slug} =
@@ -222,7 +197,6 @@ defmodule AgenticRealmsWeb.WizardReviewCleanupTest do
            "after a cross-wizard broadcast, :object_blueprints should remain " <>
              "homogeneous structs (bug_009)"
 
-    # And the inserted row is findable via struct-pattern-match.
     expected_slug = slug
 
     assert Enum.find(patched, fn
@@ -231,8 +205,6 @@ defmodule AgenticRealmsWeb.WizardReviewCleanupTest do
            end),
            "broadcast-inserted row should be a struct pattern-matchable on its id"
   end
-
-  # --- Helpers ------------------------------------------------------------
 
   defp conn_for(conn, player_id) do
     conn

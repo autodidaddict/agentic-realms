@@ -30,8 +30,6 @@ defmodule AgenticRealmsWeb.CharacterSheetRenderTest do
     {:ok, alice} =
       Accounts.register_player(%{username: "sheet_#{suffix}", password: "pw12345678"})
 
-    # Feature 021 — a character before a world. Without one, mounting lands in
-    # the creation dialog rather than the game.
     AgenticRealms.DataCase.create_character!(alice.id, name: "Sheet#{suffix}")
 
     conn =
@@ -54,7 +52,6 @@ defmodule AgenticRealmsWeb.CharacterSheetRenderTest do
       assert html =~ alice.username
       assert html =~ "Lvl 1"
       assert html =~ "Level 1 Human Fighter"
-      # A level 1 Fighter with Constitution +2 has 12 hitpoints.
       assert html =~ "12 / 12"
 
       refute html =~ "Veyr of Ashfall"
@@ -89,8 +86,6 @@ defmodule AgenticRealmsWeb.CharacterSheetRenderTest do
     test "switching tabs never reaches the server (FR-019)", %{conn: conn} do
       {_view, _html, sheet} = open_sheet(conn)
 
-      # Every tab button carries a client-side JS command, not a server event
-      # name. A bare phx-click="select_tab" would be a round trip.
       refute sheet =~ ~s(phx-click="select_tab")
       assert sheet =~ ~s([&quot;show&quot;)
     end
@@ -141,7 +136,6 @@ defmodule AgenticRealmsWeb.CharacterSheetRenderTest do
       end
 
       assert sheet =~ "Ability Scores"
-      # Strength 17 is +3; Charisma 8 is -1.
       assert sheet =~ "+3"
       assert sheet =~ "-1"
     end

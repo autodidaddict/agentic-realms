@@ -95,9 +95,6 @@ defmodule AgenticRealms.World.Stats do
       skill_proficiencies: Enum.map(ps.skill_proficiencies, &to_known(&1, Skill.all(), "skill")),
       save_proficiencies:
         Enum.map(ps.save_proficiencies, &to_known(&1, Ability.all(), "ability")),
-      # Equipment does not affect armor class this milestone, so every character
-      # is unarmored. The derived layer takes these explicitly rather than
-      # assuming, so combat can start passing real armor without changing this.
       armor: nil,
       shield: nil
     }
@@ -139,12 +136,6 @@ defmodule AgenticRealms.World.Stats do
     end
   end
 
-  # The read model stores the SRD's vocabulary as strings. Resolving them
-  # against the known set rather than `String.to_existing_atom/1` is deliberate:
-  # that function depends on the atom already being in the table, which in turn
-  # depends on whether the rules module happens to have been loaded yet. Looking
-  # the value up in a list we just asked for both forces the load and rejects
-  # anything that is not real vocabulary.
   defp to_known(value, known, kind) do
     Enum.find(known, &(Atom.to_string(&1) == value)) ||
       raise ArgumentError, "player_state holds an unknown #{kind}: #{inspect(value)}"

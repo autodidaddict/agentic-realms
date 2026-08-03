@@ -13,10 +13,6 @@ defmodule AgenticRealmsWeb.GameComponents.PlayerModals do
 
   alias Phoenix.LiveView.JS
 
-  # ────────────────────────────────────────────────────────────
-  # Stats Modal
-  # ────────────────────────────────────────────────────────────
-
   attr :stats, :map, required: true
 
   @doc """
@@ -92,8 +88,6 @@ defmodule AgenticRealmsWeb.GameComponents.PlayerModals do
     """
   end
 
-  # Show the chosen panel, hide the other two, and move the selected state
-  # across the tab strip. No server round trip.
   defp select_tab(tab) do
     Enum.reduce(~w(main abilities spells), %JS{}, fn other, js ->
       if other == tab do
@@ -109,8 +103,6 @@ defmodule AgenticRealmsWeb.GameComponents.PlayerModals do
       end
     end)
   end
-
-  # --- Main tab ------------------------------------------------------------
 
   attr :stats, :map, required: true
 
@@ -162,8 +154,6 @@ defmodule AgenticRealmsWeb.GameComponents.PlayerModals do
     """
   end
 
-  # --- Abilities tab -------------------------------------------------------
-
   attr :stats, :map, required: true
 
   @doc """
@@ -211,8 +201,6 @@ defmodule AgenticRealmsWeb.GameComponents.PlayerModals do
   attr :proficient?, :boolean, required: true
   attr :what, :string, required: true
 
-  # Proficiency is carried by the filled/hollow glyph and the label both, never
-  # by colour alone.
   defp proficiency_mark(assigns) do
     ~H"""
     <span
@@ -224,8 +212,6 @@ defmodule AgenticRealmsWeb.GameComponents.PlayerModals do
     """
   end
 
-  # --- Spells tab ----------------------------------------------------------
-
   defp spells_panel(assigns) do
     ~H"""
     <div class="sheet-empty">
@@ -233,10 +219,6 @@ defmodule AgenticRealmsWeb.GameComponents.PlayerModals do
     </div>
     """
   end
-
-  # ────────────────────────────────────────────────────────────
-  # Inventory Modal
-  # ────────────────────────────────────────────────────────────
 
   attr :inventory, :list, required: true
 
@@ -261,14 +243,6 @@ defmodule AgenticRealmsWeb.GameComponents.PlayerModals do
     </.modal>
     """
   end
-
-  # ────────────────────────────────────────────────────────────
-  # Quest Modal (feature 013)
-  # ────────────────────────────────────────────────────────────
-  #
-  # Active section: every active quest with per-criterion progress
-  # lines. Completed section: every completed quest with title, reward
-  # name, and completion timestamp.
 
   attr :quests, :list, required: true
   attr :completed_quests, :list, required: true
@@ -308,10 +282,6 @@ defmodule AgenticRealmsWeb.GameComponents.PlayerModals do
     </.modal>
     """
   end
-
-  # ────────────────────────────────────────────────────────────
-  # Presence Modal
-  # ────────────────────────────────────────────────────────────
 
   attr :presence, :list, required: true
 

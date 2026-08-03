@@ -43,8 +43,6 @@ defmodule AgenticRealms.World.Transient.Generator do
 
     %{
       region_id: region_id,
-      # Region names carry a unique index — suffix with the region id so
-      # concurrent transient regions never collide.
       name: "Transient Pocket #{String.slice(region_id, 0, 8)}",
       provision_owner_id: owner_id,
       source_room_id: source_room_id,
@@ -73,7 +71,6 @@ defmodule AgenticRealms.World.Transient.Generator do
         %{from: hollow, direction: :south, to: origin},
         %{from: hollow, direction: :east, to: alcove},
         %{from: alcove, direction: :west, to: hollow},
-        # The way back out of the pocket.
         %{from: origin, direction: :rift, to: source_room_id}
       ],
       entry_exit: %{

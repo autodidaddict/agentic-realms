@@ -875,14 +875,11 @@ defmodule AgenticRealmsWeb.GameComponents.WizardAuthoring do
     """
   end
 
-  # Feature 015 US8 — unified registry kind filter.
   defp filter_blueprints(blueprints, :all), do: blueprints
 
   defp filter_blueprints(blueprints, kind) when kind in [:object, :npc],
     do: Enum.filter(blueprints, &(&1.kind == Atom.to_string(kind)))
 
-  # Feature 015 US4 — read the (single-action) shape the direct-behavior editor
-  # renders out of a feature-009 behavior map.
   defp behavior_trigger(b), do: Map.get(b, "trigger", "player_entered")
 
   defp behavior_type(b),
@@ -891,10 +888,6 @@ defmodule AgenticRealmsWeb.GameComponents.WizardAuthoring do
   defp behavior_text(b),
     do: b |> Map.get("actions", []) |> List.first(%{}) |> Map.get("text", "")
 
-  # Slug field hint — distinguishes locked (edit mode), auto-derived
-  # (slug == Slug.derive(name)), and manual (slug differs from what
-  # derive would produce). No sticky flag — the slug value itself is
-  # the source of truth.
   defp slug_hint(draft) do
     cond do
       not is_nil(Map.get(draft, :expected_revision)) ->

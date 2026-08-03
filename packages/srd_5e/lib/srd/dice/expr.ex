@@ -8,19 +8,15 @@ defmodule Srd.Dice.Expr do
 
   @type t :: %__MODULE__{count: pos_integer(), sides: pos_integer(), modifier: integer()}
 
-  #        NdX            ±M (optional)
   @dice_notation ~r/^(\d*)d(\d+)(?:([+-])(\d+))?$/i
 
   @spec parse(String.t() | t()) :: {:ok, t()} | {:error, {:invalid_dice, String.t()}}
 
-  # already parsed → pass through
   def parse(%__MODULE__{} = expr), do: {:ok, expr}
 
   def parse(string) when is_binary(string) do
     case Regex.run(@dice_notation, String.trim(string), capture: :all_but_first) do
       [count, sides, sign, mod] -> build(count, sides, sign, mod, string)
-      # :re drops trailing non-participating groups, so a modifier-less roll
-      # comes back as just [count, sides].
       [count, sides] -> build(count, sides, "", "", string)
       _ -> {:error, {:invalid_dice, string}}
     end
@@ -35,7 +31,6 @@ defmodule Srd.Dice.Expr do
   end
 
   defp build(count, sides, sign, mod, original) do
-    # "d20" → 1d20
     count = if count == "", do: 1, else: String.to_integer(count)
     sides = String.to_integer(sides)
 

@@ -88,9 +88,6 @@ defmodule AgenticRealms.Anthropic do
     end
   end
 
-  # Req decodes JSON automatically when the response content-type is JSON; a
-  # map body is the success shape. A binary body means decoding didn't happen
-  # (unexpected content-type or malformed JSON).
   defp parse_body(body) when is_map(body), do: {:ok, body}
   defp parse_body(_), do: {:error, :malformed_response}
 

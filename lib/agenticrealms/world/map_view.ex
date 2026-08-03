@@ -92,10 +92,6 @@ defmodule AgenticRealms.World.MapView do
     |> Keyword.get(:default_zoom_cells, 3)
   end
 
-  # ------------------------------------------------------------------------
-  # Build pipeline
-  # ------------------------------------------------------------------------
-
   defp empty_view do
     %__MODULE__{
       region_id: nil,
@@ -143,16 +139,7 @@ defmodule AgenticRealms.World.MapView do
     }
   end
 
-  # Hot path. Four indexed queries (discovery + rooms + exits + two
-  # short-circuit EXISTS for above/below). The server emits ALL discovered
-  # rooms in the current region+elevation — the client owns viewport
-  # decisions via SVG viewBox pan/zoom.
   defp normal_view(player_id, %Room{} = current, %Region{} = region) do
-    # The current room is trivially "discovered" — the player is standing
-    # in it. Add it unconditionally so the renderer can draw the "you are
-    # here" highlight immediately on first spawn, even before the
-    # eventually-consistent PlayerDiscoveredRoom row lands in the read
-    # model.
     discovered =
       player_id
       |> Queries.discovered_room_ids_for()
@@ -204,60 +191,19 @@ defmodule AgenticRealms.World.MapView do
     }
   end
 
-  # ------------------------------------------------------------------------
-  # Exit classification
-  # ------------------------------------------------------------------------
-
-  # Classifies each outgoing exit into one of:
-  #   * `:normal`   — between two rendered rooms, deduped by unordered pair
-  #   * `:fog_stub` — destination is map-visible + coord-set + UNDISCOVERED;
-  #     a half-step line extends from the source toward the direction with
-  #     NO destination identity carried through (FR-007 / FR-017)
-  #
-  # Suppressed entirely (no entry):
-  #   * destination is map-hidden or has no coords (FR-006)
-  #   * destination is in a different region (deferred to US6 :cross_region)
-  #   * vertical exits (Up/Down) — those produce icons on the source room,
-  #     not lines
-  #   * destination is discovered + map-visible but OUTSIDE the rendered
-  #     viewport window (off-screen — keep the renderer simple for v1)
-  #
-  # Dedup invariant (FR-004): exactly one line per unordered pair of
-  # rendered rooms. Reciprocal exits (A→B + B→A) collapse to one line.
-  # Fog stubs DO NOT dedupe — each undiscovered direction from the same
-  # source room produces its own stub (they emerge in different
-  # directions; the player needs to see each).
   defp build_exit_lines(exits, rendered_by_id, rendered_id_set, discovered) do
-    # `normal_lines` is a map keyed on the unordered pair {a, b} so
-    # reciprocal exits collapse to one entry (FR-004). `other_lines`
-    # holds fog stubs and cross-region affordances — both are non-
-    # dedupable (each direction-from-source carries its own meaning).
     {normal_lines, other_lines} =
       Enum.reduce(exits, {%{}, []}, fn %Exit{} = e, {normal_acc, other_acc} ->
         direction = direction_atom(e.direction)
 
         cond do
-          # Vertical exits produce icons, not lines.
           direction in [:up, :down] ->
             {normal_acc, other_acc}
 
-          # FR-006: a map-hidden room (or one without coords) leaves NO
-          # visible trace on the map. The source-side line is suppressed
-          # entirely — no :normal, no :fog_stub, no :cross_region affordance.
-          # The source room looks identical to one with no exit in that
-          # direction. This is the wizard's primary tool for secret areas.
           is_nil(e.target_room) or e.target_room.map_visible != true or
             is_nil(e.target_room.map_x) or is_nil(e.target_room.map_y) ->
             {normal_acc, other_acc}
 
-          # FR-008 — cross-region exit. Source is rendered; target is in
-          # a DIFFERENT region. The destination room is NOT drawn on this
-          # view (regions are independent map planes); we emit a
-          # :cross_region affordance whose endpoint sits ~0.85 cells into
-          # the direction from the source — slightly further out than a
-          # fog stub so the portal glyph has clear visual separation from
-          # the source room's rect edge (at ±0.43 cells) and the current-
-          # room glow. NO destination identity carried.
           e.target_room.region_id != Map.fetch!(rendered_by_id, e.source_room_id).region_id ->
             source = Map.fetch!(rendered_by_id, e.source_room_id)
             {dx, dy} = Geometry.unit_vector(direction)
@@ -273,7 +219,6 @@ defmodule AgenticRealms.World.MapView do
 
             {normal_acc, [cross | other_acc]}
 
-          # Both endpoints rendered → :normal (dedup by unordered pair).
           MapSet.member?(rendered_id_set, e.target_room.id) ->
             a = e.source_room_id
             b = e.target_room.id
@@ -296,18 +241,6 @@ defmodule AgenticRealms.World.MapView do
               {Map.put(normal_acc, key, line), other_acc}
             end
 
-          # Target undiscovered but map-visible + coord-set → :fog_stub.
-          # Anchor the stub's destination at the target room's actual
-          # cell coordinates (NOT some fixed offset from the source) so
-          # that two sources pointing at the same undiscovered room
-          # converge on a single cloud at one cell. The fog cloud then
-          # sits in the same cell the room glyph will occupy once
-          # discovered — visual continuity.
-          #
-          # Coordinates of the target are not an info leak: the player
-          # can already infer them geometrically from the source and
-          # exit direction (and from any other stub converging on the
-          # same cell). Only the target's id/name/region are withheld.
           not MapSet.member?(discovered, e.target_room.id) ->
             source = Map.fetch!(rendered_by_id, e.source_room_id)
 
@@ -322,9 +255,6 @@ defmodule AgenticRealms.World.MapView do
 
             {normal_acc, [stub | other_acc]}
 
-          # Discovered + map-visible + coord-set but outside the rendered
-          # viewport (room exists but the player has wandered past the
-          # window) → suppress (off-screen affordance is out of scope).
           true ->
             {normal_acc, other_acc}
         end
@@ -338,10 +268,6 @@ defmodule AgenticRealms.World.MapView do
 
   defp direction_atom(s) when is_binary(s), do: String.to_existing_atom(s)
   defp direction_atom(a) when is_atom(a), do: a
-
-  # ------------------------------------------------------------------------
-  # Up/Down icon sets
-  # ------------------------------------------------------------------------
 
   defp vertical_icon_sets(exits) do
     Enum.reduce(exits, {MapSet.new(), MapSet.new()}, fn %Exit{} = e, {up_set, down_set} ->
@@ -367,8 +293,5 @@ defmodule AgenticRealms.World.MapView do
 
   defp renderable_vertical_target?(_), do: false
 
-  # PlayerState is preloaded by the LiveView via Queries.current_room_of/1;
-  # the alias is kept here for future use (incremental MapView updates
-  # might key off PlayerState rows directly).
   _ = PlayerState
 end

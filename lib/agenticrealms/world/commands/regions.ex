@@ -16,8 +16,6 @@ defmodule AgenticRealms.World.Commands.Regions do
   alias AgenticRealms.World.Exits.Validator, as: ExitsValidator
   alias AgenticRealms.World.Schemas.{Region, Room}
 
-  # --- Region authoring (feature 012) -------------------------------------
-
   @doc """
   Create a new region with the given `region_id` and friendly display
   `name`. Pre-dispatch validation: the name is not already in use in the
@@ -44,8 +42,6 @@ defmodule AgenticRealms.World.Commands.Regions do
       _ -> {:error, :region_name_taken}
     end
   end
-
-  # --- Room authoring (feature 012) ---------------------------------------
 
   @doc """
   Create a room with map metadata. `opts` may include `:behaviors` (default

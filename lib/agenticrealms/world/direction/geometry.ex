@@ -140,23 +140,17 @@ defmodule AgenticRealms.World.Direction.Geometry do
   def planar?(d) when d in @planar_directions, do: true
   def planar?(_), do: false
 
-  # ------------------------------------------------------------------
-  # Private helpers
-  # ------------------------------------------------------------------
-
   defp on_ray?(s, t, dx_sign, dy_sign) do
     dx = t.map_x - s.map_x
     dy = t.map_y - s.map_y
 
     cond do
-      # Pure-cardinal: one axis is zero, the other has the matching sign.
       dx_sign == 0 ->
         dx == 0 and dy != 0 and sign(dy) == dy_sign
 
       dy_sign == 0 ->
         dy == 0 and dx != 0 and sign(dx) == dx_sign
 
-      # Diagonal: |dx| == |dy|, both non-zero, both signs match.
       true ->
         dx != 0 and abs(dx) == abs(dy) and sign(dx) == dx_sign and sign(dy) == dy_sign
     end

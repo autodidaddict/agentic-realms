@@ -84,7 +84,6 @@ defmodule Srd.Content.ClassesTest do
     end
 
     test "filters by offered skill" do
-      # The bard chooses from every skill, so it offers this one too.
       assert Classes.all(skill: :sleight_of_hand) |> Enum.map(& &1.slug) |> Enum.sort() ==
                ["bard", "rogue"]
 

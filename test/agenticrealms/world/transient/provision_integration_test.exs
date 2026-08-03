@@ -47,7 +47,6 @@ defmodule AgenticRealms.World.Transient.ProvisionIntegrationTest do
     assert length(rooms) == 3
     assert Enum.all?(rooms, &(&1.map_visible == false))
 
-    # The owner was moved into the region's origin room.
     assert {:ok, region.origin_room_id} == Queries.current_room_of(owner.id)
   end
 
@@ -58,12 +57,10 @@ defmodule AgenticRealms.World.Transient.ProvisionIntegrationTest do
   } do
     origin = region.origin_room_id
 
-    # origin --north--> hollow --south--> origin
     assert {:ok, hollow} = Commands.move(owner.id, :north)
     assert hollow != origin
     assert {:ok, ^origin} = Commands.move(owner.id, :south)
 
-    # origin --rift--> back out to the source room
     assert {:ok, ^source} = Commands.move(owner.id, :rift)
     assert {:ok, ^source} = Queries.current_room_of(owner.id)
   end
@@ -76,14 +73,11 @@ defmodule AgenticRealms.World.Transient.ProvisionIntegrationTest do
   } do
     origin = region.origin_room_id
 
-    # Bring the owner back to the source room (where the entry exit lives).
     assert {:ok, ^source} = Commands.move(owner.id, :rift)
 
     {:ok, owner_view} = Queries.look_room(owner.id)
     assert "rift" in Enum.map(owner_view.exits, & &1.direction)
 
-    # A different player standing in the same source room neither sees the
-    # rift exit nor can traverse it.
     {:ok, other} = Accounts.register_player(%{username: "oth_#{suffix}", password: "pw12345678"})
     {:ok, _} = Commands.spawn(other.id, source)
 
@@ -91,7 +85,6 @@ defmodule AgenticRealms.World.Transient.ProvisionIntegrationTest do
     refute "rift" in Enum.map(other_view.exits, & &1.direction)
     assert {:error, :no_exit_in_direction} = Commands.move(other.id, :rift)
 
-    # And the origin room is genuinely the owner's (sanity: owner is elsewhere now).
     refute origin == source
   end
 

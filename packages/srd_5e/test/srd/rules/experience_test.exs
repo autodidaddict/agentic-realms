@@ -3,8 +3,6 @@ defmodule Srd.Rules.ExperienceTest do
 
   alias Srd.Rules.Experience
 
-  # The published SRD 5.2 table, restated here so the test is an independent
-  # check on the module rather than a mirror of it.
   @table [
     {1, 0},
     {2, 300},

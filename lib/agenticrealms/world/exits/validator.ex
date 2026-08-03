@@ -39,9 +39,6 @@ defmodule AgenticRealms.World.Exits.Validator do
   """
   @spec consistent?(atom(), map(), map()) ::
           :ok | {:error, {:exit_geometry_violation, atom()}}
-  # Feature 017 — `:rift` is a non-geographic portal direction (transient
-  # region entry/return). It has no coordinate delta, so geometry consistency
-  # is meaningless; accept unconditionally.
   def consistent?(:rift, _source, _target), do: :ok
 
   def consistent?(direction, source, target) do

@@ -70,8 +70,6 @@ defmodule AgenticRealms.World.CharacterDraft.Validator do
   @spec valid?(Draft.t()) :: boolean()
   def valid?(%Draft{} = draft), do: validate(draft) == :ok
 
-  # --- name ----------------------------------------------------------------
-
   defp name_errors(%Draft{name: name}) do
     trimmed = String.trim(name)
 
@@ -83,8 +81,6 @@ defmodule AgenticRealms.World.CharacterDraft.Validator do
   end
 
   defp too_long, do: "A name can be at most #{@max_name_length} characters."
-
-  # --- species, class, background -------------------------------------------
 
   defp selection_errors(%Draft{} = draft) do
     [
@@ -101,13 +97,10 @@ defmodule AgenticRealms.World.CharacterDraft.Validator do
     if get.(slug), do: [], else: [{field, "There is no such #{what}."}]
   end
 
-  # --- ability scores -------------------------------------------------------
-
   defp ability_errors(%Draft{} = draft) do
     bought_errors(draft) ++ spread_errors(draft) ++ cap_errors(draft)
   end
 
-  # Point buy: six abilities, every score on the table, total within budget.
   defp bought_errors(%Draft{bought: bought}) do
     cond do
       Map.keys(bought) |> Enum.sort() != Enum.sort(Ability.all()) ->
@@ -166,8 +159,6 @@ defmodule AgenticRealms.World.CharacterDraft.Validator do
     end
   end
 
-  # --- skills ---------------------------------------------------------------
-
   defp skill_errors(%Draft{} = draft) do
     case Enum.find(Draft.open_choices(draft), &(&1.key == :class_skills)) do
       nil ->
@@ -196,12 +187,6 @@ defmodule AgenticRealms.World.CharacterDraft.Validator do
     end
   end
 
-  # --- everything else ------------------------------------------------------
-
-  # The generic rule, and the reason this module needs no rules of its own: for
-  # each choice the package offered, exactly `choose` picks, each of them from
-  # `from`. A key the package did not offer is an error, which is what stops a
-  # forged submission from carrying a decision nobody asked for.
   defp choice_errors(%Draft{} = draft) do
     open = Draft.open_choices(draft) |> Enum.reject(&(&1.key == :class_skills))
     offered = MapSet.new(open, & &1.key)
@@ -235,8 +220,6 @@ defmodule AgenticRealms.World.CharacterDraft.Validator do
     end
   end
 
-  # Options arrive as slugs, atoms, or structs depending on the choice's kind.
-  # Comparing identity rather than shape keeps this from having to know which.
   defp option_set(%{from: from}), do: MapSet.new(from, &option_id/1)
 
   defp option_id(%{slug: slug}), do: slug

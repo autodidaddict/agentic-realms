@@ -4,7 +4,6 @@ defmodule Srd.Rules.SaveTest do
   alias Srd.Dice.Roll
   alias Srd.Rules.Save
 
-  # A plain d20 showing `nat` on the die, with a flat `mod`.
   defp d20(nat, mod \\ 0) do
     %Roll{count: 1, sides: 20, modifier: mod, dice: [nat], reduce: :sum, total: nat + mod}
   end

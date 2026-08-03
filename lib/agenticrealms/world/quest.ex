@@ -34,8 +34,6 @@ defmodule AgenticRealms.World.Quest do
     QuestItemsCleanedUp
   }
 
-  # --- AcceptQuest --------------------------------------------------------
-
   @spec execute(%__MODULE__{}, %AcceptQuest{} | %FinalizeQuest{}) ::
           %QuestAccepted{}
           | [
@@ -68,8 +66,6 @@ defmodule AgenticRealms.World.Quest do
 
   def execute(%__MODULE__{state: :completed}, _cmd),
     do: {:error, :already_completed}
-
-  # --- FinalizeQuest ------------------------------------------------------
 
   def execute(%__MODULE__{state: :initial}, %FinalizeQuest{}),
     do: {:error, :unknown_instance}
@@ -113,8 +109,6 @@ defmodule AgenticRealms.World.Quest do
     ]
   end
 
-  # --- apply/2 ------------------------------------------------------------
-
   @spec apply(
           %__MODULE__{},
           %QuestAccepted{}
@@ -148,8 +142,6 @@ defmodule AgenticRealms.World.Quest do
     %__MODULE__{state | state: :completed, completed_at: at}
   end
 
-  # The other three finalize events do not change aggregate state — they
-  # carry side effects projected into the read model.
   def apply(%__MODULE__{} = state, %QuestItemsConsumed{}), do: state
   def apply(%__MODULE__{} = state, %QuestRewardMinted{}), do: state
   def apply(%__MODULE__{} = state, %QuestItemsCleanedUp{}), do: state

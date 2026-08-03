@@ -99,8 +99,6 @@ defmodule AgenticRealms.World.Commands.SpawnNpcComposeTest do
     slug = author_and_spawn(ctx)
     clone = Repo.get_by(NPCClone, blueprint_id: slug)
 
-    # Two player_entered behaviors from different sources are BOTH retained,
-    # in attachment order, followed by the direct player_left behavior.
     assert clone.behaviors == [@orc_emote, @shop_say, @direct_bye]
     assert clone.behavior_groups == [ctx.orc, ctx.shop]
     assert clone.direct_behaviors == [@direct_bye]
@@ -111,7 +109,6 @@ defmodule AgenticRealms.World.Commands.SpawnNpcComposeTest do
     slug = author_and_spawn(ctx)
     before = Repo.get_by(NPCClone, blueprint_id: slug)
 
-    # Mutate the orc behavior_group's behaviors at the registry level.
     {1, _} =
       Repo.update_all(
         from(t in BehaviorGroup, where: t.name == ^orc),

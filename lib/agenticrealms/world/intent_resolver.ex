@@ -28,8 +28,6 @@ defmodule AgenticRealms.World.IntentResolver do
   @multi_step_refusal "Try one action at a time."
   @no_room_refusal "You are nowhere."
   @too_long_refusal "Your message is too long (max 500 characters)."
-  # Mirrors the pre-005 unknown-command copy — used when no API key is set so
-  # the feature degrades gracefully instead of crashing.
   @no_key_refusal "I don't understand that."
 
   @type action_tuple ::
@@ -94,15 +92,10 @@ defmodule AgenticRealms.World.IntentResolver do
         %{
           "type" => "text",
           "text" => SystemPrompt.text(),
-          # Marker on the system block caches tools + system together
-          # (render order is tools → system → messages).
           "cache_control" => %{"type" => "ephemeral"}
         }
       ],
       "tools" => Tools.list(),
-      # `any` forces a tool call; no `disable_parallel_tool_use` so the model
-      # can — and per the system prompt should — pick `refuse` for multi-step
-      # intent rather than silently collapsing to one action.
       "tool_choice" => %{"type" => "any"},
       "messages" => [%{"role" => "user", "content" => user_message}]
     }
@@ -148,8 +141,6 @@ defmodule AgenticRealms.World.IntentResolver do
   defp to_action("say", %{"text" => t}) when is_binary(t) and t != "", do: {:ok, {:say, t}}
   defp to_action("emote", %{"text" => t}) when is_binary(t) and t != "", do: {:ok, {:emote, t}}
 
-  # Literal clauses so the direction atoms are guaranteed to exist — never
-  # String.to_atom/to_existing_atom on model-supplied input.
   defp to_action("move", %{"direction" => "north"}), do: {:ok, {:move, :north}}
   defp to_action("move", %{"direction" => "south"}), do: {:ok, {:move, :south}}
   defp to_action("move", %{"direction" => "east"}), do: {:ok, {:move, :east}}
@@ -167,8 +158,6 @@ defmodule AgenticRealms.World.IntentResolver do
     {:ok, {:whisper, r, t}}
   end
 
-  # Feature 010 — chat verb dispatch. The NPC's name (in their current room)
-  # is the `npc` field; the player's message is `message`.
   defp to_action("chat", %{"npc" => n, "message" => m})
        when is_binary(n) and n != "" and is_binary(m) and m != "" do
     {:ok, {:chat, n, m}}
@@ -178,13 +167,7 @@ defmodule AgenticRealms.World.IntentResolver do
     {:error, m}
   end
 
-  # Recognized tool name but the input failed schema validation
-  # (missing/empty required field, bad direction enum, etc.).
   defp to_action(_name, _input), do: {:error, @generic_refusal}
-
-  # ─────────────────────────────────────────────────────────────────────
-  # Feature 014 — wizard authoring resolver (`:blueprints` mode)
-  # ─────────────────────────────────────────────────────────────────────
 
   @wizard_system_prompt """
   You are a tool-call dispatcher for a wizard authoring reusable templates
@@ -219,9 +202,6 @@ defmodule AgenticRealms.World.IntentResolver do
     Omit or leave empty if none fit; never invent names.
   """
 
-  # The model may call `list_behavior_groups` to ground behavior group proposals before it
-  # drafts. Bound the number of read-tool hops so a misbehaving model can't
-  # loop forever; the draft/refuse call terminates the loop.
   @max_wizard_tool_hops 3
 
   @doc """
@@ -265,8 +245,6 @@ defmodule AgenticRealms.World.IntentResolver do
     end
   end
 
-  # Exhausted the read-tool hop budget without a draft/refuse — treat as
-  # an unparseable intent rather than looping.
   defp run_blueprint_loop(_messages, hops) when hops >= @max_wizard_tool_hops do
     {:error, @generic_refusal}
   end
@@ -313,8 +291,6 @@ defmodule AgenticRealms.World.IntentResolver do
     }
   end
 
-  # Append the model's `list_behavior_groups` call + our tool_result so the next
-  # turn sees the grounded behavior group list.
   defp append_tool_round(messages, tool_use_id, name, result_text) do
     messages ++
       [
@@ -333,8 +309,6 @@ defmodule AgenticRealms.World.IntentResolver do
       ]
   end
 
-  # The behavior groups the LLM is allowed to propose for an NPC, as a readable
-  # block fed back through the `list_behavior_groups` tool_result.
   defp list_behavior_groups_result do
     case BehaviorGroups.list_for(:npc) do
       [] ->
@@ -412,8 +386,6 @@ defmodule AgenticRealms.World.IntentResolver do
           long_description: long,
           lore: (is_binary(input["lore"]) && input["lore"]) || "",
           fixed: input["fixed"] == true,
-          # FR-018 — drop any proposed name not in the NPC behavior_group registry
-          # so a hallucinated behavior_group never reaches the picker/commit.
           behavior_groups: grounded_behavior_groups(input["behavior_groups"])
         }}}
     else
@@ -628,8 +600,6 @@ defmodule AgenticRealms.World.IntentResolver do
       %{player_id: player_id, outcome: result, tool_name: tool_name}
     )
   end
-
-  # ─────────────────────────────────────────────────────────────────────
 
   defp emit_telemetry(player_id, raw_input, outcome, started_at) do
     latency_ms = System.monotonic_time(:millisecond) - started_at

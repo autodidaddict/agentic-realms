@@ -82,9 +82,6 @@ defmodule AgenticRealms.World.ContainerRef do
     na.type == nb.type and na.id == nb.id
   end
 
-  # The type atoms are all referenced statically in this module, so they are
-  # guaranteed to exist by decode time — `to_existing_atom/1` is safe and
-  # rejects unknown junk.
   defp to_type(type) when is_atom(type), do: type
   defp to_type(type) when is_binary(type), do: String.to_existing_atom(type)
 end

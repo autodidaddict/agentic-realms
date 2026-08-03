@@ -114,7 +114,6 @@ defmodule AgenticRealms.World.Commands.CreateNPCBlueprintWrapperTest do
                long_description: "z"
              })
 
-    # One namespace: the slug is taken by the object; no npc-kind row exists.
     assert %Blueprint{kind: "object"} = Repo.get(Blueprint, slug)
   end
 
@@ -140,7 +139,6 @@ defmodule AgenticRealms.World.Commands.CreateNPCBlueprintWrapperTest do
                long_description: "z"
              })
 
-    # One namespace: the slug is taken by the npc; no object-kind row exists.
     assert %Blueprint{kind: "npc"} = Repo.get(Blueprint, slug)
   end
 

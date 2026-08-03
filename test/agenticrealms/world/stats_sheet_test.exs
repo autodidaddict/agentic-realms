@@ -91,7 +91,6 @@ defmodule AgenticRealms.World.StatsSheetTest do
     end
 
     test "exposes no leftover derivation key", %{sheet: sheet} do
-      # `:experience` is renamed to `:xp` for the UI; it must not appear twice.
       refute Map.has_key?(sheet, :experience)
     end
   end
@@ -109,8 +108,6 @@ defmodule AgenticRealms.World.StatsSheetTest do
 
     test "the hitpoint maximum is derived from the level, not the stored value",
          %{sheet: sheet} do
-      # The row was created with max_hp 12; a level 5 Fighter with Constitution
-      # +2 has 44, and the sheet must show the derived figure.
       assert sheet.hp == %{cur: 30, max: 44}
     end
 
@@ -169,10 +166,6 @@ defmodule AgenticRealms.World.StatsSheetTest do
     end
 
     test "resolves without depending on the atom table being warm" do
-      # Regression: `String.to_existing_atom/1` raised here whenever the rules
-      # module had not been loaded yet, which is the normal state of a cold
-      # runtime. Resolving against `Skill.all()` both forces the load and keeps
-      # the check honest.
       player = register_player("cold") |> with_character()
 
       assert %{skills: skills} = Stats.for_player(player.id)

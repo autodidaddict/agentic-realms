@@ -80,8 +80,6 @@ defmodule AgenticRealms.World.IntentResolver.ContextSnapshot do
     Enum.map_join(exits, ", ", fn e -> "#{e.direction} (#{e.target_name})" end)
   end
 
-  # Objects and players are both `%{name: ...}` since feature 021, so one
-  # formatter serves both.
   defp format_names([]), do: "(none)"
   defp format_names(entries), do: Enum.map_join(entries, ", ", & &1.name)
 

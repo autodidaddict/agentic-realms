@@ -37,14 +37,12 @@ defmodule AgenticRealms.World.Commands.CreateCharacter do
     :class_slug,
     :background_slug,
     :size,
-    # nil for the four species that offer no lineage.
     :lineage_slug,
     :abilities,
     :skill_proficiencies,
     :save_proficiencies,
     :feat_slugs,
     :max_hp,
-    # Picks with no typed field: tools, weapon masteries, feature options.
     choices: %{}
   ]
 end

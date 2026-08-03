@@ -25,13 +25,6 @@ defmodule AgenticRealms.World.Ticks.LifecycleResilienceTest do
 
   alias AgenticRealms.World.Ticks.Lifecycle
 
-  # A Lifecycle with no route to a connection.
-  #
-  # It is started from a bare `spawn/1`, which sets neither `$callers` nor
-  # `$ancestors` back to this test process — so the sandbox has no owner to
-  # resolve and every query fails. Starting it from the test process directly
-  # would inherit ownership through `$callers` and quietly succeed, testing
-  # nothing.
   defp start_isolated_lifecycle do
     test = self()
 
@@ -60,8 +53,6 @@ defmodule AgenticRealms.World.Ticks.LifecycleResilienceTest do
     lifecycle = start_isolated_lifecycle()
     ref = Process.monitor(lifecycle)
 
-    # Resolving this join needs `Queries.current_room_of/1`, and there is no
-    # connection to be had.
     send(lifecycle, %{
       event: "presence_diff",
       payload: %{joins: %{"987654321" => %{}}, leaves: %{}}
@@ -72,11 +63,6 @@ defmodule AgenticRealms.World.Ticks.LifecycleResilienceTest do
   end
 
   test "it starts at all when the database is unreachable" do
-    # The startup rebuild reads the database. If that runs inline in `init/1`,
-    # an unavailable database means the process cannot start — and a process
-    # that cannot start is a process that restart-loops. Deferring the rebuild
-    # to `handle_continue/2` keeps it (it still runs before any other message)
-    # while letting a failed attempt retry instead of crash.
     lifecycle = start_isolated_lifecycle()
     ref = Process.monitor(lifecycle)
 

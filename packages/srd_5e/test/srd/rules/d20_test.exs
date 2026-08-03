@@ -4,7 +4,6 @@ defmodule Srd.Rules.D20Test do
   alias Srd.Dice.Roll
   alias Srd.Rules.D20
 
-  # A plain d20 showing `nat` on the die, with a flat `mod`.
   defp d20(nat, mod \\ 0) do
     %Roll{count: 1, sides: 20, modifier: mod, dice: [nat], reduce: :sum, total: nat + mod}
   end
@@ -29,7 +28,6 @@ defmodule Srd.Rules.D20Test do
     end
 
     test "natural comes from the kept die under advantage" do
-      # 2d20 keep-highest: dice [4, 18], +3 -> total 21, kept die 18
       adv = %Roll{count: 2, sides: 20, modifier: 3, dice: [4, 18], reduce: :max, total: 21}
       result = D20.test(adv, 15)
       assert result.natural == 18

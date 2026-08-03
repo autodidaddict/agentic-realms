@@ -19,8 +19,6 @@ defmodule AgenticRealms.World.Commands.CreateBlueprint do
     :name,
     :short_description,
     :long_description,
-    # The wrapper + seed always set `kind` explicitly; it defaults to "npc"
-    # for the convenience of direct test dispatches.
     kind: "npc",
     wizard_id: nil,
     fixed: false,

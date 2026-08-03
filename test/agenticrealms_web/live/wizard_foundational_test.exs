@@ -53,12 +53,9 @@ defmodule AgenticRealmsWeb.WizardFoundationalTest do
        %{witness_conn: wc} do
     {:ok, view, html} = live(wc, ~p"/play")
 
-    # FR-WIZ-3 — the top-bar mode switch is hidden for non-wizards.
     refute html =~ ~r/phx-click="switch_mode".*Wizard/s
     refute html =~ ~r/phx-value-mode="wizard"/
 
-    # FR-WIZ-4 — a crafted switch_mode event aiming for :wizard is refused
-    # without any visible state change.
     render_hook(view, "switch_mode", %{"mode" => "wizard"})
     refute render(view) =~ "Wizard mode · creator"
   end
@@ -68,7 +65,6 @@ defmodule AgenticRealmsWeb.WizardFoundationalTest do
     {:ok, wizard_view, _} = live(wzc, ~p"/play")
     {:ok, witness_view, _} = live(wtc, ~p"/play")
 
-    # Enter Wizard view, then flip into Sanctum (blueprint authoring mode).
     render_hook(wizard_view, "switch_mode", %{"mode" => "wizard"})
     render_hook(wizard_view, "toggle_authoring_mode", %{})
 
@@ -76,20 +72,14 @@ defmodule AgenticRealmsWeb.WizardFoundationalTest do
     witness_html = render(witness_view)
     assert witness_html =~ "#{wizard.username} enters a trance."
 
-    # Self-suppression — the wizard's own session does NOT see the entry
-    # in their own narrative log (FR-002 wording: "every *other* player
-    # session"). The wizard's authoring chrome change is their feedback.
     refute render(wizard_view) =~ "#{wizard.username} enters a trance."
 
-    # Return to World. FR-003 — exit entry fires.
     render_hook(wizard_view, "toggle_authoring_mode", %{})
     flush(witness_view)
     witness_html_after = render(witness_view)
     assert witness_html_after =~ "#{wizard.username} appears to come out of a trance."
     refute render(wizard_view) =~ "#{wizard.username} appears to come out of a trance."
   end
-
-  # --- Helpers ------------------------------------------------------------
 
   defp conn_for(conn, player_id) do
     conn

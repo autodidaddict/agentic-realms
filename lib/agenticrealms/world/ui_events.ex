@@ -226,14 +226,6 @@ defmodule AgenticRealms.World.UIEvents do
     defstruct [:kind, :npc_clone_id, :npc_name, :text, :triggering_player_id]
   end
 
-  # ── Feature 013 — Quest UI broadcasts ──────────────────────────────────
-  #
-  # All three structs are broadcast on `player:<player_id>` ONLY. The
-  # `UIEventBroadcaster` emits them in response to QuestAccepted (→
-  # PlayerQuestAccepted), inventory changes touching a tagged item (→
-  # PlayerQuestProgress), and QuestCompleted (→ PlayerQuestFinalized).
-  # See `specs/013-quest-system/contracts/ui-broadcast-events.md`.
-
   defmodule PlayerQuestAccepted do
     @moduledoc """
     Transient event signaling a quest has just been accepted. Broadcast

@@ -17,11 +17,6 @@ defmodule AgenticRealmsWeb.GameComponents.LogEntry do
 
   attr :entry, :map, required: true
 
-  # ────────────────────────────────────────────────────────────
-  # Room views — full room block (feature 003 RoomView) + the legacy
-  # mockup-shaped variant kept for any seed entries that still use it.
-  # ────────────────────────────────────────────────────────────
-
   def log_entry(%{entry: %{kind: :room, room: %AgenticRealms.World.RoomView{}}} = assigns) do
     ~H"""
     <div class="log-entry room">
@@ -90,10 +85,6 @@ defmodule AgenticRealmsWeb.GameComponents.LogEntry do
     """
   end
 
-  # ────────────────────────────────────────────────────────────
-  # Detail views — `look <target>` output for objects, players, NPCs.
-  # ────────────────────────────────────────────────────────────
-
   def log_entry(%{entry: %{kind: :detail, target_kind: :object}} = assigns) do
     ~H"""
     <div class="log-entry detail detail-object">
@@ -130,21 +121,12 @@ defmodule AgenticRealmsWeb.GameComponents.LogEntry do
     """
   end
 
-  # ────────────────────────────────────────────────────────────
-  # Narration — generic prose log entries.
-  # ────────────────────────────────────────────────────────────
-
   def log_entry(%{entry: %{kind: :narrate}} = assigns) do
     ~H"""
     <div class="log-entry narrate">{@entry.text}</div>
     """
   end
 
-  # ────────────────────────────────────────────────────────────
-  # Behavior-sourced speech & emotes (features 009/011).
-  # ────────────────────────────────────────────────────────────
-
-  # Feature 009 — attributed NPC speech: <name> says, "text".
   def log_entry(%{entry: %{kind: :npc_speech}} = assigns) do
     ~H"""
     <div class="log-entry speech speech-npc">
@@ -153,19 +135,11 @@ defmodule AgenticRealmsWeb.GameComponents.LogEntry do
     """
   end
 
-  # Feature 009 — room narration. NO attribution; ambient line, no
-  # "X says" framing, no quotes.
   def log_entry(%{entry: %{kind: :room_speech}} = assigns) do
     ~H"""
     <div class="log-entry narrate narrate-room">{@entry.text}</div>
     """
   end
-
-  # Feature 011 — emote actions (third-person narration). Three
-  # flavors: room (ambient, no attribution), NPC (name prepended),
-  # object (name prepended). No "says" wrapper, no quotes — narrative
-  # text only. Uses the `ambient` base class (NOT `narrate`) so
-  # ticking emotes don't carry feature 009's drop-cap styling.
 
   def log_entry(%{entry: %{kind: :room_emote}} = assigns) do
     ~H"""
@@ -189,13 +163,6 @@ defmodule AgenticRealmsWeb.GameComponents.LogEntry do
     """
   end
 
-  # ────────────────────────────────────────────────────────────
-  # Chat surface (feature 010) — private NPC conversation reply.
-  # ────────────────────────────────────────────────────────────
-
-  # Feature 010 — private chat reply (speech mode). Visually mirrors
-  # :npc_speech but on the private surface; `speech-chat` class lets
-  # CSS distinguish public NPC speech from a chat-private utterance.
   def log_entry(%{entry: %{kind: :chat_speech}} = assigns) do
     ~H"""
     <div class="log-entry speech speech-npc speech-chat">
@@ -204,9 +171,6 @@ defmodule AgenticRealmsWeb.GameComponents.LogEntry do
     """
   end
 
-  # Feature 010 — private chat reply (emote mode). Third-person
-  # narration attributed to the NPC by name. Mirrors the shape of
-  # :emote_action.
   def log_entry(%{entry: %{kind: :chat_emote}} = assigns) do
     ~H"""
     <div class="log-entry emote emote-chat">
@@ -215,9 +179,6 @@ defmodule AgenticRealmsWeb.GameComponents.LogEntry do
     """
   end
 
-  # Feature 010 — chat-frame system message. `kind_variant`
-  # discriminates the CSS class for styling (`chat-new`,
-  # `chat-continuing`, `chat-fallback`, `chat-in-flight`).
   def log_entry(%{entry: %{kind: :chat_system}} = assigns) do
     variant_class =
       case assigns.entry[:kind_variant] do
@@ -234,10 +195,6 @@ defmodule AgenticRealmsWeb.GameComponents.LogEntry do
     <div class={"log-entry chat-system " <> @variant_class}>{@entry.text}</div>
     """
   end
-
-  # ────────────────────────────────────────────────────────────
-  # Player input echo, system messages, basic say/whisper, combat.
-  # ────────────────────────────────────────────────────────────
 
   def log_entry(%{entry: %{kind: :cmd}} = assigns) do
     ~H"""
@@ -264,13 +221,6 @@ defmodule AgenticRealmsWeb.GameComponents.LogEntry do
     <div class="log-entry system">{@entry.text}</div>
     """
   end
-
-  # ────────────────────────────────────────────────────────────
-  # Player communication (feature 004) — speech/emote/private surfaces.
-  # All `text` and `actor` values come from player input and MUST be
-  # rendered via HEEx auto-escaping (default `{ @entry.text }`
-  # interpolation). FR-024.
-  # ────────────────────────────────────────────────────────────
 
   def log_entry(%{entry: %{kind: :speech}} = assigns) do
     ~H"""
@@ -341,7 +291,6 @@ defmodule AgenticRealmsWeb.GameComponents.LogEntry do
     """
   end
 
-  # Fallback — unknown entry kinds render empty (silent drop).
   def log_entry(assigns) do
     ~H"""
     """

@@ -57,9 +57,6 @@ defmodule AgenticRealms.EventStore.Serializer do
     end
   end
 
-  # Only the struct's own fields become atoms, and only at the top level. A key
-  # the struct does not declare is dropped rather than atomized, so a payload
-  # written by an older shape cannot introduce atoms or crash the read.
   defp to_struct(decoded, module) when is_map(decoded) do
     attrs =
       module.__struct__()

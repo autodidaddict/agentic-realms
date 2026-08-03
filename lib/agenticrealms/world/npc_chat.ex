@@ -75,13 +75,9 @@ defmodule AgenticRealms.World.NPCChat do
     Registry.lookup({player_id, npc_clone_id})
   end
 
-  # --- NPC token resolution -------------------------------------------------
-
   defp resolve_npc(room_id, token) do
     needle = String.trim(token) |> String.downcase()
 
-    # The whole row, not the room listing's projection — the Conversation needs
-    # `lore`. One query; this used to be one per NPC in the room.
     clones = Queries.list_npc_clones_in_room(room_id)
 
     exact = Enum.filter(clones, fn c -> String.downcase(c.name) == needle end)

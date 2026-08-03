@@ -72,22 +72,18 @@ defmodule AgenticRealms.World.Commands.EditObjectBlueprintWrapperTest do
 
   test "stale revision returns :stale_revision with current revision",
        %{wizard: w, slug: slug} do
-    # First edit bumps revision to 2.
     {:ok, 2} =
       Commands.edit_object_blueprint(w.id, slug, %{
         expected_revision: 1,
         fields_changed: %{short_description: "first edit"}
       })
 
-    # Second edit using stale expected_revision: 1 → :stale_revision.
     assert {:error, :stale_revision, current_revision: 2} =
              Commands.edit_object_blueprint(w.id, slug, %{
                expected_revision: 1,
                fields_changed: %{short_description: "stale edit"}
              })
 
-    # The Blueprint's actual state should NOT have been modified by the
-    # rejected edit.
     bp = Queries.get_object_blueprint(slug)
     assert bp.short_description == "first edit"
   end
@@ -125,14 +121,12 @@ defmodule AgenticRealms.World.Commands.EditObjectBlueprintWrapperTest do
         AgenticRealms.World.Seed.starting_room_id()
       )
 
-    # Edit the blueprint AFTER spawning.
     {:ok, 2} =
       Commands.edit_object_blueprint(w.id, slug, %{
         expected_revision: 1,
         fields_changed: %{short_description: "edited after spawn"}
       })
 
-    # The already-spawned clone keeps its original short_description.
     clone = AgenticRealms.Repo.get(AgenticRealms.World.Schemas.Object, object_id)
     assert clone.short_description == "a small thing"
   end

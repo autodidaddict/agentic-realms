@@ -5,9 +5,6 @@ defmodule Srd.CharacterTest do
   alias Srd.Character
   alias Srd.Rules.Skill
 
-  # A Human Fighter with a Soldier background: the character the game generates
-  # by default. Scores are the standard array dealt by class priority, plus the
-  # background's +2/+1.
   defp facts(overrides \\ []) do
     Enum.into(overrides, %{
       species: "human",
@@ -182,8 +179,6 @@ defmodule Srd.CharacterTest do
   end
 
   describe "derive/1 — every proficiency band" do
-    # Fighter, d10 hit die, Constitution +2: 12 at level 1, +8 per level after.
-    # Proficiency rises +2/+3/+4/+5/+6 at levels 1/5/9/13/17.
     @bands [
       {1, 2, 12},
       {5, 3, 44},
@@ -207,11 +202,9 @@ defmodule Srd.CharacterTest do
       for {level, bonus, _} <- @bands do
         sheet = Character.derive(facts(level: level))
 
-        # Strength +3, proficient.
         assert find(sheet.saves, :str).modifier == 3 + bonus
         assert find(sheet.skills, :athletics).modifier == 3 + bonus
 
-        # Dexterity +1, not proficient — unmoved by level.
         assert find(sheet.saves, :dex).modifier == 1
         assert find(sheet.skills, :stealth).modifier == 1
       end
@@ -249,7 +242,6 @@ defmodule Srd.CharacterTest do
         )
 
       assert sheet.class.name == "Wizard"
-      # d6 hit die, Constitution +1: 7 at level 1, +5 per level after.
       assert sheet.max_hit_points == 17
       assert sheet.hit_dice == %Srd.Dice.Expr{count: 3, sides: 6, modifier: 0}
       assert sheet.proficiency_bonus == 2
@@ -273,7 +265,6 @@ defmodule Srd.CharacterTest do
     test "worn armor routes through the armor class rules" do
       sheet = Character.derive(facts(armor: Armors.get("chain-mail")))
 
-      # Heavy armor ignores Dexterity.
       assert sheet.armor_class == 16
     end
 
@@ -293,7 +284,6 @@ defmodule Srd.CharacterTest do
           )
         )
 
-      # Half plate is 15 base, +2 at most from Dexterity.
       assert sheet.armor_class == 17
     end
   end

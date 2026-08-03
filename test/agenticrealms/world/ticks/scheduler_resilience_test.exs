@@ -16,12 +16,6 @@ defmodule AgenticRealms.World.Ticks.SchedulerResilienceTest do
   alias AgenticRealms.World.Ticks.Scheduler
   alias AgenticRealms.World.UIEvents.RoomNPCArrived
 
-  # A Scheduler with no route to a connection.
-  #
-  # Started from a bare `spawn/1`, which sets neither `$callers` nor
-  # `$ancestors` back to this test — so the sandbox has no owner to resolve and
-  # every query fails. Starting it from the test process would inherit
-  # ownership through `$callers` and quietly succeed, testing nothing.
   defp start_isolated_scheduler do
     test = self()
     room_id = Ecto.UUID.generate()
@@ -48,8 +42,6 @@ defmodule AgenticRealms.World.Ticks.SchedulerResilienceTest do
   end
 
   test "it starts at all when the database is unreachable" do
-    # `init/1` used to compute the room's scope inline. A scheduler that cannot
-    # start is a scheduler that restart-loops.
     scheduler = start_isolated_scheduler()
     ref = Process.monitor(scheduler)
 
@@ -61,7 +53,6 @@ defmodule AgenticRealms.World.Ticks.SchedulerResilienceTest do
     scheduler = start_isolated_scheduler()
     ref = Process.monitor(scheduler)
 
-    # Resolving this needs the clone's behaviors, and there is no connection.
     send(scheduler, %RoomNPCArrived{
       npc_id: Ecto.UUID.generate(),
       room_id: Ecto.UUID.generate(),

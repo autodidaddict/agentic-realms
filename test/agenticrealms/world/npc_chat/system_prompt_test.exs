@@ -97,7 +97,6 @@ defmodule AgenticRealms.World.NPCChat.SystemPromptTest do
       assert SystemPrompt.text(snap) == SystemPrompt.text(snap)
     end
 
-    # US3 — environmental grounding in the system prompt.
     test "with two other_players, both names appear" do
       prompt = SystemPrompt.text(base_snapshot(%{other_players: ["Bob", "Carol"]}))
       assert prompt =~ "Also present: Bob, Carol."
@@ -120,17 +119,12 @@ defmodule AgenticRealms.World.NPCChat.SystemPromptTest do
       assert prompt =~ "oil lamp (a sputtering oil lamp)"
     end
 
-    # US4 — out-of-lore refusal rule explicitly mentions emote preference.
     test "out-of-scope refusal rule contains both 'in-theme refusal' and 'emote' (US4)" do
       prompt = SystemPrompt.text(base_snapshot())
       assert prompt =~ "in-theme refusal"
       assert prompt =~ "Prefer an `emote` reply"
     end
 
-    # Conversational-memory rule MUST be present so the NPC remembers what
-    # the player said earlier in the chat (regression: Garrick was issuing
-    # an emote refusal on follow-up questions that referenced things the
-    # player had told him in a prior turn).
     test "system prompt includes a conversational-memory rule that distinguishes lore-dump from follow-up questions" do
       prompt = SystemPrompt.text(base_snapshot())
       assert prompt =~ "CONVERSATIONAL MEMORY"
@@ -142,11 +136,6 @@ defmodule AgenticRealms.World.NPCChat.SystemPromptTest do
              "the system prompt must explicitly state that conversational follow-ups are NOT out-of-scope refusals"
     end
 
-    # The birthday regression: Haiku was treating "is today my birthday?" as
-    # a real-world fact question (needing a calendar) rather than a callback
-    # to what the player just said. The prompt must explicitly tell the model
-    # that first-person claims by the player are TRUE within the chat and
-    # don't require external verification.
     test "system prompt instructs the LLM to treat player-supplied facts as true" do
       prompt = SystemPrompt.text(base_snapshot())
 

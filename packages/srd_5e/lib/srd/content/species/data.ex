@@ -1,8 +1,5 @@
 defmodule Srd.Content.Species.Data do
   @moduledoc false
-  # Loads the species content at compile time. This lives apart from
-  # `Srd.Content.Species` only because a module cannot build its own struct
-  # while compiling; the public API is all on `Srd.Content.Species`.
   alias Srd.Content.Feature
   alias Srd.Content.Lineage
   alias Srd.Content.Species

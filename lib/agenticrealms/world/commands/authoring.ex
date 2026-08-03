@@ -26,8 +26,6 @@ defmodule AgenticRealms.World.Commands.Authoring do
   alias AgenticRealms.World.Queries
   alias AgenticRealms.World.Schemas.{Blueprint, NPCClone, Room}
 
-  # --- NPC blueprint cloning (feature 008) --------------------------------
-
   @doc """
   Spawn a clone of `blueprint_id` into `room_id` with the given `clone_id`.
 
@@ -55,17 +53,11 @@ defmodule AgenticRealms.World.Commands.Authoring do
              | term()}
   def spawn_npc_clone(blueprint_id, room_id, clone_id)
       when is_binary(blueprint_id) and is_binary(room_id) and is_binary(clone_id) do
-    # Feature 016 — an NPC clone is cloned into existence (a full copy of the
-    # blueprint's current data) and moved into the room via the entity
-    # lifecycle. This deterministic-clone-id form is used by the seed.
     with {:ok, blueprint} <- fetch_npc_blueprint(blueprint_id) do
       spawn_npc_clone_row(blueprint, room_id, clone_id)
     end
   end
 
-  # Shared NPC spawn: per-room name-collision check, behavior_group composition
-  # (FR-016 — effective = union(behavior_groups) ++ direct), and the full-copy clone
-  # into the room carrying the behavior_group/direct-behavior provenance.
   defp spawn_npc_clone_row(%Blueprint{} = bp, room_id, clone_id) do
     with :ok <- check_room_exists(room_id),
          :ok <- check_no_clone_name_collision(room_id, bp.name),
@@ -91,8 +83,6 @@ defmodule AgenticRealms.World.Commands.Authoring do
     end
   end
 
-  # Feature 019 — freeze the blueprint's base stats onto the clone at spawn.
-  # Current hp/mana start at their maxima; NPCs never carry xp.
   defp npc_stat_fields(%Blueprint{} = bp) do
     %{
       str: bp.str,
@@ -109,7 +99,6 @@ defmodule AgenticRealms.World.Commands.Authoring do
     }
   end
 
-  # Default base stats for a freeform NPC (no blueprint) — same as a player.
   defp default_npc_stat_fields do
     %{
       str: 12,
@@ -130,7 +119,6 @@ defmodule AgenticRealms.World.Commands.Authoring do
     case Repo.get(Blueprint, blueprint_id) do
       nil -> {:error, :blueprint_not_found}
       %Blueprint{kind: "npc"} = bp -> {:ok, bp}
-      # A slug that resolves to an object blueprint is not a valid NPC source.
       %Blueprint{} -> {:error, :blueprint_not_found}
     end
   end
@@ -148,10 +136,6 @@ defmodule AgenticRealms.World.Commands.Authoring do
       {:error, :no_such_clone} -> :ok
     end
   end
-
-  # ──────────────────────────────────────────────────────────────────────
-  # Feature 015 — unified Blueprint authoring
-  # ──────────────────────────────────────────────────────────────────────
 
   @doc """
   Author a new Blueprint of either kind (`"object"` | `"npc"`).
@@ -200,8 +184,6 @@ defmodule AgenticRealms.World.Commands.Authoring do
     end
   end
 
-  # Objects carry no behaviors/behavior_groups surface in this milestone, so only
-  # npc blueprints validate them.
   defp validate_kind_payload("npc", behaviors, behavior_groups) do
     with :ok <- BehaviorGroups.validate_behaviors(behaviors) do
       BehaviorGroups.all_exist?(behavior_groups)
@@ -356,7 +338,6 @@ defmodule AgenticRealms.World.Commands.Authoring do
          :ok <- check_no_clone_name_collision(room_id, attrs[:name]) do
       fields =
         %{
-          # Freeform NPCs have no blueprint behind them.
           blueprint_id: nil,
           name: attrs[:name],
           short_description: attrs[:short_description],
@@ -434,9 +415,6 @@ defmodule AgenticRealms.World.Commands.Authoring do
     end
   end
 
-  # Resolve an entity id to an extractable world Object or NPC clone. A
-  # quest-scoped object is filtered out by `fetch_object/1`, so it falls
-  # through to `:unknown_entity`.
   defp fetch_extractable_entity(entity_id) do
     case fetch_object(entity_id) do
       {:ok, object} ->
@@ -462,12 +440,6 @@ defmodule AgenticRealms.World.Commands.Authoring do
       nil ->
         {:error, :unknown_object}
 
-      # Wizards cannot extract or edit quest-scoped objects in milestone
-      # 1 — these belong to a specific player. The Things-in-this-room
-      # panel already filters them out via
-      # `Queries.list_objects_in_room_for_wizard/1`; this is the
-      # defense-in-depth at the Commands wrapper boundary so a crafted
-      # client event or iex caller can't bypass.
       %{quest_player_id: pid} when not is_nil(pid) ->
         {:error, :unknown_object}
 
@@ -476,9 +448,7 @@ defmodule AgenticRealms.World.Commands.Authoring do
     end
   end
 
-  # In-place world-Object edit (feature 014) — narrow field set.
   @object_only_edit_fields ~w(name short_description long_description fixed)a
-  # Blueprint + npc-clone edits also reach lore/behavior_groups/behaviors.
   @edit_blueprint_fields ~w(name short_description long_description fixed lore behavior_groups behaviors)a
 
   @doc """
@@ -526,9 +496,6 @@ defmodule AgenticRealms.World.Commands.Authoring do
 
       case WorldApp.dispatch(cmd, consistency: :strong) do
         :ok ->
-          # Aggregate accepted but emitted no event (no-op diff) OR
-          # accepted and emitted the edit event. Re-read to determine
-          # the actual new revision.
           updated = Repo.get(Blueprint, blueprint_id)
 
           cond do
@@ -556,8 +523,6 @@ defmodule AgenticRealms.World.Commands.Authoring do
 
   defp validate_edit_fields(_, _), do: {:error, :invalid_field}
 
-  # When an edit touches the npc-flavored fields, validate them the same way
-  # create does (feature-009 behavior vocabulary + behavior_group existence).
   defp validate_edit_payload(fields) do
     with :ok <- maybe_validate_behaviors(fields) do
       maybe_validate_behavior_groups(fields)
@@ -615,9 +580,6 @@ defmodule AgenticRealms.World.Commands.Authoring do
           {:ok, :no_change}
 
         true ->
-          # `room_id` was only used to route to the Room aggregate; entity
-          # edits route by entity_id. The co-location check above remains the
-          # security boundary (the object must be in the wizard's room).
           _ = room_id
 
           case WorldApp.dispatch(
@@ -676,13 +638,6 @@ defmodule AgenticRealms.World.Commands.Authoring do
 
   defp ensure_in_room(_), do: {:error, :object_not_editable_here}
 
-  # Feature 014 US5 — cross-room defense in depth. The LiveView's
-  # `focus_object_for_edit` pattern matches `obj.room_id == ^room_id`
-  # at focus time (the UX gate), but the wizard's `:focused_object_edit`
-  # assign persists across PlayerMoved, so a focus-then-walk-then-commit
-  # sequence would otherwise let the wizard edit an object in a room
-  # they're no longer in. Per `contracts/commands.md`, the Commands
-  # wrapper IS the security boundary here.
   defp ensure_wizard_co_located(wizard_id, object_room_id) do
     case AgenticRealms.World.Queries.current_room_of(wizard_id) do
       {:ok, ^object_room_id} -> :ok
@@ -714,12 +669,6 @@ defmodule AgenticRealms.World.Commands.Authoring do
     if Slug.valid?(slug), do: :ok, else: {:error, :invalid_slug}
   end
 
-  # FR-004 — a blueprint slug is unique across BOTH the object and NPC
-  # registries, so a wizard can never author an object and an NPC under the
-  # same id (the unified registry, US8, keys on it).
-  # FR-004 — one slug namespace across both kinds (the unified `blueprints`
-  # table keys on it), so a wizard can never author an object and an NPC under
-  # the same id.
   defp ensure_slug_unused(slug) do
     case Repo.get(Blueprint, slug) do
       nil -> :ok
@@ -727,9 +676,6 @@ defmodule AgenticRealms.World.Commands.Authoring do
     end
   end
 
-  # Feature 014 — wizard authorization gate. Synchronous read of the
-  # `players.is_wizard` flag (FR-WIZ-5). Used as the entry guard on every
-  # wizard-only command wrapper.
   defp ensure_wizard(player_id) when is_integer(player_id) do
     case Accounts.get_player(player_id) do
       %Accounts.Player{is_wizard: true} -> :ok

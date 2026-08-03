@@ -173,9 +173,6 @@ defmodule AgenticRealms.World.Ticks.ScopeTest do
           {e.target_kind, hd(e.actions)["text"]}
         end)
 
-      # Room behaviors come first (authored order), the object last. The two
-      # NPCs sit between, in a stable (entity-id) order — serial is gone, so we
-      # don't pin their relative order, only that both are present in the band.
       assert Enum.take(kinds_and_texts, 2) == [{:room, "room-first"}, {:room, "room-second"}]
       assert List.last(kinds_and_texts) == {:object, "obj"}
       npc_texts = for {:npc, t} <- kinds_and_texts, do: t
@@ -191,7 +188,6 @@ defmodule AgenticRealms.World.Ticks.ScopeTest do
 
       base = Scope.compute(room.id)
       added = Scope.add_npc(base, clone.id)
-      # de-duped — same entries
       assert length(added) == length(base)
 
       removed = Scope.remove_npc(base, clone.id)

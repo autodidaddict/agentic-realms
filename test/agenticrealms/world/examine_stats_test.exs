@@ -75,7 +75,6 @@ defmodule AgenticRealms.World.ExamineStatsTest do
   setup do
     alice = register("alice")
     room = room!()
-    # examiner is level 1 (schema default)
     place(alice, room)
     online(alice)
     %{alice: alice, room: room}

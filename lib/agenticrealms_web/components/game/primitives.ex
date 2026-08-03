@@ -7,10 +7,6 @@ defmodule AgenticRealmsWeb.GameComponents.Primitives do
 
   use AgenticRealmsWeb, :html
 
-  # ────────────────────────────────────────────────────────────
-  # HP Bar
-  # ────────────────────────────────────────────────────────────
-
   @doc """
   A modifier with an explicit sign, so `+2` and `-1` are never ambiguous and a
   zero reads as `+0` rather than a bare `0` (FR-007).
@@ -49,10 +45,6 @@ defmodule AgenticRealmsWeb.GameComponents.Primitives do
     """
   end
 
-  # ────────────────────────────────────────────────────────────
-  # HUD Card
-  # ────────────────────────────────────────────────────────────
-
   attr :title, :string, required: true
   attr :count, :string, default: nil
   attr :modal_type, :string, required: true
@@ -82,10 +74,6 @@ defmodule AgenticRealmsWeb.GameComponents.Primitives do
     </div>
     """
   end
-
-  # ────────────────────────────────────────────────────────────
-  # Modal Shell
-  # ────────────────────────────────────────────────────────────
 
   attr :title, :string, required: true
   attr :glyph, :string, default: nil
@@ -157,11 +145,6 @@ defmodule AgenticRealmsWeb.GameComponents.Primitives do
     />
     """
   end
-
-  # ────────────────────────────────────────────────────────────
-  # Stats Panel — the player sidebar with Character / Inventory /
-  # Quest Log / Here HUD cards.
-  # ────────────────────────────────────────────────────────────
 
   attr :stats, :map, required: true
   attr :inventory, :list, required: true
@@ -249,14 +232,6 @@ defmodule AgenticRealmsWeb.GameComponents.Primitives do
     </aside>
     """
   end
-
-  # ────────────────────────────────────────────────────────────
-  # Direction arrow glyph — used by log entries (room view exits)
-  # and by any future component that wants a compact directional
-  # indicator. Accepts either the canonical atom (`:north`,
-  # `:northeast`, …) or its lowercase string form. Up and north
-  # both render as ↑; down and south as ↓.
-  # ────────────────────────────────────────────────────────────
 
   @arrow_by_dir %{
     "north" => "↑",

@@ -24,7 +24,6 @@ defmodule AgenticRealmsWeb.WizardAuthoringTest do
       MatchError -> :already_seeded
     end
 
-    # Shared mode so the resolver Task (a separate process) sees our stub.
     Req.Test.set_req_test_to_shared(%{})
 
     suffix = System.unique_integer([:positive])
@@ -48,11 +47,8 @@ defmodule AgenticRealmsWeb.WizardAuthoringTest do
        %{wizard_conn: wzc, suffix: suffix} do
     {:ok, view, _html} = live(wzc, ~p"/play")
 
-    # 1. Switch to Wizard mode (top-bar switch is gated on is_wizard, which
-    #    is true here per the setup's promote_to_wizard call).
     render_hook(view, "switch_mode", %{"mode" => "wizard"})
 
-    # 2. Flip into Sanctum (FR-001).
     render_hook(view, "toggle_authoring_mode", %{})
 
     html = render(view)
@@ -60,7 +56,6 @@ defmodule AgenticRealmsWeb.WizardAuthoringTest do
     assert html =~ "sanctum"
     assert html =~ "Describe an object archetype"
 
-    # 3. Stub the LLM to return a draft_object_blueprint tool_use.
     name = "brass-bound chest #{suffix}"
 
     stub_tool_use("draft_object_blueprint", %{
@@ -70,30 +65,24 @@ defmodule AgenticRealmsWeb.WizardAuthoringTest do
       "fixed" => true
     })
 
-    # 4. Submit the prompt — spawns the resolver task.
     view
     |> form("form[phx-submit='submit_wizard_prompt']", %{"text" => "a brass chest"})
     |> render_submit()
 
     await_wizard_unlock(view)
 
-    # 5. The Interpreted Data card now shows the LLM-extracted fields.
     html = render(view)
     assert html =~ name
     assert html =~ "a brass-bound chest"
 
-    # 6. Commit the draft.
     render_hook(view, "commit_blueprint_draft", %{})
 
-    # 7. The blueprint persists.
     expected_slug = String.replace(name, ~r/[^a-z0-9]+/, "_") |> String.trim("_")
     assert %{revision: 1} = Queries.get_object_blueprint(expected_slug)
 
-    # 8. The registry tab reflects the new row.
     html = render(view)
     assert html =~ name
 
-    # 9. After commit the draft is cleared.
     refute html =~ "Discard"
   end
 
@@ -121,9 +110,7 @@ defmodule AgenticRealmsWeb.WizardAuthoringTest do
 
     html = render(view)
     refute html =~ "discardable"
-    # Still in sanctum chrome.
     assert html =~ "Return to your body"
-    # Registry has no rows for this draft.
     assert Queries.get_object_blueprint("discardable") == nil
   end
 
@@ -142,11 +129,8 @@ defmodule AgenticRealmsWeb.WizardAuthoringTest do
     await_wizard_unlock(view)
     html = render(view)
     assert html =~ "That&#39;s a question"
-    # No Interpreted Data card visible without a draft.
     refute html =~ "Interpreted data"
   end
-
-  # --- Helpers ------------------------------------------------------------
 
   defp stub_tool_use(tool_name, input) do
     Req.Test.stub(AgenticRealms.Anthropic, fn conn ->

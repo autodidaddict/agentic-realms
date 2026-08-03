@@ -43,8 +43,6 @@ defmodule AgenticRealms.Cluster.Check do
           detail: String.t()
         }
 
-  # Every Horde registry, and the singleton key each one names, or `nil` where
-  # the registry holds per-key processes rather than a singleton.
   @registries [
     {Transient.Registry, :manager, "Transient.Manager", "the region reaper"},
     {NpcMinds.Registry, :reconciler, "NpcMinds.Reconciler", "the mind reconciler"},
@@ -52,7 +50,6 @@ defmodule AgenticRealms.Cluster.Check do
     {NPCChat.Registry, nil, nil, "per-(player, NPC) conversations"}
   ]
 
-  # Fixed report order, so the output reads as the chain it is checking.
   @sections ["Distribution", "Discovery", "Peers", "Horde", "Singletons"]
 
   @doc """
@@ -77,18 +74,12 @@ defmodule AgenticRealms.Cluster.Check do
   def check do
     peers = Node.list()
 
-    # Whether clustering was *intended* decides severity. A dev machine that is
-    # not distributed is not broken; a node with DNS_CLUSTER_QUERY set that
-    # cannot cluster is. A checker that cries wolf on every laptop gets ignored,
-    # and then it is not there on the day it matters.
     intent = if query() in [nil, :ignore], do: :single_node, else: :clustered
 
     distribution(intent) ++ discovery(intent, peers) ++ peers(intent, peers) ++ horde(peers)
   end
 
   defp query, do: Application.get_env(:agenticrealms, :dns_cluster_query)
-
-  # --- distribution ---------------------------------------------------------
 
   defp distribution(intent) do
     if Node.alive?() do
@@ -109,7 +100,6 @@ defmodule AgenticRealms.Cluster.Check do
     end
   end
 
-  # An error when clustering was intended, a note when it was not.
   defp finding(:clustered, section, label, detail), do: error(section, label, detail)
   defp finding(:single_node, section, label, detail), do: warn(section, label, detail)
 
@@ -119,8 +109,6 @@ defmodule AgenticRealms.Cluster.Check do
       _ -> ok("Distribution", "cookie", "set")
     end
   end
-
-  # --- discovery ------------------------------------------------------------
 
   defp discovery(intent, peers) do
     query = query()
@@ -166,8 +154,6 @@ defmodule AgenticRealms.Cluster.Check do
     end
   end
 
-  # --- peers ----------------------------------------------------------------
-
   defp peers(_intent, []) do
     [
       warn(
@@ -181,8 +167,6 @@ defmodule AgenticRealms.Cluster.Check do
   defp peers(_intent, peers) do
     [ok("Peers", "connected", "#{length(peers)}: #{Enum.map_join(peers, ", ", &to_string/1)}")]
   end
-
-  # --- Horde ----------------------------------------------------------------
 
   defp horde(peers) do
     expected = length(peers) + 1
@@ -215,9 +199,6 @@ defmodule AgenticRealms.Cluster.Check do
     end
   end
 
-  # A registry with a singleton key is the interesting case: it should resolve
-  # to one process, and every node should name the same one. Asking the peers
-  # is what turns "we configured it" into "it is true right now".
   defp singleton(_registry, nil, _name, _expected), do: []
 
   defp singleton(registry, key, name, expected) do
@@ -252,8 +233,6 @@ defmodule AgenticRealms.Cluster.Check do
     end
   end
 
-  # Ask this node and every peer what they resolve the key to. A node that
-  # cannot answer is itself the finding.
   defp lookup_everywhere(registry, key) do
     nodes = [Node.self() | Node.list()]
 
@@ -276,8 +255,6 @@ defmodule AgenticRealms.Cluster.Check do
     _ -> :not_running
   end
 
-  # --- reporting ------------------------------------------------------------
-
   defp ok(section, label, detail),
     do: %{section: section, label: label, status: :ok, detail: detail}
 
@@ -290,8 +267,6 @@ defmodule AgenticRealms.Cluster.Check do
   defp print(findings) do
     IO.puts("\nCluster check — #{Node.self()}\n")
 
-    # Group by section rather than chunking consecutive runs: the Horde and
-    # singleton findings are produced per registry and would otherwise alternate.
     by_section = Enum.group_by(findings, & &1.section)
 
     for section <- @sections, group = by_section[section], group do

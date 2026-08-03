@@ -60,7 +60,6 @@ defmodule AgenticRealms.World.Ticks.RegistryTest do
       {:ok, _pid} = Supervisor.find_or_start(room.id)
       :ok = Supervisor.terminate(room.id)
 
-      # Allow Horde to reap the registry entry
       Process.sleep(50)
       assert :error = Registry.lookup(room.id)
     end

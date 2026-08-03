@@ -21,7 +21,6 @@ defmodule AgenticRealms.World.Transient.ManagerTest do
     owner = unique_owner()
     rid = insert_transient(owner, owner_offline_since: minutes_ago(10))
 
-    # owner offline (not tracked in presence)
     assert rid in Manager.sweep_now()
     assert Repo.get(Region, rid) == nil
   end
@@ -41,25 +40,20 @@ defmodule AgenticRealms.World.Transient.ManagerTest do
     owner = unique_owner()
     rid = insert_transient(owner, owner_offline_since: nil)
 
-    # owner offline; the sweep stamps owner_offline_since=now but must not reap.
     refute rid in Manager.sweep_now()
     region = Repo.get(Region, rid)
     assert region
     assert region.owner_offline_since != nil
   end
 
-  # Feature 017 US4 — the 60-minute absolute cap.
   test "reaps once the lifetime cap has elapsed even if the owner is online" do
     owner = unique_owner()
     {:ok, _} = Presence.track_player(self(), owner, "owner-#{owner}")
-    # Provisioned two hours ago — well past the 60-minute cap.
     rid = insert_transient(owner, provisioned_at: minutes_ago(120), owner_offline_since: nil)
 
     assert rid in Manager.sweep_now()
     assert Repo.get(Region, rid) == nil
   end
-
-  # --- helpers ------------------------------------------------------------
 
   defp unique_owner, do: System.unique_integer([:positive])
 

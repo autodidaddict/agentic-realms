@@ -54,8 +54,6 @@ defmodule AgenticRealms.World.NPCChat.Conversation do
           last_activity_at: integer() | nil
         }
 
-  # --- Client -----------------------------------------------------------
-
   @doc """
   Start a Conversation registered under `{player_id, npc_clone_id}` via
   `Horde.Registry`. Init args: `{player_id, npc_clone_struct}`.
@@ -66,8 +64,6 @@ defmodule AgenticRealms.World.NPCChat.Conversation do
       name: Registry.via_tuple({player_id, clone_id})
     )
   end
-
-  # --- Server -----------------------------------------------------------
 
   @impl true
   def init({player_id, clone}) do
@@ -93,8 +89,6 @@ defmodule AgenticRealms.World.NPCChat.Conversation do
         now = System.monotonic_time(:millisecond)
         new_or_continuing = classify(state.last_activity_at, now)
 
-        # On :new, drop any stale history from a prior conversation
-        # that somehow survived idle reap (defensive; should not happen).
         turns_after_classify =
           case new_or_continuing do
             :new -> []
@@ -126,20 +120,17 @@ defmodule AgenticRealms.World.NPCChat.Conversation do
     end
   end
 
-  # Test-only inspection.
   def handle_call(:get_state, _from, state) do
     {:reply, state, state, idle_timeout()}
   end
 
   @impl true
   def handle_info({ref, result}, %__MODULE__{task_ref: ref} = state) when is_reference(ref) do
-    # Task completed normally — demonitor and discard the upcoming :DOWN.
     Process.demonitor(ref, [:flush])
     handle_llm_result(result, state)
   end
 
   def handle_info({:DOWN, ref, :process, _pid, reason}, %__MODULE__{task_ref: ref} = state) do
-    # Task died with a non-normal exit — treat as failure.
     Logger.warning("NPCChat Task crashed: #{inspect(reason)}")
     handle_llm_result({:error, {:task_crash, reason}}, state)
   end
@@ -156,8 +147,6 @@ defmodule AgenticRealms.World.NPCChat.Conversation do
     {:noreply, state, idle_timeout()}
   end
 
-  # --- Result handling --------------------------------------------------
-
   defp handle_llm_result({:ok, response_body}, state) do
     case Reply.parse(response_body) do
       {:speech, text} -> handle_success(:chat_speech, :speech, text, state)
@@ -171,12 +160,6 @@ defmodule AgenticRealms.World.NPCChat.Conversation do
     handle_failure(state, reason)
   end
 
-  # Feature 013 — Quest tool calls. For US1 we only handle accept_quest.
-  # The engine executes the command and synthesizes a brief NPC emote
-  # acknowledgement; the player's existing turn + this synthesized emote
-  # are recorded in history so the next round-trip continues coherently.
-  # The two-turn LLM follow-up flow (feeding tool_result back to the
-  # model for an in-character reply) is deferred to a polish iteration.
   defp handle_tool_call(%{name: "accept_quest", input: %{"slug" => slug}}, state) do
     case WorldCommands.accept_quest(state.player_id, state.npc_clone.blueprint_id, slug) do
       {:ok, _quest_id} ->
@@ -239,9 +222,6 @@ defmodule AgenticRealms.World.NPCChat.Conversation do
 
   defp check_progress_emote_text(criteria) do
     if Enum.all?(criteria, fn c -> c.count >= c.target end) do
-      # When the player visibly has everything, don't tell them to "bring
-      # them when ready" — they're standing right there. Acknowledge and
-      # wait for them to say the word.
       "looks at your hands and gives a small approving nod. \"That's all of them. Say the word and we're settled.\""
     else
       summary =
@@ -330,8 +310,6 @@ defmodule AgenticRealms.World.NPCChat.Conversation do
 
     {:noreply, new_state, idle_timeout()}
   end
-
-  # --- Helpers ----------------------------------------------------------
 
   defp broadcast_system_message(state, :new) do
     Phoenix.PubSub.broadcast(

@@ -113,7 +113,6 @@ defmodule AgenticRealms.World.NPCChatTest do
     end
 
     test "ambiguous partial match → :ambiguous_npc", %{room: room} do
-      # Two NPCs with overlapping substrings.
       bp = insert_blueprint(name: "Guards", lore: "")
       _g1 = insert_clone(bp, room, name: "Town Guard")
       _g2 = insert_clone(bp, room, name: "Guard Captain")
@@ -145,8 +144,6 @@ defmodule AgenticRealms.World.NPCChatTest do
       stub_say("Hi.")
       {:ok, :new} = NPCChat.send(p.id, "Garrick", "hi")
 
-      # Wait for the LLM Task to complete, then verify the conversation
-      # is still registered (still within the idle window).
       assert_receive %ChatUtterance{kind: :chat_speech}, 2_000
 
       assert {:ok, pid} = NPCChat.find(p.id, clone.id)

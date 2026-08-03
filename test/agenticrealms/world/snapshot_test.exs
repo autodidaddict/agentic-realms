@@ -13,9 +13,6 @@ defmodule AgenticRealms.World.SnapshotTest do
 
   use AgenticRealms.DataCase, async: false
 
-  # Issue #10 — opt in to the per-test Commanded chain. The `World.Application`
-  # is no longer started by the global supervisor in :test; `setup_commanded/0`
-  # spins up a fresh chain (incl. its in-memory event store) per test.
   @moduletag :commanded
 
   alias AgenticRealms.World.Application, as: WorldApp
@@ -44,9 +41,6 @@ defmodule AgenticRealms.World.SnapshotTest do
     data
   end
 
-  # Feature 016 — the Room aggregate no longer carries an `object_ids`
-  # MapSet (objects are freestanding entities). Only the string-keyed `exits`
-  # map needs to survive the JSON snapshot roundtrip now.
   describe "Room snapshot" do
     test "exits string keys survive (do not get atomized)" do
       room = %Room{

@@ -59,7 +59,6 @@ defmodule AgenticRealmsWeb.WizardFreeformTest do
 
     render_hook(wizard_view, "switch_mode", %{"mode" => "wizard"})
 
-    # Stub the LLM to return a manifest_object_freeform tool_use.
     name = "freeform pot #{suffix}"
 
     stub_tool_use("manifest_object_freeform", %{
@@ -71,27 +70,22 @@ defmodule AgenticRealmsWeb.WizardFreeformTest do
 
     blueprint_count_before = length(Queries.list_object_blueprints())
 
-    # Submit the prompt in world mode.
     wizard_view
     |> form("form[phx-submit='submit_wizard_prompt']", %{"text" => "a clay pot leaning"})
     |> render_submit()
 
     await_wizard_unlock(wizard_view)
 
-    # The Object Interpreted Data card now shows the LLM-extracted fields.
     html = render(wizard_view)
     assert html =~ "one-off Object"
     assert html =~ name
 
-    # Commit the draft.
     render_hook(wizard_view, "commit_object_draft", %{})
 
-    # Co-located witness sees the arrival entry.
     flush(witness_view)
     witness_html = render(witness_view)
     assert witness_html =~ "A #{name} appears."
 
-    # An Object row exists in the wizard's current room.
     row =
       Repo.get_by(Object,
         name: name,
@@ -103,10 +97,8 @@ defmodule AgenticRealmsWeb.WizardFreeformTest do
     refute Map.has_key?(Map.from_struct(row), :blueprint_id)
     assert row.short_description == "a small clay pot"
 
-    # No Blueprint was added.
     assert length(Queries.list_object_blueprints()) == blueprint_count_before
 
-    # Wizard's chrome shows the spawn confirmation toast.
     assert render(wizard_view) =~ "Spawned"
   end
 
@@ -155,8 +147,6 @@ defmodule AgenticRealmsWeb.WizardFreeformTest do
     assert html =~ "That&#39;s a question"
     refute html =~ "Interpreted data · one-off Object"
   end
-
-  # --- Helpers ------------------------------------------------------------
 
   defp conn_for(conn, player_id) do
     conn

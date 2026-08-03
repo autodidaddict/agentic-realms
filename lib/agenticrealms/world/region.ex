@@ -7,9 +7,6 @@ defmodule AgenticRealms.World.Region do
   `specs/012-maps/contracts/region.md`.
   """
 
-  # Feature 017 — Transient Regions. `kind: :transient` regions carry an
-  # owner + provisioning timestamp + the permanent source room and the
-  # generated origin room; `destroyed?` guards idempotent teardown.
   defstruct id: nil,
             name: nil,
             kind: :permanent,
@@ -33,8 +30,6 @@ defmodule AgenticRealms.World.Region do
     RegionDestroyed
   }
 
-  # --- CreateRegion -------------------------------------------------------
-
   @spec execute(
           %__MODULE__{},
           %CreateRegion{} | %ProvisionTransientRegion{} | %OpenTransientEntryExit{}
@@ -51,8 +46,6 @@ defmodule AgenticRealms.World.Region do
   end
 
   def execute(%__MODULE__{}, %CreateRegion{}), do: {:error, :region_already_exists}
-
-  # --- ProvisionTransientRegion (feature 017) -----------------------------
 
   def execute(%__MODULE__{id: nil}, %ProvisionTransientRegion{
         region_id: id,
@@ -80,8 +73,6 @@ defmodule AgenticRealms.World.Region do
 
   def execute(%__MODULE__{}, %ProvisionTransientRegion{}), do: {:error, :region_already_exists}
 
-  # --- OpenTransientEntryExit (feature 017) -------------------------------
-
   def execute(%__MODULE__{id: nil}, %OpenTransientEntryExit{}), do: {:error, :region_not_found}
 
   def execute(%__MODULE__{kind: :transient}, %OpenTransientEntryExit{
@@ -102,18 +93,12 @@ defmodule AgenticRealms.World.Region do
 
   def execute(%__MODULE__{}, %OpenTransientEntryExit{}), do: {:error, :not_transient}
 
-  # --- DestroyRegion (feature 017) ----------------------------------------
-  # Idempotent: already-destroyed, or an already-purged (empty-stream) region,
-  # is a no-op so the reaper can retry teardown safely.
-
   def execute(%__MODULE__{destroyed?: true}, %DestroyRegion{}), do: :ok
   def execute(%__MODULE__{id: nil}, %DestroyRegion{}), do: :ok
 
   def execute(%__MODULE__{}, %DestroyRegion{region_id: id}) do
     %RegionDestroyed{region_id: id}
   end
-
-  # --- apply/2 ------------------------------------------------------------
 
   @spec apply(
           %__MODULE__{},
@@ -143,13 +128,9 @@ defmodule AgenticRealms.World.Region do
     }
   end
 
-  # The entry exit lives in the read model; the aggregate records nothing
-  # beyond having emitted it.
   def apply(%__MODULE__{} = state, %TransientEntryExitOpened{}), do: state
 
   def apply(%__MODULE__{} = state, %RegionDestroyed{}), do: %__MODULE__{state | destroyed?: true}
-
-  # ------------------------------------------------------------------------
 
   defp validate_name(name) when is_binary(name) do
     case String.trim(name) do

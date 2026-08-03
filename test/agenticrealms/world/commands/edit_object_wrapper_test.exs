@@ -83,8 +83,6 @@ defmodule AgenticRealms.World.Commands.EditObjectWrapperTest do
 
   test "edit on an object that's been picked up returns :object_not_editable_here",
        %{wizard: w, object_id: oid, suffix: suffix} do
-    # Move the object into the wizard's inventory directly via Ecto
-    # (bypassing the take flow for test brevity) — feature 016 container model.
     {1, _} =
       Repo.update_all(
         from(o in Object, where: o.id == ^oid),

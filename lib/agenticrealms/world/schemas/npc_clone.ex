@@ -20,16 +20,12 @@ defmodule AgenticRealms.World.Schemas.NPCClone do
     field :name, :string
     field :short_description, :string
     field :long_description, :string
-    # Effective behaviors (behavior_groups ∪ direct), frozen at spawn.
     field :behaviors, {:array, :map}, default: []
     field :lore, :string, default: ""
-    # Feature 015 — authoring/extract provenance, frozen at spawn.
     field :fixed, :boolean, default: false
     field :behavior_groups, {:array, :string}, default: []
     field :direct_behaviors, {:array, :map}, default: []
 
-    # Feature 019 — Real Stats. Frozen from the blueprint at spawn; current
-    # hp/mana are per-instance (NPCs never carry xp).
     field :str, :integer, default: 12
     field :dex, :integer, default: 12
     field :con, :integer, default: 12

@@ -58,12 +58,8 @@ defmodule AgenticRealms.World.CommandParserTest do
     end
 
     test "self-alias requires exact match, not substring" do
-      # 'mead' contains 'me' but the FULL normalized target is 'mead', so it
-      # is a normal target, not the self-alias.
       assert {:look, "mead"} = CommandParser.parse("look mead")
-      # 'someone' is not 'me' or 'self'.
       assert {:look, "someone"} = CommandParser.parse("look someone")
-      # An extra word past 'me' makes the target 'me someone' — not the alias.
       assert {:look, "me someone"} = CommandParser.parse("look me someone")
     end
 
@@ -197,10 +193,6 @@ defmodule AgenticRealms.World.CommandParserTest do
     end
   end
 
-  # ──────────────────────────────────────────────────────────────────────
-  # Feature 004 — Communication verbs
-  # ──────────────────────────────────────────────────────────────────────
-
   describe "say (US1)" do
     test "basic say" do
       assert {:say, "hello"} = CommandParser.parse("say hello")
@@ -279,7 +271,6 @@ defmodule AgenticRealms.World.CommandParserTest do
     end
 
     test "mention does NOT parse as me ntion" do
-      # `me` must match the whole first word, not be a prefix
       assert {:unknown, "mention"} = CommandParser.parse("mention")
     end
   end
@@ -340,8 +331,6 @@ defmodule AgenticRealms.World.CommandParserTest do
     end
 
     test "w is reserved for the west movement alias from feature 003" do
-      # The 004 spec originally listed `w` as a whisper alias, but it conflicts
-      # with 003's `w`-for-west. Resolved in favor of the movement alias.
       assert {:move, :west} = CommandParser.parse("w")
     end
   end

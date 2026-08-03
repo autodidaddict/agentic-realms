@@ -41,8 +41,6 @@ defmodule AgenticRealmsWeb.XpLevelupFlowTest do
     suffix = System.unique_integer([:positive])
 
     {:ok, alice} = Accounts.register_player(%{username: "xp_#{suffix}", password: "pw12345678"})
-    # Feature 020 — mount creates the character before spawning; this setup
-    # bypasses mount, so it does the same two dispatches in the same order.
     AgenticRealms.DataCase.create_character!(alice.id, name: alice.username)
     AgenticRealms.DataCase.create_character!(alice.id, name: alice.username)
     {:ok, _} = WorldCommands.spawn(alice.id, Seed.starting_room_id())
@@ -57,38 +55,30 @@ defmodule AgenticRealmsWeb.XpLevelupFlowTest do
 
   test "orchard quest grants 300 xp → Level 2 + chat notices + live sheet",
        %{conn: conn, alice: alice} do
-    # Fresh player: default stats.
     assert %PlayerState{level: 1, xp: 0} = Repo.get(PlayerState, alice.id)
 
     {:ok, qid} = WorldCommands.accept_quest(alice.id, @blueprint_id, @slug)
     wait_for_quest_items(@spawn_rooms, qid, 1)
 
-    # Collect all three apples.
     for room <- @spawn_rooms do
       teleport(alice.id, room)
       {:ok, _} = WorldCommands.take(alice.id, "golden apple")
     end
 
-    # Mount BEFORE finalize so the LiveView catches the progression broadcasts.
     {:ok, view, _html} = live(conn, ~p"/play")
 
     teleport(alice.id, @cottage_room_id)
     assert {:ok, _} = WorldCommands.finalize_quest(alice.id, qid)
 
-    # Projector lands the new xp/level (XpAwarder is :eventual → poll).
     assert_eventually(view, fn ->
       match?(%PlayerState{level: 2, xp: 300}, Repo.get(PlayerState, alice.id))
     end)
 
-    # Chat-window notices (FR-022, FR-023).
     assert_eventually(view, fn -> render(view) =~ "You gain 300 experience." end)
     assert_eventually(view, fn -> render(view) =~ "You are now level 2!" end)
 
-    # The character sheet assign reflects Level 2 live.
     assert_eventually(view, fn -> :sys.get_state(view.pid).socket.assigns.stats.level == 2 end)
   end
-
-  # ── helpers ────────────────────────────────────────────────────────
 
   defp wait_for_quest_items(room_ids, quest_id, per_room, timeout_ms \\ 3_000) do
     deadline = System.monotonic_time(:millisecond) + timeout_ms

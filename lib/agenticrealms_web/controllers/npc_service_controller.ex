@@ -14,7 +14,6 @@ defmodule AgenticRealmsWeb.NpcServiceController do
   alias AgenticRealms.World.{Commands, ContainerRef, Queries}
   alias AgenticRealms.World.Schemas.NPCClone
 
-  # GET /api/npc/:id/identity — immutable-for-its-lifetime identity + lore.
   def identity(conn, %{"id" => id}) do
     case get_npc(id) do
       %NPCClone{} = npc ->
@@ -31,7 +30,6 @@ defmodule AgenticRealmsWeb.NpcServiceController do
     end
   end
 
-  # GET /api/npc/:id/surroundings — volatile room/exits/occupants; void → empty.
   def surroundings(conn, %{"id" => id}) do
     case get_npc(id) do
       %NPCClone{room_id: nil, id: eid} ->
@@ -50,7 +48,6 @@ defmodule AgenticRealmsWeb.NpcServiceController do
     end
   end
 
-  # POST /api/npc/:id/move — enact a move via the existing compare-and-swap path.
   def move(conn, %{"id" => id} = params) do
     expected_room_id = params["expected_room_id"]
 
@@ -87,9 +84,6 @@ defmodule AgenticRealmsWeb.NpcServiceController do
     end
   end
 
-  # --- helpers ------------------------------------------------------------
-
-  # Guard against a non-UUID id (Repo.get on a binary_id would raise).
   defp get_npc(id) when is_binary(id) do
     case Ecto.UUID.cast(id) do
       {:ok, uuid} -> Repo.get(NPCClone, uuid)
@@ -110,8 +104,6 @@ defmodule AgenticRealmsWeb.NpcServiceController do
     |> Enum.map(fn %{direction: d, target_room_id: t} -> %{direction: d, to_room_id: t} end)
   end
 
-  # Trusted service view — every occupant, tagged by kind; all objects (not
-  # per-player quest-gated); online players with id stringified.
   defp occupants_for(room_id) do
     npcs = Enum.map(Queries.list_npcs_in_room(room_id), &%{id: &1.id, kind: "npc", name: &1.name})
 

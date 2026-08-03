@@ -149,13 +149,6 @@ defmodule AgenticRealmsWeb.GameLive.Creation do
     assign(socket, :draft, draft)
   end
 
-  # --- parameter decoding ---------------------------------------------------
-  #
-  # Choice keys and options cross the wire as strings, and they come back from a
-  # client that can send anything. Each of these resolves against what the
-  # package actually offered rather than converting blindly, so a forged
-  # parameter finds no match instead of creating an atom or a bogus pick.
-
   @doc """
   Resolve a choice key and option from their wire forms, against the choices the
   draft's selections actually offer.

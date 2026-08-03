@@ -60,7 +60,6 @@ defmodule AgenticRealms.World.Commands.ExtractNpcEssenceTest do
       updated_at: now
     })
 
-    # Author + spawn a clone to extract from.
     src_slug = "src_troll_#{suffix}"
 
     {:ok, ^src_slug} =
@@ -96,11 +95,9 @@ defmodule AgenticRealms.World.Commands.ExtractNpcEssenceTest do
     assert bp.long_description == "A troll behind a counter."
     assert bp.lore == "Hoards shiny coins." or bp.lore == "Hoards shiny coins"
     assert bp.fixed == true
-    # The clone's DIRECT behaviors + behavior_group names carry over (not the frozen union).
     assert bp.behavior_groups == [orc]
     assert bp.behaviors == [@direct]
 
-    # Source clone is byte-for-byte unchanged.
     after_edit = Repo.get(NPCClone, clone_id)
     assert after_edit.name == before.name
     assert after_edit.lore == before.lore

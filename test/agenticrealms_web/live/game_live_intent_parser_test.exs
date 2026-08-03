@@ -27,14 +27,12 @@ defmodule AgenticRealmsWeb.GameLiveIntentParserTest do
   alias AgenticRealms.World.{Commands, Queries, Seed}
 
   setup %{conn: conn} do
-    # Defensive seed (see game_live_communication_test for the rationale).
     try do
       Seed.run()
     rescue
       MatchError -> :already_seeded
     end
 
-    # Shared mode so the resolver Task (a separate process) sees our stub.
     Req.Test.set_req_test_to_shared(%{})
 
     suffix = System.unique_integer([:positive])
@@ -57,7 +55,6 @@ defmodule AgenticRealmsWeb.GameLiveIntentParserTest do
 
     lantern_name = first_object_name(player.id)
 
-    # ── US1: natural-language take resolves to the canonical take action ──
     stub_tool_use("take", %{"object" => lantern_name})
 
     submit(view, "grab the #{lantern_name} off the floor")
@@ -74,11 +71,6 @@ defmodule AgenticRealmsWeb.GameLiveIntentParserTest do
     assert lantern_name in Enum.map(Queries.list_inventory(player.id), & &1.name),
            "the lantern should now be in the player's inventory"
 
-    # ── US2: a refuse tool call surfaces the model's message, takes no action ──
-    # (Apostrophe-free message so the assertion isn't tripped by HTML escaping.
-    # Post-006 the LLM is no longer expected to refuse `examine` per se, but
-    # the LiveView's refusal-handling contract still applies for any refuse
-    # tool call — this stub tests that path generically.)
     stub_tool_use("refuse", %{"message" => "Combat is not supported yet."})
 
     inventory_before = Queries.list_inventory(player.id)
@@ -91,7 +83,6 @@ defmodule AgenticRealmsWeb.GameLiveIntentParserTest do
     assert Queries.list_inventory(player.id) == inventory_before,
            "a refusal must not change game state"
 
-    # ── US3: an API failure degrades to a graceful refusal, session stays usable ──
     Req.Test.stub(AgenticRealms.Anthropic, fn conn ->
       Plug.Conn.send_resp(conn, 500, ~s({"error": "overloaded"}))
     end)
@@ -100,22 +91,14 @@ defmodule AgenticRealmsWeb.GameLiveIntentParserTest do
     await_unlock(view)
 
     html = render(view)
-    # Substring match — the full message has an apostrophe that HTML-escapes.
+
     assert html =~ "not sure what you meant just now",
            "an API failure should produce the graceful refusal"
 
-    # The session is still usable — a canonical fast-path command works after
-    # the failure (and never touches the resolver).
     submit(view, "look")
     flush(view)
     assert render(view) =~ "Stone Atrium"
 
-    # ── 005a: a fast-parsed command that fails object-name resolution falls
-    #    back to the LLM, which resolves the loose noun phrase ──
-    # The player picked up the lantern in US1. "drop the lantern" parses
-    # cleanly as {:drop, "the lantern"}, but "the lantern" does not exact-match
-    # the carried object name — the fast path fails with :not_in_inventory,
-    # and the (stubbed) LLM resolves "the lantern" → the real object name.
     assert lantern_name in Enum.map(Queries.list_inventory(player.id), & &1.name),
            "precondition: the lantern is still carried from US1"
 
@@ -132,20 +115,13 @@ defmodule AgenticRealmsWeb.GameLiveIntentParserTest do
     refute lantern_name in Enum.map(Queries.list_inventory(player.id), & &1.name),
            "the lantern should no longer be carried after the resolved drop"
 
-    # Exactly one :cmd echo of the literal input — the fast-path attempt that
-    # fell back must NOT echo; only the LLM-dispatched retry does.
     assert cmd_echo_count(html, "drop the lantern") == 1,
            "the literal input must be echoed exactly once, not doubled by the fallback"
 
-    # ── 006 (US2 + US3): natural-language examine of an object dispatches
-    #    through the new {:look, target} action tuple ───────────────────
-    # Re-take the lantern so it's back in the room (drop above moved it out
-    # of inventory, into the atrium since Alice never moved during US3-001).
     stub_tool_use("take", %{"object" => lantern_name})
     submit(view, "grab the lantern again")
     await_unlock(view)
 
-    # Now stub a look-target call and submit a natural-language examine.
     stub_tool_use("look", %{"target" => lantern_name})
     submit(view, "examine my lantern up close")
     await_unlock(view)
@@ -158,8 +134,6 @@ defmodule AgenticRealmsWeb.GameLiveIntentParserTest do
     assert html =~ ~s(class="log-entry cmd">examine my lantern up close</div>),
            "the literal natural-language input should be echoed once"
 
-    # Self-examine via the LLM (the model emits 'me'; the Examine module
-    # resolves it to the acting player via the explicit player-name match).
     stub_tool_use("look", %{"target" => "me"})
     submit(view, "look at myself")
     await_unlock(view)
@@ -172,8 +146,6 @@ defmodule AgenticRealmsWeb.GameLiveIntentParserTest do
     assert html =~ "#{player.username}</span> is a player.",
            "self-examine should render the acting player's name"
   end
-
-  # --- Helpers ------------------------------------------------------------
 
   defp stub_tool_use(tool_name, input) do
     Req.Test.stub(AgenticRealms.Anthropic, fn conn ->
@@ -197,7 +169,6 @@ defmodule AgenticRealmsWeb.GameLiveIntentParserTest do
     :ok
   end
 
-  # Count `:cmd` log entries rendered with exactly `text`.
   defp cmd_echo_count(html, text) do
     html
     |> String.split(~s(class="log-entry cmd">#{text}</div>))
@@ -205,7 +176,6 @@ defmodule AgenticRealmsWeb.GameLiveIntentParserTest do
     |> Kernel.-(1)
   end
 
-  # Poll until the resolver task has completed (input_locked back to false).
   defp await_unlock(view, timeout_ms \\ 5_000) do
     deadline = System.monotonic_time(:millisecond) + timeout_ms
     do_await_unlock(view, deadline)
@@ -227,8 +197,6 @@ defmodule AgenticRealmsWeb.GameLiveIntentParserTest do
     end
   end
 
-  # First object visible in the player's current room (the seeded starter
-  # room places a single takeable object — the brass lantern — in the atrium).
   defp first_object_name(player_id) do
     {:ok, room} = Queries.look_room(player_id)
 

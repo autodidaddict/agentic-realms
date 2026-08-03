@@ -28,18 +28,6 @@ defmodule AgenticRealms.World.UIEventBroadcaster do
       respective UI broadcasts.
   """
 
-  # `:eventual` (issue #9). The earlier `:strong` declaration was added
-  # to fix a test race — `Phoenix.LiveViewTest.render/1` could fire
-  # before the broadcast reached the subscriber's inbox — but at the
-  # cost of serializing every `move` / `take` / `drop` / `spawn`
-  # dispatch on this single handler. On a distributed PubSub backend
-  # that means every dispatch waits for fan-out to every subscriber in
-  # the broadcasting node's process, which is the wrong place to pay
-  # that cost. Witness handlers mutate from the broadcast payload only
-  # (no DB reread), so runtime correctness doesn't need synchronous
-  # broadcast. Tests poll with `assert_eventually/3` (in
-  # `AgenticRealmsWeb.ConnCase`) when they need the witness render to
-  # reflect the broadcast.
   use Commanded.Event.Handler,
     application: AgenticRealms.World.Application,
     name: __MODULE__,
@@ -162,10 +150,6 @@ defmodule AgenticRealms.World.UIEventBroadcaster do
     :ok
   end
 
-  # Feature 019 — Real Stats. Progression notices to the earning player only.
-  # Two events → one PlayerStatsChanged each (xp gain, then level-up). The
-  # payload carries the authoritative deltas so GameLive refreshes the sheet
-  # without a DB read (which could race the :strong projector under :eventual).
   def handle(%PlayerXpAwarded{player_id: pid, amount: amount, new_total: new_total}, _meta) do
     Phoenix.PubSub.broadcast(@pubsub, Topics.player_topic(pid), %PlayerStatsChanged{
       player_id: pid,
@@ -188,11 +172,6 @@ defmodule AgenticRealms.World.UIEventBroadcaster do
     :ok
   end
 
-  # Feature 016 — one witness handler for every object relocation. Maps
-  # (cause, from→to) to the legacy UI structs so observable behavior is
-  # unchanged: wizard spawn announces arrival; seed/quest placement and
-  # moves into the void are silent; take/drop keep their room broadcasts plus
-  # the inventory + quest-progress side-broadcasts.
   def handle(%EntityMoved{kind: kind, entity_id: oid, from: from, to: to, cause: cause}, _meta) do
     witness_object_move(
       norm_kind(kind),
@@ -205,8 +184,6 @@ defmodule AgenticRealms.World.UIEventBroadcaster do
     :ok
   end
 
-  # Feature 016 — in-place entity edit; broadcast a quiet RoomObjectEdited to
-  # the object's room (if it is in one) so co-located views refresh.
   def handle(%EntityEdited{kind: kind, entity_id: oid, fields_changed: fields_changed}, _meta) do
     with :object <- norm_kind(kind),
          %Object{container_type: "room", container_id: rid} <- Repo.get(Object, oid) do
@@ -220,10 +197,6 @@ defmodule AgenticRealms.World.UIEventBroadcaster do
     :ok
   end
 
-  # Feature 018 — an NPC removed from a room departs it, witnessed like any NPC
-  # leave. The `from` container is captured on the EntityRemoved event, so no DB
-  # read is needed (and the row is being deleted by the projector anyway). Only a
-  # removal from a room is visible; removal from the void is silent.
   def handle(%EntityRemoved{kind: kind, entity_id: id, from: from, name: name}, _meta) do
     with :npc <- norm_kind(kind),
          %ContainerRef{type: :room, id: rid} <- ContainerRef.from_map(from || ContainerRef.void()) do
@@ -237,14 +210,6 @@ defmodule AgenticRealms.World.UIEventBroadcaster do
     :ok
   end
 
-  # Feature 015 — live-updating unified Blueprint registry. Broadcast on the
-  # global `blueprints` topic so every wizard LiveView session with the
-  # registry open patches in place. Both branches read every field they need
-  # directly off the domain event — NO DB re-read — because the broadcaster's
-  # GenServer doesn't share the calling process's Ecto sandbox connection in
-  # tests, and a fresh DB read under :eventual consistency can race the
-  # projector anyway. `kind` in the payload drives the registry's kind badge +
-  # spawn affordance.
   def handle(%BlueprintCreated{} = e, _meta) do
     Phoenix.PubSub.broadcast(
       @pubsub,
@@ -287,15 +252,6 @@ defmodule AgenticRealms.World.UIEventBroadcaster do
     :ok
   end
 
-  # Feature 016 — NPC arrival is now witnessed via the unified EntityMoved
-  # handler (kind :npc, cause :spawned, void → room → RoomNPCArrived); see
-  # witness_object_move/5 below.
-
-  # Feature 013 — Quests. Broadcast PlayerQuestAccepted on the player's
-  # topic so GameLive can append the new active quest to its log without
-  # re-querying. Criteria counts are all 0 at accept time (FR-019; no
-  # lifetime pickup tracking, and any pre-existing matching inventory
-  # only reflects in subsequent PlayerQuestProgress events fired by US2).
   def handle(
         %QuestAccepted{
           quest_id: qid,
@@ -332,18 +288,6 @@ defmodule AgenticRealms.World.UIEventBroadcaster do
     :ok
   end
 
-  # Feature 013 — quest finalization inventory deltas. The QuestProjector
-  # mutates the read model (deletes consumed objects; clones + moves the
-  # reward into inventory), but neither delta surfaces a
-  # PlayerInventoryChanged the way take/drop do: consumed items are deleted
-  # outright (no EntityMoved), and the reward moves in with cause :spawned,
-  # which the EntityMoved witness treats as silent. Without these broadcasts
-  # the inventory side panel only catches up on the next manual `inv`. We
-  # broadcast straight from the event payloads (no DB reread, like every
-  # other witness here) so the GameLive subscriber mutates :inventory in
-  # place. :removed only needs the object id; :added carries the reward's
-  # name/description from the event, so it's correct even before the async
-  # clone is projected into world_objects.
   def handle(%QuestItemsConsumed{player_id: pid, consumed_object_ids: ids}, _meta)
       when is_list(ids) do
     for oid <- ids do
@@ -379,10 +323,6 @@ defmodule AgenticRealms.World.UIEventBroadcaster do
     :ok
   end
 
-  # Feature 013 — broadcast PlayerQuestFinalized when a Quest aggregate
-  # reaches the :completed state. The QuestProjector flips the row's
-  # state in its own transaction; this handler reads back the row to
-  # pull the title + reward name for the broadcast payload.
   def handle(%QuestCompleted{quest_id: qid, player_id: pid, completed_at: at}, _meta) do
     case Quests.quest_instance(qid) do
       nil ->
@@ -407,13 +347,6 @@ defmodule AgenticRealms.World.UIEventBroadcaster do
     end
   end
 
-  # Feature 013 — recompute progress for each of the player's active
-  # quests whose criteria reference the touched object's quest_tag, and
-  # broadcast PlayerQuestProgress per quest. Untouched quests trigger no
-  # broadcasts. Items without a quest_tag short-circuit to a no-op.
-  # --- Feature 016 entity-move witness mapping ---------------------------
-
-  # Wizard spawn → arrival announced in the destination room.
   defp witness_object_move(:object, :spawned, _from, %ContainerRef{type: :room, id: rid}, oid) do
     {name, short} = lookup_object(oid)
 
@@ -425,7 +358,6 @@ defmodule AgenticRealms.World.UIEventBroadcaster do
     })
   end
 
-  # take: room → player inventory.
   defp witness_object_move(
          :object,
          :taken,
@@ -455,7 +387,6 @@ defmodule AgenticRealms.World.UIEventBroadcaster do
     broadcast_quest_progress(pid, oid)
   end
 
-  # drop: player inventory → room.
   defp witness_object_move(
          :object,
          :dropped,
@@ -485,8 +416,6 @@ defmodule AgenticRealms.World.UIEventBroadcaster do
     broadcast_quest_progress(pid, oid)
   end
 
-  # Object relocation room → room: departure in the source, arrival in the
-  # destination (feature 016, US3). No prior convention existed for this case.
   defp witness_object_move(
          :object,
          :relocated,
@@ -510,7 +439,6 @@ defmodule AgenticRealms.World.UIEventBroadcaster do
     })
   end
 
-  # NPC spawn → arrival announced in the destination room (feature 016).
   defp witness_object_move(:npc, :spawned, _from, %ContainerRef{type: :room, id: rid}, npc_id) do
     Phoenix.PubSub.broadcast(@pubsub, Topics.room_topic(rid), %RoomNPCArrived{
       room_id: rid,
@@ -519,10 +447,6 @@ defmodule AgenticRealms.World.UIEventBroadcaster do
     })
   end
 
-  # Feature 018 — NPC room→room relocation (e.g. an external mind's move) is
-  # witnessed exactly like any NPC move: departure in the origin room, arrival in
-  # the destination room. The clone row still exists (a move only changes its
-  # room), so the name is looked up.
   defp witness_object_move(
          :npc,
          :relocated,
@@ -545,8 +469,6 @@ defmodule AgenticRealms.World.UIEventBroadcaster do
     })
   end
 
-  # Seed/quest placement (:placed), moves into the void, NPC-inventory, and
-  # any not-yet-wired relocation are silent — no existing witness convention.
   defp witness_object_move(_kind, _cause, _from, _to, _oid), do: :ok
 
   defp lookup_npc_name(npc_id) do
@@ -578,9 +500,6 @@ defmodule AgenticRealms.World.UIEventBroadcaster do
     :ok
   end
 
-  # Feature 021 — what a player is called in the world is their character's
-  # name. The fallback survives for a state that no longer arises: a player
-  # without a character is never spawned, so they are never the actor here.
   defp lookup_name(player_id) do
     PlayerNames.get(player_id) || "unknown player"
   end
@@ -592,9 +511,6 @@ defmodule AgenticRealms.World.UIEventBroadcaster do
     end
   end
 
-  # Feature 011 — population helper for the new `carried_object_ids` field
-  # on RoomPlayerArrived / RoomPlayerLeft. Returns the ids of every object
-  # currently in the player's inventory. Bounded by inventory size.
   defp lookup_carried_object_ids(player_id) do
     import Ecto.Query
 

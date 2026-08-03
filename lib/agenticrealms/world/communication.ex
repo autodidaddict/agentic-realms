@@ -40,8 +40,6 @@ defmodule AgenticRealms.World.Communication do
           required(:room_id) => binary()
         }
 
-  # --- Public API ---------------------------------------------------------
-
   @doc """
   Broadcast a `say` utterance to every player in the sender's room.
 
@@ -172,8 +170,6 @@ defmodule AgenticRealms.World.Communication do
     end
   end
 
-  # --- Shared helpers (private) -------------------------------------------
-
   @doc false
   @spec trim_and_validate(String.t()) ::
           {:ok, String.t()} | {:error, :empty} | {:error, :too_long}
@@ -205,9 +201,6 @@ defmodule AgenticRealms.World.Communication do
     if String.match?(text, ~r/[.!?]$/), do: text, else: text <> "."
   end
 
-  # Checks whether the resolved recipient has at least one connected session
-  # tracked by `Phoenix.Presence`. Returns `:ok` if online, `{:error,
-  # :not_deliverable}` if offline. FR-016.
   defp ensure_online(recipient_id) do
     case Presence.get_by_key(Presence.topic(), Integer.to_string(recipient_id)) do
       %{metas: [_ | _]} -> :ok
@@ -215,10 +208,6 @@ defmodule AgenticRealms.World.Communication do
     end
   end
 
-  # Checks whether the resolved recipient occupies the sender's current
-  # room. Returns `:ok` if so, `{:error, :recipient_not_in_room}` otherwise.
-  # FR-020. No Presence check is needed here — room occupancy in the read
-  # model implies at least one connected session.
   defp ensure_in_room(recipient_id, room_id, sender_id) do
     if Enum.any?(Queries.other_occupants_of(room_id, sender_id), fn p -> p.id == recipient_id end) do
       :ok

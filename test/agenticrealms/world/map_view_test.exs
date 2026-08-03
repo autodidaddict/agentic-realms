@@ -23,10 +23,6 @@ defmodule AgenticRealms.World.MapViewTest do
     PlayerDiscoveredRoom
   }
 
-  # ----------------------------------------------------------------
-  # Fixture helpers
-  # ----------------------------------------------------------------
-
   defp insert_region(name_prefix \\ "TestRegion") do
     Repo.insert!(%Region{
       id: Ecto.UUID.generate(),
@@ -70,8 +66,6 @@ defmodule AgenticRealms.World.MapViewTest do
     )
   end
 
-  # Need a real player row for the FK to resolve. We use a deterministic
-  # but unique id per test so async-shared sandboxes don't collide.
   defp insert_account_player do
     id = System.unique_integer([:positive])
     now = DateTime.utc_now() |> DateTime.truncate(:second)
@@ -94,10 +88,6 @@ defmodule AgenticRealms.World.MapViewTest do
       discovered_at: DateTime.utc_now() |> DateTime.truncate(:second)
     })
   end
-
-  # ----------------------------------------------------------------
-  # US1 — basic render
-  # ----------------------------------------------------------------
 
   describe "US1 — fresh player in a single discovered room" do
     setup do
@@ -149,9 +139,6 @@ defmodule AgenticRealms.World.MapViewTest do
       atrium = insert_room(region, name: "Stone Atrium", map_x: 0, map_y: 0)
       player_id = insert_account_player()
       insert_player_state(player_id, atrium.id)
-      # NOTE: NOT calling discover/2 — simulates the eventually-consistent
-      # window between PlayerSpawned and PlayerDiscoveredRoom landing in the
-      # read model.
 
       %{atrium: atrium, player_id: player_id}
     end
@@ -172,10 +159,8 @@ defmodule AgenticRealms.World.MapViewTest do
       b = insert_room(region, name: "B", map_x: 1, map_y: 0)
       c = insert_room(region, name: "C", map_x: 2, map_y: 0)
 
-      # A <-> B (reciprocal)
       insert_exit(a, :east, b)
       insert_exit(b, :west, a)
-      # B <-> C (reciprocal)
       insert_exit(b, :east, c)
       insert_exit(c, :west, b)
 
@@ -205,10 +190,6 @@ defmodule AgenticRealms.World.MapViewTest do
     end
   end
 
-  # ----------------------------------------------------------------
-  # US2 — map updates as the player moves
-  # ----------------------------------------------------------------
-
   describe "US2 — movement-driven discovery shifts the rendered set" do
     setup do
       region = insert_region()
@@ -235,17 +216,12 @@ defmodule AgenticRealms.World.MapViewTest do
       assert stub.from_x == atrium.map_x
       assert stub.from_y == atrium.map_y
       assert stub.direction == :north
-      # Fog stub endpoint is the destination's actual cell — so the fog
-      # cloud sits in the same cell the room glyph will occupy once
-      # discovered, and two stubs converging on the same room land on
-      # one cloud rather than two.
       assert stub.to_x == corridor.map_x
       assert stub.to_y == corridor.map_y
     end
 
     test "after the player moves into the Corridor: both rooms render, line connects them",
          %{atrium: atrium, corridor: corridor, player_id: player_id} do
-      # Simulate the projector's emission flow: move + discovery
       insert_player_state(player_id, corridor.id)
       discover(player_id, corridor)
 
@@ -264,11 +240,9 @@ defmodule AgenticRealms.World.MapViewTest do
 
     test "moving back to an already-discovered room re-highlights it without dropping the other",
          %{atrium: atrium, corridor: corridor, player_id: player_id} do
-      # Player visits Corridor (now discovered)
       insert_player_state(player_id, corridor.id)
       discover(player_id, corridor)
 
-      # Then moves back to Atrium
       insert_player_state(player_id, atrium.id)
 
       view = MapView.for_player(player_id)
@@ -277,10 +251,6 @@ defmodule AgenticRealms.World.MapViewTest do
       assert current.id == atrium.id
     end
   end
-
-  # ----------------------------------------------------------------
-  # US3 — fog-of-war stubs + one-way exit info-hiding
-  # ----------------------------------------------------------------
 
   describe "US3 — fog-of-war stubs" do
     test "undiscovered map-visible target produces a :fog_stub entry" do
@@ -293,7 +263,6 @@ defmodule AgenticRealms.World.MapViewTest do
       player_id = insert_account_player()
       insert_player_state(player_id, a.id)
       discover(player_id, a)
-      # B is NOT discovered.
 
       view = MapView.for_player(player_id)
 
@@ -317,10 +286,6 @@ defmodule AgenticRealms.World.MapViewTest do
 
       view = MapView.for_player(player_id)
       [stub] = view.exits
-      # The fog cloud lives in the same cell the destination room will
-      # occupy once discovered. Coords are inferrable from the source +
-      # direction anyway; only the destination's id / name / region are
-      # information-hidden (asserted separately in the renderer tests).
       assert stub.kind == :fog_stub
       assert stub.to_x == b.map_x
       assert stub.to_y == b.map_y
@@ -381,7 +346,6 @@ defmodule AgenticRealms.World.MapViewTest do
       discover(player_id, ground)
 
       view = MapView.for_player(player_id)
-      # No line at all — :up turns into an icon (covered in US4).
       assert view.exits == []
     end
   end
@@ -391,7 +355,6 @@ defmodule AgenticRealms.World.MapViewTest do
       region = insert_region()
       a = insert_room(region, map_x: 0, map_y: 0)
       b = insert_room(region, map_x: 1, map_y: 0)
-      # ONLY one direction (no B→A return)
       insert_exit(a, :east, b)
 
       player_id = insert_account_player()
@@ -403,14 +366,8 @@ defmodule AgenticRealms.World.MapViewTest do
       assert length(view.exits) == 1
       [line] = view.exits
       assert line.kind == :normal
-      # The line is visually identical to a reciprocal pair's render — no
-      # direction marker, no asymmetric styling at this layer.
     end
   end
-
-  # ----------------------------------------------------------------
-  # US4 — vertical exits + elevation filtering
-  # ----------------------------------------------------------------
 
   describe "US4 — Up/Down icon flags" do
     test "a room with an :up exit to a visible coord-bearing target gets has_up?: true" do
@@ -522,13 +479,11 @@ defmodule AgenticRealms.World.MapViewTest do
 
     test "two-wing-house — both wings on elev 1 render but with no line between them" do
       region = insert_region()
-      # Elev 0: wing A and wing B connected via a hub.
       hub = insert_room(region, elevation: 0, map_x: 0, map_y: 0)
       wing_a_ground = insert_room(region, elevation: 0, map_x: -1, map_y: 0)
       wing_b_ground = insert_room(region, elevation: 0, map_x: 1, map_y: 0)
       insert_exit(hub, :west, wing_a_ground)
       insert_exit(hub, :east, wing_b_ground)
-      # Elev 1: wing A and wing B upstairs rooms NOT connected to each other.
       wing_a_loft = insert_room(region, elevation: 1, map_x: -1, map_y: 0)
       wing_b_loft = insert_room(region, elevation: 1, map_x: 1, map_y: 0)
       insert_exit(wing_a_ground, :up, wing_a_loft)
@@ -536,27 +491,20 @@ defmodule AgenticRealms.World.MapViewTest do
 
       player_id = insert_account_player()
       insert_player_state(player_id, wing_a_loft.id)
-      # Player has discovered everything.
+
       for r <- [hub, wing_a_ground, wing_b_ground, wing_a_loft, wing_b_loft],
           do: discover(player_id, r)
 
       view = MapView.for_player(player_id)
 
-      # Only the two loft rooms render (elev 1 filter).
       assert length(view.rooms) == 2
       ids = MapSet.new(Enum.map(view.rooms, & &1.id))
       assert MapSet.equal?(ids, MapSet.new([wing_a_loft.id, wing_b_loft.id]))
-      # No line connects them (no exit between them at this elevation).
       assert view.exits == []
-      # Below affordance present (elev 0 has discovered rooms).
       assert view.has_below_rooms?
       refute view.has_above_rooms?
     end
   end
-
-  # ----------------------------------------------------------------
-  # US5 — hidden rooms (FR-006): map_visible: false leaves NO map trace
-  # ----------------------------------------------------------------
 
   describe "US5 — hidden room invisibility" do
     test "a discovered map-hidden room does NOT appear in rendered rooms" do
@@ -567,8 +515,6 @@ defmodule AgenticRealms.World.MapViewTest do
       player_id = insert_account_player()
       insert_player_state(player_id, atrium.id)
       discover(player_id, atrium)
-      # Player has discovered the Vault via the cardinal command, but
-      # map_visible is false so it never renders.
       discover(player_id, vault)
 
       view = MapView.for_player(player_id)
@@ -591,8 +537,6 @@ defmodule AgenticRealms.World.MapViewTest do
 
       view = MapView.for_player(player_id)
 
-      # No normal line, no fog stub, no cross-region affordance. The east
-      # side of Atrium looks identical to a room with no east exit.
       assert view.exits == []
     end
 
@@ -609,10 +553,6 @@ defmodule AgenticRealms.World.MapViewTest do
 
       view = MapView.for_player(player_id)
 
-      # Only the visible room renders. The hidden source can't appear in
-      # rendered_rooms (filtered by map_visible in the query layer), and
-      # build_exit_lines never sees its outgoing exits since they aren't
-      # included in exits_for_rooms(rendered_ids).
       assert length(view.rooms) == 1
       [g] = view.rooms
       assert g.id == visible.id
@@ -661,10 +601,6 @@ defmodule AgenticRealms.World.MapViewTest do
       refute g.has_up?, "FR-006 suppresses the Up icon when the target is hidden"
     end
   end
-
-  # ----------------------------------------------------------------
-  # US6 — cross-region exits + region swap
-  # ----------------------------------------------------------------
 
   describe "US6 — cross-region affordance" do
     test "exit from a Blackmire room to a Hollowvale room emits :cross_region; destination not rendered" do
@@ -754,7 +690,6 @@ defmodule AgenticRealms.World.MapViewTest do
 
       border = insert_room(blackmire, map_x: 0, map_y: 0)
       outskirts = insert_room(hollowvale, map_x: 0, map_y: 0)
-      # Only Border → Outskirts (no return). One-way trap.
       insert_exit(border, :east, outskirts)
 
       player_id = insert_account_player()
@@ -820,10 +755,6 @@ defmodule AgenticRealms.World.MapViewTest do
     end
   end
 
-  # ----------------------------------------------------------------
-  # Information-hiding sanity checks
-  # ----------------------------------------------------------------
-
   describe "MapView.Exit struct shape — info-hiding contract" do
     test ":normal entries carry coords but no target room id" do
       region = insert_region()
@@ -840,7 +771,6 @@ defmodule AgenticRealms.World.MapViewTest do
       view = MapView.for_player(player_id)
       [line] = view.exits
 
-      # The struct fields must be just these — no destination room id.
       refute Map.has_key?(line, :target_id)
       refute Map.has_key?(line, :to_room_id)
       refute Map.has_key?(line, :destination_id)

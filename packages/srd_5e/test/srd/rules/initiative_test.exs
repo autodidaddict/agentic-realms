@@ -4,7 +4,6 @@ defmodule Srd.Rules.InitiativeTest do
   alias Srd.Dice.Roll
   alias Srd.Rules.Initiative
 
-  # A d20 initiative roll with the given total.
   defp d20(total) do
     %Roll{count: 1, sides: 20, modifier: 0, dice: [total], reduce: :sum, total: total}
   end

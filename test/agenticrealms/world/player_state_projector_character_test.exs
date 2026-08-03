@@ -126,7 +126,6 @@ defmodule AgenticRealms.World.PlayerStateProjectorCharacterTest do
       :ok = PlayerStateProjector.handle(event, %{})
       Repo.update_all(PlayerState, set: [level: 7, xp: 23_000])
 
-      # A redelivered CharacterCreated must not knock the player back to 1.
       :ok = PlayerStateProjector.handle(event, %{})
 
       ps = row(player.id)

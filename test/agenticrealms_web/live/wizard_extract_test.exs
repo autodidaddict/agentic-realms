@@ -40,7 +40,6 @@ defmodule AgenticRealmsWeb.WizardExtractTest do
     AgenticRealms.DataCase.create_character!(witness.id, name: witness.username)
     {:ok, _} = Commands.spawn(witness.id, Seed.starting_room_id())
 
-    # A freeform Object the wizard can later extract from.
     {:ok, object_id} =
       Commands.spawn_object_freeform(wizard.id, Seed.starting_room_id(), %{
         name: "extract source pot #{suffix}",
@@ -65,35 +64,24 @@ defmodule AgenticRealmsWeb.WizardExtractTest do
 
     render_hook(wizard_view, "switch_mode", %{"mode" => "wizard"})
 
-    # The Things-in-this-room panel shows the source Object with an
-    # Extract essence button.
     html = render(wizard_view)
     assert html =~ "extract source pot"
     assert html =~ "Extract essence"
 
-    # Snapshot the source row before extraction.
     before_row = Repo.get(Object, oid)
 
-    # Click Extract essence — flips to :blueprints, populates the
-    # focused blueprint draft with the source object's fields.
     render_hook(wizard_view, "extract_essence", %{"object_id" => oid})
 
-    # Witness sees the trance entry (FR-002 fired by WizardTrance.enter).
     flush(witness_view)
     assert render(witness_view) =~ "#{wizard.username} enters a trance."
 
-    # The wizard chrome now shows the Interpreted Data card pre-populated
-    # with the source object's fields.
     wizard_html = render(wizard_view)
     assert wizard_html =~ "Interpreted data"
     assert wizard_html =~ "extract source pot"
     assert wizard_html =~ "a small clay extract pot"
 
-    # Refine the slug to something predictable, then commit.
     expected_slug = "extracted_pot_#{suffix}"
 
-    # The form is bound to `update_blueprint_draft` (phx-change). Push a
-    # form-change to override the auto-derived slug, then commit.
     state = :sys.get_state(wizard_view.pid)
     draft = state.socket.assigns.focused_blueprint_draft
 
@@ -109,7 +97,6 @@ defmodule AgenticRealmsWeb.WizardExtractTest do
 
     render_hook(wizard_view, "commit_blueprint_draft", %{})
 
-    # Blueprint persisted at revision 1.
     bp = Queries.get_object_blueprint(expected_slug)
     refute is_nil(bp)
     assert bp.revision == 1
@@ -118,7 +105,6 @@ defmodule AgenticRealmsWeb.WizardExtractTest do
     assert bp.long_description == before_row.long_description
     assert bp.fixed == before_row.fixed
 
-    # Source Object UNCHANGED.
     after_row = Repo.get(Object, oid)
     assert before_row.name == after_row.name
     assert before_row.short_description == after_row.short_description
@@ -134,15 +120,12 @@ defmodule AgenticRealmsWeb.WizardExtractTest do
     render_hook(view, "switch_mode", %{"mode" => "wizard"})
     render_hook(view, "toggle_authoring_mode", %{})
 
-    # In trance, the room-objects panel isn't shown and the extract
-    # handler refuses if pushed manually.
     refute render(view) =~ "Extract essence"
 
     state_before = :sys.get_state(view.pid)
     render_hook(view, "extract_essence", %{"object_id" => oid})
     state_after = :sys.get_state(view.pid)
 
-    # No focused draft and no mode change (still :blueprints).
     assert state_after.socket.assigns.authoring_mode == state_before.socket.assigns.authoring_mode
     assert is_nil(state_after.socket.assigns.focused_blueprint_draft)
   end
@@ -157,8 +140,6 @@ defmodule AgenticRealmsWeb.WizardExtractTest do
 
     assert render(view) =~ "That object no longer exists."
   end
-
-  # --- Helpers ------------------------------------------------------------
 
   defp conn_for(conn, player_id) do
     conn
