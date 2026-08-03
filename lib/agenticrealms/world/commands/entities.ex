@@ -1,6 +1,6 @@
 defmodule AgenticRealms.World.Commands.Entities do
   @moduledoc """
-  Write-side facade for the entity lifecycle (feature 016): bringing an entity
+  Write-side facade for the entity lifecycle: bringing an entity
   into existence, moving it between containers, removing it, and the two player
   verbs built on those — `take` and `drop`.
 
@@ -104,7 +104,7 @@ defmodule AgenticRealms.World.Commands.Entities do
 
   Pre-dispatch validation (read-model): the player has a current room,
   the room contains exactly one object matching `name`, and that object
-  is not fixed (FR-010, FR-011, FR-024).
+  is not fixed.
 
   Aggregate validation: the object is still in the room when the command
   is processed (race-loser path for the FR-011 / Q1 clarification).

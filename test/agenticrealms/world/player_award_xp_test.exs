@@ -82,7 +82,7 @@ defmodule AgenticRealms.World.PlayerAwardXpTest do
     assert %PlayerXpAwarded{new_total: 70} = Player.execute(state, cmd(20, "quest:q2"))
   end
 
-  describe "the level 20 cap (FR-029)" do
+  describe "the level 20 cap" do
     defp at_level_20 do
       playing()
       |> Player.apply(%PlayerXpAwarded{

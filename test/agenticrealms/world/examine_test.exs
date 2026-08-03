@@ -72,7 +72,7 @@ defmodule AgenticRealms.World.ExamineTest do
     :ok
   end
 
-  describe "examine/2 — room objects (US1)" do
+  describe "examine/2 — room objects" do
     setup do
       alice = register_player("alice")
       room = insert_room()
@@ -135,7 +135,7 @@ defmodule AgenticRealms.World.ExamineTest do
     end
   end
 
-  describe "examine/2 — inventory objects (US2)" do
+  describe "examine/2 — inventory objects" do
     setup do
       alice = register_player("alice")
       room = insert_room()
@@ -193,7 +193,7 @@ defmodule AgenticRealms.World.ExamineTest do
     end
   end
 
-  describe "examine/2 — players and self (US3)" do
+  describe "examine/2 — players and self" do
     setup do
       alice = register_player("alice")
       bob = register_player("bob")
@@ -289,7 +289,7 @@ defmodule AgenticRealms.World.ExamineTest do
     })
   end
 
-  describe "examine/2 — NPCs (feature 007)" do
+  describe "examine/2 — NPCs" do
     setup do
       alice = register_player("alice")
       room = insert_room()
@@ -375,7 +375,7 @@ defmodule AgenticRealms.World.ExamineTest do
       assert ld =~ "inventory item"
     end
 
-    test "telemetry emits clone_debug_id on successful NPC match (FR-011)",
+    test "telemetry emits clone_debug_id on successful NPC match",
          %{alice: alice, garrick: garrick} do
       handler_id = "examine-debug-id-watcher-#{System.unique_integer([:positive])}"
       ref = make_ref()

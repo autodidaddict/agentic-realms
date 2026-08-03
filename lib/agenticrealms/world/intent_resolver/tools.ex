@@ -17,7 +17,6 @@ defmodule AgenticRealms.World.IntentResolver.Tools do
   the prompt later grows past the threshold. Per-request cost without caching
   is negligible at Haiku rates.
 
-  See `specs/005-llm-intent-parser/contracts/tools.md`.
   """
 
   @doc "Set of recognized tool names (the 9 canonical actions + `refuse`)."

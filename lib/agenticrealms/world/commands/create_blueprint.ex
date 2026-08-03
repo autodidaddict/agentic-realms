@@ -2,7 +2,7 @@ defmodule AgenticRealms.World.Commands.CreateBlueprint do
   @moduledoc """
   Feature 015 — author a new Blueprint (object or npc).
 
-  `blueprint_id` is the human-typable slug (FR-004, one namespace across
+  `blueprint_id` is the human-typable slug (one namespace across
   kinds). `wizard_id` is the acting wizard's `players.id`; the
   `Commands.create_blueprint/2` wrapper verifies `is_wizard` before dispatch.
   `wizard_id` is optional so the world seed can author system NPCs directly.

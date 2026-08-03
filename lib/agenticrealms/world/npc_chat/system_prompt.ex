@@ -1,13 +1,12 @@
 defmodule AgenticRealms.World.NPCChat.SystemPrompt do
   @moduledoc """
-  Builds the chat system prompt for an NPC (feature 010).
+  Builds the chat system prompt for an NPC.
 
   This module is the developer-discoverable home for "what does the LLM
   see when an NPC speaks". Grep for `SystemPrompt` to find it. Every
   clause of FR-008 (a–f) is enforced as inline text — modifications
   here are the right place to tune NPC voice / refusal posture / etc.
 
-  See `specs/010-npc-conversations/contracts/system_prompt.md`.
   """
 
   @type snapshot :: %{

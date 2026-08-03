@@ -9,7 +9,7 @@ defmodule AgenticRealmsWeb.GameComponents.Primitives do
 
   @doc """
   A modifier with an explicit sign, so `+2` and `-1` are never ambiguous and a
-  zero reads as `+0` rather than a bare `0` (FR-007).
+  zero reads as `+0` rather than a bare `0`.
   """
   @spec signed(integer()) :: String.t()
   def signed(value) when value >= 0, do: "+#{value}"

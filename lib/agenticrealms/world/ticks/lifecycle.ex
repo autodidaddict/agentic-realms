@@ -9,7 +9,6 @@ defmodule AgenticRealms.World.Ticks.Lifecycle do
   Presence independently and `find_or_start/1` is idempotent across
   registry calls (Horde.Registry enforces uniqueness).
 
-  See `specs/011-room-tick-timers/contracts/lifecycle.md`.
   """
 
   use GenServer

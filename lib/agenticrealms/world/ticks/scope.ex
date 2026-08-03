@@ -1,7 +1,7 @@
 defmodule AgenticRealms.World.Ticks.Scope do
   @moduledoc """
   Pure (DB-bound on `compute/1`; pure list ops otherwise) computation of
-  the in-scope tick-behavior set for a room (feature 011).
+  the in-scope tick-behavior set for a room.
 
   An "in-scope" entry is one tick-triggered behavior on one of four
   authoring surfaces:
@@ -12,7 +12,6 @@ defmodule AgenticRealms.World.Ticks.Scope do
     * an object currently held by a player whose `current_room_id` is
       this room (`Object.behaviors` via inventory)
 
-  See `specs/011-room-tick-timers/contracts/scope.md`.
   """
 
   alias AgenticRealms.Repo

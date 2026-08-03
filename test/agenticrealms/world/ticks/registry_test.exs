@@ -1,6 +1,6 @@
 defmodule AgenticRealms.World.Ticks.RegistryTest do
   @moduledoc """
-  Unit tests for the per-room tick Scheduler registry (feature 011).
+  Unit tests for the per-room tick Scheduler registry.
   """
 
   use AgenticRealms.DataCase, async: false

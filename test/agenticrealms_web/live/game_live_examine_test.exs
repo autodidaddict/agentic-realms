@@ -58,7 +58,7 @@ defmodule AgenticRealmsWeb.GameLiveExamineTest do
     %{alice: alice, bob: bob, alice_conn: alice_conn, bob_conn: bob_conn}
   end
 
-  test "examine objects and players — US1, US2, US3 in sequence",
+  test "examine objects and players, US3 in sequence",
        %{alice_conn: alice_conn, bob_conn: bob_conn, alice: alice, bob: bob} do
     {:ok, alice_view, _html} = live(alice_conn, ~p"/play")
     {:ok, bob_view, _html} = live(bob_conn, ~p"/play")

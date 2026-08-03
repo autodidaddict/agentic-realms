@@ -16,7 +16,7 @@ defmodule AgenticRealms.World.UIEventBroadcaster do
   Handler clauses:
     * `PlayerSpawned` / `PlayerMoved` → RoomPlayerArrived / RoomPlayerLeft
       + PlayerCurrentRoomChanged.
-    * `EntityMoved` (feature 016) → one witness mapping keyed on
+    * `EntityMoved` → one witness mapping keyed on
       `(kind, cause, from→to)` that reproduces every prior convention:
       object spawn → RoomObjectArrived; take → RoomObjectTaken +
       PlayerInventoryChanged(:added); drop → RoomObjectDropped +

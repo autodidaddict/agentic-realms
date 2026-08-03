@@ -1,6 +1,6 @@
 defmodule AgenticRealms.World.Ticks.Scheduler do
   @moduledoc """
-  Per-room tick Scheduler GenServer (feature 011).
+  Per-room tick Scheduler GenServer.
 
   One Scheduler per active room, registered cluster-wide in
   `RoomTicks.Registry` under key `room_id`. Owns the beat timer, the
@@ -9,9 +9,8 @@ defmodule AgenticRealms.World.Ticks.Scheduler do
 
   Cadence is drift-free: `next_fire = last_fire + interval_ms`. Long
   actions don't pile up — a behavior whose previous tick is still
-  dispatching is skipped on the current beat (FR-010, future-proofing).
+  dispatching is skipped on the current beat (future-proofing).
 
-  See `specs/011-room-tick-timers/contracts/scheduler.md`.
   """
 
   use GenServer

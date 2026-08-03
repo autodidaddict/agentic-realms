@@ -8,13 +8,13 @@ defmodule AgenticRealms.World.Commands do
   bounded concern the world has. It is now the front door, and the concerns
   live behind it:
 
-    * `Commands.Entities`  — the entity lifecycle (feature 016), plus `take`
+    * `Commands.Entities`  — the entity lifecycle, plus `take`
                              and `drop`
     * `Commands.Authoring` — what a wizard authors and spawns: blueprints,
                              freeform spawns, essence extraction, in-world
                              edits (features 008, 014, 015)
-    * `Commands.Quests`    — accept, progress, finalize (feature 013)
-    * `Commands.Regions`   — regions, rooms, exits (feature 012)
+    * `Commands.Quests`    — accept, progress, finalize
+    * `Commands.Regions`   — regions, rooms, exits
 
   What stays here is the player themselves: spawning into the world, moving
   through it, creating a character, earning experience, and recording a room as
@@ -73,7 +73,7 @@ defmodule AgenticRealms.World.Commands do
   end
 
   @doc """
-  Create a player's character from the choices they made (feature 021).
+  Create a player's character from the choices they made.
 
   Three steps:
 
@@ -149,7 +149,7 @@ defmodule AgenticRealms.World.Commands do
   end
 
   @doc """
-  Award experience to a player (feature 019). Players only; idempotent per
+  Award experience to a player. Players only; idempotent per
   `award_id` (a redelivered/replayed source event cannot double-award).
   Dispatched `:strong` so the `player_state` read model reflects the new
   xp/level before this returns.
@@ -172,7 +172,7 @@ defmodule AgenticRealms.World.Commands do
   Move the player one step in the given direction.
 
   Returns `{:ok, to_room_id}` on success; `{:error, :no_exit_in_direction}`
-  when the player's current room has no exit in that direction (FR-007);
+  when the player's current room has no exit in that direction;
   `{:error, :no_current_room}` if the player has never spawned.
   """
   @spec move(integer(), atom()) ::

@@ -42,7 +42,7 @@ defmodule AgenticRealms.World.Direction.Geometry do
 
   @doc """
   Check whether an exit's direction is geometrically consistent with the
-  source and target rooms' coordinates and elevation, per FR-024.
+  source and target rooms' coordinates and elevation.
 
   Returns `:ok` on consistency, `{:error, reason}` on violation. If EITHER
   room has unset coordinates (`map_x: nil` or `map_y: nil`), the check is

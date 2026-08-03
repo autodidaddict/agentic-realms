@@ -14,7 +14,7 @@ defmodule AgenticRealms.World.MapView do
 
   The renderer trusts MapView to be honest about what's visible. MapView
   MUST NOT emit destination room ids/names/region-ids on `:fog_stub` or
-  `:cross_region` exit entries (FR-007, FR-008, FR-017). The struct shapes
+  `:cross_region` exit entries. The struct shapes
   below are deliberately narrow to make leaks impossible.
 
   ## Off-map state

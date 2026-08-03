@@ -7,7 +7,6 @@ defmodule AgenticRealms.World.Ticks.Registry do
   pid across the BEAM cluster. Same pattern as `NPCChat.Registry`
   from feature 010.
 
-  See `specs/011-room-tick-timers/contracts/registry.md`.
   """
 
   @doc false

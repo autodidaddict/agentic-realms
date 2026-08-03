@@ -17,7 +17,6 @@ defmodule AgenticRealms.Anthropic do
     * `:req_options` — extra options merged into the Req request (tests inject
       a `Req.Test` plug here so no request leaves the BEAM)
 
-  See `specs/005-llm-intent-parser/contracts/intent_resolver_api.md`.
   """
 
   require Logger

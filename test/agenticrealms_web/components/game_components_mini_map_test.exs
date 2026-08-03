@@ -5,8 +5,7 @@ defmodule AgenticRealmsWeb.GameComponents.MiniMapTest do
   Commanded. Pure component-level assertions.
 
   Feature 012 — Maps. Covers US1 (basic SVG render), US2 (sequence diff
-  on movement), and the information-hiding contract per FR-005 / FR-007 /
-  FR-017 (no data-* leaks for fog stubs or cross-region affordances).
+  on movement), and the information-hiding contract (no data-* leaks for fog stubs or cross-region affordances).
   """
 
   use ExUnit.Case, async: true
@@ -347,7 +346,7 @@ defmodule AgenticRealmsWeb.GameComponents.MiniMapTest do
     end
   end
 
-  describe "US4 — above/below header affordances (FR-011 / FR-012)" do
+  describe "US4 — above/below header affordances" do
     test "has_above_rooms?: true renders the above affordance pip with aria-label" do
       html = render_map(multi_floor_view(has_above_rooms?: true))
       assert html =~ "map-affordance--above"
@@ -366,7 +365,7 @@ defmodule AgenticRealmsWeb.GameComponents.MiniMapTest do
       refute html =~ "map-affordance--below"
     end
 
-    test "NO raw integer elevation appears anywhere in the rendered HTML (SC-008)" do
+    test "NO raw integer elevation appears anywhere in the rendered HTML" do
       html = render_map(multi_floor_view(has_above_rooms?: true, has_below_rooms?: true))
 
       refute html =~ ~r/elevation[\s:="]*\d/i
@@ -508,7 +507,7 @@ defmodule AgenticRealmsWeb.GameComponents.MiniMapTest do
     end
   end
 
-  describe "off-map state (FR-003a)" do
+  describe "off-map state" do
     test "renders only the region header — no svg canvas, no glyphs" do
       html = render_map(off_map_view())
       assert html =~ "Blackmire"
@@ -537,7 +536,7 @@ defmodule AgenticRealmsWeb.GameComponents.MiniMapTest do
       refute html =~ ~r/elevation[\s:=]*\d/i
     end
 
-    test "no arrowheads / markers on map-line elements (FR-005 / SC-003)" do
+    test "no arrowheads / markers on map-line elements" do
       html = render_map(linear_three_view())
       refute html =~ "marker-end"
       refute html =~ "marker-start"

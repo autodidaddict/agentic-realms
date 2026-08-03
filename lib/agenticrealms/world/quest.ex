@@ -1,6 +1,6 @@
 defmodule AgenticRealms.World.Quest do
   @moduledoc """
-  Quest aggregate (feature 013). One aggregate instance per accepted
+  Quest aggregate. One aggregate instance per accepted
   FetchQuest, identified by `quest_id` (binary_id).
 
   State machine:
@@ -10,9 +10,8 @@ defmodule AgenticRealms.World.Quest do
   All state changes emit one event in `:active` direction, and four events
   in `:completed` direction. Refusals return `{:error, atom}` to the
   command-dispatch wrapper, which translates them to the uniform
-  `{ok: false, reason: ...}` tool result envelope (FR-011a).
+  `{ok: false, reason: ...}` tool result envelope.
 
-  See `specs/013-quest-system/contracts/quest-aggregate.md`.
   """
 
   defstruct quest_id: nil,

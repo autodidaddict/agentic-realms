@@ -4,7 +4,6 @@ defmodule AgenticRealmsWeb.NpcServiceController do
   mind worker (`agentic-realms-npc`). Three authenticated routes: read identity,
   read surroundings, submit a move. Guarded by `RequireServiceToken`.
 
-  See `specs/018-external-npc-api/contracts/npc-service-api.md`. The wire shapes
   match the shared schema in `agentic-realms-npc` feature 001.
   """
 

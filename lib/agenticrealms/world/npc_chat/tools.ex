@@ -1,12 +1,11 @@
 defmodule AgenticRealms.World.NPCChat.Tools do
   @moduledoc """
-  Tool definitions for the chat LLM call (feature 010).
+  Tool definitions for the chat LLM call.
 
   Two tools, `say` and `emote`. With `tool_choice: {type: "any"}` on the
   Anthropic request, the model MUST produce exactly one of them per turn
   (FR-021). This shape eliminates structured-output ambiguity.
 
-  See `specs/010-npc-conversations/contracts/tools.md`.
   """
 
   @doc """

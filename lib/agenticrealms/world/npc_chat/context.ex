@@ -1,6 +1,6 @@
 defmodule AgenticRealms.World.NPCChat.Context do
   @moduledoc """
-  Assembles the per-turn LLM request for an NPC chat (feature 010).
+  Assembles the per-turn LLM request for an NPC chat.
 
   `snapshot/2` queries the current room state and assembles the context
   map that `SystemPrompt.text/1` consumes — this is impure (DB-bound).
@@ -9,7 +9,6 @@ defmodule AgenticRealms.World.NPCChat.Context do
   the current player utterance, and the NPC name (for rendering assistant
   turns), it produces the Anthropic Messages API request body.
 
-  See `specs/010-npc-conversations/contracts/context.md`.
   """
 
   alias AgenticRealms.Repo
@@ -88,7 +87,7 @@ defmodule AgenticRealms.World.NPCChat.Context do
   end
 
   @doc """
-  Compute per-(viewer, NPC) quest context (feature 013).
+  Compute per-(viewer, NPC) quest context.
 
   Returns a map with three lists:
     * `offerable_quests` — entries from the NPC's catalog that this

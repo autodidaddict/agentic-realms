@@ -46,7 +46,7 @@ defmodule AgenticRealms.World.IntentResolverTest do
       assert {:ok, {:look}} = IntentResolver.parse_response(tool_response("look", %{}))
     end
 
-    test "look with a target maps to {:look, target} (feature 006)" do
+    test "look with a target maps to {:look, target}" do
       assert {:ok, {:look, "brass lantern"}} =
                IntentResolver.parse_response(
                  tool_response("look", %{"target" => "brass lantern"})
@@ -101,7 +101,7 @@ defmodule AgenticRealms.World.IntentResolverTest do
     end
   end
 
-  describe "parse_response/1 — refusals (US2)" do
+  describe "parse_response/1 — refusals" do
     test "the refuse tool returns the model-authored message verbatim" do
       assert {:error, "Combat isn't supported yet."} =
                IntentResolver.parse_response(
@@ -149,7 +149,7 @@ defmodule AgenticRealms.World.IntentResolverTest do
     end
   end
 
-  describe "parse_response/1 — malformed responses (US3)" do
+  describe "parse_response/1 — malformed responses" do
     test "a response with no tool_use block refuses gracefully" do
       response = %{"content" => [%{"type" => "text", "text" => "hello"}]}
       assert {:error, msg} = IntentResolver.parse_response(response)

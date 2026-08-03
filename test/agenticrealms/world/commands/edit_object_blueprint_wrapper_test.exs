@@ -112,7 +112,7 @@ defmodule AgenticRealms.World.Commands.EditObjectBlueprintWrapperTest do
              })
   end
 
-  test "previously-spawned clones reflect the OLD revision values (FR-021)",
+  test "previously-spawned clones reflect the OLD revision values",
        %{wizard: w, slug: slug} do
     {:ok, object_id} =
       Commands.spawn_object_from_blueprint(

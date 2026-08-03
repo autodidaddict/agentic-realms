@@ -1,13 +1,13 @@
 defmodule AgenticRealms.World.NPCChat do
   @moduledoc """
-  Public API for NPC chat (feature 010). The top-of-tree entry point
+  Public API for NPC chat. The top-of-tree entry point
   callers (GameLive, IntentResolver) use to initiate a chat turn.
 
   Responsibilities:
 
-    1. Validate input length (FR-019a).
+    1. Validate input length.
     2. Resolve the NPC token to a clone in the player's current room
-       using the same exact-then-partial rules as `Examine` (FR-002).
+       using the same exact-then-partial rules as `Examine`.
     3. Find or start the `Conversation` GenServer for the
        `(player_id, npc_clone_id)` pair via the cluster-wide
        `NPCChat.Supervisor`.
@@ -18,7 +18,6 @@ defmodule AgenticRealms.World.NPCChat do
   via PubSub broadcast on `AgenticRealmsWeb.Topics.player_topic(player_id)`
   — the caller is the LiveView, which is already subscribed.
 
-  See `specs/010-npc-conversations/contracts/npc_chat_api.md`.
   """
 
   alias AgenticRealms.World.NPCChat.{Registry, Supervisor}

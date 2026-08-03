@@ -1,6 +1,6 @@
 defmodule AgenticRealms.World.NPCChat.TaskSupervisor do
   @moduledoc """
-  Task.Supervisor dedicated to NPC-chat LLM round-trips (feature 010).
+  Task.Supervisor dedicated to NPC-chat LLM round-trips.
 
   Conversation GenServers spawn LLM-call tasks here (rather than under
   their own supervision) so a slow or crashing Anthropic call cannot

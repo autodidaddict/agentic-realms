@@ -1,11 +1,10 @@
 defmodule AgenticRealms.World.NPCChat.SystemPromptTest do
   @moduledoc """
-  Unit tests for the chat system prompt (feature 010).
+  Unit tests for the chat system prompt.
 
   Verifies every clause of FR-008 (a–f) appears in the rendered prompt
-  via substring assertions, plus the empty-lore fallback (FR-013).
+  via substring assertions, plus the empty-lore fallback.
 
-  See `specs/010-npc-conversations/contracts/system_prompt.md`.
   """
 
   use ExUnit.Case, async: true
@@ -28,36 +27,36 @@ defmodule AgenticRealms.World.NPCChat.SystemPromptTest do
   end
 
   describe "text/1" do
-    test "names the NPC in the opening line (FR-008a)" do
+    test "names the NPC in the opening line" do
       prompt = SystemPrompt.text(base_snapshot())
       assert prompt =~ "You are Garrick the Innkeeper"
     end
 
-    test "includes the lore content (FR-008a)" do
+    test "includes the lore content" do
       prompt = SystemPrompt.text(base_snapshot())
       assert prompt =~ "A former bridge-guard from Riverford."
     end
 
-    test "rule against meta-references is present (FR-008d)" do
+    test "rule against meta-references is present" do
       prompt = SystemPrompt.text(base_snapshot())
       assert prompt =~ "NEVER reference being an AI"
       assert prompt =~ "as an AI"
       assert prompt =~ "as a language model"
     end
 
-    test "rule against reciting lore on demand is present (FR-008e)" do
+    test "rule against reciting lore on demand is present" do
       prompt = SystemPrompt.text(base_snapshot())
       assert prompt =~ ~r/do not recite, paraphrase/i
       assert prompt =~ "what's your lore"
     end
 
-    test "rule for in-theme refusal is present and prefers emote (FR-008c, FR-021)" do
+    test "rule for in-theme refusal is present and prefers emote" do
       prompt = SystemPrompt.text(base_snapshot())
       assert prompt =~ "in-theme refusal"
       assert prompt =~ "Prefer an `emote` reply"
     end
 
-    test "rule for structured speech-or-emote output is present (FR-008f, FR-021)" do
+    test "rule for structured speech-or-emote output is present" do
       prompt = SystemPrompt.text(base_snapshot())
       assert prompt =~ "exactly one tool call"
       assert prompt =~ "`say`"
@@ -119,7 +118,7 @@ defmodule AgenticRealms.World.NPCChat.SystemPromptTest do
       assert prompt =~ "oil lamp (a sputtering oil lamp)"
     end
 
-    test "out-of-scope refusal rule contains both 'in-theme refusal' and 'emote' (US4)" do
+    test "out-of-scope refusal rule contains both 'in-theme refusal' and 'emote'" do
       prompt = SystemPrompt.text(base_snapshot())
       assert prompt =~ "in-theme refusal"
       assert prompt =~ "Prefer an `emote` reply"

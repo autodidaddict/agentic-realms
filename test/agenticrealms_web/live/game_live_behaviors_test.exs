@@ -60,7 +60,7 @@ defmodule AgenticRealmsWeb.GameLiveBehaviorsTest do
     %{alice: alice, bob: bob, alice_conn: alice_conn, bob_conn: bob_conn}
   end
 
-  test "behaviors — US1, US2, US3, US4, US5 in sequence",
+  test "behaviors, US5 in sequence",
        %{alice_conn: alice_conn, bob_conn: bob_conn} do
     {:ok, alice_view, _html} = live(alice_conn, ~p"/play")
     flush(alice_view)

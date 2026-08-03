@@ -7,7 +7,7 @@ defmodule AgenticRealms.World.BehaviorGroups do
   this milestone (no wizard authoring surface yet), so this is a plain read +
   composition module — no aggregate, no events.
 
-  Composition (`compose/2`) is **additive and lossless** (FR-016): the
+  Composition (`compose/2`) is **additive and lossless**: the
   effective behavior list is the concatenation, in attachment order, of each
   referenced behavior_group's behaviors, followed by the blueprint's direct
   behaviors. Same-trigger behaviors from different sources are all retained
@@ -67,7 +67,7 @@ defmodule AgenticRealms.World.BehaviorGroups do
     end
   end
 
-  @doc "Validate behaviors against the feature-009 vocabulary (FR-014). Delegates to `Behaviors.Validator`."
+  @doc "Validate behaviors against the feature-009 vocabulary. Delegates to `Behaviors.Validator`."
   @spec validate_behaviors([map()]) :: :ok | {:error, term()}
   def validate_behaviors(behaviors), do: Validator.validate(behaviors)
 

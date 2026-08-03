@@ -616,7 +616,7 @@ defmodule AgenticRealmsWeb.GameComponents.WizardAuthoring do
           <label class="bp-field-label">
             Direct behaviors
             <span class="bp-field-hint">
-              individual triggers, on top of any behavior groups (FR-015a)
+              individual triggers, on top of any behavior groups
             </span>
           </label>
           <div

@@ -4,7 +4,7 @@ defmodule AgenticRealms.World.Commands.EditNpcTest do
 
   * Blueprint edit is revision-tracked + optimistically locked (a concurrent
     stale edit is refused) and does NOT retro-propagate to already-spawned
-    clones (FR-009/FR-017).
+    clones.
   * In-place clone edit (`edit_npc/3`) changes only that clone.
   """
 
@@ -74,7 +74,7 @@ defmodule AgenticRealms.World.Commands.EditNpcTest do
     assert Queries.get_npc_blueprint_row(slug).lore == "v2 lore"
   end
 
-  test "editing the blueprint does not retro-propagate to a spawned clone (FR-017)",
+  test "editing the blueprint does not retro-propagate to a spawned clone",
        %{wizard: wizard, room_id: room_id, slug: slug} do
     {:ok, clone_id} = Commands.spawn_from_blueprint(wizard.id, slug, room_id)
     assert Repo.get(NPCClone, clone_id).lore == "original lore"

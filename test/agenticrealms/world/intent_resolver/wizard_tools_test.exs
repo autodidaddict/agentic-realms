@@ -121,7 +121,7 @@ defmodule AgenticRealms.World.IntentResolver.WizardToolsTest do
     end
   end
 
-  describe "parse_wizard_blueprint_response/1 — npc drafts (feature 015)" do
+  describe "parse_wizard_blueprint_response/1 — npc drafts" do
     test "extracts an npc draft from draft_npc_blueprint (no behavior_groups)" do
       response = %{
         "content" => [

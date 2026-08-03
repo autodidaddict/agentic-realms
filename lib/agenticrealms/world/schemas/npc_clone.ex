@@ -8,9 +8,8 @@ defmodule AgenticRealms.World.Schemas.NPCClone do
   quest-identity tag (feature 013 groups quest progress on it) — NOT lineage,
   and absent for freeform NPCs. The LPMud-style debug identity (`debug_id/1`)
   is exposed for admin / telemetry / debug audiences ONLY — never for
-  player-facing surfaces (FR-011).
+  player-facing surfaces.
 
-  See `specs/008-npc-blueprints/data-model.md` §2.
   """
 
   use Ecto.Schema
@@ -59,7 +58,7 @@ defmodule AgenticRealms.World.Schemas.NPCClone do
 
   @doc """
   LPMud-style debug identity: `<display_name>#<entity_id>`. Used in telemetry
-  and admin surfaces. MUST NOT appear in player-facing renders (FR-011).
+  and admin surfaces. MUST NOT appear in player-facing renders.
   """
   @spec debug_id(t()) :: String.t()
   def debug_id(%__MODULE__{name: name, id: id}) do

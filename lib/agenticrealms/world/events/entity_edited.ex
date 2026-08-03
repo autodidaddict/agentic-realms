@@ -1,6 +1,6 @@
 defmodule AgenticRealms.World.Events.EntityEdited do
   @moduledoc """
-  An entity's frozen read-model fields changed in place (feature 016).
+  An entity's frozen read-model fields changed in place.
   `fields_changed` is a sparse map applied to the read row.
   """
   @derive Jason.Encoder

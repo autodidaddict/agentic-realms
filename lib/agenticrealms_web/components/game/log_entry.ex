@@ -3,12 +3,12 @@ defmodule AgenticRealmsWeb.GameComponents.LogEntry do
   The narrative log entry renderer. One public `log_entry/1` function
   with a clause per `entry.kind` — room, detail, narrate, speech (and
   its variants), command echo, system, combat, and the private/whisper
-  surfaces from feature 004 plus the chat/emote/behavior variants from
+  surfaces plus the chat/emote/behavior variants from
   features 009/010/011.
 
   All `text` and `actor` values originate from player input and are
   rendered through HEEx auto-escaping (the default `{ @entry.text }`
-  interpolation) per FR-024.
+  interpolation).
   """
 
   use AgenticRealmsWeb, :html

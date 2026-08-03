@@ -3,7 +3,7 @@ defmodule AgenticRealms.World.ContainerRef do
   A typed reference to the place an entity is contained: the void, a room,
   a player's inventory, or an NPC's inventory. Replaces the ad-hoc
   `room_id`/`player_id` + XOR location model with a single `(type, id)`
-  value (feature 016, FR-006/FR-012b).
+  value.
 
   The **void** is the null container — `%ContainerRef{type: :void, id: nil}`
   — holding entities that exist but are placed nowhere.
@@ -12,7 +12,6 @@ defmodule AgenticRealms.World.ContainerRef do
   payloads. `from_map/1` is tolerant of struct passthrough and of both
   string- and atom-keyed maps (events come back string-keyed after replay).
 
-  See `specs/016-entity-containment/data-model.md` §1.
   """
 
   @types ~w(void room player npc)a

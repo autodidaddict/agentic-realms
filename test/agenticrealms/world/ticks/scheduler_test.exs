@@ -1,6 +1,6 @@
 defmodule AgenticRealms.World.Ticks.SchedulerTest do
   @moduledoc """
-  Tests for the per-room tick Scheduler GenServer (feature 011).
+  Tests for the per-room tick Scheduler GenServer.
 
   Bypasses the Lifecycle and starts a Scheduler directly via
   `Supervisor.find_or_start/1`, so the GenServer's beat loop can be
@@ -105,7 +105,7 @@ defmodule AgenticRealms.World.Ticks.SchedulerTest do
   defp subscribe_player(player),
     do: Phoenix.PubSub.subscribe(@pubsub, Topics.player_topic(player.id))
 
-  describe "scheduler lifecycle (US1)" do
+  describe "scheduler lifecycle" do
     test "find_or_start returns a pid and registers it" do
       room = insert_room()
       pid = start_scheduler(room)
@@ -132,7 +132,7 @@ defmodule AgenticRealms.World.Ticks.SchedulerTest do
     end
   end
 
-  describe "beat dispatch (US1 / US3)" do
+  describe "beat dispatch" do
     test "a 1-base-rate room tick fires within ~base + dispatch tolerance" do
       base = Application.get_env(:agenticrealms, AgenticRealms.World.Ticks)[:base_tick_rate_ms]
       room = insert_room([tick("hello room", base)])

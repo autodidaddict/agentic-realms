@@ -66,7 +66,7 @@ defmodule AgenticRealmsWeb.GameLiveNPCTest do
     %{alice: alice, bob: bob, alice_conn: alice_conn, bob_conn: bob_conn}
   end
 
-  test "static NPCs — US1, US2, US3, US4 in sequence",
+  test "static NPCs, US4 in sequence",
        %{alice_conn: alice_conn, bob_conn: bob_conn, alice: alice, bob: bob} do
     assert %Blueprint{id: "garrick_the_innkeeper", kind: "npc"} =
              Repo.get(Blueprint, "garrick_the_innkeeper")
@@ -157,7 +157,7 @@ defmodule AgenticRealmsWeb.GameLiveNPCTest do
     refreshed_clone = Repo.get(NPCClone, garrick_clone.id)
 
     assert refreshed_clone.long_description == original_long_description,
-           "full-copy: existing clone data MUST NOT change when the blueprint is edited (SC-003)"
+           "full-copy: existing clone data MUST NOT change when the blueprint is edited"
 
     {1, _} =
       Repo.update_all(
@@ -180,7 +180,7 @@ defmodule AgenticRealmsWeb.GameLiveNPCTest do
            "the Also here section should render in the Stone Atrium"
 
     assert html =~ ~s(class="room-section-label">Also here:</span>),
-           "the section label MUST be the literal string 'Also here:' (FR-004)"
+           "the section label MUST be the literal string 'Also here:'"
 
     assert html =~ "Garrick the Innkeeper",
            "Garrick's display name should appear in the Also here section"
@@ -269,7 +269,7 @@ defmodule AgenticRealmsWeb.GameLiveNPCTest do
     assert log_count(bob_view) > bob_count_before
 
     refute alice_html =~ "Maelyn the Bard arrives from",
-           "the NPC arrival entry must NOT include 'from the X' (FR-012)"
+           "the NPC arrival entry must NOT include 'from the X'"
 
     submit(alice_view, "look")
     flush(alice_view)
@@ -332,7 +332,7 @@ defmodule AgenticRealmsWeb.GameLiveNPCTest do
     html = render(alice_view)
 
     assert html =~ "You can&#39;t take that." or html =~ "You can't take that.",
-           "taking an NPC should produce the same refusal as taking a fixed object (FR-015)"
+           "taking an NPC should produce the same refusal as taking a fixed object"
 
     assert Queries.list_inventory(alice.id) == inventory_before,
            "the inventory must not change after a failed take"

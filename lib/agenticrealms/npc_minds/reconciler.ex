@@ -4,8 +4,7 @@ defmodule AgenticRealms.NpcMinds.Reconciler do
   handoff (`LifecycleManager`) is best-effort, so a start/terminate issued while
   Temporal is unreachable is lost. This periodic sweep converges the set of
   running minds to the set of live NPCs: it starts a mind for any live NPC that
-  has none and terminates any running mind whose NPC no longer exists (FR-029a,
-  SC-013). Every operation is idempotent (Temporal `USE_EXISTING` start /
+  has none and terminates any running mind whose NPC no longer exists. Every operation is idempotent (Temporal `USE_EXISTING` start /
   tolerant terminate), so the sweep is safe to repeat.
 
   **Cluster semantics (Principle I).** Runs as a Horde cluster singleton: started

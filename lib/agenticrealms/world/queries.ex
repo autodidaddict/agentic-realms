@@ -3,7 +3,6 @@ defmodule AgenticRealms.World.Queries do
   Read-side API for the world. Every query is a pure Ecto read against the
   read models in `AgenticRealms.Repo` — no Commanded dispatch, no events.
 
-  See `specs/003-persisted-world/data-model.md` §4 for the contract.
   """
 
   import Ecto.Query
@@ -83,7 +82,7 @@ defmodule AgenticRealms.World.Queries do
   end
 
   @doc """
-  Fetch the behaviors list attached to a room (feature 009).
+  Fetch the behaviors list attached to a room.
 
   Returns `{:ok, behaviors_list}` (which may be `[]`) or
   `{:error, :no_such_room}` if the room id is unknown.
@@ -99,7 +98,7 @@ defmodule AgenticRealms.World.Queries do
 
   @doc """
   List NPC clones in a room together with their behaviors list, ordered by
-  the per-blueprint serial counter (feature 009). Returns an empty list
+  the per-blueprint serial counter. Returns an empty list
   when the room contains no NPCs.
   """
   @spec list_npc_clones_in_room_with_behaviors(String.t()) :: [
@@ -230,7 +229,7 @@ defmodule AgenticRealms.World.Queries do
 
   @doc """
   Resolve an object name within a room's current contents to its object_id,
-  filtered for the given viewer per feature 013's per-viewer item
+  filtered for the given viewer's per-viewer item
   visibility (quest-scoped items are invisible to non-owners).
 
   Case-insensitive; whitespace-collapsed. Returns `:ambiguous` if more than
@@ -308,7 +307,7 @@ defmodule AgenticRealms.World.Queries do
 
   @doc """
   Read the `fixed` flag for an object. Used by `World.Commands.take` to
-  refuse fixed objects at the pre-dispatch layer (FR-010).
+  refuse fixed objects at the pre-dispatch layer.
   """
   @spec object_fixed?(String.t()) :: {:ok, boolean()} | {:error, :no_such_object}
   def object_fixed?(object_id) when is_binary(object_id) do
@@ -354,7 +353,7 @@ defmodule AgenticRealms.World.Queries do
   end
 
   @doc """
-  Viewer-aware variant of `list_objects_in_room/1` (feature 013). Objects
+  Viewer-aware variant of `list_objects_in_room/1`. Objects
   carrying a `quest_player_id` are visible only to the player whose id
   matches; objects without a `quest_player_id` are visible to everyone.
 
@@ -418,7 +417,7 @@ defmodule AgenticRealms.World.Queries do
 
   @doc """
   Returns the list of player ids whose `current_room_id == room_id` AND
-  who appear in `Phoenix.Presence`'s online set (feature 011). Used by
+  who appear in `Phoenix.Presence`'s online set. Used by
   `RoomTicks.Scheduler` to compute fan-out recipients for tick-driven
   room/object speech, and by `RoomTicks.Lifecycle` to seed live-occupant
   state on Scheduler init.
@@ -439,7 +438,7 @@ defmodule AgenticRealms.World.Queries do
 
   @doc """
   Returns all objects currently held by any player whose `current_room_id
-  == room_id` (feature 011). Used by `RoomTicks.Scope` to include carried
+  == room_id`. Used by `RoomTicks.Scope` to include carried
   objects in the tick-behavior scope set for the carrier's current room.
 
   The caller is responsible for filtering by online presence if needed
@@ -628,7 +627,7 @@ defmodule AgenticRealms.World.Queries do
   @registry_kinds ~w(object npc)
 
   @doc """
-  Feature 015 US8 — unified blueprint registry (FR-024/FR-025). Projects the
+  Feature 015 US8 — unified blueprint registry. Projects the
   `blueprints` table to a uniform display row
   `%{id, kind, name, short_description, revision}`, ordered by name then id.
   """

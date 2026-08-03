@@ -5,7 +5,6 @@ defmodule AgenticRealms.World.Behaviors.Validator do
   and (in a future feature) by the wizard tab before persisting any
   user-authored behaviors.
 
-  See `specs/009-npc-behaviors/contracts/validator.md`.
   """
 
   @valid_triggers ~w(player_entered player_left tick)

@@ -3,7 +3,6 @@ defmodule AgenticRealms.World.Region do
   Region aggregate. Owns the named map area to which one or more rooms
   belong. v1 supports creation only — no rename, no delete.
 
-  See `specs/012-maps/data-model.md` §1.1 and
   `specs/012-maps/contracts/region.md`.
   """
 

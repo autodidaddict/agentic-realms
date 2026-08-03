@@ -277,11 +277,11 @@ defmodule AgenticRealmsWeb.GameLive.UIEvents do
       originating LiveView appends its own actor-side confirmation
       inline and discards the broadcast it receives back. The
       speaker's OTHER sessions in the same room render the broadcast
-      as a witness entry (FR-006).
-    * `:emote` — NO actor exclusion (FR-008). Every room subscriber,
+      as a witness entry.
+    * `:emote` — NO actor exclusion. Every room subscriber,
       sender included, sees the third-person narration.
     * `:whisper` — every room subscriber receives the broadcast, but
-      only the resolved recipient renders it (FR-017). The sender's
+      only the resolved recipient renders it. The sender's
       own sessions also fall through this filter (their
       `current_player.id` is the `sender_id`, not `recipient_id`),
       which gives us the FR-018 "originating session only" rule for
@@ -310,7 +310,7 @@ defmodule AgenticRealmsWeb.GameLive.UIEvents do
 
   @doc """
   `:tell` — no filter needed; only the recipient's sessions subscribe
-  to the `player:<recipient_id>` topic (FR-011, FR-013). The sender's
+  to the `player:<recipient_id>` topic. The sender's
   other sessions are NOT subscribed and never receive this broadcast.
   """
   def private_utterance(socket, %PrivateUtterance{kind: :tell} = msg) do

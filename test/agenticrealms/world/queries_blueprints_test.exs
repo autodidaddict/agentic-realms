@@ -1,7 +1,7 @@
 defmodule AgenticRealms.World.QueriesBlueprintsTest do
   @moduledoc """
   Feature 015 US8 — the unified blueprint registry query lists both kinds and
-  filters by kind (FR-024/FR-025).
+  filters by kind.
   """
 
   use AgenticRealms.DataCase, async: false

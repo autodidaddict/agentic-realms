@@ -116,7 +116,7 @@ defmodule AgenticRealms.World.CharacterGenTest do
     end
   end
 
-  describe "complete/1 — the hand-over as steps ship (feature 021)" do
+  describe "complete/1 — the hand-over as steps ship" do
     alias AgenticRealms.World.CharacterDraft, as: Draft
 
     defp identity_draft do

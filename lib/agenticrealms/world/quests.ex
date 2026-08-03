@@ -1,12 +1,11 @@
 defmodule AgenticRealms.World.Quests do
   @moduledoc """
-  Read-side API for the quest system (feature 013). Pure Ecto reads
+  Read-side API for the quest system. Pure Ecto reads
   against `quest_instances` and `world_objects` — no Commanded dispatch.
 
   Quest progress is a pure function of the player's current inventory
   (FR-019). This module is the canonical place to compute it.
 
-  See `specs/013-quest-system/data-model.md` § 11 for the API shapes.
   """
 
   import Ecto.Query
@@ -55,7 +54,7 @@ defmodule AgenticRealms.World.Quests do
 
   @doc """
   Completed quest instances for a player, ordered by completion time
-  (most recent first). Lifetime-retained per FR-025.
+  (most recent first). Lifetime-retained.
   """
   @spec history_for(integer()) :: [completed_quest_summary()]
   def history_for(player_id) when is_integer(player_id) do

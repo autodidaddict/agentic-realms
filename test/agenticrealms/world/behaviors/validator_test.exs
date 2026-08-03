@@ -1,7 +1,6 @@
 defmodule AgenticRealms.World.Behaviors.ValidatorTest do
   @moduledoc """
-  Unit tests for the behavior list validator (feature 009).
-  See `specs/009-npc-behaviors/contracts/validator.md`.
+  Unit tests for the behavior list validator.
   """
 
   use ExUnit.Case, async: true
@@ -156,7 +155,7 @@ defmodule AgenticRealms.World.Behaviors.ValidatorTest do
     end
   end
 
-  describe "tick trigger validation (feature 011)" do
+  describe "tick trigger validation" do
     defp say_action, do: %{"type" => "say", "text" => "tick"}
 
     setup do

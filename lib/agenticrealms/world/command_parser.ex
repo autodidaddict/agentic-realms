@@ -4,8 +4,8 @@ defmodule AgenticRealms.World.CommandParser do
 
   Pure function: no DB, no aggregates, no dispatch. Owns FR-006 (movement
   aliases), FR-014 (inventory aliases), FR-017 (case/whitespace tolerance),
-  FR-018 (unknown commands), and FR-019 (empty input) from feature 003 plus
-  the four communication verbs from feature 004 (say, emote, tell, whisper).
+  FR-018 (unknown commands), and FR-019 (empty input) plus
+  the four communication verbs (say, emote, tell, whisper).
 
   Case-handling contract:
 
@@ -18,7 +18,6 @@ defmodule AgenticRealms.World.CommandParser do
       `<recipient>` for tell/whisper) preserve the original casing from the
       input.
 
-  See `specs/003-persisted-world/contracts/parser.md` and
   `specs/004-player-communication/contracts/parser.md`.
   """
 

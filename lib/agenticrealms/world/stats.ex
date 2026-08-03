@@ -11,7 +11,7 @@ defmodule AgenticRealms.World.Stats do
 
   `health_tier/2` and `relative_power/2` are pure banding helpers used by
   `Examine`. They surface only qualitative bands, never the target's exact
-  numbers (FR-025), and are unchanged from feature 019.
+  numbers, and are unchanged.
   """
 
   alias AgenticRealms.Repo

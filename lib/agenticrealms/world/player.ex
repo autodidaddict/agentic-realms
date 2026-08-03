@@ -8,7 +8,6 @@ defmodule AgenticRealms.World.Player do
   two represent different things and modules consuming both should alias
   one of them to avoid ambiguity.
 
-  See `specs/003-persisted-world/data-model.md` §1.2.
   """
 
   defstruct id: nil,

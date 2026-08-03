@@ -31,7 +31,7 @@ defmodule AgenticRealms.World.CommandParserTest do
     end
   end
 
-  describe "look [target] (feature 006)" do
+  describe "look [target]" do
     test "look <target> returns {:look, target} with target lowercased" do
       assert {:look, "brass lantern"} = CommandParser.parse("look brass lantern")
       assert {:look, "brass lantern"} = CommandParser.parse("look BRASS LANTERN")
@@ -88,7 +88,7 @@ defmodule AgenticRealms.World.CommandParserTest do
     end
   end
 
-  describe "movement (FR-006)" do
+  describe "movement" do
     test "north / n" do
       assert {:move, :north} = CommandParser.parse("north")
       assert {:move, :north} = CommandParser.parse("n")
@@ -179,7 +179,7 @@ defmodule AgenticRealms.World.CommandParserTest do
     end
   end
 
-  describe "unknown verbs (FR-018)" do
+  describe "unknown verbs" do
     test "single unknown verb" do
       assert {:unknown, "dance"} = CommandParser.parse("dance")
     end
@@ -193,7 +193,7 @@ defmodule AgenticRealms.World.CommandParserTest do
     end
   end
 
-  describe "say (US1)" do
+  describe "say" do
     test "basic say" do
       assert {:say, "hello"} = CommandParser.parse("say hello")
     end
@@ -236,7 +236,7 @@ defmodule AgenticRealms.World.CommandParserTest do
     end
   end
 
-  describe "emote (US2)" do
+  describe "emote" do
     test "emote verb form" do
       assert {:emote, "waves"} = CommandParser.parse("emote waves")
     end
@@ -275,7 +275,7 @@ defmodule AgenticRealms.World.CommandParserTest do
     end
   end
 
-  describe "tell (US3)" do
+  describe "tell" do
     test "basic tell" do
       assert {:tell, "alice", "hi"} = CommandParser.parse("tell alice hi")
     end
@@ -309,7 +309,7 @@ defmodule AgenticRealms.World.CommandParserTest do
     end
   end
 
-  describe "whisper (US4)" do
+  describe "whisper" do
     test "basic whisper" do
       assert {:whisper, "alice", "hi"} = CommandParser.parse("whisper alice hi")
     end
@@ -330,7 +330,7 @@ defmodule AgenticRealms.World.CommandParserTest do
       refute match?({:tell, _, _}, CommandParser.parse("whisper alice hi"))
     end
 
-    test "w is reserved for the west movement alias from feature 003" do
+    test "w is reserved for the west movement alias" do
       assert {:move, :west} = CommandParser.parse("w")
     end
   end

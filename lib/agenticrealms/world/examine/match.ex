@@ -13,7 +13,6 @@ defmodule AgenticRealms.World.Examine.Match do
       is `world_npcs.long_description` verbatim. Render contract identical
       in shape to `:object`.
 
-  See `specs/006-examine-objects/data-model.md` §1 and
   `specs/007-static-npcs/data-model.md` §7.
   """
 

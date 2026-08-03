@@ -1,7 +1,7 @@
 defmodule AgenticRealms.World.Transient.Registry do
   @moduledoc """
   Cluster-wide unique registry for the singleton `Transient.Manager`
-  (feature 017; same `Horde.Registry` pattern as `NpcMinds.Registry` /
+  (same `Horde.Registry` pattern as `NpcMinds.Registry` /
   `Ticks.Registry`). A single fixed key (`:manager`) maps to exactly one
   manager pid across the BEAM cluster.
 

@@ -144,7 +144,7 @@ defmodule AgenticRealmsWeb.WizardNpcAuthoringTest do
     assert Enum.any?(clone.behaviors, &(&1["trigger"] == "player_entered"))
   end
 
-  test "direct-behavior editor: add a behavior alongside a behavior_group → both commit (FR-015a)",
+  test "direct-behavior editor: add a behavior alongside a behavior_group → both commit",
        %{wizard_conn: wzc, suffix: suffix} do
     {:ok, view, _} = live(wzc, ~p"/play")
     render_hook(view, "switch_mode", %{"mode" => "wizard"})
@@ -198,7 +198,7 @@ defmodule AgenticRealmsWeb.WizardNpcAuthoringTest do
            ]
   end
 
-  test "extract essence from an in-world NPC → trance + pre-filled npc draft → commit (US6)",
+  test "extract essence from an in-world NPC → trance + pre-filled npc draft → commit",
        %{wizard_conn: wzc, suffix: suffix} do
     {:ok, view, _} = live(wzc, ~p"/play")
     render_hook(view, "switch_mode", %{"mode" => "wizard"})
@@ -226,7 +226,7 @@ defmodule AgenticRealmsWeb.WizardNpcAuthoringTest do
     assert Repo.get(NPCClone, garrick.id).blueprint_id == "garrick_the_innkeeper"
   end
 
-  test "edit an npc blueprint's lore via the form → revision bump (US7)",
+  test "edit an npc blueprint's lore via the form → revision bump",
        %{wizard_conn: wzc, suffix: suffix} do
     {:ok, view, _} = live(wzc, ~p"/play")
     render_hook(view, "switch_mode", %{"mode" => "wizard"})
@@ -261,7 +261,7 @@ defmodule AgenticRealmsWeb.WizardNpcAuthoringTest do
     assert bp.lore == "v2 lore, much wiser"
   end
 
-  test "edit an in-world NPC clone in place; the blueprint is untouched (US7)",
+  test "edit an in-world NPC clone in place; the blueprint is untouched",
        %{wizard_conn: wzc} do
     {:ok, view, _} = live(wzc, ~p"/play")
     render_hook(view, "switch_mode", %{"mode" => "wizard"})
@@ -280,7 +280,7 @@ defmodule AgenticRealmsWeb.WizardNpcAuthoringTest do
     assert Queries.get_npc_blueprint_row("garrick_the_innkeeper").long_description =~ "wiry man"
   end
 
-  test "unified registry shows both kinds with badges; kind filter narrows it (US8)",
+  test "unified registry shows both kinds with badges; kind filter narrows it",
        %{wizard: wizard, wizard_conn: wzc, suffix: suffix} do
     obj_slug = "chest_#{suffix}"
     npc_slug = "ogre_reg_#{suffix}"

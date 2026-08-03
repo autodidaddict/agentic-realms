@@ -1,7 +1,7 @@
 defmodule AgenticRealms.World.EntityLifecycleIntegrationTest do
   @moduledoc """
   Feature 016 Phases 5–7 — end-to-end entity lifecycle: relocation between
-  containers (US3), the void state (US4), and container-type uniformity (US5).
+  containers, the void state, and container-type uniformity.
   Asserts read-model container transitions through the live clone/move service.
   """
 
@@ -93,7 +93,7 @@ defmodule AgenticRealms.World.EntityLifecycleIntegrationTest do
       assert oid in ids_b
     end
 
-    test "a stale-origin relocation is refused (FR-005)", %{fields: fields, room_a: a, room_b: b} do
+    test "a stale-origin relocation is refused", %{fields: fields, room_a: a, room_b: b} do
       {:ok, oid} = Commands.clone_into(:object, fields, ContainerRef.room(a), :spawned)
 
       assert {:error, :container_conflict} =

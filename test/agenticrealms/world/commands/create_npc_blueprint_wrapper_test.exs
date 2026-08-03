@@ -92,7 +92,7 @@ defmodule AgenticRealms.World.Commands.CreateNPCBlueprintWrapperTest do
              })
   end
 
-  test "slug uniqueness spans the object registry (FR-004)",
+  test "slug uniqueness spans the object registry",
        %{wizard: wizard, suffix: suffix} do
     slug = "shared_slug_#{suffix}"
 
@@ -117,7 +117,7 @@ defmodule AgenticRealms.World.Commands.CreateNPCBlueprintWrapperTest do
     assert %Blueprint{kind: "object"} = Repo.get(Blueprint, slug)
   end
 
-  test "an object cannot reuse an npc slug (FR-004, reverse direction)",
+  test "an object cannot reuse an npc slug (reverse direction)",
        %{wizard: wizard, suffix: suffix} do
     slug = "npc_first_#{suffix}"
 
@@ -142,7 +142,7 @@ defmodule AgenticRealms.World.Commands.CreateNPCBlueprintWrapperTest do
     assert %Blueprint{kind: "npc"} = Repo.get(Blueprint, slug)
   end
 
-  test "refuses an unknown behavior_group name (FR-018)",
+  test "refuses an unknown behavior_group name",
        %{wizard: wizard, suffix: suffix} do
     slug = "ghost_behavior_group_#{suffix}"
 
@@ -159,7 +159,7 @@ defmodule AgenticRealms.World.Commands.CreateNPCBlueprintWrapperTest do
     assert is_nil(Repo.get(Blueprint, slug))
   end
 
-  test "refuses a direct behavior outside the feature-009 vocabulary (FR-014)",
+  test "refuses a direct behavior outside the feature-009 vocabulary",
        %{wizard: wizard, suffix: suffix} do
     slug = "bad_behavior_#{suffix}"
 

@@ -57,7 +57,7 @@ defmodule AgenticRealms.World.Commands.ExtractObjectEssenceTest do
     assert bp.revision == 1
   end
 
-  test "leaves the source Object unmodified (FR-018)",
+  test "leaves the source Object unmodified",
        %{wizard: w, object_id: oid, suffix: suffix} do
     before = Repo.get(Object, oid)
 

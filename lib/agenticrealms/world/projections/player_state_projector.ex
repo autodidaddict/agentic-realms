@@ -3,8 +3,8 @@ defmodule AgenticRealms.World.Projections.PlayerStateProjector do
   Projects player lifecycle events into the `player_state` read model.
 
   Event handler clauses added so far:
-    * Phase 4 (US1): PlayerSpawned    → upsert player_state.current_room_id
-    * Phase 5 (US2): PlayerMoved      → update player_state.current_room_id
+    * Phase 4: PlayerSpawned    → upsert player_state.current_room_id
+    * Phase 5: PlayerMoved      → update player_state.current_room_id
                                         (with FR-022 nilify if target room gone)
     * Feature 020:   CharacterCreated → upsert the character columns
 

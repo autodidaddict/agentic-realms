@@ -2,7 +2,7 @@ defmodule AgenticRealms.World.WizardTrance do
   @moduledoc """
   Feature 014 — wizard trance broadcast helper. Translates an
   `authoring_mode` toggle on a wizard's LiveView socket into a co-present
-  player-facing log entry per FR-002 / FR-003.
+  player-facing log entry.
 
   Why this is not a Commanded aggregate / event: trance is a UI signal,
   not world state. Putting it through the event store would mean

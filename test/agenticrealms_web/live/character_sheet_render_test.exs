@@ -58,7 +58,7 @@ defmodule AgenticRealmsWeb.CharacterSheetRenderTest do
       refute html =~ "Cleric"
     end
 
-    test "has no mana bar (FR-033)", %{conn: conn} do
+    test "has no mana bar", %{conn: conn} do
       {_view, html, _sheet} = open_sheet(conn)
 
       refute html =~ ~r/mana/i
@@ -75,7 +75,7 @@ defmodule AgenticRealmsWeb.CharacterSheetRenderTest do
       assert sheet =~ ~s(role="tablist")
     end
 
-    test "opens on the main tab with the others hidden (FR-020)", %{conn: conn} do
+    test "opens on the main tab with the others hidden", %{conn: conn} do
       {_view, _html, sheet} = open_sheet(conn)
 
       assert sheet =~ ~s(id="sheet-tab-main" class="sheet-tab active")
@@ -83,7 +83,7 @@ defmodule AgenticRealmsWeb.CharacterSheetRenderTest do
       assert sheet =~ ~r/id="sheet-panel-spells".*?display: none/s
     end
 
-    test "switching tabs never reaches the server (FR-019)", %{conn: conn} do
+    test "switching tabs never reaches the server", %{conn: conn} do
       {_view, _html, sheet} = open_sheet(conn)
 
       refute sheet =~ ~s(phx-click="select_tab")
@@ -101,7 +101,7 @@ defmodule AgenticRealmsWeb.CharacterSheetRenderTest do
   end
 
   describe "the main tab" do
-    test "shows identity, vitals and the derived combat values (FR-016)", %{conn: conn} do
+    test "shows identity, vitals and the derived combat values", %{conn: conn} do
       {_view, _html, sheet} = open_sheet(conn)
 
       assert sheet =~ "Human Fighter"
@@ -128,7 +128,7 @@ defmodule AgenticRealmsWeb.CharacterSheetRenderTest do
   end
 
   describe "the abilities tab" do
-    test "lists all six scores with signed modifiers (FR-007, FR-017)", %{conn: conn} do
+    test "lists all six scores with signed modifiers", %{conn: conn} do
       {_view, _html, sheet} = open_sheet(conn)
 
       for name <- ~w(Strength Dexterity Constitution Intelligence Wisdom Charisma) do
@@ -161,7 +161,7 @@ defmodule AgenticRealmsWeb.CharacterSheetRenderTest do
   end
 
   describe "the spells tab" do
-    test "is an explicit placeholder with no spell data (FR-018)", %{conn: conn} do
+    test "is an explicit placeholder with no spell data", %{conn: conn} do
       {_view, _html, sheet} = open_sheet(conn)
 
       assert sheet =~ "Spellcasting is not yet available."
@@ -171,7 +171,7 @@ defmodule AgenticRealmsWeb.CharacterSheetRenderTest do
   end
 
   describe "closing" do
-    test "escape closes the whole sheet from any tab (FR-021)", %{conn: conn} do
+    test "escape closes the whole sheet from any tab", %{conn: conn} do
       {view, _html, sheet} = open_sheet(conn)
 
       assert sheet =~ "Character Sheet"

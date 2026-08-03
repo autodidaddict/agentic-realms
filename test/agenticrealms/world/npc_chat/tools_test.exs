@@ -1,8 +1,7 @@
 defmodule AgenticRealms.World.NPCChat.ToolsTest do
   @moduledoc """
-  Unit tests for the chat tool definitions (feature 010).
+  Unit tests for the chat tool definitions.
 
-  See `specs/010-npc-conversations/contracts/tools.md`.
   """
 
   use ExUnit.Case, async: true

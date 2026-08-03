@@ -6,7 +6,7 @@ defmodule AgenticRealms.World.Commands.ConcurrentTakeTest do
   Two players resolve the same object in the room; the first take wins, and
   the second taker — acting on its already-resolved (now stale) view of the
   object being in the room — is refused with `:container_conflict`. The
-  object stays with the first taker and is never stolen (FR-005).
+  object stays with the first taker and is never stolen.
   """
 
   use AgenticRealms.DataCase, async: false

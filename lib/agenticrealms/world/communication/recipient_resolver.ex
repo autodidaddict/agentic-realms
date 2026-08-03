@@ -11,7 +11,6 @@ defmodule AgenticRealms.World.Communication.RecipientResolver do
   Behavior is governed by FR-010 (case-insensitive exact match, ambiguous
   refusal) and FR-010a (self-target refusal).
 
-  See `specs/004-player-communication/contracts/communication_api.md`.
   """
 
   import Ecto.Query

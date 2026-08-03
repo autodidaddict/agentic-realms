@@ -52,7 +52,7 @@ defmodule AgenticRealms.DataCase do
 
   Tests that build Room rows directly via `Repo.insert!(%Room{...})`
   should pass `region_id: AgenticRealms.DataCase.insert_test_region()`
-  to satisfy the NOT NULL FK introduced in feature 012.
+  to satisfy the NOT NULL FK.
   """
   def insert_test_region(name_prefix \\ "TestRegion") do
     alias AgenticRealms.Repo
@@ -111,7 +111,7 @@ defmodule AgenticRealms.DataCase do
   end
 
   @doc """
-  Give a player a character through the real creation path (feature 021).
+  Give a player a character through the real creation path.
 
   Needed by any test that mounts `/play`: a player with no character now gets
   the creation dialog rather than the world, which is the point of the feature.

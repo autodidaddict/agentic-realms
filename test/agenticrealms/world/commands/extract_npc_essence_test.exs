@@ -3,7 +3,7 @@ defmodule AgenticRealms.World.Commands.ExtractNpcEssenceTest do
   Feature 015 US6 — extract a new NPC Blueprint from an in-world clone: the
   extracted blueprint copies the clone's name/short/long/lore/fixed + its
   behavior_groups + DIRECT behaviors at revision 1, and the source clone is left
-  byte-for-byte unchanged (FR-012 / SC-005).
+  byte-for-byte unchanged.
   """
 
   use AgenticRealms.DataCase, async: false

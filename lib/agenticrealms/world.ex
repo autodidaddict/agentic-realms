@@ -13,7 +13,6 @@ defmodule AgenticRealms.World do
   event store). UI events live under `AgenticRealms.World.UIEvents.*` and
   are broadcast via `Phoenix.PubSub` only.
 
-  See `specs/003-persisted-world/plan.md` for the full design.
   """
 
   @doc """

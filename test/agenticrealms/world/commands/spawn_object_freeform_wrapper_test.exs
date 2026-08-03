@@ -105,7 +105,7 @@ defmodule AgenticRealms.World.Commands.SpawnObjectFreeformWrapperTest do
     assert Repo.get(Object, id_b).container_id == room_id
   end
 
-  test "freeform Object is observationally indistinguishable from a blueprint-spawned one (FR-012)",
+  test "freeform Object is observationally indistinguishable from a blueprint-spawned one",
        %{wizard: w, starting_room_id: room_id, suffix: suffix} do
     slug = "comparison_pot_#{suffix}"
 

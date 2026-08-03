@@ -44,8 +44,8 @@ defmodule AgenticRealms.World.Communication do
   Broadcast a `say` utterance to every player in the sender's room.
 
   The originating session does NOT receive the broadcast back — it is excluded
-  by `actor_session_id` filtering in subscribers (per FR-005). The sender's
-  other sessions in the same room DO receive it as witnesses (per FR-006).
+  by `actor_session_id` filtering in subscribers (). The sender's
+  other sessions in the same room DO receive it as witnesses ().
 
   Returns `:ok` on broadcast; `{:error, :empty}` or `{:error, :too_long}` if
   the text fails validation. The caller (GameLive) is responsible for
@@ -73,7 +73,7 @@ defmodule AgenticRealms.World.Communication do
   Broadcast a `whisper` — private utterance to a same-room recipient.
 
   The recipient MUST occupy the sender's current room. If they don't, the
-  command is refused with `:recipient_not_in_room` (FR-020) — the LiveView
+  command is refused with `:recipient_not_in_room` — the LiveView
   surfaces a "not nearby" refusal that hints at `tell` as the cross-room
   alternative.
 
@@ -82,7 +82,7 @@ defmodule AgenticRealms.World.Communication do
   broadcast; non-recipient subscribers (including the sender's own other
   sessions, whose `current_player.id != recipient_id`) drop it in
   `handle_info/2`. This naturally satisfies the "originating session only"
-  rule for the sender (FR-018) without any session-id filter.
+  rule for the sender without any session-id filter.
   """
   @spec whisper(sender(), recipient_name :: String.t(), String.t()) ::
           {:ok, %{recipient_id: integer(), recipient_name: binary()}}
@@ -145,7 +145,7 @@ defmodule AgenticRealms.World.Communication do
 
   @doc """
   Broadcast an `emote` (third-person narration) to every player in the
-  sender's room — including the actor (FR-008). A trailing period is appended
+  sender's room — including the actor. A trailing period is appended
   unless the text already ends with `.`, `!`, or `?`. The actor sees the
   same broadcast every other room subscriber sees; no separate actor-side
   confirmation is generated.

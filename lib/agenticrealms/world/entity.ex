@@ -1,6 +1,6 @@
 defmodule AgenticRealms.World.Entity do
   @moduledoc """
-  Generic world-entity aggregate (feature 016). Owns an entity's existence,
+  Generic world-entity aggregate. Owns an entity's existence,
   its `kind` (`:object | :npc`), and its current `container` — modeled on the
   `Player` aggregate, which already owns its own location.
 
@@ -8,7 +8,7 @@ defmodule AgenticRealms.World.Entity do
 
     * `CloneEntity` — born in the void (`EntityCloned`). Re-clone → `:already_exists`.
     * `MoveEntity`  — relocate (`EntityMoved`). No-op when `to` == current; rejects a
-      stale `expected_from` with `:container_conflict` (FR-005, preserves take/drop
+      stale `expected_from` with `:container_conflict` (preserves take/drop
       "already taken" under concurrency); unknown destination type → `:unsupported_container`.
     * `EditEntity` — sparse in-place field edit (`EntityEdited`); no-op diff → no event.
 
@@ -16,7 +16,6 @@ defmodule AgenticRealms.World.Entity do
   the destination container *exists* (cross-aggregate) — that is the world
   service's job (`AgenticRealms.World.Commands.move_entity/4`).
 
-  See `specs/016-entity-containment/{data-model,contracts}`.
   """
 
   alias AgenticRealms.World.ContainerRef

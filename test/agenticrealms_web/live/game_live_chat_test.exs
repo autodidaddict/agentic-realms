@@ -65,7 +65,7 @@ defmodule AgenticRealmsWeb.GameLiveChatTest do
     %{alice: alice, bob: bob, alice_conn: alice_conn, bob_conn: bob_conn}
   end
 
-  test "chat — US1, US2, US3, US4, US5 + FR-017 privacy + FR-020 lockout in sequence",
+  test "chat, US5 + FR-017 privacy + FR-020 lockout in sequence",
        %{alice_conn: alice_conn, bob_conn: bob_conn, alice: alice} do
     stub_say = fn text ->
       Req.Test.stub(AgenticRealms.Anthropic, fn conn ->

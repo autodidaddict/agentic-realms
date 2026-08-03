@@ -7,14 +7,14 @@ defmodule AgenticRealms.World.Behaviors.ActionExecutor do
   Recipient sets per `contracts/ui_events.md` and FR-015:
     * `:room_speech` (room is the source) → triggering player only when
       `triggering_player_id` is a player id (event-driven path from
-      feature 009). For the tick-driven path (feature 011), where there
+      feature 009). For the tick-driven path, where there
       is no single triggering player, pass `nil` and the action fans out
       to ALL live occupants of the room.
     * `:npc_speech` (NPC clone is the speaker) → triggering player + every
       other player in the speaker's room. For tick-driven NPC speech,
       pass `nil` — the recipient set is the same "every live occupant"
       computation, just without the explicit triggering player.
-    * `:object_speech` (object is the speaker) — feature 011, fans out to
+    * `:object_speech` (object is the speaker), fans out to
       every live occupant of the room.
 
   Unknown / malformed actions are logged and skipped (no crash) — this
@@ -32,7 +32,7 @@ defmodule AgenticRealms.World.Behaviors.ActionExecutor do
   @typedoc """
   Speaker context — either the room itself (`{:room, room_id}`), an NPC
   clone (`{:npc_clone, %{name: ...}}`), or an object (`{:object,
-  %{name: ...}}`, feature 011).
+  %{name: ...}}`).
   """
   @type speaker_ctx ::
           {:room, String.t()}

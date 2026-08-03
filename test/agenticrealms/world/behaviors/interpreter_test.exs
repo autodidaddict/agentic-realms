@@ -1,10 +1,9 @@
 defmodule AgenticRealms.World.Behaviors.InterpreterTest do
   @moduledoc """
-  Direct-invocation tests for the behavior interpreter (feature 009).
+  Direct-invocation tests for the behavior interpreter.
   Bypasses Commanded by calling `Interpreter.handle/2` with synthesized
   event structs and asserting broadcasts via PubSub subscriptions.
 
-  See `specs/009-npc-behaviors/contracts/interpreter.md` test surface.
   """
 
   use AgenticRealms.DataCase, async: false
@@ -146,7 +145,7 @@ defmodule AgenticRealms.World.Behaviors.InterpreterTest do
       }
     end
 
-    test "room behavior fires BEFORE NPC behavior (FR-008a)" do
+    test "room behavior fires BEFORE NPC behavior" do
       room = insert_room([say_behavior("player_entered", "ROOM_FIRST")])
       blueprint = insert_blueprint()
 
@@ -334,7 +333,7 @@ defmodule AgenticRealms.World.Behaviors.InterpreterTest do
       }
     end
 
-    test "does NOT broadcast room_speech to other players (anti-spam, FR-015)" do
+    test "does NOT broadcast room_speech to other players (anti-spam)" do
       source = insert_room([say_behavior("player_left", "Source farewell.")])
 
       alice = register_and_place("alice", source)

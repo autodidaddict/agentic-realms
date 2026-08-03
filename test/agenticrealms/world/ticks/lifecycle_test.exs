@@ -1,6 +1,6 @@
 defmodule AgenticRealms.World.Ticks.LifecycleTest do
   @moduledoc """
-  Tests for the singleton tick Lifecycle GenServer (feature 011).
+  Tests for the singleton tick Lifecycle GenServer.
 
   Exercises the 0↔1 transition detection on simulated `RoomPlayerArrived`
   and `RoomPlayerLeft` events. Grace periods are configured small in

@@ -1,9 +1,8 @@
 defmodule AgenticRealms.World.NPCChatTest do
   @moduledoc """
-  Tests for the public NPCChat API (feature 010). Exercises input
+  Tests for the public NPCChat API. Exercises input
   validation, NPC resolution, and the Horde-backed find-or-start path.
 
-  See `specs/010-npc-conversations/contracts/npc_chat_api.md`.
   """
 
   use AgenticRealms.DataCase, async: false

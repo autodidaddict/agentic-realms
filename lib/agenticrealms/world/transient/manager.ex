@@ -23,7 +23,7 @@ defmodule AgenticRealms.World.Transient.Manager do
   before either reaches the purge. One manager, one sweep.
 
   After a restart the next sweep re-derives "due" from durable state, so
-  regions that became abandoned during downtime are reaped (FR-018), and a
+  regions that became abandoned during downtime are reaped, and a
   crash midway through a purge is retried by the tombstone clause in `due?/2`.
   """
 

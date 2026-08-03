@@ -1,12 +1,12 @@
 defmodule AgenticRealms.World.Blueprint do
   @moduledoc """
-  Unified Blueprint aggregate (feature 015) — the authored template for a
+  Unified Blueprint aggregate — the authored template for a
   kind of world entity (`kind` ∈ {`"object"`, `"npc"`}). Owns the shared core
   (name/descriptions/fixed) plus the NPC-flavored fields (behaviors/lore/
   behavior_groups/quests) and the monotonic `revision` that secures optimistic-lock
   edits.
 
-  Identified by `:blueprint_id` (the human-typable slug, FR-004) with stream
+  Identified by `:blueprint_id` (the human-typable slug) with stream
   prefix `"blueprint-"`. UUIDs are disallowed by the slug shape.
 
   Replaces the structurally-identical `ObjectBlueprint` (014) + `NPCBlueprint`

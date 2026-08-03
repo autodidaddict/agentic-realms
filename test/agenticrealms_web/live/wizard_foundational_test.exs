@@ -1,8 +1,7 @@
 defmodule AgenticRealmsWeb.WizardFoundationalTest do
   @moduledoc """
   Feature 014 — foundational LiveView smoke tests for wizard authorization
-  (FR-WIZ-1 through FR-WIZ-4) and the trance broadcast pipeline (FR-002 /
-  FR-003 / FR-004).
+  (FR-WIZ-1 through FR-WIZ-4) and the trance broadcast pipeline.
 
   Story-level integration tests for the full authoring loop land alongside
   US1 in `wizard_authoring_test.exs`.
@@ -60,7 +59,7 @@ defmodule AgenticRealmsWeb.WizardFoundationalTest do
     refute render(view) =~ "Wizard mode · creator"
   end
 
-  test "wizard's authoring mode toggle broadcasts trance log entries to co-present players (FR-002 / FR-003) and is self-suppressed (actor exclusion)",
+  test "wizard's authoring mode toggle broadcasts trance log entries to co-present players and is self-suppressed (actor exclusion)",
        %{wizard_conn: wzc, witness_conn: wtc, wizard: wizard} do
     {:ok, wizard_view, _} = live(wzc, ~p"/play")
     {:ok, witness_view, _} = live(wtc, ~p"/play")

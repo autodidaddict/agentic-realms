@@ -1,6 +1,6 @@
 defmodule AgenticRealms.World.Projections.QuestProjector do
   @moduledoc """
-  Projector for the four finalize-side quest events (feature 013).
+  Projector for the four finalize-side quest events.
 
   Handler clauses:
     * `QuestItemsConsumed`     → delete consumed objects from `world_objects`
@@ -14,7 +14,6 @@ defmodule AgenticRealms.World.Projections.QuestProjector do
   id-set is a no-op the second time, `update_all` to a final value is
   idempotent, `insert(on_conflict: :nothing)` is idempotent.
 
-  See `specs/013-quest-system/contracts/projector-quest.md`.
   """
 
   use Commanded.Event.Handler,

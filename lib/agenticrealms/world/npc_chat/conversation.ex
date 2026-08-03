@@ -1,6 +1,6 @@
 defmodule AgenticRealms.World.NPCChat.Conversation do
   @moduledoc """
-  Per-(player, NPC clone) chat process (feature 010).
+  Per-(player, NPC clone) chat process.
 
   Holds the rolling conversation history, fronts the Anthropic call via
   an async Task, enforces the FR-020 in-flight lockout, and self-
@@ -11,7 +11,6 @@ defmodule AgenticRealms.World.NPCChat.Conversation do
   `{NPCChat.Registry, {player_id, npc_clone_id}}`. Started under
   `NPCChat.Supervisor` (a `Horde.DynamicSupervisor`).
 
-  See `specs/010-npc-conversations/contracts/conversation.md`.
   """
 
   use GenServer

@@ -78,7 +78,7 @@ defmodule AgenticRealms.World.Commands.SpawnNpcFreeformTest do
              })
   end
 
-  test "refuses a per-room name collision (FR-001a)",
+  test "refuses a per-room name collision",
        %{wizard: wizard, room_id: room_id, suffix: suffix} do
     name = "twin #{suffix}"
 

@@ -91,7 +91,7 @@ defmodule AgenticRealms.World.RoomTest do
     end
   end
 
-  describe "behaviors (feature 009)" do
+  describe "behaviors" do
     @behaviors_payload [
       %{
         "trigger" => "player_entered",

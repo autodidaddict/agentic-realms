@@ -4,7 +4,7 @@ defmodule AgenticRealmsWeb.GameLiveQuestTest do
 
   Exercises US1 (accept → quest spawns + log appears), US2 (pickup updates
   progress live), US3 (finalize destroys items, mints reward, marks
-  completed), plus multi-player isolation (SC-003) and sticky completion
+  completed), plus multi-player isolation and sticky completion
   (FR-012) in a single sequential test. Follows the same comprehensive-
   single-test pattern as `game_live_npc_test.exs` to avoid fighting the
   shared in-memory event store across nested setups.

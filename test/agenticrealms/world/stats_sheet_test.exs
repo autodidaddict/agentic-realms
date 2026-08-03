@@ -85,7 +85,7 @@ defmodule AgenticRealms.World.StatsSheetTest do
       assert for(s <- sheet.saves, s.proficient?, do: s.key) == [:str, :con]
     end
 
-    test "carries no mana (FR-032)", %{sheet: sheet} do
+    test "carries no mana", %{sheet: sheet} do
       refute Map.has_key?(sheet, :mana)
       refute Map.has_key?(sheet, :max_mana)
     end

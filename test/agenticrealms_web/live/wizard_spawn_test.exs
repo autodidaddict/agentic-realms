@@ -91,7 +91,7 @@ defmodule AgenticRealmsWeb.WizardSpawnTest do
     assert row.short_description == "a brass-bound spawn chest"
   end
 
-  test "Spawn here is not exposed in :blueprints mode (FR-027)",
+  test "Spawn here is not exposed in :blueprints mode",
        %{wizard_conn: wzc} do
     {:ok, view, _} = live(wzc, ~p"/play")
     render_hook(view, "switch_mode", %{"mode" => "wizard"})

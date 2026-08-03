@@ -41,7 +41,6 @@ defmodule AgenticRealms.World.Commands.Authoring do
   the `EntityCloned` payload (full-copy at dispatch time). Returns
   `{:ok, %{clone_id: clone_id}}`.
 
-  See `specs/008-npc-blueprints/contracts/commands.md`.
   """
   @spec spawn_npc_clone(String.t(), String.t(), String.t()) ::
           {:ok, %{clone_id: String.t()}}
@@ -142,7 +141,7 @@ defmodule AgenticRealms.World.Commands.Authoring do
 
   FR-WIZ-5 authorization, FR-004 slug-shape + one-namespace uniqueness, and —
   for `kind: "npc"` — validates the direct `behaviors` against the feature-009
-  vocabulary (FR-014) and every referenced `behavior_group` against the registry
+  vocabulary and every referenced `behavior_group` against the registry
   (FR-018). `behaviors` are the DIRECT behaviors; the effective set is composed
   (union with behavior_groups) at spawn time.
 
@@ -206,12 +205,12 @@ defmodule AgenticRealms.World.Commands.Authoring do
   @doc """
   Spawn a clone of a Blueprint (either kind) into a room — the unified UI
   spawn path. FR-WIZ-5 authorization; resolves the blueprint from the read
-  model and stamps the denormalized fields into the clone (full-copy, FR-013):
+  model and stamps the denormalized fields into the clone (full-copy):
 
     * object → `Entities.clone_into(:object, …)`.
     * npc → `BehaviorGroups.compose(behavior_groups, behaviors)` → effective behaviors,
       then `Entities.clone_into(:npc, …)` carrying the behavior_group/direct-behavior
-      provenance; with the per-room name-collision pre-check (FR-013).
+      provenance; with the per-room name-collision pre-check.
 
   Returns `{:ok, entity_id}`. Refusals: `:not_a_wizard` / `:unknown_player`,
   `:unknown_blueprint`, `:room_not_found`, `:clone_name_taken_in_room`,
@@ -265,7 +264,7 @@ defmodule AgenticRealms.World.Commands.Authoring do
   @doc """
   Spawn a freeform Object into a room — no Object Blueprint involvement,
   no registry change. The wizard's authored payload is cloned into the
-  room via the entity lifecycle (`Entities.clone_into(:object, …)`, feature 016).
+  room via the entity lifecycle (`Entities.clone_into(:object, …)`).
 
   Returns `{:ok, object_id}` on success.
   Refusals:
@@ -365,7 +364,7 @@ defmodule AgenticRealms.World.Commands.Authoring do
 
   @doc """
   One-shot extract-essence — read an in-world entity's denormalized fields and
-  persist a new Blueprint at `revision: 1` (FR-012 / FR-016 / FR-018). The
+  persist a new Blueprint at `revision: 1`. The
   source entity is NOT modified. The entity kind is detected from its id: a
   world Object yields an object blueprint; an NPC clone yields an npc blueprint
   (copying its lore + DIRECT behaviors + behavior_group names, so the new blueprint
@@ -453,7 +452,7 @@ defmodule AgenticRealms.World.Commands.Authoring do
 
   @doc """
   Edit an existing Object Blueprint. `expected_revision` MUST equal the
-  blueprint's current revision (FR-020a). On stale revision the wrapper
+  blueprint's current revision. On stale revision the wrapper
   returns `{:error, :stale_revision, current_revision: N}` so the
   LiveView can reload the form with the latest values.
 

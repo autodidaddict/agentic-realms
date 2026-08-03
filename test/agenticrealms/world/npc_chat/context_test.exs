@@ -1,8 +1,7 @@
 defmodule AgenticRealms.World.NPCChat.ContextTest do
   @moduledoc """
-  Unit tests for the chat context-builder (feature 010).
+  Unit tests for the chat context-builder.
 
-  See `specs/010-npc-conversations/contracts/context.md`.
   """
 
   use ExUnit.Case, async: true

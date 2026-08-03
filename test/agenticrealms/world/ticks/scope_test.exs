@@ -1,6 +1,6 @@
 defmodule AgenticRealms.World.Ticks.ScopeTest do
   @moduledoc """
-  Tests for the tick-behavior scope computation (feature 011).
+  Tests for the tick-behavior scope computation.
   """
 
   use AgenticRealms.DataCase, async: false

@@ -1,6 +1,6 @@
 defmodule AgenticRealms.World.Commands.Quests do
   @moduledoc """
-  Write-side facade for quests (feature 013): accepting one from an NPC's
+  Write-side facade for quests: accepting one from an NPC's
   catalog, checking progress, and finalizing.
 
   Split out of `AgenticRealms.World.Commands`, which had grown to cover every
@@ -23,7 +23,7 @@ defmodule AgenticRealms.World.Commands.Quests do
     * `:unknown_npc` — blueprint doesn't exist
     * `:unknown_slug` — slug is not in the NPC's catalog
     * `:already_completed` — this player has already finished this quest
-      with this NPC (FR-012, sticky completion)
+      with this NPC (sticky completion)
     * `{:already_active, existing_quest_id}` — this player already has
       this quest in flight with this NPC
 
@@ -32,7 +32,7 @@ defmodule AgenticRealms.World.Commands.Quests do
   aggregate, and returns `{:ok, quest_id}`. The projector handler for
   `QuestAccepted` then inserts the `quest_instances` row and clones a
   quest-scoped item into each criterion's spawn rooms via the entity
-  lifecycle (feature 016).
+  lifecycle.
   """
   @spec accept_quest(integer(), String.t(), String.t()) ::
           {:ok, String.t()}

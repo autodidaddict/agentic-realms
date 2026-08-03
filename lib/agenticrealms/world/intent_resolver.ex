@@ -1,6 +1,6 @@
 defmodule AgenticRealms.World.IntentResolver do
   @moduledoc """
-  Natural-language → canonical-action resolver (feature 005).
+  Natural-language → canonical-action resolver.
 
   When the fast `CommandParser` returns `{:unknown, raw}`, `GameLive` routes
   the input here. `resolve/2` builds a context snapshot, calls the Anthropic
@@ -12,7 +12,6 @@ defmodule AgenticRealms.World.IntentResolver do
   response, unrecognized tool, multiple tool calls) collapses to a graceful
   `{:error, refusal_message}`. No exception escapes `resolve/2`.
 
-  See `specs/005-llm-intent-parser/contracts/intent_resolver_api.md`.
   """
 
   require Logger

@@ -10,7 +10,7 @@ defmodule AgenticRealmsWeb.GameLive.Communication do
     * `:say` → actor-side `:speech_self` entry rendered inline; the
       witness broadcast it produces is self-filtered downstream.
     * `:emote` → no inline entry; the actor renders the same
-      `:emote_action` broadcast every witness sees (FR-008).
+      `:emote_action` broadcast every witness sees.
     * `:tell` / `:whisper` → actor-side outgoing entry rendered inline;
       the incoming broadcast renders for recipients only.
     * `:chat` → no inline entry; the conversation GenServer broadcasts
@@ -143,7 +143,7 @@ defmodule AgenticRealmsWeb.GameLive.Communication do
   end
 
   @doc """
-  NPC chat (feature 010). Routes to `NPCChat.send/3` which (a)
+  NPC chat. Routes to `NPCChat.send/3` which (a)
   validates input, (b) resolves the NPC token, (c) finds-or-starts
   the Conversation GenServer (cluster-aware via Horde.Registry),
   (d) returns the new-vs-continuing indicator synchronously. The

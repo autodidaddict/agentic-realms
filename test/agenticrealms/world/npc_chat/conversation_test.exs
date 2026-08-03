@@ -1,6 +1,6 @@
 defmodule AgenticRealms.World.NPCChat.ConversationTest do
   @moduledoc """
-  Tests for the Conversation GenServer (feature 010).
+  Tests for the Conversation GenServer.
 
   Bypasses the Horde registry by `start_supervised`-ing a Conversation
   with `name: nil` so the same module can be exercised directly without
@@ -8,7 +8,6 @@ defmodule AgenticRealms.World.NPCChat.ConversationTest do
 
   Stubs the Anthropic call via `Req.Test` so the test stays hermetic.
 
-  See `specs/010-npc-conversations/contracts/conversation.md`.
   """
 
   use AgenticRealms.DataCase, async: false
@@ -193,7 +192,7 @@ defmodule AgenticRealms.World.NPCChat.ConversationTest do
     end
   end
 
-  describe "in-flight lockout (FR-020)" do
+  describe "in-flight lockout" do
     setup [:setup_chat_fixture]
 
     test "second :send while pending returns {:error, :still_thinking}",
@@ -229,7 +228,7 @@ defmodule AgenticRealms.World.NPCChat.ConversationTest do
     end
   end
 
-  describe "multi-turn history (US2)" do
+  describe "multi-turn history" do
     setup [:setup_chat_fixture]
 
     test "second :send within window returns {:ok, :continuing} and broadcasts :chat_continuing",
@@ -269,7 +268,7 @@ defmodule AgenticRealms.World.NPCChat.ConversationTest do
     end
   end
 
-  describe "out-of-lore refusal rendering (US4)" do
+  describe "out-of-lore refusal rendering" do
     setup [:setup_chat_fixture]
 
     test "emote-mode refusal renders without quotes and without meta-references", %{
@@ -305,7 +304,7 @@ defmodule AgenticRealms.World.NPCChat.ConversationTest do
     end
   end
 
-  describe "empty-lore NPC (US5)" do
+  describe "empty-lore NPC" do
     test "chat works and the system prompt uses the empty-lore fallback paragraph" do
       Req.Test.set_req_test_to_shared(%{})
       room = insert_room()

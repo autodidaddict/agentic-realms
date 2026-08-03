@@ -1,7 +1,7 @@
 defmodule AgenticRealms.World.Transient.EdgeCasesTest do
   @moduledoc """
   Feature 017 — edge cases: clean provisioning refusals (FR-020 — no orphan
-  region) and no entry into a region once it has been torn down (FR-011).
+  region) and no entry into a region once it has been torn down.
   """
   use AgenticRealms.DataCase, async: false
 

@@ -275,7 +275,7 @@ defmodule AgenticRealmsWeb.CharacterCreationTest do
     end
   end
 
-  describe "the abilities step (US2)" do
+  describe "the abilities step" do
     setup %{conn: conn} do
       player = register("abilities")
       {:ok, view, _} = play_as(conn, player)
@@ -430,7 +430,7 @@ defmodule AgenticRealmsWeb.CharacterCreationTest do
     end
   end
 
-  describe "the skills step (US3)" do
+  describe "the skills step" do
     setup %{conn: conn} do
       player = register("skills")
       {:ok, view, _} = play_as(conn, player)
@@ -542,7 +542,7 @@ defmodule AgenticRealmsWeb.CharacterCreationTest do
     end
   end
 
-  describe "the specializations step (US4)" do
+  describe "the specializations step" do
     test "an elf is asked for a lineage, named after the trait", %{conn: conn} do
       {_player, view} = at_specializations(conn, "elf", "wizard", "sage")
       html = render(view)
@@ -659,7 +659,7 @@ defmodule AgenticRealmsWeb.CharacterCreationTest do
     end
   end
 
-  describe "the review step (US5)" do
+  describe "the review step" do
     defp at_review(conn) do
       {player, view} = at_specializations(conn, "elf", "fighter", "soldier")
 
@@ -687,7 +687,7 @@ defmodule AgenticRealmsWeb.CharacterCreationTest do
       assert html =~ "Perception"
     end
 
-    test "the created character is the one that was reviewed (FR-029)", %{conn: conn} do
+    test "the created character is the one that was reviewed", %{conn: conn} do
       {player, view} = at_review(conn)
 
       reviewed = render(view)

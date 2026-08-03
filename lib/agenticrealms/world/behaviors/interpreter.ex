@@ -2,7 +2,7 @@ defmodule AgenticRealms.World.Behaviors.Interpreter do
   @moduledoc """
   Commanded event handler that processes player-movement domain events
   (`PlayerMoved`) and fires `player_entered` behaviors in the destination
-  room (feature 009).
+  room.
 
   `player_left` is NOT fired from the event handler — it would arrive in
   GameLive's mailbox AFTER the destination room view has rendered, making
@@ -12,7 +12,7 @@ defmodule AgenticRealms.World.Behaviors.Interpreter do
   appended to the log.
 
   Configured with `start_from: :current` so historical events are NEVER
-  replayed through this handler (FR-016a). Configured with
+  replayed through this handler. Configured with
   `consistency: :strong` so the destination-room behaviors fire and
   broadcast before `Commands.move/2` returns.
 

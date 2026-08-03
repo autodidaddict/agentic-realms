@@ -10,7 +10,6 @@ defmodule AgenticRealms.World.Room do
   property of the entity, not of the room. Occupancy and object location
   both live in read models, not on this aggregate.
 
-  See `specs/003-persisted-world/data-model.md` §1.1 and
   `specs/016-entity-containment/data-model.md`.
   """
 

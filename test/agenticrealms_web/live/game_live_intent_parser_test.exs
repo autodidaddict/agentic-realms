@@ -100,7 +100,7 @@ defmodule AgenticRealmsWeb.GameLiveIntentParserTest do
     assert render(view) =~ "Stone Atrium"
 
     assert lantern_name in Enum.map(Queries.list_inventory(player.id), & &1.name),
-           "precondition: the lantern is still carried from US1"
+           "precondition: the lantern is still carried"
 
     stub_tool_use("drop", %{"object" => lantern_name})
 

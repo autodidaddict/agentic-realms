@@ -182,7 +182,7 @@ defmodule AgenticRealms.World.MapViewTest do
       assert length(non_current) == 2
     end
 
-    test "reciprocal exits dedupe to exactly two undirected lines (FR-004)",
+    test "reciprocal exits dedupe to exactly two undirected lines",
          %{player_id: player_id} do
       view = MapView.for_player(player_id)
       assert length(view.exits) == 2
@@ -420,7 +420,7 @@ defmodule AgenticRealms.World.MapViewTest do
       assert g.has_down?
     end
 
-    test "vertical exit to a map-hidden target does NOT set the icon flag (FR-006)" do
+    test "vertical exit to a map-hidden target does NOT set the icon flag" do
       region = insert_region()
       ground = insert_room(region, elevation: 0, map_x: 0, map_y: 0)
       hidden_loft = insert_room(region, map_visible: false, elevation: 1, map_x: 0, map_y: 0)
@@ -721,7 +721,7 @@ defmodule AgenticRealms.World.MapViewTest do
     end
   end
 
-  describe "off-map render (FR-003a)" do
+  describe "off-map render" do
     test "player in a room with map_x = nil → blank map, region header only" do
       region = insert_region()
       off_map = insert_room(region, name: "Off Map", map_x: nil, map_y: nil)

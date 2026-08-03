@@ -128,7 +128,7 @@ defmodule AgenticRealms.World.BlueprintTest do
                })
     end
 
-    test "matching revision + no-op diff returns :ok with no event (FR-008)" do
+    test "matching revision + no-op diff returns :ok with no event" do
       state = created_state()
 
       assert :ok =
@@ -140,7 +140,7 @@ defmodule AgenticRealms.World.BlueprintTest do
                })
     end
 
-    test "stale revision returns :stale_revision (FR-020a)" do
+    test "stale revision returns :stale_revision" do
       assert {:error, :stale_revision} =
                Blueprint.execute(created_state(), %EditBlueprint{
                  blueprint_id: "test_chest",
