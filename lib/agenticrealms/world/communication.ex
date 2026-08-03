@@ -2,13 +2,11 @@ defmodule AgenticRealms.World.Communication do
   @moduledoc """
   Non-event-sourced write-side facade for player-to-player communication.
 
-  Owns the four communication verbs introduced by feature 004 — `say`,
+  Owns the four communication verbs: `say`,
   `emote`, `tell`, `whisper`. None of them mutate world state, so this module
   deliberately sits OUTSIDE the Commanded write path (`World.Commands` /
   aggregates / event store) and broadcasts utterances directly on the same
-  `Phoenix.PubSub` topics established for witness UI events in feature 003.
-
-  Public contract: `specs/004-player-communication/contracts/communication_api.md`.
+  `Phoenix.PubSub` topics used for witness UI events.
 
   All four functions accept a `sender` map sourced from a `GameLive` socket's
   assigns:
@@ -116,7 +114,7 @@ defmodule AgenticRealms.World.Communication do
   do NOT receive a copy (the broadcast topic is the recipient's, not the
   sender's).
 
-  Per FR-016, if the resolved recipient has zero connected sessions the
+  If the resolved recipient has zero connected sessions the
   command is refused with `:not_deliverable` — the LiveView maps this to a
   neutral "could not be delivered" refusal that does not reveal presence.
   """

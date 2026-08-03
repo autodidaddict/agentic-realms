@@ -7,9 +7,9 @@ defmodule AgenticRealms.World.NPCChat.TaskSupervisor do
   take down the Conversation that owns the chat history. Tasks send
   their result back to the Conversation via `Process.send/2` and exit.
 
-  Parallel sibling of `AgenticRealms.IntentResolverTaskSupervisor` from
-  feature 005 — same role, distinct supervision so a flood in one
-  surface doesn't starve the other.
+  Parallel sibling of `AgenticRealms.IntentResolverTaskSupervisor`: same
+  role, distinct supervision so a flood in one surface doesn't starve the
+  other.
   """
 
   @doc false

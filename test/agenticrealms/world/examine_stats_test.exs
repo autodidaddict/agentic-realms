@@ -1,6 +1,6 @@
 defmodule AgenticRealms.World.ExamineStatsTest do
   @moduledoc """
-  Feature 019 US3 — examining a player or NPC enriches the Match with a
+  Examining a player or NPC enriches the Match with a
   qualitative health tier and a relative-power phrase; self omits the power
   phrase. Inserts read-model rows directly (pure read), mirroring ExamineTest.
   """

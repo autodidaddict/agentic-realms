@@ -64,7 +64,7 @@ defmodule AgenticRealmsWeb.GameLiveMapsTest do
     assert html_in_loft =~ "map-affordance--below", "US4: below-rooms pip"
 
     refute html_in_loft =~ ~r/elevation[\s:="]*\d/i,
-           "FR-012 / SC-008: no integer elevation in markup"
+           "no integer elevation in markup"
 
     _ = render_submit(view, "submit_command", %{"text" => "down"})
 
@@ -107,7 +107,7 @@ defmodule AgenticRealmsWeb.GameLiveMapsTest do
     assert html_in_hollowvale =~ ~s|data-room-name="Hollowvale Outskirts"|
     assert html_in_hollowvale =~ ~s|aria-label="Hollowvale Outskirts"|
 
-    refute html_in_hollowvale =~ "marker-end", "SC-003: no arrowheads"
-    refute html_in_hollowvale =~ "marker-start", "SC-003: no arrowheads"
+    refute html_in_hollowvale =~ "marker-end", "no arrowheads"
+    refute html_in_hollowvale =~ "marker-start", "no arrowheads"
   end
 end

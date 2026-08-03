@@ -1,6 +1,6 @@
 defmodule AgenticRealms.World.QueriesBlueprintsTest do
   @moduledoc """
-  Feature 015 US8 — the unified blueprint registry query lists both kinds and
+  The unified blueprint registry query lists both kinds and
   filters by kind.
   """
 

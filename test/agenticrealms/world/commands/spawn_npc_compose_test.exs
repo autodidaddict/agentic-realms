@@ -1,6 +1,6 @@
 defmodule AgenticRealms.World.Commands.SpawnNpcComposeTest do
   @moduledoc """
-  Feature 015 US4 — behavior_group composition is frozen onto the spawned clone:
+  Behavior_group composition is frozen onto the spawned clone:
   effective behaviors = union(behavior_groups, attachment order) ++ direct,
   and editing a behavior_group after spawn does NOT mutate an existing clone.
   """

@@ -151,12 +151,12 @@ defmodule AgenticRealmsWeb.GameLive.UIEvents do
   end
 
   @doc """
-  Feature 014 US2 — wizard-driven object arrival witness. Uses the
+  Wizard-driven object arrival witness. Uses the
   (constrained, short) `name` with an article rather than the
   `short_description` so the entry is always a clean one-liner
   regardless of how verbose the LLM was when extracting fields.
   Also refreshes the wizard's `:room_objects` assign so the
-  Things-in-this-room panel reflects the new clone (feature 014 US4).
+  Things-in-this-room panel reflects the new clone.
   """
   def object_arrived(socket, %RoomObjectArrived{name: name}) do
     {:noreply,
@@ -166,7 +166,7 @@ defmodule AgenticRealmsWeb.GameLive.UIEvents do
   end
 
   @doc """
-  Feature 014 US5 — quiet in-place edit broadcast. No log entry by
+  Quiet in-place edit broadcast. No log entry by
   design (wizard edits don't generate an in-fiction notification).
   Just refresh the wizard's room-objects panel so the row reflects
   the new values.
@@ -284,8 +284,7 @@ defmodule AgenticRealmsWeb.GameLive.UIEvents do
       only the resolved recipient renders it. The sender's
       own sessions also fall through this filter (their
       `current_player.id` is the `sender_id`, not `recipient_id`),
-      which gives us the FR-018 "originating session only" rule for
-      free.
+      which gives us the "originating session only" rule for free.
   """
   def room_utterance(socket, %RoomUtterance{kind: :say} = msg) do
     if msg.actor_session_id == socket.assigns.session_id do

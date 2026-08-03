@@ -3,14 +3,13 @@ defmodule AgenticRealms.World.Room do
   Room aggregate. Owns a room's display info (name + description), its exit
   set, and map metadata.
 
-  **Feature 016 note**: object presence (`object_ids`) and the object
+  Object presence (`object_ids`) and the object
   spawn / place / take / drop / edit command+event handling were removed
   from this aggregate when the entity lifecycle moved to `World.Entity`
   (clone/move). Objects are now freestanding entities whose container is a
   property of the entity, not of the room. Occupancy and object location
   both live in read models, not on this aggregate.
 
-  `specs/016-entity-containment/data-model.md`.
   """
 
   defstruct id: nil,

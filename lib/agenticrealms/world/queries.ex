@@ -53,7 +53,7 @@ defmodule AgenticRealms.World.Queries do
   @doc """
   All NPC clones currently located in `room_id`, ordered alphabetically by
   display name. Returns each clone's id, name, and short description — the
-  room view does NOT need long descriptions (FR-005 in feature 007). Clone
+  room view does NOT need long descriptions. Clone
   data is fully denormalized, so no join to the blueprint is needed.
   """
   @spec list_npcs_in_room(String.t()) ::
@@ -181,7 +181,7 @@ defmodule AgenticRealms.World.Queries do
   end
 
   @doc """
-  Feature 015 US6 — fetch a full NPC clone row by id (for extract-essence,
+  Fetch a full NPC clone row by id (for extract-essence,
   which reads its lore/behavior_groups/direct_behaviors). Returns `nil` if unknown.
   """
   @spec get_npc_clone_row(String.t()) :: %NPCClone{} | nil
@@ -192,7 +192,7 @@ defmodule AgenticRealms.World.Queries do
   @doc """
   Find a clone in a given room by its display name (case-insensitive,
   whitespace-normalized). Used by the pre-dispatch per-room name-collision
-  check (preserves feature 007 FR-001a at the clone level).
+  check.
   """
   @spec find_clone_in_room_by_name(String.t(), String.t()) ::
           {:ok, %{id: String.t(), name: String.t()}}
@@ -282,8 +282,7 @@ defmodule AgenticRealms.World.Queries do
   @doc """
   Resolve an NPC display name within a room's current contents to its npc_id.
   Mirrors `resolve_object_in_room/2`. Used by `World.Commands.take/2` to
-  refuse takes against NPCs via the existing fixed-object refusal path
-  (feature 007 FR-015).
+  refuse takes against NPCs via the existing fixed-object refusal path.
   """
   @spec resolve_npc_in_room(String.t(), String.t()) ::
           {:ok, String.t()} | {:error, :no_such_npc | :ambiguous}
@@ -332,7 +331,7 @@ defmodule AgenticRealms.World.Queries do
   @doc """
   All objects currently in `room_id`, ordered alphabetically.
 
-  **WARNING — unsafe for rendering as of feature 013.** This function does
+  **WARNING — unsafe for rendering.** This function does
   not honor quest-scoped item visibility (`quest_player_id`). Use
   `list_objects_in_room_for_viewer/2` for any path that renders objects
   to a specific player. Retained for tick-behavior scope assembly
@@ -626,7 +625,7 @@ defmodule AgenticRealms.World.Queries do
   @registry_kinds ~w(object npc)
 
   @doc """
-  Feature 015 US8 — unified blueprint registry. Projects the
+  Unified blueprint registry. Projects the
   `blueprints` table to a uniform display row
   `%{id, kind, name, short_description, revision}`, ordered by name then id.
   """

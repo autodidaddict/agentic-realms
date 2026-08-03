@@ -8,7 +8,7 @@ defmodule AgenticRealms.World.Projections.WorldProjector do
   `NPCBlueprintCreated`, `PlayerDiscoveredRoom`, and `QuestAccepted` (which
   also dispatches quest-item creation via the entity lifecycle).
 
-  **Feature 016 note**: object and NPC-clone row writes moved to
+  Object and NPC-clone row writes moved to
   `EntityProjector` (from `EntityCloned`/`EntityMoved`/`EntityEdited`) when
   spawning was unified onto clone/move. The object placement/take/drop and
   NPC clone/legacy-replay handlers were removed from this projector.

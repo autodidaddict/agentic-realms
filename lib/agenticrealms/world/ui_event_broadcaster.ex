@@ -9,9 +9,9 @@ defmodule AgenticRealms.World.UIEventBroadcaster do
     * `"player:<player_id>"` — PlayerCurrentRoomChanged /
       PlayerInventoryChanged
 
-  Subscribers (`GameLive.handle_info/2`) are responsible for actor-exclusion
-  per FR-029 — the broadcaster fans out to all subscribers in the relevant
-  room or player scope.
+  Subscribers (`GameLive.handle_info/2`) are responsible for actor-exclusion;
+  the broadcaster fans out to all subscribers in the relevant room or player
+  scope.
 
   Handler clauses:
     * `PlayerSpawned` / `PlayerMoved` → RoomPlayerArrived / RoomPlayerLeft

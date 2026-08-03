@@ -7,8 +7,8 @@ defmodule AgenticRealms.World.Progression.XpAwarder do
   `QuestCompleted{xp: n}` and dispatches `AwardXp` to the Player aggregate when
   `n > 0`. Idempotency lives on the aggregate (`award_id`), so at-least-once
   redelivery/replay of `QuestCompleted` is a safe no-op. NPCs are never awarded
-  experience — there is no NPC completion event (Principle I; mirrors 018's
-  `NpcMinds.LifecycleManager`).
+  experience — there is no NPC completion event. Mirrors
+  `NpcMinds.LifecycleManager`.
   """
 
   use Commanded.Event.Handler,

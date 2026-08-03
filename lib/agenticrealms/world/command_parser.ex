@@ -16,8 +16,6 @@ defmodule AgenticRealms.World.CommandParser do
     * **Communication-verb payloads** (`<text>` for say/emote/tell/whisper,
       `<recipient>` for tell/whisper) preserve the original casing from the
       input.
-
-  `specs/004-player-communication/contracts/parser.md`.
   """
 
   alias AgenticRealms.World.Direction

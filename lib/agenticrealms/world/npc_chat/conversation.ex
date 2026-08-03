@@ -3,7 +3,7 @@ defmodule AgenticRealms.World.NPCChat.Conversation do
   Per-(player, NPC clone) chat process.
 
   Holds the rolling conversation history, fronts the Anthropic call via
-  an async Task, enforces the FR-020 in-flight lockout, and self-
+  an async Task, enforces the in-flight lockout, and self-
   terminates after 60s of inactivity via the GenServer built-in idle
   `:timeout` mechanism. State is volatile — nothing is persisted.
 

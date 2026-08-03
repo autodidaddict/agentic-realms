@@ -36,7 +36,7 @@ defmodule AgenticRealms.World.Transient do
   (which must be the owner's current room). Returns `{:ok, region_id}`.
 
   Refusals: `:owner_not_spawned`, `:owner_not_in_source_room`,
-  `:already_provisioned` (FR-021 — one active transient region per owner),
+  `:already_provisioned` (one active transient region per owner),
   or any dispatch error.
   """
   @spec provision(integer(), String.t()) :: {:ok, String.t()} | {:error, atom()}

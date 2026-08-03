@@ -1,6 +1,6 @@
 defmodule AgenticRealms.World.EntityLifecycleIntegrationTest do
   @moduledoc """
-  Feature 016 Phases 5–7 — end-to-end entity lifecycle: relocation between
+  End-to-end entity lifecycle: relocation between
   containers, the void state, and container-type uniformity.
   Asserts read-model container transitions through the live clone/move service.
   """

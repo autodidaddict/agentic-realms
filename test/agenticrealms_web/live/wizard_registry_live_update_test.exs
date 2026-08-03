@@ -1,6 +1,6 @@
 defmodule AgenticRealmsWeb.WizardRegistryLiveUpdateTest do
   @moduledoc """
-  Feature 014 US6 — global Blueprint registry live-updates: any wizard's
+  Global Blueprint registry live-updates: any wizard's
   create/edit shows up in every other wizard's open registry without a
   manual reload.
   """

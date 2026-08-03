@@ -18,7 +18,7 @@ defmodule AgenticRealms.World.Commands.Quests do
 
   @doc """
   Accept the FetchQuest with slug `slug` from `npc_blueprint_id` on behalf
-  of `player_id`. Pre-dispatch validation enforces FR-009:
+  of `player_id`. Pre-dispatch validation refuses:
 
     * `:unknown_npc` — blueprint doesn't exist
     * `:unknown_slug` — slug is not in the NPC's catalog

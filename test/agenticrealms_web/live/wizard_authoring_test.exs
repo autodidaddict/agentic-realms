@@ -1,6 +1,6 @@
 defmodule AgenticRealmsWeb.WizardAuthoringTest do
   @moduledoc """
-  Feature 014 US1 — full LiveView integration test for the wizard
+  Full LiveView integration test for the wizard
   authoring loop: trance toggle → LLM-extracted draft → form refinement
   → Commit → registry shows the new blueprint at revision 1.
 

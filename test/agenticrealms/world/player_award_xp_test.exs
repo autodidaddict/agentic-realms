@@ -1,9 +1,9 @@
 defmodule AgenticRealms.World.PlayerAwardXpTest do
   @moduledoc """
-  Feature 019/020 — Player aggregate AwardXp: award, level-up, idempotency, and
+  Player aggregate AwardXp: award, level-up, idempotency, and
   the level 20 cap.
 
-  Thresholds are the SRD 5.2 table now, not feature 019's quadratic: level 2 at
+  Thresholds are the SRD 5.2 table, not a quadratic: level 2 at
   300, level 5 at 6,500, level 20 at 355,000.
   """
   use ExUnit.Case, async: true

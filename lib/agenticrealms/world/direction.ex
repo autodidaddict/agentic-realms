@@ -12,7 +12,7 @@ defmodule AgenticRealms.World.Direction do
   Inputs to `parse/1` are matched literally against pre-allocated atoms;
   we never call `String.to_atom/1` on user input.
 
-  Feature 012 (maps) added the four diagonals. Geometric semantics — coord
+  Geometric semantics — coord
   deltas, fog-stub angles, exit-validation rules — live in
   `AgenticRealms.World.Direction.Geometry`. This module remains a pure
   name/parse/opposite/serialize helper with no coordinate awareness.

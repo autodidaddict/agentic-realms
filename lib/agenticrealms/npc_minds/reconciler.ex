@@ -7,7 +7,7 @@ defmodule AgenticRealms.NpcMinds.Reconciler do
   has none and terminates any running mind whose NPC no longer exists. Every operation is idempotent (Temporal `USE_EXISTING` start /
   tolerant terminate), so the sweep is safe to repeat.
 
-  **Cluster semantics (Principle I).** Runs as a Horde cluster singleton: started
+  **Cluster semantics.** Runs as a Horde cluster singleton: started
   under `NpcMinds.Supervisor` (a `Horde.DynamicSupervisor`) and named via
   `NpcMinds.Registry` (a `Horde.Registry`), so exactly one instance runs
   cluster-wide and Horde **relocates it to a surviving node** if the owning node

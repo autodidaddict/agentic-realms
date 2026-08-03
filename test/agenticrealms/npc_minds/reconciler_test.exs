@@ -1,5 +1,5 @@
 defmodule AgenticRealms.NpcMinds.ReconcilerTest do
-  @moduledoc "Feature 018 — the reconciler's pure live↔running diff."
+  @moduledoc "The reconciler's pure live↔running diff."
   use ExUnit.Case, async: true
 
   alias AgenticRealms.NpcMinds.Reconciler

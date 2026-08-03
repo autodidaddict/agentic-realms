@@ -8,9 +8,8 @@ defmodule AgenticRealmsWeb.GameLive.Creation do
 
   ## Why these are round trips
 
-  Principle III asks for the reason whenever an interaction could plausibly be
-  local, and feature 020 deliberately kept the character sheet's tabs off the
-  server, so the difference is worth stating.
+  The character sheet's tabs are deliberately kept off the server, so the
+  difference is worth stating.
 
   A sheet tab shows a panel that is already in the DOM; the server has nothing
   to add, so it must not be asked. A creation selection changes *which questions

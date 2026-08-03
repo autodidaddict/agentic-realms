@@ -1,6 +1,6 @@
 defmodule AgenticRealms.World.Commands.ConcurrentTakeTest do
   @moduledoc """
-  Feature 016 T031a / analysis finding H2 — the concurrent-"already taken"
+  The concurrent-"already taken"
   regression test that replaces the old `Room`-aggregate `object_ids` guard.
 
   Two players resolve the same object in the room; the first take wins, and

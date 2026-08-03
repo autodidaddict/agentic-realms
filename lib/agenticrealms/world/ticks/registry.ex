@@ -1,11 +1,9 @@
 defmodule AgenticRealms.World.Ticks.Registry do
   @moduledoc """
-  Cluster-wide unique registry for `RoomTicks.Scheduler` processes
-  (feature 011).
+  Cluster-wide unique registry for `RoomTicks.Scheduler` processes.
 
   Wraps `Horde.Registry` so a `room_id` maps to exactly one Scheduler
-  pid across the BEAM cluster. Same pattern as `NPCChat.Registry`
-  from feature 010.
+  pid across the BEAM cluster. Same pattern as `NPCChat.Registry`.
   """
 
   @doc false

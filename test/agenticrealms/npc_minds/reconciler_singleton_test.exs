@@ -1,5 +1,5 @@
 defmodule AgenticRealms.NpcMinds.ReconcilerSingletonTest do
-  @moduledoc "Feature 018 — the reconciler runs as a single Horde-registered cluster singleton."
+  @moduledoc "The reconciler runs as a single Horde-registered cluster singleton."
   use ExUnit.Case, async: false
 
   alias AgenticRealms.NpcMinds.{Registry, Supervisor}

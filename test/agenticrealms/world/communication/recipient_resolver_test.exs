@@ -1,7 +1,7 @@
 defmodule AgenticRealms.World.Communication.RecipientResolverTest do
   @moduledoc """
   Unit tests for case-insensitive recipient resolution shared by tell/whisper.
-  Covers FR-010 (case-insensitive exact match, ambiguous refusal) and
+  Covers case-insensitive exact match, ambiguous refusal) and
   FR-010a (self-target refusal).
 
   Players are resolved by their character's name, so every

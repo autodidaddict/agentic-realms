@@ -1,5 +1,5 @@
 defmodule AgenticRealmsWeb.Plugs.RequireServiceTokenTest do
-  @moduledoc "Feature 018 — the shared-secret bearer auth plug."
+  @moduledoc "The shared-secret bearer auth plug."
   use ExUnit.Case, async: false
 
   import Plug.Test

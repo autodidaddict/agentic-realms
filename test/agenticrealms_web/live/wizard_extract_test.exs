@@ -1,6 +1,6 @@
 defmodule AgenticRealmsWeb.WizardExtractTest do
   @moduledoc """
-  Feature 014 US4 — LiveView integration: wizard clicks "Extract
+  LiveView integration: wizard clicks "Extract
   essence" on a world Object → mode flips to :blueprints (trance
   entries fire), focused blueprint draft pre-populates with the
   source Object's fields → wizard refines + Commits → new Blueprint

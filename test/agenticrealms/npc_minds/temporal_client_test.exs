@@ -1,5 +1,5 @@
 defmodule AgenticRealms.NpcMinds.TemporalClientTest do
-  @moduledoc "Feature 018 — the Temporal HTTP client (start/terminate/list), stubbed via Req.Test."
+  @moduledoc "The Temporal HTTP client (start/terminate/list), stubbed via Req.Test."
   use ExUnit.Case, async: true
 
   alias AgenticRealms.NpcMinds.TemporalClient

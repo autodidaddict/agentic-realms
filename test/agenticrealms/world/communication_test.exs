@@ -5,7 +5,6 @@ defmodule AgenticRealms.World.CommunicationTest do
   These tests subscribe to PubSub topics directly and assert on broadcast
   payloads, bypassing both the parser and `GameLive`. They cover validation
   rules and the broadcast contract per
-  `specs/004-player-communication/contracts/communication_api.md`.
 
   See the LiveView integration tests for end-to-end multi-session behavior.
 

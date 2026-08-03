@@ -9,8 +9,8 @@ defmodule AgenticRealms.World.EventData do
   `WorldProjector`, `UIEventBroadcaster`, and `Quests`, byte-identical apart
   from the path-walking clause only `Quests` needed.
 
-  This is not a licence to read raw event data for business decisions, which
-  Principle II forbids. It is for the denormalized payload maps events carry
+  This is not a licence to read raw event data for business decisions. It is
+  for the denormalized payload maps events carry
   (`fields`, `snapshot`, `criteria`) whose shape is data rather than schema.
   """
 

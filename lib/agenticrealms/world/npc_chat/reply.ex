@@ -6,8 +6,8 @@ defmodule AgenticRealms.World.NPCChat.Reply do
   Returns `{:speech, text} | {:emote, text} | {:error, :malformed}`.
   Anything that isn't EXACTLY one well-formed `tool_use` block whose
   name is in `Tools.names/0` and whose `input.text` is a non-empty
-  trimmed string collapses to `:malformed`. Malformed output
-  flows through the FR-011 fallback path.
+  trimmed string collapses to `:malformed`. Malformed output flows through
+  the fallback path.
   """
 
   alias AgenticRealms.World.NPCChat.Tools

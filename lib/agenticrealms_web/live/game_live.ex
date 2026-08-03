@@ -115,7 +115,7 @@ defmodule AgenticRealmsWeb.GameLive do
           {view.id, view}
 
         {:error, reason} ->
-          raise "GameLive mount: look_room/1 returned #{inspect(reason)} for player #{player_id} after spawn — read model and aggregate are desynced (likely FR-022)"
+          raise "GameLive mount: look_room/1 returned #{inspect(reason)} for player #{player_id} after spawn — read model and aggregate are desynced"
       end
 
     inventory = Queries.list_inventory(player_id)

@@ -2,8 +2,7 @@ defmodule AgenticRealms.World.Router do
   @moduledoc """
   Commanded router for the world. Maps command structs to aggregates.
 
-  Dispatch clauses are added per user story as each command type is
-  introduced (see `specs/003-persisted-world/tasks.md`).
+  Dispatch clauses are added as each command type is introduced.
   """
 
   use Commanded.Commands.Router

@@ -1,6 +1,6 @@
 defmodule AgenticRealms.World.Transient.EdgeCasesTest do
   @moduledoc """
-  Edge cases: clean provisioning refusals (FR-020 — no orphan
+  Edge cases: clean provisioning refusals (no orphan
   region) and no entry into a region once it has been torn down.
   """
   use AgenticRealms.DataCase, async: false

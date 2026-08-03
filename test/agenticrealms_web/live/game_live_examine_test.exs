@@ -1,6 +1,6 @@
 defmodule AgenticRealmsWeb.GameLiveExamineTest do
   @moduledoc """
-  End-to-end LiveView tests for feature 006 (examine objects and players).
+  End-to-end LiveView tests for examining objects and players.
 
   Structured as a single comprehensive test that exercises US1 (room object),
   US2 (inventory object), and US3 (player + self + privacy) in sequence — one

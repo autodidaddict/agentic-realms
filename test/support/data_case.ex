@@ -71,7 +71,7 @@ defmodule AgenticRealms.DataCase do
   The character columns a `player_state` row carries once `CharacterCreated`
   has been projected, as a keyword list.
 
-  Feature 020 removed the schema's placeholder stat defaults, so a row built
+  The schema has no placeholder stat defaults, so a row built
   straight from `%PlayerState{}` has no character and renders nothing. Tests
   that only need *a* character — examine, presence, the sheet — should splat
   this into their insert rather than restating the default Human Fighter:

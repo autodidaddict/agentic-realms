@@ -1,6 +1,6 @@
 defmodule AgenticRealmsWeb.WizardFreeformTest do
   @moduledoc """
-  Feature 014 US3 — LiveView integration: wizard in World mode types a
+  LiveView integration: wizard in World mode types a
   prompt describing a one-off Object → mocked LLM extracts fields →
   wizard commits → Object lands in the wizard's current room WITHOUT
   any row added to the Object Blueprint registry. Co-present player

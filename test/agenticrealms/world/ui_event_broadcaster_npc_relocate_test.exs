@@ -1,5 +1,5 @@
 defmodule AgenticRealms.World.UIEventBroadcasterNpcRelocateTest do
-  @moduledoc "Feature 018 — a room→room NPC move is witnessed as NPC-left + NPC-arrived."
+  @moduledoc "A room→room NPC move is witnessed as NPC-left + NPC-arrived."
   use AgenticRealms.DataCase, async: false
 
   @moduletag :commanded

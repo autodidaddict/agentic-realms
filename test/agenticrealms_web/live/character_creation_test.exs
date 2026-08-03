@@ -1,8 +1,8 @@
 defmodule AgenticRealmsWeb.CharacterCreationTest do
   @moduledoc """
-  Feature 021 US1 — a new player is asked who they are before they get a world.
+  A new player is asked who they are before they get a world.
 
-  This file previously asserted the opposite: that feature 020's generated
+  This file previously asserted the opposite: that the generated
   character arrived with no prompt at all. That is the behaviour this feature
   removes, so the assertions are inverted rather than extended.
 
@@ -381,9 +381,12 @@ defmodule AgenticRealmsWeb.CharacterCreationTest do
       select(view, "background", "sage")
       html = spread(view, "split:int:con")
 
-      assert html =~ "15"
-      assert html =~ "+2"
+      draft = draft_of(view)
+
       assert html =~ "from background"
+      assert Draft.scores(draft)[:int] == draft.bought[:int] + 2
+      assert Draft.scores(draft)[:con] == draft.bought[:con] + 1
+      assert html =~ to_string(Draft.scores(draft)[:int])
     end
 
     test "offers only the three abilities the background names", %{view: view} do

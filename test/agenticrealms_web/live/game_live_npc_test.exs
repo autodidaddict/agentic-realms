@@ -1,6 +1,6 @@
 defmodule AgenticRealmsWeb.GameLiveNPCTest do
   @moduledoc """
-  End-to-end LiveView tests for feature 007 (static NPCs).
+  End-to-end LiveView tests for static NPCs.
 
   Structured as a single comprehensive test that exercises US1 (room view
   "Also here" section), US2 (examine NPC), US3 (arrival witness via
@@ -225,7 +225,7 @@ defmodule AgenticRealmsWeb.GameLiveNPCTest do
            "the NPC's long description should appear in detail-body"
 
     refute html =~ ~r/Garrick the Innkeeper#[0-9a-f]/,
-           "FR-011: player-facing HTML must not contain the <name>#<id> debug identity"
+           "player-facing HTML must not contain the <name>#<id> debug identity"
 
     assert log_count(bob_view) == log_count_before,
            "examining an NPC must not append a witness entry to other players"

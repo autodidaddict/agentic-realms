@@ -1,6 +1,6 @@
 defmodule AgenticRealmsWeb.GameLiveIntentParserTest do
   @moduledoc """
-  End-to-end LiveView test for feature 005 (natural-language intent parser).
+  End-to-end LiveView test for natural-language intent parser).
 
   Structured as a single comprehensive test exercising US1 (success path),
   US2 (refusal), and US3 (resilience) in sequence — one `Seed.run` setup,

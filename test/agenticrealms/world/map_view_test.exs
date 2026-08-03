@@ -290,7 +290,7 @@ defmodule AgenticRealms.World.MapViewTest do
       assert stub.to_y == b.map_y
     end
 
-    test "exit to a map-hidden target produces NO stub (FR-006 trumps fog)" do
+    test "exit to a map-hidden target produces NO stub" do
       region = insert_region()
       a = insert_room(region, map_x: 0, map_y: 0)
       hidden = insert_room(region, map_visible: false, map_x: 1, map_y: 0)
@@ -597,7 +597,7 @@ defmodule AgenticRealms.World.MapViewTest do
 
       view = MapView.for_player(player_id)
       [g] = view.rooms
-      refute g.has_up?, "FR-006 suppresses the Up icon when the target is hidden"
+      refute g.has_up?, "suppresses the Up icon when the target is hidden"
     end
   end
 
@@ -700,7 +700,7 @@ defmodule AgenticRealms.World.MapViewTest do
       assert cr.kind == :cross_region
     end
 
-    test "hidden cross-region target gets suppressed (FR-006 trumps FR-008)" do
+    test "hidden cross-region target gets suppressed" do
       blackmire = insert_region("Blackmire")
       hollowvale = insert_region("Hollowvale")
 

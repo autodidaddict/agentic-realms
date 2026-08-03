@@ -2,7 +2,7 @@ defmodule AgenticRealms.World.NPCChat.SystemPromptTest do
   @moduledoc """
   Unit tests for the chat system prompt.
 
-  Verifies every clause of FR-008 (a–f) appears in the rendered prompt
+  Verifies every clause appears in the rendered prompt
   via substring assertions, plus the empty-lore fallback.
   """
 

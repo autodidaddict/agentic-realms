@@ -153,7 +153,7 @@ defmodule AgenticRealms.World.PlayerCreateCharacterTest do
     end
   end
 
-  describe "feature 021 — the player's own choices" do
+  describe "the player's own choices" do
     test "the name, lineage, and keyed choices round-trip onto the event" do
       event = Player.execute(%Player{}, cmd())
 

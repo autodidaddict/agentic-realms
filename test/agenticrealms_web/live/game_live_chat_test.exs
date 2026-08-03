@@ -1,12 +1,12 @@
 defmodule AgenticRealmsWeb.GameLiveChatTest do
   @moduledoc """
-  End-to-end LiveView tests for feature 010 (NPC conversations).
+  End-to-end LiveView tests for NPC conversations.
 
   Structured as a single comprehensive test that exercises US1 (basic
   chat), US2 (multi-turn history & continuing indicator), US3 (environmental
   grounding), US4 (out-of-lore emote refusal), US5 (empty-lore fallback),
-  plus FR-017 (privacy / zero leak to bystanders) and FR-020 (in-flight
-  lockout). Mirrors the feature 007 / 008 / 009 LiveView pattern.
+  plus privacy (zero leak to bystanders) and the in-flight
+  lockout. Mirrors the other end-to-end LiveView tests.
 
   Tagged `:integration` and excluded from the default `mix test` run.
   Run with:
@@ -65,7 +65,7 @@ defmodule AgenticRealmsWeb.GameLiveChatTest do
     %{alice: alice, bob: bob, alice_conn: alice_conn, bob_conn: bob_conn}
   end
 
-  test "chat, US5 + FR-017 privacy + FR-020 lockout in sequence",
+  test "chat, US5 privacy lockout in sequence",
        %{alice_conn: alice_conn, bob_conn: bob_conn, alice: alice} do
     stub_say = fn text ->
       Req.Test.stub(AgenticRealms.Anthropic, fn conn ->
@@ -136,13 +136,13 @@ defmodule AgenticRealmsWeb.GameLiveChatTest do
     bob_chat_count_after = count_occurrences(bob_html_after, "speech-chat")
 
     assert bob_chat_count_after == bob_chat_count_before,
-           "FR-017: Bob MUST NOT see Alice's chat speech entries (was #{bob_chat_count_before}, now #{bob_chat_count_after})"
+           "Bob MUST NOT see Alice's chat speech entries (was #{bob_chat_count_before}, now #{bob_chat_count_after})"
 
     refute bob_html_after =~ "Sure thing.",
-           "FR-017: Bob MUST NOT see the NPC's reply text"
+           "Bob MUST NOT see the NPC's reply text"
 
     refute bob_html_after =~ "You begin a conversation",
-           "FR-017: Bob MUST NOT see Alice's :chat_new indicator text"
+           "Bob MUST NOT see Alice's :chat_new indicator text"
 
     alice_html_us2 = render(alice_view)
 
@@ -194,7 +194,7 @@ defmodule AgenticRealmsWeb.GameLiveChatTest do
     alice_html_post_move = render(alice_view)
 
     assert alice_html_post_move =~ "You don&#39;t see Garrick here.",
-           "FR-016: chat with absent NPC must produce a 'not here' style rejection"
+           "chat with absent NPC must produce a 'not here' style rejection"
   end
 
   defp flush(view) do

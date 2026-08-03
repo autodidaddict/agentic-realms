@@ -1,11 +1,11 @@
 defmodule AgenticRealmsWeb.GameLiveBehaviorsTest do
   @moduledoc """
-  End-to-end LiveView tests for feature 009 (NPC and room behaviors).
+  End-to-end LiveView tests for NPC and room behaviors.
 
   Structured as a single comprehensive test that exercises US1 (NPC
   greeting), US2 (NPC farewell), US3 (room narration + anti-spam), US4
   (multi-behavior composition), and US5 (multi-action composition) in
-  sequence. Mirrors the feature 007 / 008 LiveView pattern.
+  sequence. Mirrors the other end-to-end LiveView tests.
 
   Tagged `:integration` and excluded from the default `mix test` run.
   Run with:
@@ -79,7 +79,7 @@ defmodule AgenticRealmsWeb.GameLiveBehaviorsTest do
            "Garrick's greeting text should appear in Alice's log"
 
     refute alice_html =~ ~r/Garrick the Innkeeper#[0-9a-f]/,
-           "FR-011: player-facing HTML must not contain the <name>#<id> debug identity"
+           "player-facing HTML must not contain the <name>#<id> debug identity"
 
     assert alice_html =~ ~s(class="log-entry narrate narrate-room"),
            "Alice should see the Stone Atrium's room narration rendered with narrate-room class"

@@ -4,14 +4,13 @@ defmodule AgenticRealms.World.NPCChat.Tools do
 
   Two tools, `say` and `emote`. With `tool_choice: {type: "any"}` on the
   Anthropic request, the model MUST produce exactly one of them per turn
-  (FR-021). This shape eliminates structured-output ambiguity.
+  This shape eliminates structured-output ambiguity.
   """
 
   @doc """
   The set of recognized tool names.
 
-  Feature 013 adds `accept_quest` as a third tool. `check_progress` and
-  `finalize_quest` are deferred to US2/US3 in the implementation plan.
+  Quests add `accept_quest`, `check_progress` and `finalize_quest`.
   """
   @spec names() :: MapSet.t(String.t())
   def names, do: MapSet.new(~w(say emote accept_quest check_progress finalize_quest))

@@ -1,7 +1,7 @@
 defmodule AgenticRealms.World.Ticks.Supervisor do
   @moduledoc """
-  Cluster-wide dynamic supervisor for per-room `Scheduler` processes
-  (feature 011). Wraps `Horde.DynamicSupervisor`. Same pattern as
+  Cluster-wide dynamic supervisor for per-room `Scheduler` processes.
+  Wraps `Horde.DynamicSupervisor`. Same pattern as
   `NPCChat.Supervisor`.
   """
 

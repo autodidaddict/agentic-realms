@@ -1,6 +1,6 @@
 defmodule AgenticRealmsWeb.XpLevelupFlowTest do
   @moduledoc """
-  Feature 019 US2 — completing a quest awards its xp to the Player aggregate,
+  Completing a quest awards its xp to the Player aggregate,
   which levels up and notifies the player; the character sheet updates live.
 
   Tagged `:integration`; run with:

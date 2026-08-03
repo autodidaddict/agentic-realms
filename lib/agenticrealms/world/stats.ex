@@ -56,7 +56,7 @@ defmodule AgenticRealms.World.Stats do
   @doc """
   A character sheet from a set of facts, a name, and current hitpoints.
 
-  The one adapter over `Srd.Character.derive/1`, and the reason feature 021's
+  The one adapter over `Srd.Character.derive/1`, and the reason the creation
   review cannot disagree with the sheet it previews: both go through here, so
   "the reviewed character and the created character are identical" is a
   property of the code rather than of two implementations kept in step.

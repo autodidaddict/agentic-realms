@@ -8,8 +8,8 @@ defmodule AgenticRealms.World.Communication.RecipientResolver do
   in a room to be whispered at.
 
   Shared by `World.Communication.tell/3` and `World.Communication.whisper/3`.
-  Behavior is governed by FR-010 (case-insensitive exact match, ambiguous
-  refusal) and FR-010a (self-target refusal).
+  Matching is case-insensitive and exact; an ambiguous name is refused, as
+  is targeting yourself.
   """
 
   import Ecto.Query

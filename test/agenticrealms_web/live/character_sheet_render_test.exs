@@ -1,6 +1,6 @@
 defmodule AgenticRealmsWeb.CharacterSheetRenderTest do
   @moduledoc """
-  Feature 020 US1 — the character sheet renders the viewing player's real SRD
+  The character sheet renders the viewing player's real SRD
   character across three tabs, with no mana and no mock values. Tagged
   `:integration` (mounts the full GameLive); run with:
 

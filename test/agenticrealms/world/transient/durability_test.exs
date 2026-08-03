@@ -1,6 +1,6 @@
 defmodule AgenticRealms.World.Transient.DurabilityTest do
   @moduledoc """
-  Feature 017 US2 — transient rooms are as durable as permanent rooms.
+  Transient rooms are as durable as permanent rooms.
 
   Full event-replay crash recovery is a platform guarantee: transient rooms are
   ordinary event-sourced `Room` aggregates whose events live in the Postgres

@@ -31,8 +31,8 @@ defmodule AgenticRealms.World.Exits.Validator do
   visual treatment in the renderer (dashed line + portal glyph) makes the
   semantics of these exits clear to the player.
 
-  Off-map rooms (either side with unset coords) also skip the check, per
-  FR-024's wormhole-pattern clause.
+  Off-map rooms (either side with unset coords) also skip the check, which
+  is what makes wormhole-like exits possible.
   """
   @spec consistent?(atom(), map(), map()) ::
           :ok | {:error, {:exit_geometry_violation, atom()}}

@@ -1,6 +1,6 @@
 defmodule AgenticRealmsWeb.WizardSpawnTest do
   @moduledoc """
-  Feature 014 US2 — LiveView integration: wizard clicks "Spawn here"
+  LiveView integration: wizard clicks "Spawn here"
   on a registry row → co-located player sees the arrival entry → the
   spawned object exists in the room's `world_objects` rows with no
   blueprint_id column.

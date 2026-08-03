@@ -1,6 +1,6 @@
 defmodule AgenticRealms.World.Commands.SpawnNpcFreeformTest do
   @moduledoc """
-  Feature 015 US5 — a freeform one-off NPC is cloned straight into a room with
+  A freeform one-off NPC is cloned straight into a room with
   no blueprint behind it: a real `npc_clones` row (null `blueprint_id`) carrying
   the authored lore, observationally identical to a blueprint-spawned clone, and
   NO `blueprints` row added.

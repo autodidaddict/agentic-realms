@@ -1,7 +1,7 @@
 defmodule AgenticRealms.World.BlueprintTest do
   @moduledoc """
   Aggregate unit tests for the unified `AgenticRealms.World.Blueprint`
-  (feature 015) — folds the former ObjectBlueprint + NPCBlueprint aggregate
+  Folds the former ObjectBlueprint + NPCBlueprint aggregate
   tests. Covers create (both kinds), the revision'd optimistic-lock edit, and
   the apply/2 round-trip.
   """

@@ -18,8 +18,8 @@ defmodule AgenticRealms.World.Direction.Geometry do
   The unit-step delta for a direction.
 
   Planar directions return `{:planar, {dx_sign, dy_sign}}` — the signs of
-  the coordinate deltas (NOT the magnitudes, since FR-024 allows variable
-  distance along the direction axis).
+  the coordinate deltas, not the magnitudes: distance along the direction
+  axis is free.
 
   Vertical directions return `{:vertical, dz_sign}` — `+1` for `:up`,
   `-1` for `:down`.

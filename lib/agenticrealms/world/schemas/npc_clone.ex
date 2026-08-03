@@ -2,10 +2,10 @@ defmodule AgenticRealms.World.Schemas.NPCClone do
   @moduledoc """
   An NPC instance in the world. A clone is spawned from a blueprint (or, for a
   freeform NPC, from nothing) and carries a denormalized full-copy snapshot of
-  that data as of the moment of spawning (feature 008 FR-007 / FR-012).
+  that data as of the moment of spawning.
 
   Identified by its own entity `id`. `blueprint_id` is a nullable, denormalized
-  quest-identity tag (feature 013 groups quest progress on it) — NOT lineage,
+  quest-identity tag that quest progress groups on — NOT lineage,
   and absent for freeform NPCs. The LPMud-style debug identity (`debug_id/1`)
   is exposed for admin / telemetry / debug audiences ONLY — never for
   player-facing surfaces.

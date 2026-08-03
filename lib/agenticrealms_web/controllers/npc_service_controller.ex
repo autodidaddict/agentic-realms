@@ -4,7 +4,7 @@ defmodule AgenticRealmsWeb.NpcServiceController do
   mind worker (`agentic-realms-npc`). Three authenticated routes: read identity,
   read surroundings, submit a move. Guarded by `RequireServiceToken`.
 
-  match the shared schema in `agentic-realms-npc` feature 001.
+  match the shared schema in `agentic-realms-npc`.
   """
 
   use AgenticRealmsWeb, :controller

@@ -2,7 +2,7 @@ defmodule AgenticRealms.World.Seed do
   @moduledoc """
   Idempotent starter-map seeder. Run from `priv/repo/seeds.exs`.
 
-  Feature 012 (Maps) rewrite. The seeded world now lives inside two
+  The seeded world lives inside two
   regions — Blackmire (primary, where players spawn) and Hollowvale (a
   stub region behind a cross-region exit). Every seed room carries
   explicit `(map_x, map_y, elevation)` so the map renderer has meaningful

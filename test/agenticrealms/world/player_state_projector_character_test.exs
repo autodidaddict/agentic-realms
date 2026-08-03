@@ -182,7 +182,7 @@ defmodule AgenticRealms.World.PlayerStateProjectorCharacterTest do
     end
   end
 
-  describe "feature 021 — the player's own choices reach the row" do
+  describe "the player's own choices reach the row" do
     test "the name, lineage, and choices map round-trip through the event" do
       player = register_player()
 

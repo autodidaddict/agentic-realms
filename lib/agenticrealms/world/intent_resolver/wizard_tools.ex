@@ -17,9 +17,7 @@ defmodule AgenticRealms.World.IntentResolver.WizardTools do
     * `refuse` — the escape hatch when the prompt is not an archetype.
 
   `:world` mode (manifesting one-offs) tools: `manifest_object_freeform`
-  (feature 014), `manifest_npc_freeform` (feature 015 US5), `refuse`.
-
-  `specs/015-npc-blueprints/`.
+  `manifest_npc_freeform`, `refuse`.
   """
 
   @doc "Set of recognized tool names in :blueprints mode."

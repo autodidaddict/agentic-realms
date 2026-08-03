@@ -16,7 +16,7 @@ defmodule AgenticRealmsWeb.GameLive.Wizard do
   alias AgenticRealms.World.Schemas.Blueprint, as: BlueprintRow
 
   @doc """
-  Feature 014 US1 commit-create. Dispatches `create_object_blueprint`,
+  Commit-create. Dispatches `create_object_blueprint`,
   refreshes the registry on success, surfaces the error otherwise.
   """
   def commit_blueprint_create(socket, draft) do
@@ -67,7 +67,7 @@ defmodule AgenticRealmsWeb.GameLive.Wizard do
   defp drop_blank_behaviors(_), do: []
 
   @doc """
-  Feature 014 US5 commit-edit. Stale-revision response reloads the
+  Commit-edit. Stale-revision response reloads the
   form with the latest persisted values + surfaces a banner.
   """
   def commit_blueprint_edit(socket, draft, expected_revision) do
@@ -131,7 +131,7 @@ defmodule AgenticRealmsWeb.GameLive.Wizard do
   end
 
   @doc """
-  Feature 014 US1 / US3 — apply the resolver-task outcome to the
+  Apply the resolver-task outcome to the
   appropriate draft assign. Caller has already cleared
   `:wizard_resolver_task` and `:wizard_input_locked`; this just
   populates the matching draft (or commit-error) and returns
@@ -228,7 +228,7 @@ defmodule AgenticRealmsWeb.GameLive.Wizard do
   def cancel_resolver_task(socket), do: socket
 
   @doc """
-  Feature 014 US6 — apply a `WizardBlueprintRegistryChanged` payload
+  Apply a `WizardBlueprintRegistryChanged` payload
   to the wizard's `:object_blueprints` list in place. Insert (with
   de-dup) on `:created`; merge the sparse diff into the matching row
   on `:edited`.

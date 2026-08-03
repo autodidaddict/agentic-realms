@@ -1,5 +1,5 @@
 defmodule AgenticRealms.World.QueriesGlobalExitsTest do
-  @moduledoc "Feature 018 — list_global_exits/1 returns only global exits with target_room_id."
+  @moduledoc "List_global_exits/1 returns only global exits with target_room_id."
   use AgenticRealms.DataCase, async: true
 
   alias AgenticRealms.World.Queries

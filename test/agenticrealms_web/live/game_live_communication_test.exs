@@ -1,6 +1,6 @@
 defmodule AgenticRealmsWeb.GameLiveCommunicationTest do
   @moduledoc """
-  End-to-end LiveView tests for feature 004 (player communication).
+  End-to-end LiveView tests for player communication.
 
   This file is intentionally structured as a single comprehensive test
   exercising all US1 scenarios in sequence, sharing one `Seed.run`

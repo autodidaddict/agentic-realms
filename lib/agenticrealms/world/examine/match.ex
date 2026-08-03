@@ -12,8 +12,6 @@ defmodule AgenticRealms.World.Examine.Match do
     * `:npc` — `name` is the NPC's stored display name; `long_description`
       is `world_npcs.long_description` verbatim. Render contract identical
       in shape to `:object`.
-
-  `specs/007-static-npcs/data-model.md` §7.
   """
 
   @enforce_keys [:target_kind, :name]

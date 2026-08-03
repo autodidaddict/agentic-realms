@@ -29,8 +29,8 @@ defmodule AgenticRealms.World.UIEvents do
 
   defmodule RoomNPCLeft do
     @moduledoc """
-    Transient NPC-departure event. Mirror of `RoomNPCArrived`
-    from feature 007. Broadcast on `room:<source>` when an NPC clone is
+    Transient NPC-departure event. Mirror of `RoomNPCArrived`. Broadcast on
+    `room:<source>` when an NPC clone is
     despawned or removed.
 
     Consumed by `AgenticRealms.World.Ticks.Scheduler` to drop the NPC's
@@ -44,7 +44,7 @@ defmodule AgenticRealms.World.UIEvents do
 
   defmodule WizardBlueprintRegistryChanged do
     @moduledoc """
-    Feature 014 US6 — broadcast on the global `blueprints` topic when an
+    Broadcast on the global `blueprints` topic when an
     `ObjectBlueprintCreated` or `ObjectBlueprintEdited` domain event
     fires. Wizard LiveView sessions patch their `:object_blueprints`
     assign in place — insert on `:created`, update-row on `:edited` —
@@ -60,7 +60,7 @@ defmodule AgenticRealms.World.UIEvents do
 
   defmodule RoomObjectEdited do
     @moduledoc """
-    Feature 014 US5 — transient object-edit notice. Broadcast on
+    Transient object-edit notice. Broadcast on
     `room:<room_id>` when an `EntityEdited` event fires for an object in a
     room. Quiet (no
     narrative log entry by default — wizard edits don't generate an
@@ -74,11 +74,11 @@ defmodule AgenticRealms.World.UIEvents do
 
   defmodule RoomObjectArrived do
     @moduledoc """
-    Feature 014 US2 — transient object-arrival entry. Broadcast on
+    Transient object-arrival entry. Broadcast on
     `room:<destination>` when an object is moved into the room (an
     `EntityMoved` with cause `:spawned` or `:relocated`)
-    while live sessions are present. Mirror of `RoomNPCArrived` from
-    feature 007. Co-located players' narrative logs gain a system entry
+    while live sessions are present. Mirror of `RoomNPCArrived`. Co-located
+    players' narrative logs gain a system entry
     `<object short description> appears.`
 
     No actor exclusion — wizards see the entry too (it's the same
@@ -108,13 +108,12 @@ defmodule AgenticRealms.World.UIEvents do
     `authoring_mode` to `:blueprints`. Renders as a `system` narrative-log
     entry on every co-present player's view.
 
-    The wizard themselves self-filters (FR-002 wording — "every other
-    player session") via their own `handle_info` clause checking
+    The wizard themselves self-filters via their own `handle_info` clause
+    checking
     `wizard_id == current_player.id`.
 
     Not persisted — there is no domain event behind it. Trance is a UI
-    signal, not world state. See
-    `specs/014-item-blueprints/research.md` R3.
+    signal, not world state.
     """
     @enforce_keys [:room_id, :wizard_id, :wizard_name]
     defstruct [:room_id, :wizard_id, :wizard_name]
@@ -124,9 +123,9 @@ defmodule AgenticRealms.World.UIEvents do
     @moduledoc """
     Transient trance-exit log entry. Broadcast on
     `room:<wizard's current room>` when a wizard flips their
-    `authoring_mode` back to `:world`. Suppressed on disconnect
-    per FR-005 by virtue of the LiveView's terminate callback NOT firing
-    this event (only an explicit toggle does).
+    `authoring_mode` back to `:world`. Suppressed on disconnect by virtue of
+    the LiveView's terminate callback NOT firing this event; only an explicit
+    toggle does.
     """
     @enforce_keys [:room_id, :wizard_id, :wizard_name]
     defstruct [:room_id, :wizard_id, :wizard_name]
@@ -136,11 +135,9 @@ defmodule AgenticRealms.World.UIEvents do
     @moduledoc """
     Transient NPC-arrival event. Broadcast on `room:<destination>` when an
     NPC is moved into the room (an `EntityMoved` with kind `:npc`, cause
-    `:spawned`) while live sessions are present in the
-    destination room. Feature 007 FR-011 / FR-012.
+    `:spawned`) while live sessions are present in the destination room.
 
-    Always directionless — NPCs in feature 007 do not move and have no
-    source room.
+    Always directionless: NPCs do not move and have no source room.
     """
     @enforce_keys [:room_id, :npc_id, :npc_name]
     defstruct [:room_id, :npc_id, :npc_name]
@@ -150,8 +147,7 @@ defmodule AgenticRealms.World.UIEvents do
     @moduledoc """
     Transient utterance produced by a behavior's :say action.
     Broadcast on `player:<player_id>` topic, NEVER persisted, NEVER on the
-    room topic — see `specs/009-npc-behaviors/research.md` R2 for the
-    delivery-topic rationale.
+    room topic.
 
     `kind` is `:npc_speech` (NPC clone speaker, attributed) or `:room_speech`
     (room source, unattributed ambient narration). `actor_name` is the
@@ -179,8 +175,7 @@ defmodule AgenticRealms.World.UIEvents do
     Commanded event handler involved — communication is non-event-sourced).
 
     For `:whisper`, every same-room subscriber receives the struct; non-recipient
-    subscribers MUST drop it based on `recipient_id`. See
-    `specs/004-player-communication/contracts/ui_events.md`.
+    subscribers MUST drop it based on `recipient_id`.
     """
     @enforce_keys [:room_id, :actor_id, :actor_name, :actor_session_id, :kind, :text]
     defstruct [
@@ -199,8 +194,7 @@ defmodule AgenticRealms.World.UIEvents do
     Transient private utterance — `:tell`. Broadcast on `player:<recipient_id>`.
 
     Sender's other sessions do NOT subscribe to the recipient's player topic, so
-    no actor-side filter is needed. See
-    `specs/004-player-communication/contracts/ui_events.md`.
+    no actor-side filter is needed.
     """
     @enforce_keys [:actor_id, :actor_name, :recipient_id, :kind, :text]
     defstruct [:actor_id, :actor_name, :recipient_id, :kind, :text]
@@ -256,9 +250,8 @@ defmodule AgenticRealms.World.UIEvents do
   defmodule ChatSystemMessage do
     @moduledoc """
     Transient chat-frame system message. Broadcast on
-    `player:<player_id>` ONLY. Covers the new-vs-continuing indicator
-    (FR-003), the in-flight rejection, and the LLM-failure
-    fallback line.
+    `player:<player_id>` ONLY. Covers the new-vs-continuing indicator, the
+    in-flight rejection, and the LLM-failure fallback line.
 
     `kind`:
       * `:chat_new` — first turn in a fresh conversation

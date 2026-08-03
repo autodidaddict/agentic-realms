@@ -10,8 +10,7 @@ defmodule AgenticRealms.World.Schemas.Blueprint do
   supports them; the object authoring UI doesn't expose them yet).
 
   Spawned instances are freestanding: a blueprint stamps a clone's frozen
-  fields at spawn and is never consulted at render time (see
-  `specs/015-npc-blueprints/data-model.md` §0).
+  fields at spawn and is never consulted at render time.
   """
 
   use Ecto.Schema

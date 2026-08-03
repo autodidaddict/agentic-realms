@@ -242,7 +242,7 @@ defmodule AgenticRealmsWeb.GameComponents.MiniMapTest do
       assert length(cells) == 3
     end
 
-    test "renders exactly two map-line elements (FR-004 dedup verified upstream)" do
+    test "renders exactly two map-line elements" do
       html = render_map(linear_three_view())
       lines = Regex.scan(~r/class="[^"]*\bmap-line\b[^"]*"/, html)
       assert length(lines) == 2

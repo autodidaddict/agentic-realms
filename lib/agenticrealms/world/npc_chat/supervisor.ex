@@ -1,7 +1,7 @@
 defmodule AgenticRealms.World.NPCChat.Supervisor do
   @moduledoc """
-  Cluster-wide dynamic supervisor for `NPCChat.Conversation` processes
-  (feature 010). Wraps `Horde.DynamicSupervisor` so a Conversation may
+  Cluster-wide dynamic supervisor for `NPCChat.Conversation` processes.
+  Wraps `Horde.DynamicSupervisor` so a Conversation may
   be started on any node in the cluster; Horde decides placement via
   `Horde.UniformDistribution`.
 

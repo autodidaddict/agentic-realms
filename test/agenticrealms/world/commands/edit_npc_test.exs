@@ -1,6 +1,6 @@
 defmodule AgenticRealms.World.Commands.EditNpcTest do
   @moduledoc """
-  Feature 015 US7 — editing NPC blueprints + in-world NPC clones.
+  Editing NPC blueprints + in-world NPC clones.
 
   * Blueprint edit is revision-tracked + optimistically locked (a concurrent
     stale edit is refused) and does NOT retro-propagate to already-spawned

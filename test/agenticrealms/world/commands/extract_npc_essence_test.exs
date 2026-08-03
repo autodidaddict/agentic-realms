@@ -1,6 +1,6 @@
 defmodule AgenticRealms.World.Commands.ExtractNpcEssenceTest do
   @moduledoc """
-  Feature 015 US6 — extract a new NPC Blueprint from an in-world clone: the
+  Extract a new NPC Blueprint from an in-world clone: the
   extracted blueprint copies the clone's name/short/long/lore/fixed + its
   behavior_groups + DIRECT behaviors at revision 1, and the source clone is left
   byte-for-byte unchanged.

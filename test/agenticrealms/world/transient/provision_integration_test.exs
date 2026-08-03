@@ -1,6 +1,6 @@
 defmodule AgenticRealms.World.Transient.ProvisionIntegrationTest do
   @moduledoc """
-  Feature 017 US1 — provision a transient region, land the owner inside it,
+  Provision a transient region, land the owner inside it,
   navigate the generated rooms, and enforce the owner-only `:rift` entry exit.
   """
   use AgenticRealms.DataCase, async: false

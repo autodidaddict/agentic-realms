@@ -65,7 +65,7 @@ defmodule AgenticRealms.World.NPCChat.ReplyTest do
       assert Reply.parse(response) == {:error, :malformed}
     end
 
-    test "two tool_use blocks → :malformed (FR-021 forbids mixing)" do
+    test "two tool_use blocks → :malformed" do
       response = %{
         "content" => [
           %{"type" => "tool_use", "name" => "say", "input" => %{"text" => "A"}},

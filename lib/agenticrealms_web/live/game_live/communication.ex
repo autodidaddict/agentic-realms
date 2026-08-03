@@ -1,7 +1,7 @@
 defmodule AgenticRealmsWeb.GameLive.Communication do
   @moduledoc """
-  Communication verb handlers (feature 004 + feature 010 NPC chat) —
-  `say`, `whisper`, `tell`, `emote`, `chat`. Same shape as the player
+  Communication verb handlers: `say`, `whisper`, `tell`, `emote`, `chat`.
+  Same shape as the player
   command handlers: take socket + raw input + verb-specific args,
   return `{:noreply, socket}`.
 

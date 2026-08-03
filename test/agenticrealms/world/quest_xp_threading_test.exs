@@ -1,5 +1,5 @@
 defmodule AgenticRealms.World.QuestXpThreadingTest do
-  @moduledoc "Feature 019 — the quest's reward xp is threaded into QuestCompleted."
+  @moduledoc "The quest's reward xp is threaded into QuestCompleted."
   use ExUnit.Case, async: true
 
   alias AgenticRealms.World.Quest

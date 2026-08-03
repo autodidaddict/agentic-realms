@@ -6,7 +6,7 @@ defmodule AgenticRealms.World.Transient.Supervisor do
 
   Horde places the manager on one node and **redistributes it to a surviving
   node** if that node leaves, so the reaper keeps running after node loss
-  without a `:global` single-point dependency (Constitution Principle I).
+  without a `:global` single-point dependency.
   """
 
   alias AgenticRealms.World.Transient.{Manager, Registry}

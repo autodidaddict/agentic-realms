@@ -1,5 +1,5 @@
 defmodule AgenticRealmsWeb.NpcServiceControllerMoveTest do
-  @moduledoc "Feature 018 — POST /api/npc/:id/move (compare-and-swap, witnessed)."
+  @moduledoc "POST /api/npc/:id/move (compare-and-swap, witnessed)."
   use AgenticRealmsWeb.ConnCase, async: false
 
   @moduletag :commanded

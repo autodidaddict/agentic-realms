@@ -83,8 +83,8 @@ defmodule AgenticRealmsWeb.GameComponents.Primitives do
     default: true,
     doc: """
     Whether the modal offers a way out. When false, all three are omitted: the
-    Escape binding, the click-catching backdrop, and the ✕ button. Feature 021's
-    character creation needs this — a character comes before a world, so there
+    Escape binding, the click-catching backdrop, and the ✕ button. Character
+    creation needs this — a character comes before a world, so there
     is nothing to go back to — and leaving the controls rendered would show a
     close button that silently does nothing, since `close_modal` only clears the
     `@modal` assign that dialog does not use.

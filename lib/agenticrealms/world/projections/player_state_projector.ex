@@ -5,8 +5,8 @@ defmodule AgenticRealms.World.Projections.PlayerStateProjector do
   Event handler clauses added so far:
     * Phase 4: PlayerSpawned    → upsert player_state.current_room_id
     * Phase 5: PlayerMoved      → update player_state.current_room_id
-                                        (with FR-022 nilify if target room gone)
-    * Feature 020:   CharacterCreated → upsert the character columns
+                                        (nilified if the target room is gone)
+    * CharacterCreated          → upsert the character columns
 
   All upserts use `on_conflict: :replace_all` so replays are safe.
   """

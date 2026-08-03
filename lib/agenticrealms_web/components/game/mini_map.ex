@@ -69,7 +69,7 @@ defmodule AgenticRealmsWeb.GameComponents.MiniMap do
         <div class="map-canvas map-canvas--off-map"></div>
       <% else %>
         <script :type={Phoenix.LiveView.ColocatedHook} name=".MapInteract">
-          // Feature 012 — client-side map interaction. Combines:
+          // Client-side map interaction. Combines:
           //   * styled hover tooltip (reads data-room-name from .map-cell)
           //   * mouse-wheel zoom around the cursor
           //   * click-drag pan
@@ -80,7 +80,7 @@ defmodule AgenticRealmsWeb.GameComponents.MiniMap do
           // pan/zoom is reset on movement, which is the desired UX (we
           // always recenter on the player after they move).
           //
-          // FR-017 information hiding: fog stubs and cross-region portals
+          // Information hiding: fog stubs and cross-region portals
           // do NOT carry data-room-name, so they silently no-op for the
           // tooltip path.
           export default {
@@ -402,7 +402,7 @@ defmodule AgenticRealmsWeb.GameComponents.MiniMap do
       <% :fog_stub -> %>
         <%!-- Soft cloud built from overlapping circles. Reads as a
               fluffy puff at the line endpoint instead of a hatched
-              tile. No title/aria — FR-007 / FR-017 information hiding. --%>
+              tile. No title or aria, for information hiding. --%>
         <g class="map-fog-cloud" transform={"translate(#{@exit.to_x} #{@exit.to_y})"}>
           <circle cx="-0.13" cy="0.02" r="0.08" />
           <circle cx="-0.05" cy="-0.07" r="0.10" />

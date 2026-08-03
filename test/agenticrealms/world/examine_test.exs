@@ -1,7 +1,7 @@
 defmodule AgenticRealms.World.ExamineTest do
   @moduledoc """
   Unit tests for `AgenticRealms.World.Examine` — the target resolution facade
-  introduced in feature 006. Tests insert read-model rows directly via
+  Tests insert read-model rows directly via
   `Repo.insert!/1`, sidestepping Commanded — Examine is a pure read against
   the projected world state, so the event-source path is incidental.
   """

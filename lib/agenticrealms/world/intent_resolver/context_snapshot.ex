@@ -5,8 +5,7 @@ defmodule AgenticRealms.World.IntentResolver.ContextSnapshot do
   and their literal input.
 
   This is the only part of the Anthropic request that varies per call; the
-  system prompt and tool definitions are stable. See
-  `specs/005-llm-intent-parser/contracts/system_prompt.md` for the format.
+  system prompt and tool definitions are stable.
   """
 
   alias AgenticRealms.World.Queries

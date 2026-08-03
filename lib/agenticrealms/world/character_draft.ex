@@ -5,7 +5,7 @@ defmodule AgenticRealms.World.CharacterDraft do
   Held in the creating player's LiveView socket and nowhere else. Never
   persisted, never broadcast, never in a registry: a draft belongs to one
   player's one session and is meaningless to any other process on any other
-  node, which is the node-local state Principle I permits. Abandoning creation
+  node. Abandoning creation
   therefore leaves nothing behind, and no half-made character can ever be
   mistaken for a real one.
 

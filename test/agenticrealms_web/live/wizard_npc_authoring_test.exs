@@ -1,6 +1,6 @@
 defmodule AgenticRealmsWeb.WizardNpcAuthoringTest do
   @moduledoc """
-  Feature 015 US1/US2 — the wizard authors an NPC blueprint in trance (lore +
+  The wizard authors an NPC blueprint in trance (lore +
   composable behavior_groups), commits it (unified registry, kind badge), and spawns
   it into the room (witnessed arrival; the clone carries the composed
   behaviors).

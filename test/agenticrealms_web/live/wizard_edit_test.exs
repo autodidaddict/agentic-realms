@@ -1,6 +1,6 @@
 defmodule AgenticRealmsWeb.WizardEditTest do
   @moduledoc """
-  Feature 014 US5 — LiveView integration: form-based editing of
+  LiveView integration: form-based editing of
   Blueprints (with optimistic locking) and in-place editing of world
   Objects.
   """

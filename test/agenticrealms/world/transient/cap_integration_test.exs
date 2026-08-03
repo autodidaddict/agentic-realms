@@ -1,6 +1,6 @@
 defmodule AgenticRealms.World.Transient.CapIntegrationTest do
   @moduledoc """
-  Feature 017 US4 — the 60-minute absolute lifetime cap, and crash-recovery of
+  The 60-minute absolute lifetime cap, and crash-recovery of
   the stateless reaper.
   """
   use AgenticRealms.DataCase, async: false

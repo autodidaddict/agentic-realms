@@ -1,6 +1,6 @@
 defmodule AgenticRealms.World.Transient.PurgeIntegrationTest do
   @moduledoc """
-  Feature 017 US3 — end-to-end teardown: provision a region, then exercise the
+  End-to-end teardown: provision a region, then exercise the
   reaper through logoff/grace/online cases. Asserts full purge, owner
   relocation, and that an empty region with an online owner survives.
   """

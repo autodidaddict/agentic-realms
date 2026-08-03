@@ -9,10 +9,8 @@ defmodule AgenticRealms.World.Examine do
   Pure read facade. Composes existing reads from `World.Queries`; never
   dispatches commands, never broadcasts.
 
-  The three-stage decision tree (exact > partial; inventory > room;
-  mixed-kind tie → refuse) is documented in
-  `specs/006-examine-objects/data-model.md` §3 and extended for NPCs in
-  `specs/007-static-npcs/data-model.md` §8.
+  The decision tree is three-stage: exact beats partial, inventory beats
+  room, and a mixed-kind tie is refused.
 
   Parser-injected sentinel `"__self__"` short-circuits scope gathering: the
   acting player is always examinable as themselves regardless of room
