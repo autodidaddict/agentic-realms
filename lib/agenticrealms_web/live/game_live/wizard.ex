@@ -1,6 +1,6 @@
 defmodule AgenticRealmsWeb.GameLive.Wizard do
   @moduledoc """
-  Feature 014 — wizard authoring helpers.
+  Wizard authoring helpers.
 
   Houses the blueprint and freeform-object commit pipelines, the
   resolver-task outcome dispatcher, the in-flight task canceller, and
@@ -209,7 +209,7 @@ defmodule AgenticRealmsWeb.GameLive.Wizard do
   end
 
   @doc """
-  Feature 014 — cancel an in-flight wizard LLM resolver task on
+  Cancel an in-flight wizard LLM resolver task on
   discard. Demonitors so the trailing `:DOWN` message is flushed;
   the completion message that arrives later will fail to match the
   `wizard_resolver_task: %{ref: ref}` guard and hit the generic

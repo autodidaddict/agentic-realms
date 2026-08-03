@@ -11,7 +11,6 @@ defmodule AgenticRealms.World.ContainerRef do
   Serializes to/from a plain map (`%{"type" => ..., "id" => ...}`) for event
   payloads. `from_map/1` is tolerant of struct passthrough and of both
   string- and atom-keyed maps (events come back string-keyed after replay).
-
   """
 
   @types ~w(void room player npc)a

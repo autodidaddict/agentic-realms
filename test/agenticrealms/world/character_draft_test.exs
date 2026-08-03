@@ -1,6 +1,6 @@
 defmodule AgenticRealms.World.CharacterDraftTest do
   @moduledoc """
-  Feature 021 — the in-progress character.
+  The in-progress character.
 
   Pure and DB-free: the draft never touches the repository, which is half the
   reason it can live in a socket and be thrown away.

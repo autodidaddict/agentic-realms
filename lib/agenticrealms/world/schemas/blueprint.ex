@@ -1,6 +1,6 @@
 defmodule AgenticRealms.World.Schemas.Blueprint do
   @moduledoc """
-  Feature 015 — the unified authored template (`blueprints` read model),
+  The unified authored template (`blueprints` read model),
   keyed by slug, discriminated by `kind` (`"object" | "npc"`). Replaces the
   former `object_blueprints` (014) + `npc_blueprints` (008/013) tables.
 

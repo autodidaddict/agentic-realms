@@ -11,7 +11,6 @@ defmodule AgenticRealms.World.IntentResolver do
   Every failure mode (missing API key, HTTP error, timeout, malformed
   response, unrecognized tool, multiple tool calls) collapses to a graceful
   `{:error, refusal_message}`. No exception escapes `resolve/2`.
-
   """
 
   require Logger

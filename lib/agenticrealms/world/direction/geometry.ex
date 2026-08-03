@@ -4,8 +4,6 @@ defmodule AgenticRealms.World.Direction.Geometry do
   no aggregate references. Operates on direction atoms and Room-shaped maps
   (anything with `:map_x`, `:map_y`, `:elevation` keys).
 
-  Feature 012 — Maps. See `specs/012-maps/contracts/direction.md`.
-
   ## Coordinate convention
 
   Screen coordinates: `y` increases DOWNWARD, so a "north" exit has

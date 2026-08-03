@@ -6,7 +6,6 @@ defmodule AgenticRealms.World.Ticks.Registry do
   Wraps `Horde.Registry` so a `room_id` maps to exactly one Scheduler
   pid across the BEAM cluster. Same pattern as `NPCChat.Registry`
   from feature 010.
-
   """
 
   @doc false

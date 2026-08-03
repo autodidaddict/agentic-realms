@@ -1,6 +1,6 @@
 defmodule AgenticRealms.World.PlayerCreateCharacterTest do
   @moduledoc """
-  Feature 020 — Player aggregate CreateCharacter: emits once, then never again.
+  Player aggregate CreateCharacter: emits once, then never again.
 
   Pure — no database, no Commanded.
   """

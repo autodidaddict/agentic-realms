@@ -3,7 +3,6 @@ defmodule AgenticRealms.World.Behaviors.InterpreterTest do
   Direct-invocation tests for the behavior interpreter.
   Bypasses Commanded by calling `Interpreter.handle/2` with synthesized
   event structs and asserting broadcasts via PubSub subscriptions.
-
   """
 
   use AgenticRealms.DataCase, async: false

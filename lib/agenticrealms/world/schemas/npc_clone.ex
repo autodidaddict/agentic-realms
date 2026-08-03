@@ -9,7 +9,6 @@ defmodule AgenticRealms.World.Schemas.NPCClone do
   and absent for freeform NPCs. The LPMud-style debug identity (`debug_id/1`)
   is exposed for admin / telemetry / debug audiences ONLY — never for
   player-facing surfaces.
-
   """
 
   use Ecto.Schema

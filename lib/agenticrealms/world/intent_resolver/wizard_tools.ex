@@ -1,6 +1,6 @@
 defmodule AgenticRealms.World.IntentResolver.WizardTools do
   @moduledoc """
-  Feature 014 — Anthropic tool schemas exposed to wizards. Separate from
+  Anthropic tool schemas exposed to wizards. Separate from
   the player-facing `Tools` module because the wizard's tool surface is
   intentionally narrow — creation verbs
   only, no edit verbs, mode-dependent.

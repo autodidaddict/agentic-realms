@@ -1,6 +1,6 @@
 defmodule AgenticRealms.NpcMinds.Reconciler do
   @moduledoc """
-  Feature 018 — cluster-singleton reconciliation sweep. The event-driven lifecycle
+  Cluster-singleton reconciliation sweep. The event-driven lifecycle
   handoff (`LifecycleManager`) is best-effort, so a start/terminate issued while
   Temporal is unreachable is lost. This periodic sweep converges the set of
   running minds to the set of live NPCs: it starts a mind for any live NPC that

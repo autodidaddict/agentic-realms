@@ -3,7 +3,6 @@ defmodule AgenticRealms.World.Ticks.Supervisor do
   Cluster-wide dynamic supervisor for per-room `Scheduler` processes
   (feature 011). Wraps `Horde.DynamicSupervisor`. Same pattern as
   `NPCChat.Supervisor`.
-
   """
 
   alias AgenticRealms.World.Ticks.{Registry, Scheduler}

@@ -1,6 +1,6 @@
 defmodule AgenticRealms.World.CharacterDraft.Validator do
   @moduledoc """
-  Feature 021 — is this a legal SRD character?
+  Is this a legal SRD character?
 
   The dialog is a client, so its constraints are a convenience rather than an
   authority. This runs before dispatch and refuses anything the SRD does not

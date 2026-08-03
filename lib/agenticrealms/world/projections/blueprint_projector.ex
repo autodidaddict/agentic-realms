@@ -1,6 +1,6 @@
 defmodule AgenticRealms.World.Projections.BlueprintProjector do
   @moduledoc """
-  Feature 015 — projects unified Blueprint events into the `blueprints`
+  Projects unified Blueprint events into the `blueprints`
   read-model table. Replaces `ObjectBlueprintProjector` and the
   `NPCBlueprintCreated` handler that lived in `WorldProjector`.
 

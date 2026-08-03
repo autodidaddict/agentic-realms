@@ -24,7 +24,6 @@ defmodule AgenticRealmsWeb.CoreComponents do
     * [Phoenix.Component](https://hexdocs.pm/phoenix_live_view/Phoenix.Component.html) -
       the component system used by Phoenix. Some components, such as `<.link>`
       and `<.form>`, are defined there.
-
   """
   use Phoenix.Component
 

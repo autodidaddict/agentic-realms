@@ -1,6 +1,6 @@
 defmodule AgenticRealms.World.CharacterDraft.ValidatorTest do
   @moduledoc """
-  Feature 021 — the guard on the write side.
+  The guard on the write side.
 
   The dialog is a client, so these tests care most about what a forged
   submission can get past. Pure and DB-free.

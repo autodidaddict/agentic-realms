@@ -1,6 +1,6 @@
 defmodule AgenticRealms.World.RegionLifespan do
   @moduledoc """
-  Feature 017 — aggregate lifespan for the `Region` aggregate. Evicts the
+  Aggregate lifespan for the `Region` aggregate. Evicts the
   aggregate process (`:stop`) as soon as a region is destroyed, so a
   transient region's GenServer is freed immediately on teardown. All other
   events keep the aggregate resident (`:infinity`), preserving the existing

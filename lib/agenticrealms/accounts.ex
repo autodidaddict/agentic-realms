@@ -79,9 +79,8 @@ defmodule AgenticRealms.Accounts do
   @doc """
   Promote a player to wizard status. Idempotent on already-wizard accounts.
 
-  Intended invocation: `iex` during local development. No UI for promotion
-  ships in feature 014 milestone 1 — see
-  `specs/014-item-blueprints/spec.md` Clarifications + FR-WIZ-2.
+  Intended invocation: `iex` during local development. There is no UI for
+  promotion.
   """
   @spec promote_to_wizard(integer()) ::
           {:ok, %Player{}} | {:error, :not_found}
@@ -103,7 +102,7 @@ defmodule AgenticRealms.Accounts do
   @doc """
   Delete a player's account.
 
-  Per FR-023, any objects the player is carrying are returned to the room
+  Any objects the player is carrying are returned to the room
   they were in at the time of deletion. If the player has no current room
   (never played, or their last room is gone), carried objects fall back to
   the seeded starting room so they remain reachable.

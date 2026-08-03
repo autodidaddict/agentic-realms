@@ -33,14 +33,13 @@ defmodule AgenticRealms.World.Commands.Authoring do
     * blueprint exists (`:blueprint_not_found`)
     * room exists (`:room_not_found`)
     * no other clone in this room shares the blueprint's display name
-      (`:clone_name_taken_in_room` — preserves feature 007 FR-001a)
+      (`:clone_name_taken_in_room`)
 
   On success, clones the NPC into existence and moves it into the room via
   the entity lifecycle (`Entities.clone_into(:npc, …)`), with the blueprint's current
   data (incl. its `blueprint_id` reference, behaviors and lore) copied into
   the `EntityCloned` payload (full-copy at dispatch time). Returns
   `{:ok, %{clone_id: clone_id}}`.
-
   """
   @spec spawn_npc_clone(String.t(), String.t(), String.t()) ::
           {:ok, %{clone_id: String.t()}}
@@ -139,10 +138,10 @@ defmodule AgenticRealms.World.Commands.Authoring do
   @doc """
   Author a new Blueprint of either kind (`"object"` | `"npc"`).
 
-  FR-WIZ-5 authorization, FR-004 slug-shape + one-namespace uniqueness, and —
-  for `kind: "npc"` — validates the direct `behaviors` against the feature-009
-  vocabulary and every referenced `behavior_group` against the registry
-  (FR-018). `behaviors` are the DIRECT behaviors; the effective set is composed
+  Checks authorization, slug shape and one-namespace uniqueness, and — for
+  `kind: "npc"` — validates the direct `behaviors` against the behavior
+  vocabulary and every referenced `behavior_group` against the registry.
+  `behaviors` are the DIRECT behaviors; the effective set is composed
   (union with behavior_groups) at spawn time.
 
   Returns `{:ok, blueprint_id}`. Refusals: `:not_a_wizard` / `:unknown_player`,
@@ -305,8 +304,8 @@ defmodule AgenticRealms.World.Commands.Authoring do
   end
 
   @doc """
-  Spawn a freeform one-off NPC into a room — no Blueprint, no registry change
-  (feature 015 US5). The wizard's authored payload (incl. `lore`) is cloned
+  Spawn a freeform one-off NPC into a room — no Blueprint, no registry
+  change. The wizard's authored payload (incl. `lore`) is cloned
   into the room via `Entities.clone_into(:npc, …)` with a null `blueprint_id`/`serial`,
   so the clone is observationally identical to a blueprint-spawned NPC but has
   no template behind it.
@@ -458,7 +457,7 @@ defmodule AgenticRealms.World.Commands.Authoring do
 
   Returns `{:ok, new_revision}` on a field-changing commit. Returns
   `{:ok, :no_change}` when every field in `fields_changed` already
-  equals the current state (FR-008 — no revision bump for no-op).
+  equals the current state; a no-op does not bump the revision.
 
   Refusals:
     * `{:error, :not_a_wizard}` / `{:error, :unknown_player}`.
@@ -593,7 +592,7 @@ defmodule AgenticRealms.World.Commands.Authoring do
   end
 
   @doc """
-  Feature 015 US7 — edit an in-world NPC clone in place. Co-located security
+  Edit an in-world NPC clone in place. Co-located security
   boundary: the clone must be in the wizard's current room. The clone is
   freestanding, so the edit applies only to it (no propagation to the
   blueprint or sibling clones).

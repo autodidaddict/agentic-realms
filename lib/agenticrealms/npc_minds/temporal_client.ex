@@ -1,6 +1,6 @@
 defmodule AgenticRealms.NpcMinds.TemporalClient do
   @moduledoc """
-  Feature 018 — thin HTTP client for the **Temporal server's** HTTP API, built on
+  Thin HTTP client for the **Temporal server's** HTTP API, built on
   `Req`. Starts/terminates one durable workflow per NPC (`npc-<entity_id>`) and
   lists running NPC workflows for the reconciler. This talks to the Temporal
   server, **never** to the `agentic-realms-npc` worker.

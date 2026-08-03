@@ -1,6 +1,6 @@
 defmodule AgenticRealms.World.Events.CharacterCreated do
   @moduledoc """
-  Feature 020 — a player's character came into being.
+  A player's character came into being.
 
   Distinct from `PlayerSpawned`, which means "entered the world" and happens
   every session. A character is made once, and this is the event that says so.

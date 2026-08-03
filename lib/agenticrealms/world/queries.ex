@@ -2,7 +2,6 @@ defmodule AgenticRealms.World.Queries do
   @moduledoc """
   Read-side API for the world. Every query is a pure Ecto read against the
   read models in `AgenticRealms.Repo` — no Commanded dispatch, no events.
-
   """
 
   import Ecto.Query
@@ -376,7 +375,7 @@ defmodule AgenticRealms.World.Queries do
   end
 
   @doc """
-  Feature 018 — global (non-owner-scoped) exits of `room_id` with their
+  Global (non-owner-scoped) exits of `room_id` with their
   destination room ids. Unlike `list_exits/2`, this returns `target_room_id`
   (not the display name) and includes ONLY exits with `visible_to_user_id IS
   NULL`, so an external NPC mind never sees or traverses another actor's
@@ -393,12 +392,12 @@ defmodule AgenticRealms.World.Queries do
   end
 
   @doc """
-  Feature 018 — online players currently in `room_id` (id + name), for the
+  Online players currently in `room_id` (id + name), for the
   external NPC surroundings read. Mirrors the online-presence filtering used for
   the player-facing room view, but without any self-exclusion (the caller is a
   service, not a player).
 
-  Feature 021 — the name is the character's, not the account's, and the sort
+  The name is the character's, not the account's, and the sort
   follows it. A player with no character has none to show, so they are excluded
   the same way an offline one is; they are never in a room to begin with.
   """
@@ -589,7 +588,7 @@ defmodule AgenticRealms.World.Queries do
   end
 
   @doc """
-  Feature 015 — all Blueprint rows (both kinds) as full schema structs,
+  All Blueprint rows (both kinds) as full schema structs,
   ordered by name then id. Backs the wizard's unified registry pane.
   """
   @spec list_blueprint_rows() :: [%Blueprint{}]

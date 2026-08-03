@@ -11,7 +11,6 @@ defmodule AgenticRealms.World.Quest do
   in `:completed` direction. Refusals return `{:error, atom}` to the
   command-dispatch wrapper, which translates them to the uniform
   `{ok: false, reason: ...}` tool result envelope.
-
   """
 
   defstruct quest_id: nil,

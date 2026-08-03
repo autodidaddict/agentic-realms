@@ -1,13 +1,11 @@
 defmodule AgenticRealmsWeb.GameLiveMapsTest do
   @moduledoc """
-  End-to-end LiveView test exercising US1 through US7 against the seeded
-  Blackmire + Hollowvale world.
+  End-to-end LiveView test for maps against the seeded Blackmire and
+  Hollowvale world.
 
-  Feature 012 — Maps. Tagged `:integration` so it runs alongside the
-  other integration suites (e.g., game_live_behaviors_test.exs). The
-  whole story is a single sequential test so the seed runs exactly once
-  per module — see the moduledoc comment in `World.Seed` for why the
-  Commanded aggregate state persists across sandbox-isolated tests.
+  Tagged `:integration` so it runs alongside the other integration suites.
+  The whole story is a single sequential test so the seed runs exactly once
+  per module.
   """
 
   use AgenticRealmsWeb.ConnCase, async: false

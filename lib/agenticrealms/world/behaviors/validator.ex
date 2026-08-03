@@ -4,7 +4,6 @@ defmodule AgenticRealms.World.Behaviors.Validator do
   seed before dispatching CreateRoom / CreateNPCBlueprint with behaviors,
   and (in a future feature) by the wizard tab before persisting any
   user-authored behaviors.
-
   """
 
   @valid_triggers ~w(player_entered player_left tick)

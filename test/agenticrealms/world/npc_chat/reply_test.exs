@@ -1,7 +1,6 @@
 defmodule AgenticRealms.World.NPCChat.ReplyTest do
   @moduledoc """
   Unit tests for the chat reply parser.
-
   """
 
   use ExUnit.Case, async: true

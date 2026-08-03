@@ -11,7 +11,6 @@ defmodule AgenticRealms.World.Ticks.Scope do
     * an object currently in the room (`Object.behaviors`)
     * an object currently held by a player whose `current_room_id` is
       this room (`Object.behaviors` via inventory)
-
   """
 
   alias AgenticRealms.Repo

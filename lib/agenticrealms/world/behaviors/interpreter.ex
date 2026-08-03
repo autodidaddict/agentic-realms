@@ -16,8 +16,8 @@ defmodule AgenticRealms.World.Behaviors.Interpreter do
   `consistency: :strong` so the destination-room behaviors fire and
   broadcast before `Commands.move/2` returns.
 
-  Per FR-016, the handler produces only transient PubSub broadcasts — it
-  does NOT emit domain events.
+  The handler produces only transient PubSub broadcasts; it does not emit
+  domain events.
   """
 
   use Commanded.Event.Handler,

@@ -5,7 +5,6 @@ defmodule AgenticRealms.World.NPCChat.Tools do
   Two tools, `say` and `emote`. With `tool_choice: {type: "any"}` on the
   Anthropic request, the model MUST produce exactly one of them per turn
   (FR-021). This shape eliminates structured-output ambiguity.
-
   """
 
   @doc """

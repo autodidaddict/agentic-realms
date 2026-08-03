@@ -1,6 +1,6 @@
 defmodule AgenticRealms.World.StatsSheetTest do
   @moduledoc """
-  Feature 020 — `Stats.for_player/1` is an adapter over `Srd.Character.derive/1`.
+  `Stats.for_player/1` is an adapter over `Srd.Character.derive/1`.
 
   These assert the adapter: that it reads the row, passes level and scores
   through, and merges in the name and current hitpoints. That the derived

@@ -17,7 +17,6 @@ defmodule AgenticRealms.World.NPCChat do
   Side effects from the Conversation (system messages, replies) flow
   via PubSub broadcast on `AgenticRealmsWeb.Topics.player_topic(player_id)`
   — the caller is the LiveView, which is already subscribed.
-
   """
 
   alias AgenticRealms.World.NPCChat.{Registry, Supervisor}

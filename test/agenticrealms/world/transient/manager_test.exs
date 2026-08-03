@@ -1,6 +1,6 @@
 defmodule AgenticRealms.World.Transient.ManagerTest do
   @moduledoc """
-  Feature 017 — the reaper's due-ness logic and presence reconciliation, driven
+  The reaper's due-ness logic and presence reconciliation, driven
   synchronously via `Manager.sweep_now/0` against directly-inserted region rows.
   """
   use AgenticRealms.DataCase, async: false

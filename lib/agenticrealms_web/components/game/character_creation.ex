@@ -1,6 +1,6 @@
 defmodule AgenticRealmsWeb.GameComponents.CharacterCreation do
   @moduledoc """
-  Feature 021 — the character creation dialog.
+  The character creation dialog.
 
   Shown once, before a player has ever entered the world, and there is no way
   out of it except creating a character or leaving the page: the shared modal

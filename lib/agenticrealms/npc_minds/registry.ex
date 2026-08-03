@@ -1,6 +1,6 @@
 defmodule AgenticRealms.NpcMinds.Registry do
   @moduledoc """
-  Feature 018 — cluster-wide unique registry for the singleton
+  Cluster-wide unique registry for the singleton
   `NpcMinds.Reconciler` (same `Horde.Registry` pattern as `Ticks.Registry` /
   `NPCChat.Registry`). A single fixed key (`:reconciler`) maps to exactly one
   reconciler pid across the BEAM cluster, so the periodic sweep runs on one node

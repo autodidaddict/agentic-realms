@@ -1,6 +1,6 @@
 defmodule AgenticRealms.World.WizardTrance do
   @moduledoc """
-  Feature 014 — wizard trance broadcast helper. Translates an
+  Wizard trance broadcast helper. Translates an
   `authoring_mode` toggle on a wizard's LiveView socket into a co-present
   player-facing log entry.
 

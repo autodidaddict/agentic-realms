@@ -1,6 +1,6 @@
 defmodule AgenticRealms.World.Commands.CreateCharacter do
   @moduledoc """
-  Feature 020 — give a player their SRD character.
+  Give a player their SRD character.
 
   Carries a fully-formed character: the aggregate generates nothing, looks
   nothing up, and defaults nothing. Generation happens in
@@ -11,7 +11,7 @@ defmodule AgenticRealms.World.Commands.CreateCharacter do
   Idempotent at the aggregate: dispatched once per confirmation, it emits only
   the first time.
 
-  Feature 021 — the values are now the player's own. `AgenticRealms.World.
+  The values are the player's own. `AgenticRealms.World.
   Commands.create_character/2` completes their draft, validates it, claims the
   name, and dispatches this. Generation still fills whatever the dialog has not
   learned to ask.

@@ -6,9 +6,8 @@ defmodule AgenticRealms.World.MapViewTest do
   event store. Discovery rows are inserted directly here so the MapView
   layer sees a consistent read-model state.
 
-  Feature 012 — Maps. Covers US1 (basic render), US2 (movement updates),
-  and the off-map / cross-region / hidden-room negative cases that US5–US7
-  will exercise further in subsequent phases.
+  Covers the basic render, movement updates, and the off-map,
+  cross-region and hidden-room negative cases.
   """
 
   use AgenticRealms.DataCase, async: false

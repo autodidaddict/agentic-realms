@@ -4,7 +4,7 @@ defmodule AgenticRealms.World.Communication.RecipientResolverTest do
   Covers FR-010 (case-insensitive exact match, ambiguous refusal) and
   FR-010a (self-target refusal).
 
-  Feature 021 — players are resolved by their character's name, so every
+  Players are resolved by their character's name, so every
   fixture here registers an account and then gives it a character to be
   addressed by. The account username is no longer a way to reach anyone.
   """

@@ -1,6 +1,6 @@
 defmodule AgenticRealmsWeb.Plugs.RequireServiceToken do
   @moduledoc """
-  Feature 018 — guards the NPC service contract routes with the shared bearer
+  Guards the NPC service contract routes with the shared bearer
   token. Every request must present `Authorization: Bearer <NPC_SERVICE_SECRET>`;
   a missing, malformed, or incorrect token → `401` with `halt` before any read or
   world change. The comparison is constant-time (`Plug.Crypto.secure_compare/2`),

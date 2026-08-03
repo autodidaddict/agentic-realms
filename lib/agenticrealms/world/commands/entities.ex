@@ -56,7 +56,7 @@ defmodule AgenticRealms.World.Commands.Entities do
   end
 
   @doc """
-  Feature 018 — remove an entity from the world. First-class, event-sourced
+  Remove an entity from the world. First-class, event-sourced
   removal: dispatches `RemoveEntity` to the `Entity` aggregate, which emits
   `EntityRemoved` (the read-model row is then deleted by the projector, the
   witness announces an NPC's departure, and the NPC-mind process manager
@@ -107,7 +107,7 @@ defmodule AgenticRealms.World.Commands.Entities do
   is not fixed.
 
   Aggregate validation: the object is still in the room when the command
-  is processed (race-loser path for the FR-011 / Q1 clarification).
+  is processed (the race-loser path).
 
   Returns `{:ok, %{object_id, object_name}}` on success.
   """

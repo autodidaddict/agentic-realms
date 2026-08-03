@@ -4,10 +4,10 @@ defmodule AgenticRealms.World.Behaviors.ActionExecutor do
   `BehaviorUtterance` struct and broadcasting it on the appropriate set of
   `player_topic`s.
 
-  Recipient sets per `contracts/ui_events.md` and FR-015:
+  Recipient sets:
     * `:room_speech` (room is the source) → triggering player only when
-      `triggering_player_id` is a player id (event-driven path from
-      feature 009). For the tick-driven path, where there
+      `triggering_player_id` is a player id (the event-driven path).
+      For the tick-driven path, where there
       is no single triggering player, pass `nil` and the action fans out
       to ALL live occupants of the room.
     * `:npc_speech` (NPC clone is the speaker) → triggering player + every

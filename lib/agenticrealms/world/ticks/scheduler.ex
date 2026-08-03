@@ -10,7 +10,6 @@ defmodule AgenticRealms.World.Ticks.Scheduler do
   Cadence is drift-free: `next_fire = last_fire + interval_ms`. Long
   actions don't pile up — a behavior whose previous tick is still
   dispatching is skipped on the current beat (future-proofing).
-
   """
 
   use GenServer

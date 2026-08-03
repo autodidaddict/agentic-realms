@@ -1,7 +1,6 @@
 defmodule Srd.Dice do
   @moduledoc """
   Dice rolling for SRD 5.2 resolution.
-
   """
   alias Srd.Dice.{Expr, Roll}
 

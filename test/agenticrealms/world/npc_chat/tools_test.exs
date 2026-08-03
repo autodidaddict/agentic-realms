@@ -1,7 +1,6 @@
 defmodule AgenticRealms.World.NPCChat.ToolsTest do
   @moduledoc """
   Unit tests for the chat tool definitions.
-
   """
 
   use ExUnit.Case, async: true

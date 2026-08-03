@@ -1,6 +1,6 @@
 defmodule AgenticRealms.World.Transient.EventStoreStub do
   @moduledoc """
-  Feature 017 — test double for the transient-purge event-store seam
+  Test double for the transient-purge event-store seam
   (`config :agenticrealms, :transient_event_store`). The in-memory Commanded
   adapter used in `:test` has no `delete_stream`, so the real hard-delete path
   cannot run there; this records the stream/snapshot deletions Purge requests

@@ -1,6 +1,6 @@
 defmodule AgenticRealms.World.PlayerNames do
   @moduledoc """
-  Feature 021 — what a player is called, and the one place the world asks.
+  What a player is called, and the one place the world asks.
 
   Since interactive character creation, the character name is a player's
   identity everywhere another player can see them: room occupant lists, speech,

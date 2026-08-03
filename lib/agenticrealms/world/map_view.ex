@@ -8,8 +8,6 @@ defmodule AgenticRealms.World.MapView do
   milliseconds on realistic data, dominated by 3–5 indexed Postgres queries
   bounded by the viewport size.
 
-  Feature 012 — Maps. See `specs/012-maps/contracts/map-view.md`.
-
   ## Information-hiding contract
 
   The renderer trusts MapView to be honest about what's visible. MapView

@@ -4,8 +4,9 @@ defmodule AgenticRealmsWeb.GameComponents.MiniMapTest do
   handcrafted `MapView` structs — no Repo, no LiveView socket, no
   Commanded. Pure component-level assertions.
 
-  Feature 012 — Maps. Covers US1 (basic SVG render), US2 (sequence diff
-  on movement), and the information-hiding contract (no data-* leaks for fog stubs or cross-region affordances).
+  Covers the basic SVG render, the sequence diff on movement, and the
+  information-hiding contract (no data-* leaks for fog stubs or cross-region
+  affordances).
   """
 
   use ExUnit.Case, async: true

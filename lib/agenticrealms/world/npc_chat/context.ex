@@ -8,7 +8,6 @@ defmodule AgenticRealms.World.NPCChat.Context do
   `build_request/4` is pure: given a snapshot, the conversation history,
   the current player utterance, and the NPC name (for rendering assistant
   turns), it produces the Anthropic Messages API request body.
-
   """
 
   alias AgenticRealms.Repo

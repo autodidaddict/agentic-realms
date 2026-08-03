@@ -2,10 +2,9 @@ defmodule AgenticRealms.World.CommandParser do
   @moduledoc """
   Parse the player's raw text input into a structured command sentinel.
 
-  Pure function: no DB, no aggregates, no dispatch. Owns FR-006 (movement
-  aliases), FR-014 (inventory aliases), FR-017 (case/whitespace tolerance),
-  FR-018 (unknown commands), and FR-019 (empty input) plus
-  the four communication verbs (say, emote, tell, whisper).
+  Pure function: no DB, no aggregates, no dispatch. Owns movement aliases,
+  inventory aliases, case and whitespace tolerance, unknown commands, empty
+  input, and the four communication verbs (say, emote, tell, whisper).
 
   Case-handling contract:
 

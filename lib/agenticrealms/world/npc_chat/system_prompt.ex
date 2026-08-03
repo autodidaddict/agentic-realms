@@ -6,7 +6,6 @@ defmodule AgenticRealms.World.NPCChat.SystemPrompt do
   see when an NPC speaks". Grep for `SystemPrompt` to find it. Every
   clause of FR-008 (a–f) is enforced as inline text — modifications
   here are the right place to tune NPC voice / refusal posture / etc.
-
   """
 
   @type snapshot :: %{

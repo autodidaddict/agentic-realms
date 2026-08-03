@@ -16,7 +16,6 @@ defmodule AgenticRealms.World.IntentResolver.Tools do
   request just isn't cached). It is kept so caching engages automatically if
   the prompt later grows past the threshold. Per-request cost without caching
   is negligible at Haiku rates.
-
   """
 
   @doc "Set of recognized tool names (the 9 canonical actions + `refuse`)."

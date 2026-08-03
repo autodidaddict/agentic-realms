@@ -13,7 +13,6 @@ defmodule AgenticRealms.World.Projections.QuestProjector do
   Each handler is idempotent under replay: `delete_all` over a closed
   id-set is a no-op the second time, `update_all` to a final value is
   idempotent, `insert(on_conflict: :nothing)` is idempotent.
-
   """
 
   use Commanded.Event.Handler,

@@ -10,7 +10,6 @@ defmodule AgenticRealms.World.NPCChat.Conversation do
   Registered cluster-wide via `Horde.Registry` under
   `{NPCChat.Registry, {player_id, npc_clone_id}}`. Started under
   `NPCChat.Supervisor` (a `Horde.DynamicSupervisor`).
-
   """
 
   use GenServer

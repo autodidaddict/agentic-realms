@@ -1,6 +1,6 @@
 defmodule AgenticRealmsWeb.StatsChangedTest do
   @moduledoc """
-  Feature 020 — how the open character sheet reacts to progression.
+  How the open character sheet reacts to progression.
 
   An xp-only change is patched from the broadcast payload with no database
   read. A level change re-derives the whole sheet, because level moves the

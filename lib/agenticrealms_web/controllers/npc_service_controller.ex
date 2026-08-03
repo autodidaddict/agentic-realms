@@ -1,6 +1,6 @@
 defmodule AgenticRealmsWeb.NpcServiceController do
   @moduledoc """
-  Feature 018 — the game-exposed NPC service contract consumed by the external
+  The game-exposed NPC service contract consumed by the external
   mind worker (`agentic-realms-npc`). Three authenticated routes: read identity,
   read surroundings, submit a move. Guarded by `RequireServiceToken`.
 

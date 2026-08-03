@@ -2,7 +2,6 @@ defmodule AgenticRealms.World.NPCChatTest do
   @moduledoc """
   Tests for the public NPCChat API. Exercises input
   validation, NPC resolution, and the Horde-backed find-or-start path.
-
   """
 
   use AgenticRealms.DataCase, async: false

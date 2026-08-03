@@ -1,6 +1,6 @@
 defmodule AgenticRealmsWeb.GameComponents.MiniMap do
   @moduledoc """
-  Feature 012 — region mini-map rendering.
+  Region mini-map rendering.
 
   The SVG viewBox lives in CELL UNITS. A "cell" is the 1x1 unit; room
   rects sit inside their cell with a small padding so connecting lines

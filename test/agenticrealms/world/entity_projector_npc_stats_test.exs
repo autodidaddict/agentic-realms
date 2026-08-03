@@ -1,6 +1,6 @@
 defmodule AgenticRealms.World.EntityProjectorNpcStatsTest do
   @moduledoc """
-  Feature 019 — EntityCloned{:npc} freezes the blueprint's stats onto the
+  EntityCloned{:npc} freezes the blueprint's stats onto the
   npc_clones row. Calls the projector's `handle/2` directly (a pure Repo write;
   no command dispatch), so no Commanded chain is needed.
   """

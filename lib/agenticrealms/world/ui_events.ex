@@ -5,7 +5,6 @@ defmodule AgenticRealms.World.UIEvents do
 
   These are NOT persisted — domain events live in
   `AgenticRealms.World.Events.*` and are appended to the event store.
-
   """
 
   defmodule RoomObjectTaken do
@@ -93,7 +92,7 @@ defmodule AgenticRealms.World.UIEvents do
 
   defmodule RoomObjectDeparted do
     @moduledoc """
-    Feature 016 — transient object-departure entry. Broadcast on
+    Transient object-departure entry. Broadcast on
     `room:<source>` when an object is moved out of a room into another room
     (`:relocated`). NOT emitted for `:taken` (which has `RoomObjectTaken`) or
     for moves into the void. Mirror of the dormant `RoomNPCLeft`.
@@ -104,7 +103,7 @@ defmodule AgenticRealms.World.UIEvents do
 
   defmodule RoomTranceEntered do
     @moduledoc """
-    Feature 014 — transient trance-entry log entry. Broadcast on
+    Transient trance-entry log entry. Broadcast on
     `room:<wizard's current room>` when a wizard flips their
     `authoring_mode` to `:blueprints`. Renders as a `system` narrative-log
     entry on every co-present player's view.
@@ -123,7 +122,7 @@ defmodule AgenticRealms.World.UIEvents do
 
   defmodule RoomTranceExited do
     @moduledoc """
-    Feature 014 — transient trance-exit log entry. Broadcast on
+    Transient trance-exit log entry. Broadcast on
     `room:<wizard's current room>` when a wizard flips their
     `authoring_mode` back to `:world`. Suppressed on disconnect
     per FR-005 by virtue of the LiveView's terminate callback NOT firing
@@ -218,7 +217,6 @@ defmodule AgenticRealms.World.UIEvents do
     `kind` is `:chat_speech` (rendered with quoted attribution like a
     `says`) or `:chat_emote` (rendered as freeform third-person narration
     attributed to the NPC by name).
-
     """
     @enforce_keys [:kind, :npc_clone_id, :npc_name, :text, :triggering_player_id]
     defstruct [:kind, :npc_clone_id, :npc_name, :text, :triggering_player_id]
@@ -267,7 +265,6 @@ defmodule AgenticRealms.World.UIEvents do
       * `:chat_continuing` — subsequent turn within the 60s window
       * `:chat_in_flight_rejection` — concurrent send while a prior call is in flight
       * `:chat_fallback` — LLM call failed; in-theme fallback line for the player
-
     """
     @enforce_keys [:kind, :npc_name, :text, :player_id]
     defstruct [:kind, :npc_name, :text, :player_id]
@@ -275,7 +272,7 @@ defmodule AgenticRealms.World.UIEvents do
 
   defmodule PlayerStatsChanged do
     @moduledoc """
-    Feature 019 — transient progression notice. Broadcast on
+    Transient progression notice. Broadcast on
     `player:<player_id>` ONLY when a player gains experience (`xp_gained` +
     `new_total`) and/or levels up (`leveled_to`). `GameLive` refreshes the
     character sheet from the payload (no DB read — the deltas are authoritative)

@@ -1,6 +1,6 @@
 defmodule AgenticRealms.World.CreateCharacterFacadeTest do
   @moduledoc """
-  Feature 021 — `Commands.create_character/2`: complete, validate, check the
+  `Commands.create_character/2`: complete, validate, check the
   name, create.
 
   The first step is the one worth testing hardest. A draft only carries the

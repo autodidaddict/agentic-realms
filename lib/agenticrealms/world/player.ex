@@ -7,7 +7,6 @@ defmodule AgenticRealms.World.Player do
   Coexists with `AgenticRealms.Accounts.Player` (the account record); the
   two represent different things and modules consuming both should alias
   one of them to avoid ambiguity.
-
   """
 
   defstruct id: nil,

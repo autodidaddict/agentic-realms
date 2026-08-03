@@ -8,7 +8,6 @@ defmodule AgenticRealms.World.NPCChat.Reply do
   name is in `Tools.names/0` and whose `input.text` is a non-empty
   trimmed string collapses to `:malformed`. Malformed output
   flows through the FR-011 fallback path.
-
   """
 
   alias AgenticRealms.World.NPCChat.Tools

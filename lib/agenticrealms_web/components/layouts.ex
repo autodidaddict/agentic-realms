@@ -18,7 +18,6 @@ defmodule AgenticRealmsWeb.Layouts do
       <Layouts.app flash={@flash} current_player={@current_player}>
         <h1>Content</h1>
       </Layouts.app>
-
   """
   attr :flash, :map, required: true, doc: "the map of flash messages"
 

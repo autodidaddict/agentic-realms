@@ -2,7 +2,7 @@ defmodule AgenticRealms.World.Schemas.PlayerState do
   @moduledoc """
   A player's projected world state: where they are, and who their character is.
 
-  Feature 020 — SRD 5e Character Stats. The character columns carry only what
+  SRD 5e Character Stats. The character columns carry only what
   cannot be recomputed: the choices made at creation, and the two counters that
   change during play. Everything a character sheet shows beyond these —
   modifiers, proficiency bonus, saving throws, skills, armor class, initiative,

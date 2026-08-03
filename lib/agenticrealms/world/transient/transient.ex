@@ -1,6 +1,6 @@
 defmodule AgenticRealms.World.Transient do
   @moduledoc """
-  Feature 017 — Transient Regions context. The programmatic provisioning
+  Transient Regions context. The programmatic provisioning
   surface (there is no player-facing command in the MVP): `provision/2`
   orchestrates the generate → guard → dispatch → place-owner flow, and
   `destroy/1` (added with the teardown lifecycle) force-destroys + purges a

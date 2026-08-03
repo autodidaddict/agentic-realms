@@ -1,6 +1,6 @@
 defmodule AgenticRealms.World.Transient.Generator do
   @moduledoc """
-  Feature 017 — stand-in for a procedural region generator. For the MVP this
+  Stand-in for a procedural region generator. For the MVP this
   hand-codes a small, fixed layout of interconnected rooms suitable for
   testing; there is no map data or real procedural generation yet.
 

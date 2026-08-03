@@ -4,7 +4,6 @@ defmodule AgenticRealms.World.NPCChat.SystemPromptTest do
 
   Verifies every clause of FR-008 (a–f) appears in the rendered prompt
   via substring assertions, plus the empty-lore fallback.
-
   """
 
   use ExUnit.Case, async: true

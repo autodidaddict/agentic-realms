@@ -1,6 +1,6 @@
 defmodule AgenticRealms.World.Transient.Manager do
   @moduledoc """
-  Feature 017 — singleton lifecycle manager for transient regions. Two duties,
+  Singleton lifecycle manager for transient regions. Two duties,
   both driven off durable `regions` columns so there is nothing to rehydrate
   after a crash:
 

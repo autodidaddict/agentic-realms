@@ -8,7 +8,6 @@ defmodule AgenticRealms.World.Ticks.Lifecycle do
   NOT under Horde — in multi-node deployments, each node observes
   Presence independently and `find_or_start/1` is idempotent across
   registry calls (Horde.Registry enforces uniqueness).
-
   """
 
   use GenServer

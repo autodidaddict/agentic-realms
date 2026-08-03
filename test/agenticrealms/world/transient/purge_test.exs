@@ -1,6 +1,6 @@
 defmodule AgenticRealms.World.Transient.PurgeTest do
   @moduledoc """
-  Feature 017 — `Transient.Purge` targets the right streams/rows and is
+  `Transient.Purge` targets the right streams/rows and is
   idempotent. Uses direct read-model inserts + the recording event-store stub
   (the in-memory Commanded adapter has no `delete_stream`), so no Commanded
   chain is needed.

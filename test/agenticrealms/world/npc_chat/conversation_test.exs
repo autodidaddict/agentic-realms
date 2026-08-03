@@ -7,7 +7,6 @@ defmodule AgenticRealms.World.NPCChat.ConversationTest do
   cluster registration getting in the way.
 
   Stubs the Anthropic call via `Req.Test` so the test stays hermetic.
-
   """
 
   use AgenticRealms.DataCase, async: false

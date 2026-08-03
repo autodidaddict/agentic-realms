@@ -15,7 +15,6 @@ defmodule AgenticRealms.World.Entity do
   The aggregate validates *type* and *self-consistency* only; it cannot verify
   the destination container *exists* (cross-aggregate) — that is the world
   service's job (`AgenticRealms.World.Commands.move_entity/4`).
-
   """
 
   alias AgenticRealms.World.ContainerRef

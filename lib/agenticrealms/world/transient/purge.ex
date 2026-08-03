@@ -1,6 +1,6 @@
 defmodule AgenticRealms.World.Transient.Purge do
   @moduledoc """
-  Feature 017 — permanently purge a destroyed transient region. Commanded's
+  Permanently purge a destroyed transient region. Commanded's
   event-store adapter exposes no stream deletion, so this calls the underlying
   event store directly (`delete_stream/3` hard, `delete_snapshot/1`) — which
   requires `enable_hard_deletes: true`. The event-store module is an injectable

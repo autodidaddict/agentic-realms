@@ -1,6 +1,6 @@
 defmodule AgenticRealms.World.BehaviorGroups do
   @moduledoc """
-  Feature 015 — the behavior_group registry + composition.
+  The behavior_group registry and composition.
 
   A behavior_group is a named group of feature-009 behaviors, applicable to items,
   NPCs, or rooms (cross-entity), referenced by a blueprint by name. Seed-only
@@ -10,8 +10,8 @@ defmodule AgenticRealms.World.BehaviorGroups do
   Composition (`compose/2`) is **additive and lossless**: the
   effective behavior list is the concatenation, in attachment order, of each
   referenced behavior_group's behaviors, followed by the blueprint's direct
-  behaviors. Same-trigger behaviors from different sources are all retained
-  (feature 009 fires every behavior matching a trigger).
+  behaviors. Same-trigger behaviors from different sources are all retained;
+  every behavior matching a trigger fires.
   """
 
   import Ecto.Query
@@ -36,8 +36,8 @@ defmodule AgenticRealms.World.BehaviorGroups do
 
   @doc """
   Resolve behavior_group names to their behaviors lists, preserving input order.
-  Returns `{:error, {:unknown_behavior_group, name}}` for the first unknown name
-  (FR-018).
+  Returns `{:error, {:unknown_behavior_group, name}}` for the first unknown
+  name.
   """
   @spec resolve([String.t()]) ::
           {:ok, [[map()]]} | {:error, {:unknown_behavior_group, String.t()}}

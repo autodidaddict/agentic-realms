@@ -1,6 +1,6 @@
 defmodule AgenticRealms.World.CharacterGenTest do
   @moduledoc """
-  Feature 020 — deterministic default character generation.
+  Deterministic default character generation.
 
   Generation is policy, not rules: the SRD says a fighter picks two skills from
   a list, and this module decides which two. These tests pin those decisions so

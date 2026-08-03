@@ -1,6 +1,6 @@
 defmodule AgenticRealms.World.CharacterDraft do
   @moduledoc """
-  Feature 021 — a character being made, before it exists.
+  A character being made, before it exists.
 
   Held in the creating player's LiveView socket and nowhere else. Never
   persisted, never broadcast, never in a registry: a draft belongs to one

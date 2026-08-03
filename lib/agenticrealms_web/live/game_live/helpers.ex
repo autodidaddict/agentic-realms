@@ -38,7 +38,7 @@ defmodule AgenticRealmsWeb.GameLive.Helpers do
   end
 
   @doc """
-  Feature 012 — recompute the per-player MapView struct. Called every
+  Recompute the per-player MapView struct. Called every
   time the player's current room changes (own move, other-tab swap, or
   any future region/elevation transition). The MapView query is
   bounded by the configured viewport (default 11×11 cells) so this

@@ -1,6 +1,6 @@
 defmodule AgenticRealms.World.Stats do
   @moduledoc """
-  Feature 020 — the character-sheet read, plus the qualitative banding examine
+  The character-sheet read, plus the qualitative banding examine
   uses.
 
   `for_player/1` is an adapter and nothing more: it reads the `player_state`

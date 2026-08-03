@@ -1,6 +1,6 @@
 defmodule AgenticRealms.World.Projections.EntityProjector do
   @moduledoc """
-  Feature 016 — projects the unified entity lifecycle (`EntityCloned` /
+  Projects the unified entity lifecycle (`EntityCloned` /
   `EntityMoved` / `EntityEdited`) into the read models. Owns every
   `world_objects` (and, from Phase 4, `npc_clones`) row write.
 

@@ -16,7 +16,6 @@ defmodule AgenticRealms.Anthropic do
     * `:timeout_ms` — receive timeout, defaults to 5000
     * `:req_options` — extra options merged into the Req request (tests inject
       a `Req.Test` plug here so no request leaves the BEAM)
-
   """
 
   require Logger

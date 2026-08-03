@@ -3,14 +3,13 @@ defmodule AgenticRealms.World.Communication.RecipientResolver do
   Resolves a player-typed recipient token to a `%{id, name}` map via
   case-insensitive exact match against a character's name.
 
-  Feature 021 — players are addressed by their character's name, not their
+  Players are addressed by their character's name, not their
   login. A player with no character has no name to be addressed by, and is never
   in a room to be whispered at.
 
   Shared by `World.Communication.tell/3` and `World.Communication.whisper/3`.
   Behavior is governed by FR-010 (case-insensitive exact match, ambiguous
   refusal) and FR-010a (self-target refusal).
-
   """
 
   import Ecto.Query

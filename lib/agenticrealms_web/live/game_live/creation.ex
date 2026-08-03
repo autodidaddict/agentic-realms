@@ -1,6 +1,6 @@
 defmodule AgenticRealmsWeb.GameLive.Creation do
   @moduledoc """
-  Feature 021 — the creation dialog's event handlers.
+  The creation dialog's event handlers.
 
   Every one of these updates the draft in socket assigns and re-renders. None
   touches world state until `confirm/1`, so abandoning creation leaves nothing

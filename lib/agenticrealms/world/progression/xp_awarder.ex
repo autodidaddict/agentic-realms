@@ -1,6 +1,6 @@
 defmodule AgenticRealms.World.Progression.XpAwarder do
   @moduledoc """
-  Feature 019 — awards quest experience to players.
+  Awards quest experience to players.
 
   A named `Commanded.Event.Handler` (⇒ a single exclusive cluster-wide
   subscriber, so exactly one node awards each quest's XP) that reacts to

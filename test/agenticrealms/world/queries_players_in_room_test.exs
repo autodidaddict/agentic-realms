@@ -1,6 +1,6 @@
 defmodule AgenticRealms.World.QueriesPlayersInRoomTest do
   @moduledoc """
-  Feature 018 — list_players_in_room/1 returns online players. The online filter
+  List_players_in_room/1 returns online players. The online filter
   is verified via offline-exclusion (a persisted-in-room but not-Presence-tracked
   player is excluded); tracking a live session here would drive the always-on
   `Ticks.Lifecycle` to touch the DB outside the sandbox, so the positive online

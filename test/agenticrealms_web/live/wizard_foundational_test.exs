@@ -1,6 +1,6 @@
 defmodule AgenticRealmsWeb.WizardFoundationalTest do
   @moduledoc """
-  Feature 014 — foundational LiveView smoke tests for wizard authorization
+  Foundational LiveView smoke tests for wizard authorization
   (FR-WIZ-1 through FR-WIZ-4) and the trance broadcast pipeline.
 
   Story-level integration tests for the full authoring loop land alongside

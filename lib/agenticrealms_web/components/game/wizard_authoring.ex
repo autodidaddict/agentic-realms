@@ -1,6 +1,6 @@
 defmodule AgenticRealmsWeb.GameComponents.WizardAuthoring do
   @moduledoc """
-  Feature 014 — wizard authoring surface. Combines the sanctum
+  Wizard authoring surface. Combines the sanctum
   (`authoring_mode == :blueprints`) and in-world (`:world`) views in a
   single component because the prompt textarea, the right-side panes,
   and the blueprint registry are all shared scaffolding — only the

@@ -1,6 +1,6 @@
 defmodule AgenticRealms.World.PlayerStateProjectorCharacterTest do
   @moduledoc """
-  Feature 020 — the `CharacterCreated` projector clause.
+  The `CharacterCreated` projector clause.
 
   It upserts, so it must work whether or not `PlayerSpawned` has already
   created the row: a replay from position 0 can deliver the two in either

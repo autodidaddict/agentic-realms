@@ -5,7 +5,6 @@ defmodule AgenticRealms.World.Quests do
 
   Quest progress is a pure function of the player's current inventory
   (FR-019). This module is the canonical place to compute it.
-
   """
 
   import Ecto.Query
