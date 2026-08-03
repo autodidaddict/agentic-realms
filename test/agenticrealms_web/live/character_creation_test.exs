@@ -51,7 +51,10 @@ defmodule AgenticRealmsWeb.CharacterCreationTest do
 
   # Walk the identity step: a name and one of each selection.
   defp fill_identity(view, name, species \\ "elf", class \\ "wizard", background \\ "sage") do
-    render_keyup(view, "creation_name", %{"name" => name})
+    # Exactly what `phx-keyup` puts on the wire: the key pressed plus the
+    # input's current value. Sending a friendlier shape here is what let a
+    # crash-on-every-keystroke bug ship.
+    render_keyup(view, "creation_name", %{"key" => "r", "value" => name})
     select(view, "species", species)
     select(view, "class", class)
     select(view, "background", background)
@@ -59,13 +62,13 @@ defmodule AgenticRealmsWeb.CharacterCreationTest do
   end
 
   defp select(view, field, value) do
-    render_click(view, "creation_select", %{"field" => field, "value" => value})
+    render_click(view, "creation_select", %{"field" => field, "slug" => value})
   end
 
   defp assign_ability(view, ability, value) do
     render_click(view, "creation_assign_ability", %{
       "ability" => to_string(ability),
-      "value" => to_string(value)
+      "score" => to_string(value)
     })
   end
 
@@ -75,7 +78,7 @@ defmodule AgenticRealmsWeb.CharacterCreationTest do
     do: render_click(view, "creation_skill", %{"skill" => to_string(skill)})
 
   defp pick(view, key, value),
-    do: render_click(view, "creation_pick", %{"key" => key, "value" => to_string(value)})
+    do: render_click(view, "creation_pick", %{"key" => key, "option" => to_string(value)})
 
   # Walk to the specializations step for a given species/class/background.
   defp at_specializations(conn, species, class, background) do
@@ -295,7 +298,7 @@ defmodule AgenticRealmsWeb.CharacterCreationTest do
       html = render(view)
 
       for value <- Srd.Rules.Ability.standard_array() do
-        assert html =~ ~s(phx-value-value="#{value}")
+        assert html =~ ~s(phx-value-score="#{value}")
       end
 
       for ability <- Srd.Rules.Ability.all() do
@@ -363,8 +366,8 @@ defmodule AgenticRealmsWeb.CharacterCreationTest do
     test "a forged ability or value is ignored rather than accepted", %{view: view} do
       before = render(view)
 
-      render_click(view, "creation_assign_ability", %{"ability" => "luck", "value" => "18"})
-      render_click(view, "creation_assign_ability", %{"ability" => "str", "value" => "banana"})
+      render_click(view, "creation_assign_ability", %{"ability" => "luck", "score" => "18"})
+      render_click(view, "creation_assign_ability", %{"ability" => "str", "score" => "banana"})
       render_click(view, "creation_spread", %{"spread" => "split:cha:cha"})
 
       assert render(view) == before
@@ -579,7 +582,7 @@ defmodule AgenticRealmsWeb.CharacterCreationTest do
       assert html =~ "Alert"
       assert html =~ "already granted by your background"
       # And Alert is not among the pickable options.
-      refute html =~ ~s(phx-value-value="alert")
+      refute html =~ ~s(phx-value-option="alert")
     end
 
     test "picks reach the character in the right column", %{conn: conn} do

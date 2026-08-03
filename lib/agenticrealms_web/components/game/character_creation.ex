@@ -232,7 +232,7 @@ defmodule AgenticRealmsWeb.GameComponents.CharacterCreation do
             aria-pressed={to_string(@draft.array[ability] == value)}
             phx-click="creation_assign_ability"
             phx-value-ability={ability}
-            phx-value-value={value}
+            phx-value-score={value}
           >
             {value}
           </button>
@@ -407,7 +407,7 @@ defmodule AgenticRealmsWeb.GameComponents.CharacterCreation do
           aria-pressed={to_string(option.value in held(@draft, choice))}
           phx-click="creation_pick"
           phx-value-key={Draft.storage_key(choice.key)}
-          phx-value-value={option.value}
+          phx-value-option={option.value}
         >
           <span class="cc-option-name">{option.name}</span>
           <span :if={option.detail} class="cc-option-traits">{option.detail}</span>
@@ -657,7 +657,7 @@ defmodule AgenticRealmsWeb.GameComponents.CharacterCreation do
           aria-pressed={to_string(@selected == option.slug)}
           phx-click="creation_select"
           phx-value-field={@field}
-          phx-value-value={option.slug}
+          phx-value-slug={option.slug}
         >
           <span class="cc-option-name">{option.name}</span>
           <span class="cc-option-meta">{option.meta}</span>
