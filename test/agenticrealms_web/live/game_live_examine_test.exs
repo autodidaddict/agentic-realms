@@ -73,7 +73,7 @@ defmodule AgenticRealmsWeb.GameLiveExamineTest do
     flush(bob_view)
 
     # ── US1: examine a room object via the fast path ──────────────────────
-    log_count_before = bob_log_count(bob_view)
+    log_before = bob_log(bob_view)
 
     submit(alice_view, "look #{lantern_name}")
     flush(alice_view)
@@ -101,7 +101,7 @@ defmodule AgenticRealmsWeb.GameLiveExamineTest do
     # SC-005 — Bob (in the same room) sees NO new log entry from Alice's examine.
     flush(bob_view)
 
-    assert bob_log_count(bob_view) == log_count_before,
+    assert leaked_entries(bob_view, log_before) == [],
            "examining must not append a witness entry to other players in the room"
 
     # ── US1 via LLM fallback (natural-language examine) ───────────────────
@@ -155,7 +155,7 @@ defmodule AgenticRealmsWeb.GameLiveExamineTest do
     submit(alice_view, "s")
     flush(alice_view)
 
-    log_count_before = bob_log_count(bob_view)
+    log_before = bob_log(bob_view)
     submit(alice_view, "look #{bob.username}")
     flush(alice_view)
 
@@ -170,7 +170,7 @@ defmodule AgenticRealmsWeb.GameLiveExamineTest do
     # Privacy: Bob's log is unchanged
     flush(bob_view)
 
-    assert bob_log_count(bob_view) == log_count_before,
+    assert leaked_entries(bob_view, log_before) == [],
            "examining a player must not append a witness entry to that player"
 
     # US3 — self-examine via 'me'
@@ -285,9 +285,36 @@ defmodule AgenticRealmsWeb.GameLiveExamineTest do
     end
   end
 
-  defp bob_log_count(view) do
+  # The whole log, not its length. A privacy leak has a shape — an examine
+  # writes a `:detail` entry — and counting every entry cannot tell that apart
+  # from whatever the room emitted on its own while the test was running. The
+  # room these tests use is occupied, so it ticks, and a tick-driven object or
+  # NPC emote lands in Bob's log often enough to fail the assertion on timing
+  # rather than on privacy.
+  defp bob_log(view) do
     state = :sys.get_state(view.pid)
-    length(state.socket.assigns.log)
+    state.socket.assigns.log
+  end
+
+  # Entries the room produces on its own, unprompted by anything Alice typed.
+  # The room is occupied, so it ticks, and ticks drive object and NPC
+  # behaviour.
+  @ambient_kinds [
+    :object,
+    :object_emote,
+    :npc,
+    :npc_emote,
+    :npc_speech,
+    :room,
+    :room_emote,
+    :room_speech
+  ]
+
+  # Anything new in Bob's log that Alice's examine could be responsible for.
+  # Still fails on any leaked entry, of any kind — only ambient room chatter is
+  # forgiven.
+  defp leaked_entries(view, before) do
+    Enum.reject(bob_log(view) -- before, &(Map.get(&1, :kind) in @ambient_kinds))
   end
 
   defp first_object_name(player_id) do
