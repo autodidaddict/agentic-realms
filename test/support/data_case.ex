@@ -162,8 +162,42 @@ defmodule AgenticRealms.DataCase do
     on_exit(fn ->
       stop_tick_schedulers()
       await_background_tasks()
+      await_lifecycle_idle()
       Ecto.Adapters.SQL.Sandbox.stop_owner(pid)
     end)
+  end
+
+  @doc """
+  Wait until `Ticks.Lifecycle` has finished whatever it was doing.
+
+  Lifecycle is the one process in this family that cannot be stopped at
+  teardown — schedulers and tasks belong to a test and are disposable, and
+  Lifecycle is meant to run forever. It also queries on every presence change,
+  so a test that ends while it is resolving a presence diff leaves it holding
+  that test's connection. `safe_db/2` means it survives losing the connection,
+  but the connection is torn down all the same.
+
+  A `call` is the whole fix: it returns only once Lifecycle has processed
+  everything queued ahead of it, so it cannot be mid-query when the owner
+  stops. This narrows the window rather than removing it — a presence diff
+  arriving between this call and `stop_owner/1` would still land badly — but
+  that window is microseconds against the length of a test.
+
+  Only `async: false` tests can hit this at all. An async test owns its
+  connection rather than sharing it, so Lifecycle has nothing to borrow and
+  its queries fail immediately instead of holding anything.
+  """
+  def await_lifecycle_idle(timeout \\ 5_000) do
+    lifecycle = AgenticRealms.World.Ticks.Lifecycle
+
+    if Process.whereis(lifecycle) do
+      GenServer.call(lifecycle, :get_state, timeout)
+    end
+
+    :ok
+  catch
+    # Not running, or too busy to answer. Neither is worth failing a teardown.
+    :exit, _ -> :ok
   end
 
   @doc """
