@@ -55,8 +55,17 @@ defmodule AgenticRealms.World.CreateCharacterFacadeTest do
       assert ps.background_slug == "soldier"
 
       # Everything the player was not asked, filled in and legal.
-      assert Enum.sort([ps.str, ps.dex, ps.con, ps.int, ps.wis, ps.cha]) ==
-               Enum.sort([17, 13, 15, 12, 10, 8])
+      # Generation buys a spread rather than dealing a fixed array, so assert
+      # what has to hold: six reachable scores. Reproducibility is asserted by
+      # the determinism test below rather than by hard-coding the numbers here.
+      scores = [ps.str, ps.dex, ps.con, ps.int, ps.wis, ps.cha]
+
+      assert length(scores) == 6
+
+      for score <- scores do
+        assert score >= Srd.Rules.PointBuy.min_score()
+        assert score <= Srd.Rules.PointBuy.max_score() + 2
+      end
 
       assert length(ps.skill_proficiencies) > 0
       assert ps.save_proficiencies == ["con", "str"]
@@ -95,14 +104,11 @@ defmodule AgenticRealms.World.CreateCharacterFacadeTest do
       assert "acrobatics" in ps.skill_proficiencies
     end
 
-    test "a player-assigned ability array survives completion" do
+    test "a player-bought ability spread survives completion" do
       player_id = register()
 
       draft =
-        [str: 8, dex: 10, con: 12, int: 13, wis: 14, cha: 15]
-        |> Enum.reduce(identity_draft("Bard"), fn {ability, value}, acc ->
-          Draft.assign_ability(acc, ability, value)
-        end)
+        %{identity_draft("Bard") | bought: %{str: 8, dex: 10, con: 12, int: 13, wis: 14, cha: 15}}
 
       assert {:ok, :created} = Commands.create_character(player_id, draft)
 
@@ -117,12 +123,7 @@ defmodule AgenticRealms.World.CreateCharacterFacadeTest do
     test "CharacterGen.complete/1 fills nothing a fully-answered draft already has" do
       draft =
         identity_draft("Complete", "dwarf", "wizard", "sage")
-        |> Draft.assign_ability(:int, 15)
-        |> Draft.assign_ability(:con, 14)
-        |> Draft.assign_ability(:dex, 13)
-        |> Draft.assign_ability(:wis, 12)
-        |> Draft.assign_ability(:cha, 10)
-        |> Draft.assign_ability(:str, 8)
+        |> then(&%{&1 | bought: %{int: 15, con: 14, dex: 13, wis: 12, cha: 10, str: 8}})
         |> Draft.put_spread({:even, [:con, :int, :wis]})
         |> Draft.toggle_skill(:investigation)
         |> Draft.toggle_skill(:insight)

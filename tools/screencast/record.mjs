@@ -118,23 +118,15 @@ async function main() {
   await pickOption(page, 'background', 'sage', beat)
 
   // --- abilities ----------------------------------------------------------
-  log('assigning the standard array')
+  // The step rolls a spread on arrival, so there is nothing to assign. Nudge a
+  // couple of scores instead, which is what the steppers are for and what a
+  // viewer needs to see happen.
+  log('adjusting the rolled spread')
   await gotoStep(page, 'abilities', beat)
+  await page.waitForTimeout(DWELL)
 
-  // A wizard's array. Each value is used once, so no swap is triggered.
-  for (const [ability, value] of [
-    ['int', 15],
-    ['dex', 14],
-    ['con', 13],
-    ['wis', 12],
-    ['cha', 10],
-    ['str', 8],
-  ]) {
-    await page.click(
-      `button[phx-click="creation_assign_ability"][phx-value-ability="${ability}"][phx-value-score="${value}"]`,
-    )
-    await page.waitForTimeout(HALF)
-  }
+  await nudge(page, 'creation_ability_down', 2)
+  await nudge(page, 'creation_ability_up', 2)
   await page.waitForTimeout(DWELL)
 
   // Background increases. Options differ per background, so take the first.
@@ -187,6 +179,20 @@ async function main() {
   if (video) {
     await rename(join(OUT, video), join(OUT, 'character-creation.webm'))
     log(`wrote ${OUT}/character-creation.webm`)
+  }
+}
+
+// Press a stepper a few times, taking whichever ability the rules still allow
+// it on. Which one is not the point; that the number moves and the budget moves
+// with it is.
+async function nudge(page, event, times) {
+  for (let i = 0; i < times; i++) {
+    const button = page.locator(`button[phx-click="${event}"]:not([disabled])`).first()
+    if (!(await button.count())) return
+
+    await button.scrollIntoViewIfNeeded()
+    await button.click()
+    await page.waitForTimeout(HALF)
   }
 }
 

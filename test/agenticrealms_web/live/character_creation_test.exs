@@ -22,8 +22,9 @@ defmodule AgenticRealmsWeb.CharacterCreationTest do
   alias AgenticRealms.Accounts
   alias AgenticRealms.Repo
   alias AgenticRealms.World.CharacterDraft, as: Draft
-  alias AgenticRealms.World.Seed
   alias AgenticRealms.World.Schemas.PlayerState
+  alias AgenticRealms.World.Seed
+  alias Srd.Rules.PointBuy
 
   setup %{conn: conn} do
     try do
@@ -65,12 +66,17 @@ defmodule AgenticRealmsWeb.CharacterCreationTest do
     render_click(view, "creation_select", %{"field" => field, "slug" => value})
   end
 
-  defp assign_ability(view, ability, value) do
-    render_click(view, "creation_assign_ability", %{
-      "ability" => to_string(ability),
-      "score" => to_string(value)
-    })
-  end
+  defp raise_ability(view, ability),
+    do: render_click(view, "creation_ability_up", %{"ability" => to_string(ability)})
+
+  defp lower_ability(view, ability),
+    do: render_click(view, "creation_ability_down", %{"ability" => to_string(ability)})
+
+  defp reroll(view), do: render_click(view, "creation_reroll", %{})
+
+  # The draft as the LiveView holds it. Scores are rolled, so a test that needs
+  # to know them has to ask rather than assume.
+  defp draft_of(view), do: :sys.get_state(view.pid).socket.assigns.draft
 
   defp spread(view, param), do: render_click(view, "creation_spread", %{"spread" => param})
 
@@ -86,7 +92,7 @@ defmodule AgenticRealmsWeb.CharacterCreationTest do
     {:ok, view, _} = play_as(conn, player)
 
     fill_identity(view, "Spec#{System.unique_integer([:positive])}", species, class, background)
-    assign_array(view)
+    roll_abilities(view)
     spread(view, "even")
 
     # The specializations step is only reachable once skills are done. Ask the
@@ -109,13 +115,10 @@ defmodule AgenticRealmsWeb.CharacterCreationTest do
 
   defp step(view, name), do: render_click(view, "creation_step", %{"step" => to_string(name)})
 
-  # The whole standard array, in an order nothing would pick by default.
-  defp assign_array(view) do
-    Enum.each(
-      [str: 8, dex: 10, con: 12, int: 13, wis: 14, cha: 15],
-      fn {ability, value} -> assign_ability(view, ability, value) end
-    )
-
+  # Visiting the abilities step is what rolls a spread, so anything downstream
+  # of it has to go through the step rather than assigning scores directly.
+  defp roll_abilities(view) do
+    step(view, :abilities)
     view
   end
 
@@ -241,9 +244,17 @@ defmodule AgenticRealmsWeb.CharacterCreationTest do
 
       ps = Repo.get(PlayerState, player.id)
 
-      # Story 2 has not shipped, so generation assigned the array.
-      assert Enum.sort([ps.str, ps.dex, ps.con, ps.int, ps.wis, ps.cha]) ==
-               Enum.sort([17, 13, 15, 12, 10, 8])
+      # Generation bought a spread, so the exact numbers vary. What has to hold
+      # is that they are reachable: nothing below the floor, and nothing above
+      # the ceiling plus the largest increase a background can give.
+      scores = [ps.str, ps.dex, ps.con, ps.int, ps.wis, ps.cha]
+
+      assert length(scores) == 6
+
+      for score <- scores do
+        assert score >= PointBuy.min_score()
+        assert score <= PointBuy.max_score() + 2
+      end
 
       # Story 3 has not shipped, so generation picked the class' skills.
       assert length(ps.skill_proficiencies) > 0
@@ -294,35 +305,104 @@ defmodule AgenticRealmsWeb.CharacterCreationTest do
       %{player: player, view: view}
     end
 
-    test "offers the standard array against every ability", %{view: view} do
-      html = render(view)
+    test "opens on a spread that spends the whole budget", %{view: view} do
+      bought = draft_of(view).bought
 
-      for value <- Srd.Rules.Ability.standard_array() do
-        assert html =~ ~s(phx-value-score="#{value}")
-      end
+      assert map_size(bought) == 6
 
-      for ability <- Srd.Rules.Ability.all() do
-        assert html =~ ~s(phx-value-ability="#{ability}")
+      assert PointBuy.fully_spent?(bought),
+             "the step should open playable, not on six eights and a bill"
+    end
+
+    test "puts the highest score on what the class runs on", %{conn: conn} do
+      # fill_identity/2 defaults to a wizard.
+      for _ <- 1..10 do
+        player = register("primary")
+        {:ok, view, _} = play_as(conn, player)
+        fill_identity(view, "Prime#{System.unique_integer([:positive])}")
+        step(view, :abilities)
+
+        bought = draft_of(view).bought
+        assert bought.int == bought |> Map.values() |> Enum.max()
       end
     end
 
-    test "assigning a value another ability holds swaps the two", %{view: view} do
-      assign_ability(view, :str, 15)
-      assign_ability(view, :dex, 15)
-
-      # Strength gave 15 up rather than both holding it.
+    test "shows a stepper for every ability rather than a value per score", %{view: view} do
       html = render(view)
 
-      assert html =~
-               ~r|Strength</span><span class="cc-ability-total"><span class="cc-ability-score">—|
+      for ability <- Srd.Rules.Ability.all() do
+        assert html =~ ~s(phx-click="creation_ability_up" phx-value-ability="#{ability}")
+        assert html =~ ~s(phx-click="creation_ability_down" phx-value-ability="#{ability}")
+      end
+    end
 
-      assert html =~
-               ~r|Dexterity</span><span class="cc-ability-total"><span class="cc-ability-score">15|
+    test "+ spends a point and - refunds one", %{view: view} do
+      # Make room first: the opening spread has nothing left over.
+      before = draft_of(view).bought
+
+      lowered_from =
+        before |> Enum.find(fn {_a, score} -> score > PointBuy.min_score() end) |> elem(0)
+
+      lower_ability(view, lowered_from)
+      after_lower = draft_of(view)
+
+      assert after_lower.bought[lowered_from] == before[lowered_from] - 1
+      assert Draft.points_remaining(after_lower) > 0
+
+      raisable =
+        Enum.find(Srd.Rules.Ability.all(), &PointBuy.can_increase?(after_lower.bought, &1))
+
+      raise_ability(view, raisable)
+
+      assert draft_of(view).bought[raisable] == after_lower.bought[raisable] + 1
+    end
+
+    test "refuses to go below the floor", %{view: view} do
+      # Drive one ability all the way down, then once more.
+      for _ <- 1..10, do: lower_ability(view, :cha)
+
+      assert draft_of(view).bought.cha == PointBuy.min_score()
+
+      lower_ability(view, :cha)
+      assert draft_of(view).bought.cha == PointBuy.min_score()
+    end
+
+    test "disables the buttons the rules refuse", %{view: view} do
+      for _ <- 1..10, do: lower_ability(view, :cha)
+      html = render(view)
+
+      # Charisma is at the floor, so its minus is dead.
+      assert html =~ ~r|disabled[^>]*phx-click="creation_ability_down" phx-value-ability="cha"|s or
+               html =~ ~r|phx-click="creation_ability_down" phx-value-ability="cha"[^>]*disabled|s
+    end
+
+    test "rolling again produces another full spend", %{view: view} do
+      first = draft_of(view).bought
+
+      spreads =
+        for _ <- 1..20 do
+          reroll(view)
+          bought = draft_of(view).bought
+          assert PointBuy.fully_spent?(bought)
+          bought
+        end
+
+      assert Enum.any?(spreads, &(&1 != first)), "rerolling should be able to change something"
+    end
+
+    test "a forged ability is ignored rather than accepted", %{view: view} do
+      before = render(view)
+
+      render_click(view, "creation_ability_up", %{"ability" => "luck"})
+      render_click(view, "creation_ability_down", %{"ability" => "banana"})
+      render_click(view, "creation_spread", %{"spread" => "split:cha:cha"})
+
+      assert render(view) == before
     end
 
     test "shows each ability's final score including the background increase",
          %{view: view} do
-      assign_array(view)
+      roll_abilities(view)
       # Sage raises con, int, or wis.
       select(view, "background", "sage")
       html = spread(view, "split:int:con")
@@ -343,7 +423,7 @@ defmodule AgenticRealmsWeb.CharacterCreationTest do
     end
 
     test "the even spread asks nothing further", %{view: view} do
-      assign_array(view)
+      roll_abilities(view)
       html = spread(view, "even")
 
       assert html =~ ~s(aria-pressed="true")
@@ -352,7 +432,7 @@ defmodule AgenticRealmsWeb.CharacterCreationTest do
     end
 
     test "changing the background clears the spread and keeps the array", %{view: view} do
-      assign_array(view)
+      roll_abilities(view)
       select(view, "background", "sage")
       spread(view, "split:int:con")
 
@@ -363,32 +443,22 @@ defmodule AgenticRealmsWeb.CharacterCreationTest do
       assert html =~ ~s(phx-value-ability="cha")
     end
 
-    test "a forged ability or value is ignored rather than accepted", %{view: view} do
-      before = render(view)
-
-      render_click(view, "creation_assign_ability", %{"ability" => "luck", "score" => "18"})
-      render_click(view, "creation_assign_ability", %{"ability" => "str", "score" => "banana"})
-      render_click(view, "creation_spread", %{"spread" => "split:cha:cha"})
-
-      assert render(view) == before
-    end
-
-    test "the player's own array and spread reach the character", %{
-      conn: _conn,
-      view: view,
-      player: player
-    } do
-      assign_array(view)
+    test "the player's own spread reaches the character", %{view: view, player: player} do
       select(view, "background", "sage")
       spread(view, "split:int:con")
+
+      # Rolled, so the expected numbers come from the draft rather than from a
+      # constant. What matters is that what was reviewed is what was created.
+      expected = view |> draft_of() |> Draft.scores()
+
       render_click(view, "creation_confirm", %{})
 
       ps = Repo.get(PlayerState, player.id)
 
-      assert ps.int == 15
-      assert ps.con == 13
-      assert ps.cha == 15
-      assert ps.str == 8
+      for {ability, score} <- expected do
+        assert Map.fetch!(ps, ability) == score,
+               "#{ability} should have reached the character as #{score}"
+      end
     end
   end
 
@@ -407,7 +477,7 @@ defmodule AgenticRealmsWeb.CharacterCreationTest do
         "soldier"
       )
 
-      assign_array(view)
+      roll_abilities(view)
       spread(view, "split:str:con")
       step(view, :skills)
 
@@ -443,10 +513,12 @@ defmodule AgenticRealmsWeb.CharacterCreationTest do
          %{view: view} do
       html = render(view)
 
-      # Acrobatics keys off Dexterity, which holds 10 here, so +0 untrained.
       assert html =~ "DEX"
       assert html =~ "WIS"
-      assert html =~ "+0"
+
+      # Scores are rolled now, so the modifier itself varies. What has to hold
+      # is that every offered skill shows one, signed, beside its ability.
+      assert html =~ ~r|cc-skill-meta">\s*[A-Z]{3}\s*[+-]\d|
     end
 
     test "picking past the allowance releases the oldest pick", %{view: view} do
@@ -778,7 +850,7 @@ defmodule AgenticRealmsWeb.CharacterCreationTest do
       {:ok, view, _} = play_as(conn, player)
 
       fill_identity(view, "Halfway", "elf", "fighter", "soldier")
-      assign_array(view)
+      roll_abilities(view)
       spread(view, "even")
 
       # Skills untouched. The review is not reachable, so confirm stays shut

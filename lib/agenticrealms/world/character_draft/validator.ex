@@ -14,7 +14,7 @@ defmodule AgenticRealms.World.CharacterDraft.Validator do
   no change here.
 
   Ability scores are checked the same way, against
-  `Srd.Rules.Ability.standard_array/0`, `Srd.Content.Background.spreads/0`, and
+  `Srd.Rules.PointBuy`, `Srd.Content.Background.spreads/0`, and
   the background's own `ability_scores` — lists the package supplies rather than
   rules this module carries.
 
@@ -39,6 +39,7 @@ defmodule AgenticRealms.World.CharacterDraft.Validator do
   alias Srd.Content.Classes
   alias Srd.Content.Species
   alias Srd.Rules.Ability
+  alias Srd.Rules.PointBuy
 
   @max_name_length 32
   @max_score 20
@@ -103,20 +104,23 @@ defmodule AgenticRealms.World.CharacterDraft.Validator do
   # --- ability scores -------------------------------------------------------
 
   defp ability_errors(%Draft{} = draft) do
-    array_errors(draft) ++ spread_errors(draft) ++ cap_errors(draft)
+    bought_errors(draft) ++ spread_errors(draft) ++ cap_errors(draft)
   end
 
-  # The standard array, each value used exactly once across the six abilities.
-  defp array_errors(%Draft{array: array}) do
-    assigned = array |> Map.values() |> Enum.sort()
-    expected = Ability.standard_array() |> Enum.sort()
-
+  # Point buy: six abilities, every score on the table, total within budget.
+  defp bought_errors(%Draft{bought: bought}) do
     cond do
-      Map.keys(array) |> Enum.sort() != Enum.sort(Ability.all()) ->
-        [{:array, "Every ability needs a score."}]
+      Map.keys(bought) |> Enum.sort() != Enum.sort(Ability.all()) ->
+        [{:bought, "Every ability needs a score."}]
 
-      assigned != expected ->
-        [{:array, "Use each of the standard array's scores exactly once."}]
+      Enum.any?(bought, fn {_ability, score} -> PointBuy.cost(score) == :error end) ->
+        [
+          {:bought,
+           "Every score must be between #{PointBuy.min_score()} and #{PointBuy.max_score()}."}
+        ]
+
+      not PointBuy.legal?(bought) ->
+        [{:bought, "That spread costs more than #{PointBuy.budget()} points."}]
 
       true ->
         []
@@ -156,7 +160,7 @@ defmodule AgenticRealms.World.CharacterDraft.Validator do
 
   defp cap_errors(%Draft{} = draft) do
     if Enum.any?(Draft.scores(draft), fn {_ability, score} -> score > @max_score end) do
-      [{:array, "No ability score may exceed #{@max_score}."}]
+      [{:bought, "No ability score may exceed #{@max_score}."}]
     else
       []
     end

@@ -284,11 +284,22 @@ defmodule AgenticRealmsWeb.GameLive do
     {:noreply, Creation.select(socket, String.to_existing_atom(field), presence_or_nil(value))}
   end
 
-  def handle_event("creation_assign_ability", %{"ability" => a, "score" => v}, socket) do
-    case {Creation.decode_ability(a), Integer.parse(v)} do
-      {{:ok, ability}, {value, ""}} -> {:noreply, Creation.assign_ability(socket, ability, value)}
-      _ -> {:noreply, socket}
+  def handle_event("creation_ability_up", %{"ability" => a}, socket) do
+    case Creation.decode_ability(a) do
+      {:ok, ability} -> {:noreply, Creation.raise_ability(socket, ability)}
+      :error -> {:noreply, socket}
     end
+  end
+
+  def handle_event("creation_ability_down", %{"ability" => a}, socket) do
+    case Creation.decode_ability(a) do
+      {:ok, ability} -> {:noreply, Creation.lower_ability(socket, ability)}
+      :error -> {:noreply, socket}
+    end
+  end
+
+  def handle_event("creation_reroll", _params, socket) do
+    {:noreply, Creation.reroll(socket)}
   end
 
   def handle_event("creation_spread", %{"spread" => spread}, socket) do
