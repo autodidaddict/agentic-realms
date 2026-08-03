@@ -160,9 +160,41 @@ defmodule AgenticRealms.DataCase do
     pid = Ecto.Adapters.SQL.Sandbox.start_owner!(AgenticRealms.Repo, shared: not tags[:async])
 
     on_exit(fn ->
+      stop_tick_schedulers()
       await_background_tasks()
       Ecto.Adapters.SQL.Sandbox.stop_owner(pid)
     end)
+  end
+
+  @doc """
+  Stop any room-tick schedulers this test caused to start.
+
+  A `Ticks.Scheduler` is started by `Ticks.Lifecycle` when a room becomes
+  occupied, and it lives under a Horde dynamic supervisor that is not torn down
+  between tests. So it outlives the test that started it and keeps querying —
+  `Scope.compute/1` on every refresh, the beat timer forever — against a
+  sandbox connection borrowed from an owner that is gone. That tears the
+  connection down, and the next test to pick it up fails in setup for reasons
+  that have nothing to do with it.
+
+  This is the same failure as the background tasks above, one layer up: a
+  supervised GenServer rather than a `Task`, which is why draining task
+  supervisors did not catch it. A nightly seed run found it as
+  `CharacterCreationTest` dying inside `Seed.run/0`.
+  """
+  def stop_tick_schedulers do
+    supervisor = AgenticRealms.World.Ticks.Supervisor
+
+    if Process.whereis(supervisor) do
+      for {_, child, _, _} <- Horde.DynamicSupervisor.which_children(supervisor),
+          is_pid(child) do
+        Horde.DynamicSupervisor.terminate_child(supervisor, child)
+      end
+    end
+
+    :ok
+  catch
+    :exit, _ -> :ok
   end
 
   # Task supervisors whose tasks read the Repo. Add any new one here.
