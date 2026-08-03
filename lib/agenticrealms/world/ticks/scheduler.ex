@@ -64,20 +64,41 @@ defmodule AgenticRealms.World.Ticks.Scheduler do
     state = %__MODULE__{
       room_id: room_id,
       base_tick_rate_ms: base,
-      scheduler_start_time: System.monotonic_time(:millisecond),
-      in_scope: Scope.compute(room_id),
-      live_occupants: room_id |> Queries.live_occupants_of() |> MapSet.new()
+      scheduler_start_time: System.monotonic_time(:millisecond)
     }
 
     schedule_next_beat(base)
-    {:ok, state}
+
+    # Scope and occupants are read from the database, which happens in
+    # `handle_continue/2` rather than here for the same reason as
+    # `Ticks.Lifecycle`: a process that cannot start on an unavailable database
+    # restarts straight back into the query that stopped it. `handle_continue`
+    # runs before any other message, so the scope is loaded before the first
+    # beat is handled.
+    {:ok, state, {:continue, :load_scope}}
+  end
+
+  @impl true
+  def handle_continue(:load_scope, %__MODULE__{} = state) do
+    state = %{
+      state
+      | in_scope: safe_db(fn -> Scope.compute(state.room_id) end, state.in_scope),
+        live_occupants:
+          safe_db(
+            fn -> MapSet.new(Queries.live_occupants_of(state.room_id)) end,
+            state.live_occupants
+          )
+    }
+
+    {:noreply, state}
   end
 
   @impl true
   def handle_call(:get_state, _from, state), do: {:reply, state, state}
 
   def handle_call(:refresh, _from, state) do
-    {:reply, :ok, %{state | in_scope: Scope.compute(state.room_id)}}
+    scope = safe_db(fn -> Scope.compute(state.room_id) end, state.in_scope)
+    {:reply, :ok, %{state | in_scope: scope}}
   end
 
   @impl true
@@ -118,7 +139,9 @@ defmodule AgenticRealms.World.Ticks.Scheduler do
   end
 
   def handle_info(%RoomNPCArrived{npc_id: npc_id}, state) do
-    {:noreply, %{state | in_scope: Scope.add_npc(state.in_scope, npc_id)}}
+    # Reads the clone's behaviors, so it can fail like any other query.
+    scope = safe_db(fn -> Scope.add_npc(state.in_scope, npc_id) end, state.in_scope)
+    {:noreply, %{state | in_scope: scope}}
   end
 
   def handle_info(%RoomNPCLeft{npc_id: npc_id}, state) do
@@ -151,8 +174,30 @@ defmodule AgenticRealms.World.Ticks.Scheduler do
     Process.send_after(self(), :beat, base_rate_ms)
   end
 
+  # Run a query, and survive the database not being there. Same reasoning as
+  # `Ticks.Lifecycle.safe_db/2`: this process is long-lived and supervised, and
+  # an exit here costs a restart into the same query rather than one stale
+  # scope entry. Scope is recomputed on the next `:refresh` or scope event.
+  defp safe_db(fun, fallback) do
+    fun.()
+  rescue
+    error ->
+      Logger.warning("Ticks.Scheduler: query failed (#{Exception.message(error)}); degrading")
+      fallback
+  catch
+    :exit, reason ->
+      Logger.warning("Ticks.Scheduler: query exited (#{inspect(reason)}); degrading")
+      fallback
+  end
+
   defp add_carried_object_state(%__MODULE__{} = state, player_id, object_id) do
-    %{state | in_scope: Scope.add_carried_object(state.in_scope, player_id, object_id)}
+    scope =
+      safe_db(
+        fn -> Scope.add_carried_object(state.in_scope, player_id, object_id) end,
+        state.in_scope
+      )
+
+    %{state | in_scope: scope}
   end
 
   defp remove_carried_object_state(%__MODULE__{} = state, player_id, object_id) do
