@@ -235,6 +235,7 @@ defmodule AgenticRealms.World.NPCChat.ConversationTest do
       end)
 
       assert {:ok, :continuing} = GenServer.call(pid, {:send, player.id, "third"})
+      assert_receive %ChatUtterance{kind: :chat_speech, text: "Sure."}, 2_000
     end
   end
 
