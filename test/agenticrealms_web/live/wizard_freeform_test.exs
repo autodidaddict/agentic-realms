@@ -82,9 +82,10 @@ defmodule AgenticRealmsWeb.WizardFreeformTest do
 
     render_hook(wizard_view, "commit_object_draft", %{})
 
-    flush(witness_view)
-    witness_html = render(witness_view)
-    assert witness_html =~ "A #{name} appears."
+    assert_eventually(witness_view, fn -> render(witness_view) =~ "A #{name} appears." end,
+      label: "witness saw the object arrive",
+      on_timeout: fn -> render(witness_view) end
+    )
 
     row =
       Repo.get_by(Object,
@@ -163,11 +164,6 @@ defmodule AgenticRealmsWeb.WizardFreeformTest do
         "stop_reason" => "tool_use"
       })
     end)
-  end
-
-  defp flush(view) do
-    _ = :sys.get_state(view.pid)
-    :ok
   end
 
   defp await_wizard_unlock(view, timeout_ms \\ 5_000) do

@@ -6,7 +6,7 @@ defmodule AgenticRealms.World.Ticks.RegistryTest do
   use AgenticRealms.DataCase, async: false
 
   alias AgenticRealms.World.Schemas.Room
-  alias AgenticRealms.World.Ticks.{Registry, Supervisor, Scheduler}
+  alias AgenticRealms.World.Ticks.{Registry, Supervisor}
 
   defp insert_room do
     Repo.insert!(%Room{
@@ -64,6 +64,4 @@ defmodule AgenticRealms.World.Ticks.RegistryTest do
       assert :error = Registry.lookup(room.id)
     end
   end
-
-  defp _used_in_setup, do: Scheduler
 end

@@ -135,8 +135,12 @@ defmodule AgenticRealmsWeb.WizardNpcAuthoringTest do
 
     render_hook(wizard_view, "spawn_here", %{"blueprint_id" => slug})
 
-    flush(witness_view)
-    assert render(witness_view) =~ "Mossback the Ogre arrives."
+    assert_eventually(
+      witness_view,
+      fn -> render(witness_view) =~ "Mossback the Ogre arrives." end,
+      label: "witness saw the NPC arrive",
+      on_timeout: fn -> render(witness_view) end
+    )
 
     clone = Repo.get_by(NPCClone, blueprint_id: slug)
     refute is_nil(clone)
@@ -327,11 +331,6 @@ defmodule AgenticRealmsWeb.WizardNpcAuthoringTest do
     conn
     |> Plug.Test.init_test_session(%{})
     |> Plug.Conn.put_session(:player_id, player_id)
-  end
-
-  defp flush(view) do
-    _ = :sys.get_state(view.pid)
-    :ok
   end
 
   defp stub_tool_use(tool_name, input) do

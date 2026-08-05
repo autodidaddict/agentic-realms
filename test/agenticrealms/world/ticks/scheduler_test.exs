@@ -11,7 +11,7 @@ defmodule AgenticRealms.World.Ticks.SchedulerTest do
 
   alias AgenticRealmsWeb.Topics
   alias AgenticRealms.World.Schemas.{Blueprint, NPCClone, Object, PlayerState, Room}
-  alias AgenticRealms.World.Ticks.{Registry, Scheduler, Supervisor}
+  alias AgenticRealms.World.Ticks.{Registry, Supervisor}
 
   alias AgenticRealms.World.UIEvents.{
     BehaviorUtterance,
@@ -366,6 +366,4 @@ defmodule AgenticRealms.World.Ticks.SchedulerTest do
       50 -> Enum.reverse(acc)
     end
   end
-
-  defp _used, do: {Scheduler, insert_object_in_room(nil, [])}
 end

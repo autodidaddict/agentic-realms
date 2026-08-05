@@ -119,7 +119,7 @@ defmodule AgenticRealmsWeb.GameComponents.MiniMapTest do
     }
   end
 
-  defp multi_floor_view(opts \\ []) do
+  defp multi_floor_view(opts) do
     has_up = Keyword.get(opts, :has_up?, true)
     has_down = Keyword.get(opts, :has_down?, false)
     above = Keyword.get(opts, :has_above_rooms?, false)
