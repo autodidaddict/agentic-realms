@@ -63,9 +63,15 @@ defmodule AgenticRealmsWeb.GameLiveBehaviorsTest do
   test "behaviors, US5 in sequence",
        %{alice_conn: alice_conn, bob_conn: bob_conn} do
     {:ok, alice_view, _html} = live(alice_conn, ~p"/play")
-    flush(alice_view)
-    Process.sleep(120)
-    flush(alice_view)
+
+    # Arrival behaviors fire over PubSub, so they land after the mount
+    # returns. The room narration is broadcast before the NPC greeting and
+    # both reach this view in order, so waiting on the greeting means the
+    # whole arrival round has been delivered.
+    assert_eventually(alice_view, fn -> render(alice_view) =~ "Welcome to the Stone Atrium." end,
+      label: "Alice saw Garrick's greeting",
+      on_timeout: fn -> render(alice_view) end
+    )
 
     alice_html = render(alice_view)
 
@@ -101,12 +107,29 @@ defmodule AgenticRealmsWeb.GameLiveBehaviorsTest do
              "NPC speech (DOM @#{npc_pos}); log is column-reverse so visually-earlier = higher byte offset"
 
     alice_room_speech_count_before = count_occurrences(alice_html, "narrate-room")
+    alice_npc_speech_count_before = count_occurrences(alice_html, "speech-npc")
 
     {:ok, bob_view, _html} = live(bob_conn, ~p"/play")
-    flush(bob_view)
-    Process.sleep(120)
-    flush(bob_view)
-    flush(alice_view)
+
+    assert_eventually(
+      bob_view,
+      fn -> render(bob_view) =~ "The cool air carries the scent of rain." end,
+      label: "Bob saw the room narration",
+      on_timeout: fn -> render(bob_view) end
+    )
+
+    # Garrick's greeting for Bob is the one entry Alice IS meant to get from
+    # Bob's arrival, so it doubles as proof that the arrival round reached
+    # her. Without waiting for it the anti-spam count below would pass just
+    # by being read before anything showed up.
+    assert_eventually(
+      alice_view,
+      fn ->
+        count_occurrences(render(alice_view), "speech-npc") > alice_npc_speech_count_before
+      end,
+      label: "Alice saw Garrick greet Bob",
+      on_timeout: fn -> render(alice_view) end
+    )
 
     bob_html = render(bob_view)
 
@@ -127,10 +150,12 @@ defmodule AgenticRealmsWeb.GameLiveBehaviorsTest do
     |> form("form[phx-submit='submit_command']", %{"text" => "go north"})
     |> render_submit()
 
-    flush(alice_view)
-    Process.sleep(120)
-    flush(alice_view)
-    flush(bob_view)
+    # Alice is the leaver, so her farewell came back inline from
+    # render_submit. Bob is a bystander and gets his over PubSub.
+    assert_eventually(bob_view, fn -> render(bob_view) =~ "Farewell, traveler." end,
+      label: "Bob saw the farewell",
+      on_timeout: fn -> render(bob_view) end
+    )
 
     alice_html_after_move = render(alice_view)
 
@@ -171,9 +196,12 @@ defmodule AgenticRealmsWeb.GameLiveBehaviorsTest do
     |> form("form[phx-submit='submit_command']", %{"text" => "go south"})
     |> render_submit()
 
-    flush(alice_view)
-    Process.sleep(120)
-    flush(alice_view)
+    assert_eventually(
+      alice_view,
+      fn -> render(alice_view) =~ "Mind the loose flagstone by the door." end,
+      label: "Alice saw the second player_entered behavior",
+      on_timeout: fn -> render(alice_view) end
+    )
 
     alice_html_multi_behavior = render(alice_view)
 
@@ -206,21 +234,21 @@ defmodule AgenticRealmsWeb.GameLiveBehaviorsTest do
         ]
       )
 
+    # Garrick only has a player_entered behavior now, so stepping out fires
+    # nothing to wait for, and the mover's own room assigns are updated
+    # inline by the time render_submit returns.
     alice_view
     |> form("form[phx-submit='submit_command']", %{"text" => "go north"})
     |> render_submit()
-
-    flush(alice_view)
-    Process.sleep(120)
-    flush(alice_view)
 
     alice_view
     |> form("form[phx-submit='submit_command']", %{"text" => "go south"})
     |> render_submit()
 
-    flush(alice_view)
-    Process.sleep(120)
-    flush(alice_view)
+    assert_eventually(alice_view, fn -> render(alice_view) =~ "BETA_LINE" end,
+      label: "Alice saw the second action of the multi-action behavior",
+      on_timeout: fn -> render(alice_view) end
+    )
 
     alice_html_multi_action = render(alice_view)
 
@@ -236,11 +264,6 @@ defmodule AgenticRealmsWeb.GameLiveBehaviorsTest do
     assert alpha_pos > beta_pos,
            "multi-action ordering: ALPHA should fire before BETA " <>
              "(alpha DOM @#{alpha_pos} vs beta DOM @#{beta_pos}; log is column-reverse)"
-  end
-
-  defp flush(view) do
-    _ = :sys.get_state(view.pid)
-    :ok
   end
 
   defp count_occurrences(haystack, needle) do
