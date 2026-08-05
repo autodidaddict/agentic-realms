@@ -837,8 +837,7 @@ defmodule AgenticRealmsWeb.CharacterCreationTest do
       assert html =~ bob.username
     end
 
-    test "a whisper reaches a character by name, and the username finds nobody",
-         %{conn: conn} do
+    test "a whisper reaches a character by name, and the username finds nobody" do
       alice = register("alice_w")
       bob = register("bob_w")
 

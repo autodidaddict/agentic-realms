@@ -15,7 +15,7 @@ defmodule AgenticRealmsWeb.CharacterSheetRenderTest do
   import Phoenix.LiveViewTest
 
   alias AgenticRealms.Accounts
-  alias AgenticRealms.World.{Commands, Seed}
+  alias AgenticRealms.World.Seed
 
   setup %{conn: conn} do
     try do

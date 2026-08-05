@@ -47,7 +47,7 @@ defmodule AgenticRealmsWeb.WizardRegistryLiveUpdateTest do
   end
 
   test "Alice creates a blueprint → Bob's open registry shows the new row without reload",
-       %{alice: alice, alice_conn: ac, bob_conn: bc, suffix: suffix} do
+       %{alice: alice, bob_conn: bc, suffix: suffix} do
     {:ok, bob_view, _} = live(bc, ~p"/play")
     render_hook(bob_view, "switch_mode", %{"mode" => "wizard"})
 
@@ -69,7 +69,7 @@ defmodule AgenticRealmsWeb.WizardRegistryLiveUpdateTest do
   end
 
   test "Alice edits an existing blueprint → Bob's open registry patches the row in place",
-       %{alice: alice, alice_conn: ac, bob_conn: bc, suffix: suffix} do
+       %{alice: alice, bob_conn: bc, suffix: suffix} do
     slug = "alice_edit_chest_#{suffix}"
 
     {:ok, ^slug} =
@@ -118,11 +118,6 @@ defmodule AgenticRealmsWeb.WizardRegistryLiveUpdateTest do
     conn
     |> Plug.Test.init_test_session(%{})
     |> Plug.Conn.put_session(:player_id, player_id)
-  end
-
-  defp flush(view) do
-    _ = :sys.get_state(view.pid)
-    :ok
   end
 
   defp wait_for_render(view, needle, timeout_ms \\ 5_000) do

@@ -39,7 +39,7 @@ defmodule AgenticRealms.World.Ticks.ScopeTest do
     })
   end
 
-  defp insert_clone(bp, room, opts \\ []) do
+  defp insert_clone(bp, room, opts) do
     Repo.insert!(%NPCClone{
       id: Ecto.UUID.generate(),
       blueprint_id: bp.id,
@@ -51,7 +51,7 @@ defmodule AgenticRealms.World.Ticks.ScopeTest do
     })
   end
 
-  defp insert_object_in_room(room, behaviors \\ []) do
+  defp insert_object_in_room(room, behaviors) do
     Repo.insert!(%Object{
       id: Ecto.UUID.generate(),
       name: "lantern",
@@ -80,7 +80,7 @@ defmodule AgenticRealms.World.Ticks.ScopeTest do
     Repo.insert!(%PlayerState{player_id: player.id, current_room_id: room.id})
   end
 
-  defp insert_object_carried_by(player, behaviors \\ []) do
+  defp insert_object_carried_by(player, behaviors) do
     Repo.insert!(%Object{
       id: Ecto.UUID.generate(),
       name: "satchel",

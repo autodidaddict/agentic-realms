@@ -29,7 +29,7 @@ defmodule AgenticRealms.World.MapViewTest do
     })
   end
 
-  defp insert_room(region, opts \\ []) do
+  defp insert_room(region, opts) do
     Repo.insert!(%Room{
       id: Keyword.get(opts, :id, Ecto.UUID.generate()),
       name: Keyword.get(opts, :name, "Test Room"),
@@ -337,8 +337,8 @@ defmodule AgenticRealms.World.MapViewTest do
     test "vertical exit (:up) to an undiscovered room does NOT produce a fog stub" do
       region = insert_region()
       ground = insert_room(region, name: "Ground", elevation: 0, map_x: 0, map_y: 0)
-      _loft = insert_room(region, name: "Loft", elevation: 1, map_x: 0, map_y: 0)
-      insert_exit(ground, :up, _loft)
+      loft = insert_room(region, name: "Loft", elevation: 1, map_x: 0, map_y: 0)
+      insert_exit(ground, :up, loft)
 
       player_id = insert_account_player()
       insert_player_state(player_id, ground.id)
@@ -372,8 +372,8 @@ defmodule AgenticRealms.World.MapViewTest do
     test "a room with an :up exit to a visible coord-bearing target gets has_up?: true" do
       region = insert_region()
       ground = insert_room(region, elevation: 0, map_x: 0, map_y: 0)
-      _loft = insert_room(region, elevation: 1, map_x: 0, map_y: 0)
-      insert_exit(ground, :up, _loft)
+      loft = insert_room(region, elevation: 1, map_x: 0, map_y: 0)
+      insert_exit(ground, :up, loft)
 
       player_id = insert_account_player()
       insert_player_state(player_id, ground.id)
@@ -388,8 +388,8 @@ defmodule AgenticRealms.World.MapViewTest do
     test "a room with a :down exit gets has_down?: true" do
       region = insert_region()
       loft = insert_room(region, elevation: 1, map_x: 0, map_y: 0)
-      _ground = insert_room(region, elevation: 0, map_x: 0, map_y: 0)
-      insert_exit(loft, :down, _ground)
+      ground = insert_room(region, elevation: 0, map_x: 0, map_y: 0)
+      insert_exit(loft, :down, ground)
 
       player_id = insert_account_player()
       insert_player_state(player_id, loft.id)

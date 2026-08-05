@@ -73,9 +73,10 @@ defmodule AgenticRealmsWeb.WizardSpawnTest do
 
     render_hook(wizard_view, "spawn_here", %{"blueprint_id" => slug})
 
-    flush(witness_view)
-    witness_html = render(witness_view)
-    assert witness_html =~ "A spawn chest appears."
+    assert_eventually(witness_view, fn -> render(witness_view) =~ "A spawn chest appears." end,
+      label: "witness saw the object arrive",
+      on_timeout: fn -> render(witness_view) end
+    )
 
     assert render(wizard_view) =~ "Spawned"
 
@@ -113,10 +114,5 @@ defmodule AgenticRealmsWeb.WizardSpawnTest do
     conn
     |> Plug.Test.init_test_session(%{})
     |> Plug.Conn.put_session(:player_id, player_id)
-  end
-
-  defp flush(view) do
-    _ = :sys.get_state(view.pid)
-    :ok
   end
 end

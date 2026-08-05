@@ -23,7 +23,7 @@ defmodule AgenticRealms.World.NPCChatTest do
     })
   end
 
-  defp insert_blueprint(opts \\ []) do
+  defp insert_blueprint(opts) do
     Repo.insert!(%Blueprint{
       id: "test_bp_#{System.unique_integer([:positive])}",
       name: Keyword.get(opts, :name, "Test Blueprint"),
